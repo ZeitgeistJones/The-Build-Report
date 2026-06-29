@@ -1,0 +1,48 @@
+# The Build Report
+
+A plain English look at the clawdbotatg repos, scored and sourced.
+
+## What it does
+
+- Tracks GitHub activity for clawdbotatg in real time (commits, active days, new repos)
+- Shows rolling builder grade and holder relevance grade (30d / 7d toggle with trend)
+- Scores every major repo on two axes: holder relevance and builder integrity
+- Each score is broken into three weighted components, each cited to a public source
+- Admin panel for adding context notes to cards (scores are not editable)
+
+## Setup
+
+```bash
+npm install
+cp .env.example .env.local
+# fill in your env vars
+npm run dev
+```
+
+## Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `GITHUB_TOKEN` | Recommended | GitHub PAT — no scopes needed. Prevents rate limiting. |
+| `UPSTASH_REDIS_REST_URL` | Yes | Upstash Redis URL for admin notes |
+| `UPSTASH_REDIS_REST_TOKEN` | Yes | Upstash Redis token |
+| `ADMIN_PASSWORD` | Yes | Password for /admin page |
+
+## Deploy
+
+Push to GitHub, connect to Vercel, add env vars in Vercel dashboard. Auto-deploys on push.
+
+## Updating scores
+
+Scores are in `lib/scores.ts`. Edit the rubric rows and verdicts directly. Add changelog entries in the `CHANGELOG` array at the bottom of the file.
+
+## Stack
+
+- Next.js 14 (App Router)
+- Upstash Redis (admin notes)
+- GitHub public API (live activity data)
+- Vercel (deployment)
+
+## Disclaimer
+
+Independent community project. Not affiliated with clawdbotatg, Austin Griffith, or any core team. Not financial advice. Scores are interpretive. See /about for full disclaimer.
