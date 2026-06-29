@@ -46,13 +46,22 @@ function isWithinDays(dateStr: string, days: number) {
   return (now.getTime() - d.getTime()) / 86400000 <= days
 }
 
+// Slugs used only for scoring card activity lookups
+export const SCORED_SLUGS = [
+  'leftclaw-services', 'clawd-incinerator', 'clawd-fomo3d-v2',
+  'clawd-pfp-market', '1024x', 'clawdviction', 'clawd-vesting',
+  'liquidity-vesting', 'clawd-meme-arena', 'zkllmapi-v2',
+  'clawd-talk-to-your-wallet', 'ethskills', 'dead-simple-agent',
+  'clawd-containers', 'clawd-token-hub', 'sponsor-clawdbotatg-eth',
+  'yet-another-builder-agent',
+]
+
 export async function getGitHubStats(): Promise<GitHubStats> {
   const now = new Date()
   const since30 = new Date(now.getTime() - 30 * 86400000).toISOString()
   const since60 = new Date(now.getTime() - 60 * 86400000).toISOString()
-  const since7 = new Date(now.getTime() - 7 * 86400000).toISOString()
 
-  // Step 1: get all public repos (paginated, ~3 requests for 274 repos)
+  // Step 1: get all public repos
   let repos: any[] = []
   let page = 1
   while (true) {
@@ -67,16 +76,11 @@ export async function getGitHubStats(): Promise<GitHubStats> {
   const newRepos30d = repos.filter(r => isWithinDays(r.created_at, 30)).length
   const newRepos7d = repos.filter(r => isWithinDays(r.created_at, 7)).length
 
-  // Step 2: only fetch commits for our tracked repos (18 repos from scores.ts)
-  // This is much more efficient than scanning all 274 repos
-  const TRACKED_SLUGS = [
-    'leftclaw-services', 'clawd-incinerator', 'clawd-fomo3d-v2',
-    'clawd-pfp-market', '1024x', 'clawdviction', 'clawd-vesting',
-    'liquidity-vesting', 'clawd-meme-arena', 'zkllmapi-v2',
-    'clawd-talk-to-your-wallet', 'clawdviction', 'ethskills',
-    'dead-simple-agent', 'clawd-containers', 'clawd-token-hub',
-    'sponsor-clawdbotatg-eth', 'yet-another-builder-agent',
-  ]
+  // Step 2: fetch commits for all repos updated in last 30 days
+  // This gives accurate totals including post-Chronicle repos
+  const recentlyUpdated = repos
+    .filter(r => isWithinDays(r.updated_at, 30))
+    .slice(0, 40) // cap at 40 to stay within rate limits
 
   const activeDaySet30 = new Set<string>()
   const activeDaySet7 = new Set<string>()
@@ -89,12 +93,10 @@ export async function getGitHubStats(): Promise<GitHubStats> {
 
   const repoActivity: Record<string, RepoActivity> = {}
 
-  // Sequential fetching to respect rate limits — 18 requests, well within 60/hr unauthenticated
-  const uniqueSlugs = TRACKED_SLUGS.filter((s, i) => TRACKED_SLUGS.indexOf(s) === i)
-  for (const slug of uniqueSlugs) {
+  for (const repo of recentlyUpdated) {
     try {
       const commits = await ghFetch(
-        `/repos/${GITHUB_ORG}/${slug}/commits?since=${since60}&per_page=100`
+        `/repos/${GITHUB_ORG}/${repo.name}/commits?since=${since60}&per_page=100`
       )
 
       const c30 = commits.filter((c: any) => isWithinDays(c.commit.author.date, 30))
@@ -106,16 +108,18 @@ export async function getGitHubStats(): Promise<GitHubStats> {
       totalCommits30_60 += c30_60.length
 
       c30.forEach((c: any) => {
-        activeDaySet30.add(c.commit.author.date.slice(0, 10))
+        const day = c.commit.author.date.slice(0, 10)
+        activeDaySet30.add(day)
         if (!lastCommitAt || c.commit.author.date > lastCommitAt) {
           lastCommitAt = c.commit.author.date
-          lastCommitRepo = slug
+          lastCommitRepo = repo.name
         }
       })
       c7.forEach((c: any) => activeDaySet7.add(c.commit.author.date.slice(0, 10)))
 
-      repoActivity[slug] = {
-        slug,
+      // Store activity for this repo — used by scoring cards
+      repoActivity[repo.name] = {
+        slug: repo.name,
         commits30d: c30.length,
         commits7d: c7.length,
         lastCommitAt: commits[0]?.commit?.author?.date ?? null,
@@ -125,14 +129,6 @@ export async function getGitHubStats(): Promise<GitHubStats> {
       if (err.message === 'rate_limited') {
         rateLimited = true
         break
-      }
-      // repo not found or other error — mark as unknown
-      repoActivity[slug] = {
-        slug,
-        commits30d: 0,
-        commits7d: 0,
-        lastCommitAt: null,
-        isActive: false,
       }
     }
   }
