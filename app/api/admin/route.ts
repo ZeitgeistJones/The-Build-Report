@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminNotes, setAdminNote, verifyAdminPassword } from '@/lib/admin'
+import { flushAutoScore, listCachedAutoScores } from '@/lib/autoscore'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -10,11 +11,18 @@ export async function POST(req: NextRequest) {
 
   if (action === 'auth') {
     const notes = await getAdminNotes()
-    return NextResponse.json({ ok: true, notes })
+    const autoScored = await listCachedAutoScores()
+    return NextResponse.json({ ok: true, notes, autoScored })
   }
 
   if (action === 'save') {
     await setAdminNote(repoId, note ?? '')
+    return NextResponse.json({ ok: true })
+  }
+
+  if (action === 'flush') {
+    // Clear a cached auto-score so it gets re-inferred on next page load
+    await flushAutoScore(repoId)
     return NextResponse.json({ ok: true })
   }
 

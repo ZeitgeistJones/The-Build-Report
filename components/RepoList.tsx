@@ -74,6 +74,11 @@ export default function RepoList({ repos }: Props) {
   const filtered = repos
     .filter(r => activeFilter === 'all' || r.tag === activeFilter)
     .sort((a, b) => {
+      // Hand-scored always before auto-scored
+      const aAuto = a.confidence === 'low' && (a.adminNote ?? '').startsWith('Scores auto-inferred')
+      const bAuto = b.confidence === 'low' && (b.adminNote ?? '').startsWith('Scores auto-inferred')
+      if (aAuto !== bAuto) return aAuto ? 1 : -1
+
       const tagA = TAG_ORDER.indexOf(a.tag)
       const tagB = TAG_ORDER.indexOf(b.tag)
       if (tagA !== tagB) return tagA - tagB
@@ -81,6 +86,11 @@ export default function RepoList({ repos }: Props) {
       const scoreB = b.holderRelevance?.pct ?? b.builderIntegrity.pct
       return scoreB - scoreA
     })
+
+  // Detect auto-inferred cards by their adminNote prefix
+  function isAutoInferred(repo: RepoWithLive) {
+    return (repo.adminNote ?? '').startsWith('Scores auto-inferred')
+  }
 
   function toggleExpand(id: string) {
     setExpandedIds(prev => {
@@ -124,18 +134,19 @@ export default function RepoList({ repos }: Props) {
           const isExpanded = expandedIds.has(repo.id)
           const ts = TAG_STYLES[repo.tag]
           const ss = STATUS_STYLES[repo.status]
+          const auto = isAutoInferred(repo)
 
           return (
             <div
               key={repo.id}
               style={{
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border)',
+                background: auto ? 'var(--surface-1)' : 'var(--surface-1)',
+                border: `1px solid ${auto ? 'rgba(255,255,255,0.05)' : 'var(--border)'}`,
                 borderRadius: 'var(--radius-lg)',
                 overflow: 'hidden',
+                opacity: auto ? 0.85 : 1,
               }}
             >
-              {/* Card header — always visible, click to expand */}
               <button
                 onClick={() => toggleExpand(repo.id)}
                 style={{
@@ -149,9 +160,8 @@ export default function RepoList({ repos }: Props) {
                   cursor: 'pointer',
                 }}
               >
-                {/* Tags */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: '5px', marginBottom: '5px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '5px', marginBottom: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{
                       fontSize: '11px',
                       padding: '2px 8px',
@@ -172,6 +182,19 @@ export default function RepoList({ repos }: Props) {
                     }}>
                       {ss.label}
                     </span>
+                    {auto && (
+                      <span style={{
+                        fontSize: '10px',
+                        padding: '2px 7px',
+                        borderRadius: '99px',
+                        color: 'var(--text-muted)',
+                        background: 'var(--surface-3)',
+                        border: '1px solid var(--border)',
+                        letterSpacing: '0.03em',
+                      }}>
+                        ✦ auto-inferred
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
                     {repo.name}
@@ -216,7 +239,22 @@ export default function RepoList({ repos }: Props) {
               {/* Expanded content */}
               {isExpanded && (
                 <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
-                  {/* Rubric rows */}
+                  {auto && (
+                    <div style={{
+                      marginBottom: '12px',
+                      padding: '8px 12px',
+                      background: 'var(--surface-2)',
+                      borderRadius: 'var(--radius)',
+                      border: '1px solid var(--border)',
+                      fontSize: '12px',
+                      color: 'var(--text-muted)',
+                      lineHeight: 1.5,
+                    }}>
+                      <span style={{ color: 'var(--amber)', fontWeight: 500, marginRight: '6px' }}>✦ Auto-inferred:</span>
+                      This repo was not in the original scored set. Scores were generated automatically by Claude based on the repo name, description, and ecosystem context. They are a starting point, not a verdict. Hand scoring will replace this.
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '14px' }}>
                     {repo.holderRelevance && (
                       <div>
@@ -295,8 +333,8 @@ export default function RepoList({ repos }: Props) {
                     {repo.verdict}
                   </div>
 
-                  {/* Admin note */}
-                  {repo.adminNote && (
+                  {/* Admin note — skip the auto-inferred note since we already show the banner */}
+                  {repo.adminNote && !auto && (
                     <div style={{
                       marginTop: '10px',
                       padding: '8px 12px',
@@ -314,7 +352,7 @@ export default function RepoList({ repos }: Props) {
                   {/* Footer */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)' }}>
                     <span>Scored {repo.scoredAt}</span>
-                    <span>{CONFIDENCE_LABEL[repo.confidence]}</span>
+                    <span>{auto ? 'Auto-inferred — low confidence' : CONFIDENCE_LABEL[repo.confidence]}</span>
                   </div>
                 </div>
               )}

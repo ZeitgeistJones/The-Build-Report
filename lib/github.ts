@@ -1,3 +1,5 @@
+import { RawRepo } from './autoscore'
+
 const GITHUB_ORG = 'clawdbotatg'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 
@@ -38,6 +40,7 @@ export interface GitHubStats {
   repoActivity: Record<string, RepoActivity>
   trend30vs30: 'up' | 'flat' | 'down'
   rateLimited: boolean
+  allRepos: RawRepo[]  // full list for autoscoring
 }
 
 function isWithinDays(dateStr: string, days: number) {
@@ -46,15 +49,19 @@ function isWithinDays(dateStr: string, days: number) {
   return (now.getTime() - d.getTime()) / 86400000 <= days
 }
 
-// Slugs used only for scoring card activity lookups
-export const SCORED_SLUGS = [
-  'leftclaw-services', 'clawd-incinerator', 'clawd-fomo3d-v2',
-  'clawd-pfp-market', '1024x', 'clawdviction', 'clawd-vesting',
-  'liquidity-vesting', 'clawd-meme-arena', 'zkllmapi-v2',
-  'clawd-talk-to-your-wallet', 'ethskills', 'dead-simple-agent',
-  'clawd-containers', 'clawd-token-hub', 'sponsor-clawdbotatg-eth',
-  'yet-another-builder-agent',
-]
+// Slugs that should never be auto-scored — jobs, noise, private scaffolding
+const SKIP_SLUGS = new Set([
+  'leftclaw-service-job',
+  '.github',
+])
+
+function shouldSkip(name: string): boolean {
+  if (SKIP_SLUGS.has(name)) return true
+  if (name.startsWith('leftclaw-service-job')) return true
+  if (name.startsWith('cv-')) return true
+  if (name.startsWith('job-')) return true
+  return false
+}
 
 export async function getGitHubStats(): Promise<GitHubStats> {
   const now = new Date()
@@ -65,7 +72,7 @@ export async function getGitHubStats(): Promise<GitHubStats> {
   let repos: any[] = []
   let page = 1
   while (true) {
-    const batch = await ghFetch(`/users/${GITHUB_ORG}/repos?per_page=100&page=${page}&sort=updated`)
+    const batch = await ghFetch(`/users/${GITHUB_ORG}/repos?per_page=100&page=${page}&sort=pushed`)
     if (!batch.length) break
     repos = repos.concat(batch)
     if (batch.length < 100) break
@@ -76,11 +83,21 @@ export async function getGitHubStats(): Promise<GitHubStats> {
   const newRepos30d = repos.filter(r => isWithinDays(r.created_at, 30)).length
   const newRepos7d = repos.filter(r => isWithinDays(r.created_at, 7)).length
 
+  // Build allRepos for autoscoring — filter noise
+  const allRepos: RawRepo[] = repos
+    .filter(r => !shouldSkip(r.name))
+    .map(r => ({
+      name: r.name,
+      description: r.description ?? null,
+      pushedAt: r.pushed_at,
+      createdAt: r.created_at,
+      language: r.language ?? null,
+    }))
+
   // Step 2: fetch commits for all repos updated in last 30 days
-  // This gives accurate totals including post-Chronicle repos
   const recentlyUpdated = repos
-    .filter(r => isWithinDays(r.updated_at, 30))
-    .slice(0, 40) // cap at 40 to stay within rate limits
+    .filter(r => isWithinDays(r.pushed_at, 30))
+    .slice(0, 40)
 
   const activeDaySet30 = new Set<string>()
   const activeDaySet7 = new Set<string>()
@@ -117,7 +134,6 @@ export async function getGitHubStats(): Promise<GitHubStats> {
       })
       c7.forEach((c: any) => activeDaySet7.add(c.commit.author.date.slice(0, 10)))
 
-      // Store activity for this repo — used by scoring cards
       repoActivity[repo.name] = {
         slug: repo.name,
         commits30d: c30.length,
@@ -133,7 +149,6 @@ export async function getGitHubStats(): Promise<GitHubStats> {
     }
   }
 
-  // trend
   let trend30vs30: 'up' | 'flat' | 'down' = 'flat'
   if (totalCommits30_60 > 0) {
     if (totalCommits30d > totalCommits30_60 * 1.1) trend30vs30 = 'up'
@@ -153,6 +168,7 @@ export async function getGitHubStats(): Promise<GitHubStats> {
     repoActivity,
     trend30vs30,
     rateLimited,
+    allRepos,
   }
 }
 
