@@ -15,6 +15,9 @@ function getRedis() {
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:'
 
+// Only score this many new repos per page load to avoid timeouts
+const MAX_NEW_PER_LOAD = 5
+
 export interface RawRepo {
   name: string
   description: string | null
@@ -72,6 +75,7 @@ The project's stated goals: every consumer app burns CLAWD, autonomous operation
 `.trim()
 
 async function inferScore(repo: RawRepo): Promise<Repo | null> {
+  console.log(`[autoscore] inferring: ${repo.name}`)
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   const prompt = `You are scoring a GitHub repository for the clawdbotatg CLAWD ecosystem.
@@ -146,43 +150,67 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
       adminNote: parsed.adminNote,
     }
 
+    console.log(`[autoscore] done: ${repo.name} tag:${repo_out.tag} HR:${repo_out.holderRelevance?.letter ?? 'N/A'} BI:${repo_out.builderIntegrity.letter}`)
     return repo_out
   } catch (err) {
-    console.error(`autoscore failed for ${repo.name}:`, err)
+    console.error(`[autoscore] FAILED for ${repo.name}:`, err)
     return null
   }
 }
 
 export async function getAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
-  if (!newRepos.length) return []
+  if (!newRepos.length) {
+    console.log('[autoscore] no new repos to score')
+    return []
+  }
+
+  console.log(`[autoscore] ${newRepos.length} unscored repos found`)
 
   const r = getRedis()
   const results: Repo[] = []
+  const toInfer: RawRepo[] = []
 
+  // First pass: check cache for all
   await Promise.all(newRepos.map(async (repo) => {
     const key = `${CACHE_KEY_PREFIX}${repo.name}`
     try {
       const cached = await r.get<Repo>(key)
       if (cached) {
+        console.log(`[autoscore] cache hit: ${repo.name}`)
         results.push(cached)
-        return
+      } else {
+        toInfer.push(repo)
       }
     } catch {
-      // redis miss, proceed to infer
+      toInfer.push(repo)
     }
+  }))
 
+  console.log(`[autoscore] ${results.length} from cache, ${toInfer.length} need inference`)
+
+  // Sort by most recently pushed — score freshest repos first
+  toInfer.sort((a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime())
+
+  // Only infer up to MAX_NEW_PER_LOAD per page load to avoid timeouts
+  const batch = toInfer.slice(0, MAX_NEW_PER_LOAD)
+  if (toInfer.length > MAX_NEW_PER_LOAD) {
+    console.log(`[autoscore] capping at ${MAX_NEW_PER_LOAD} this load, ${toInfer.length - MAX_NEW_PER_LOAD} deferred to next load`)
+  }
+
+  // Sequential to avoid hammering APIs in parallel
+  for (const repo of batch) {
     const scored = await inferScore(repo)
     if (scored) {
       try {
-        // cache for 7 days
-        await r.set(key, scored, { ex: 60 * 60 * 24 * 7 })
+        await r.set(`${CACHE_KEY_PREFIX}${repo.name}`, scored, { ex: 60 * 60 * 24 * 7 })
       } catch {
         // non-fatal
       }
       results.push(scored)
     }
-  }))
+  }
 
+  console.log(`[autoscore] returning ${results.length} total`)
   return results
 }
 
