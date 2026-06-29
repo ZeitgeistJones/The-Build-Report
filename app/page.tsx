@@ -6,7 +6,7 @@ import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 
-export const revalidate = 3600 // refresh every hour
+export const revalidate = 300 // refresh every hour
 
 export default async function Home() {
   let stats
