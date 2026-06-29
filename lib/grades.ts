@@ -12,6 +12,7 @@ export interface BuilderGrade {
 }
 
 export interface HolderRelevanceGrade {
+  counts: { direct: number; lock: number; indirect: number; infra: number }
   letter: string
   pct: number
   summary: string
@@ -143,5 +144,11 @@ export function calcHolderRelevanceGrade(stats: GitHubStats, period: Period): Ho
     pct: score,
     summary,
     signals: signals.map(s => ({ ...s })),
+    counts: {
+      direct: directActive,
+      lock: lockActive,
+      indirect: indirectActive,
+      infra: infraActive,
+    },
   }
 }

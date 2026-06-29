@@ -159,6 +159,15 @@ export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade
                 </span>
               </div>
             ))}
+            {hg?.counts && (
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                {hg.counts.direct > 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hg.counts.direct} direct</span>}
+                {hg.counts.lock > 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hg.counts.lock} supply lock</span>}
+                {hg.counts.indirect > 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hg.counts.indirect} indirect</span>}
+                {hg.counts.infra > 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hg.counts.infra} infra</span>}
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto' }}>active repos ({period})</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

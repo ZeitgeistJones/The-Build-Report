@@ -310,13 +310,17 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: null,
+    holderRelevance: hr([
+      { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'high', source: 'directly improves quality of shipped apps' },
+      { label: 'Downstream path to holder value', weight: '30%', level: 'mid', source: 'indirect — better tools, better burns' },
+      { label: 'Active and maintained', weight: '20%', level: 'high', source: '6+ PRs merged Feb 2026 — Chronicle ch.3' },
+    ]),
     builderIntegrity: bi([
       { label: 'Serves stated vision at time of build', weight: '40%', level: 'high', source: '"missing knowledge layer" Feb 13' },
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'collaborative with Austin, open source' },
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires ongoing updates to stay current' },
     ]),
-    verdict: 'Good infrastructure work. Makes every future app smarter and more accurate. Its value is upstream — you see it in what gets built on top of it, not in the repo itself.',
+    verdict: 'Makes every future app smarter and more accurate. Its holder value is upstream — it shows in the quality of consumer apps built on top of it, not in the repo itself. The connection to burns is real, just indirect.',
   },
   {
     id: 'dead-simple-agent',
@@ -326,13 +330,17 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: null,
+    holderRelevance: hr([
+      { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'high', source: 'powers Leftclaw worker fleet directly' },
+      { label: 'Downstream path to holder value', weight: '30%', level: 'high', source: 'Leftclaw burns CLAWD on every job — Mar 28' },
+      { label: 'Active and maintained', weight: '20%', level: 'high', source: 'pip package, multi-provider — Mar 28 tweet' },
+    ]),
     builderIntegrity: bi([
       { label: 'Serves stated vision at time of build', weight: '40%', level: 'high', source: 'powers Leftclaw worker fleet — Chronicle ch.10' },
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: '~400 lines, pip package — Mar 28 tweet' },
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'framework requires orchestration' },
     ]),
-    verdict: 'The agent framework powering the Leftclaw worker fleet. Every job that runs through Leftclaw Services runs on this. Infrastructure with direct downstream holder value — if Leftclaw burns CLAWD, dead-simple-agent is part of why.',
+    verdict: 'The agent framework powering the Leftclaw worker fleet. Every job that burns CLAWD runs on this. The downstream path to holder value is as direct as infrastructure gets — if Leftclaw earns, this is part of why.',
   },
   {
     id: 'clawd-containers',
@@ -342,13 +350,17 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: null,
+    holderRelevance: hr([
+      { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'high', source: 'keeps the worker bot fleet running' },
+      { label: 'Downstream path to holder value', weight: '30%', level: 'high', source: 'if this breaks, Leftclaw stops, burns stop' },
+      { label: 'Active and maintained', weight: '20%', level: 'high', source: '5 agent types operational — Chronicle ch.9' },
+    ]),
     builderIntegrity: bi([
       { label: 'Serves stated vision at time of build', weight: '40%', level: 'high', source: 'runs the worker bots — Chronicle ch.9' },
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: '5 agent types, Docker/VM isolation' },
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires Mac Mini hardware to run' },
     ]),
-    verdict: 'The factory floor. If this breaks, Leftclaw stops running and burns stop happening. No token mechanic here and none expected — its job is to keep everything else alive.',
+    verdict: 'The factory floor. If this breaks, Leftclaw stops running and burns stop happening. The holder value is existential — not exciting but foundational.',
   },
   {
     id: 'clawd-token-hub',
@@ -358,13 +370,17 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: null,
+    holderRelevance: hr([
+      { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'low', source: 'read-only, no downstream burn path' },
+      { label: 'Downstream path to holder value', weight: '30%', level: 'low', source: 'informs holders but does not move CLAWD' },
+      { label: 'Active and maintained', weight: '20%', level: 'high', source: 'IPFS hosted, ENS set onchain — Chronicle ch.7' },
+    ]),
     builderIntegrity: bi([
       { label: 'Serves stated vision at time of build', weight: '40%', level: 'high', source: 'live price, buy, send — Chronicle ch.7' },
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'IPFS hosted, ENS content hash set onchain' },
       { label: 'Passes walkaway test', weight: '25%', level: 'high', source: 'read-only, no management needed' },
     ]),
-    verdict: 'Read-only dashboard showing live CLAWD price and ecosystem stats. No burn mechanic — it\'s a window not an engine. Passes the walkaway test cleanly because it just reads and displays.',
+    verdict: 'A window into the ecosystem, not an engine for it. Useful for holders wanting live price and stats but it doesn\'t move CLAWD in any direction. Holder relevance is low by design — that\'s what it is.',
   },
   {
     id: 'sponsored-8004',
@@ -374,13 +390,17 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'mid',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: null,
+    holderRelevance: hr([
+      { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'mid', source: 'expands agent ecosystem that uses CLAWD' },
+      { label: 'Downstream path to holder value', weight: '30%', level: 'low', source: 'theoretical — more agents could mean more burns' },
+      { label: 'Active and maintained', weight: '20%', level: 'mid', source: 'gasless registration operational — Mar 2026' },
+    ]),
     builderIntegrity: bi([
       { label: 'Serves stated vision at time of build', weight: '40%', level: 'high', source: '"get agents onchain" — ERC-8004 guide Jan 31' },
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'EIP-7702 + ERC-8004 gasless registration' },
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires gas sponsorship funding' },
     ]),
-    verdict: 'Gasless ERC-8004 registration using EIP-7702. Makes it easier for other agents to get onchain identity — expanding the ecosystem clawdbotatg is trying to build. Pioneer work on a standard most agents hadn\'t touched.',
+    verdict: 'Pioneer work on gasless agent identity. The holder value is theoretical — more agents onchain expands the ecosystem clawdbotatg is building toward, which could mean more Leftclaw jobs and more burns. Early stage signal.',
   },
   {
     id: 'builder-agent',
@@ -390,13 +410,17 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'low',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: null,
+    holderRelevance: hr([
+      { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'mid', source: 'if mature, multiplies shipping capacity significantly' },
+      { label: 'Downstream path to holder value', weight: '30%', level: 'low', source: 'potential only — no live mechanic yet' },
+      { label: 'Active and maintained', weight: '20%', level: 'high', source: '25/25 pipeline steps passing — Apr 9 tweet' },
+    ]),
     builderIntegrity: bi([
       { label: 'Serves stated vision at time of build', weight: '40%', level: 'high', source: 'dApp pipeline automation — Chronicle ch.11' },
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: '25/25 pipeline steps passing — Apr 9 tweet' },
       { label: 'Passes walkaway test', weight: '25%', level: 'low', source: 'meta-tooling, not a live product' },
     ]),
-    verdict: 'An agent that builds agents. 10-step dApp pipeline with auto-fix loops. Theoretically powerful — if this matures it multiplies clawdbotatg\'s shipping capacity significantly. No token mechanic yet and confidence is low because we\'re scoring R&D.',
+    verdict: 'An agent that builds agents. If this matures it multiplies clawdbotatg\'s shipping capacity significantly. Holder value is potential not present — we\'re scoring R&D and confidence is low accordingly.',
   },
 ]
 

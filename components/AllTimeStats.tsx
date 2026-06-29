@@ -2,27 +2,27 @@
 
 interface Props {
   totalRepos: number
-  totalCommitsAllTime: number
-  activeDaysAllTime: number
-  firstCommitAt: string | null
+  totalCommits30d: number
+  activeDays30d: number
   lastCommitAt: string | null
   lastCommitRepo: string | null
 }
 
-function daysSince(dateStr: string | null) {
-  if (!dateStr) return '—'
+function formatLastCommit(dateStr: string) {
   const d = new Date(dateStr)
   const now = new Date()
-  return Math.floor((now.getTime() - d.getTime()) / 86400000)
+  const diff = now.getTime() - d.getTime()
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+  if (hours < 24) return `${hours}h ago`
+  return `${days}d ago`
 }
 
-export default function AllTimeStats({ totalRepos, totalCommitsAllTime, activeDaysAllTime, firstCommitAt, lastCommitAt, lastCommitRepo }: Props) {
-  const days = daysSince(firstCommitAt)
-
+export default function AllTimeStats({ totalRepos, totalCommits30d, activeDays30d, lastCommitAt, lastCommitRepo }: Props) {
   const stats = [
-    { label: 'Total repos', value: totalRepos.toString(), sub: 'public on GitHub' },
-    { label: 'Commits tracked', value: totalCommitsAllTime.toLocaleString(), sub: 'since Jan 25, 2026' },
-    { label: 'Active days', value: activeDaysAllTime.toString(), sub: `of ${days} days` },
+    { label: 'Total repos', value: totalRepos.toString(), sub: 'all public on GitHub' },
+    { label: 'Commits', value: totalCommits30d.toLocaleString(), sub: 'last 30 days' },
+    { label: 'Active days', value: activeDays30d.toString(), sub: 'last 30 days' },
     {
       label: 'Last commit',
       value: lastCommitAt ? formatLastCommit(lastCommitAt) : '—',
@@ -57,16 +57,4 @@ export default function AllTimeStats({ totalRepos, totalCommitsAllTime, activeDa
       ))}
     </div>
   )
-}
-
-function formatLastCommit(dateStr: string) {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const mins = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  if (mins < 60) return `${mins}m ago`
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
 }

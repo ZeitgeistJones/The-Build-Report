@@ -98,9 +98,8 @@ export default async function Home() {
       {stats && (
         <AllTimeStats
           totalRepos={stats.totalRepos}
-          totalCommitsAllTime={stats.totalCommitsAllTime}
-          activeDaysAllTime={stats.activeDaysAllTime}
-          firstCommitAt={stats.firstCommitAt}
+          totalCommits30d={stats.totalCommits30d}
+          activeDays30d={stats.activeDays30d}
           lastCommitAt={stats.lastCommitAt}
           lastCommitRepo={stats.lastCommitRepo}
         />
@@ -146,7 +145,7 @@ export default async function Home() {
                 { label: 'Revenue or burn path built in', weight: '30%' },
                 { label: 'Takes CLAWD out of circulation', weight: '20%' },
               ],
-              note: 'Each component rated low (1) / mid (2) / high (3). Score = (weighted sum ÷ 3) × 100. We score whether the mechanic exists and is live — not how much has actually burned. Infrastructure and theoretical repos receive N/A.',
+              note: 'Each component rated low (1) / mid (2) / high (3). Score = (weighted sum ÷ 3) × 100. We score whether the mechanic exists and is live — not how much has actually burned. Infrastructure and theoretical repos use adapted criteria: enables consumer apps that burn CLAWD / downstream path to holder value / active and maintained.',
             },
             {
               title: 'Builder integrity — all repos',
