@@ -17,6 +17,7 @@ export interface HolderRelevanceGrade {
   pct: number
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
+  trend: 'up' | 'flat' | 'down'
 }
 
 const levelMap = { high: 3, mid: 2, low: 1 }
