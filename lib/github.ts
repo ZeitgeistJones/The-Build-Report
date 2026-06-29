@@ -10,7 +10,10 @@ async function ghFetch(path: string) {
     headers,
     next: { revalidate: 3600 }
   })
-  if (!res.ok) throw new Error(`GitHub API error: ${res.status} ${path}`)
+  if (!res.ok) {
+    if (res.status === 403 || res.status === 429) throw new Error('rate_limited')
+    throw new Error(`GitHub API error: ${res.status} ${path}`)
+  }
   return res.json()
 }
 
@@ -33,22 +36,14 @@ export interface GitHubStats {
   lastCommitAt: string | null
   lastCommitRepo: string | null
   repoActivity: Record<string, RepoActivity>
-  // all-time
-  totalCommitsAllTime: number
-  activeDaysAllTime: number
-  firstCommitAt: string | null
-  // trend
   trend30vs30: 'up' | 'flat' | 'down'
-}
-
-function daysBetween(a: Date, b: Date) {
-  return Math.floor(Math.abs(a.getTime() - b.getTime()) / 86400000)
+  rateLimited: boolean
 }
 
 function isWithinDays(dateStr: string, days: number) {
   const d = new Date(dateStr)
   const now = new Date()
-  return daysBetween(d, now) <= days
+  return (now.getTime() - d.getTime()) / 86400000 <= days
 }
 
 export async function getGitHubStats(): Promise<GitHubStats> {
@@ -57,7 +52,7 @@ export async function getGitHubStats(): Promise<GitHubStats> {
   const since60 = new Date(now.getTime() - 60 * 86400000).toISOString()
   const since7 = new Date(now.getTime() - 7 * 86400000).toISOString()
 
-  // get all public repos
+  // Step 1: get all public repos (paginated, ~3 requests for 274 repos)
   let repos: any[] = []
   let page = 1
   while (true) {
@@ -72,91 +67,81 @@ export async function getGitHubStats(): Promise<GitHubStats> {
   const newRepos30d = repos.filter(r => isWithinDays(r.created_at, 30)).length
   const newRepos7d = repos.filter(r => isWithinDays(r.created_at, 7)).length
 
-  // get commits per repo for last 60 days (to compute trend)
+  // Step 2: only fetch commits for our tracked repos (18 repos from scores.ts)
+  // This is much more efficient than scanning all 274 repos
+  const TRACKED_SLUGS = [
+    'leftclaw-services', 'clawd-incinerator', 'clawd-fomo3d-v2',
+    'clawd-pfp-market', '1024x', 'clawdviction', 'clawd-vesting',
+    'liquidity-vesting', 'clawd-meme-arena', 'zkllmapi-v2',
+    'clawd-talk-to-your-wallet', 'clawdviction', 'ethskills',
+    'dead-simple-agent', 'clawd-containers', 'clawd-token-hub',
+    'sponsor-clawdbotatg-eth', 'yet-another-builder-agent',
+  ]
+
   const activeDaySet30 = new Set<string>()
   const activeDaySet7 = new Set<string>()
-  const activeDaySet60 = new Set<string>()
-  const activeDaySetAll = new Set<string>()
-
   let totalCommits30d = 0
   let totalCommits7d = 0
   let totalCommits30_60 = 0
-  let totalCommitsAllTime = 0
   let lastCommitAt: string | null = null
   let lastCommitRepo: string | null = null
-  let firstCommitAt: string | null = null
+  let rateLimited = false
 
   const repoActivity: Record<string, RepoActivity> = {}
 
-  // fetch commits for each repo — limit to recently updated ones to avoid rate limits
-  const recentRepos = repos
-    .filter(r => isWithinDays(r.updated_at, 60))
-    .slice(0, 30)
-
-  await Promise.all(recentRepos.map(async (repo) => {
+  // Sequential fetching to respect rate limits — 18 requests, well within 60/hr unauthenticated
+  for (const slug of [...new Set(TRACKED_SLUGS)]) {
     try {
-      const commits60 = await ghFetch(
-        `/repos/${GITHUB_ORG}/${repo.name}/commits?since=${since60}&per_page=100`
+      const commits = await ghFetch(
+        `/repos/${GITHUB_ORG}/${slug}/commits?since=${since60}&per_page=100`
       )
-      const commits30 = commits60.filter((c: any) => isWithinDays(c.commit.author.date, 30))
-      const commits7 = commits60.filter((c: any) => isWithinDays(c.commit.author.date, 7))
-      const commits30_60 = commits60.filter((c: any) => !isWithinDays(c.commit.author.date, 30))
 
-      totalCommits30d += commits30.length
-      totalCommits7d += commits7.length
-      totalCommits30_60 += commits30_60.length
+      const c30 = commits.filter((c: any) => isWithinDays(c.commit.author.date, 30))
+      const c7 = commits.filter((c: any) => isWithinDays(c.commit.author.date, 7))
+      const c30_60 = commits.filter((c: any) => !isWithinDays(c.commit.author.date, 30))
 
-      commits30.forEach((c: any) => {
-        const day = c.commit.author.date.slice(0, 10)
-        activeDaySet30.add(day)
-        activeDaySet60.add(day)
+      totalCommits30d += c30.length
+      totalCommits7d += c7.length
+      totalCommits30_60 += c30_60.length
+
+      c30.forEach((c: any) => {
+        activeDaySet30.add(c.commit.author.date.slice(0, 10))
         if (!lastCommitAt || c.commit.author.date > lastCommitAt) {
           lastCommitAt = c.commit.author.date
-          lastCommitRepo = repo.name
+          lastCommitRepo = slug
         }
       })
-      commits7.forEach((c: any) => {
-        activeDaySet7.add(c.commit.author.date.slice(0, 10))
-      })
-      commits60.forEach((c: any) => {
-        activeDaySet60.add(c.commit.author.date.slice(0, 10))
-      })
+      c7.forEach((c: any) => activeDaySet7.add(c.commit.author.date.slice(0, 10)))
 
-      repoActivity[repo.name] = {
-        slug: repo.name,
-        commits30d: commits30.length,
-        commits7d: commits7.length,
-        lastCommitAt: commits60[0]?.commit?.author?.date ?? null,
-        isActive: commits30.length > 0,
+      repoActivity[slug] = {
+        slug,
+        commits30d: c30.length,
+        commits7d: c7.length,
+        lastCommitAt: commits[0]?.commit?.author?.date ?? null,
+        isActive: c30.length > 0,
       }
-    } catch {
-      repoActivity[repo.name] = {
-        slug: repo.name,
+    } catch (err: any) {
+      if (err.message === 'rate_limited') {
+        rateLimited = true
+        break
+      }
+      // repo not found or other error — mark as unknown
+      repoActivity[slug] = {
+        slug,
         commits30d: 0,
         commits7d: 0,
         lastCommitAt: null,
         isActive: false,
       }
     }
-  }))
-
-  // all-time: use contributions data
-  try {
-    const events = await ghFetch(`/users/${GITHUB_ORG}/events?per_page=100`)
-    events.forEach((e: any) => {
-      if (e.type === 'PushEvent') {
-        totalCommitsAllTime += e.payload?.commits?.length ?? 0
-        const day = e.created_at?.slice(0, 10)
-        if (day) activeDaySetAll.add(day)
-        if (!firstCommitAt || e.created_at < firstCommitAt) firstCommitAt = e.created_at
-      }
-    })
-  } catch { /* ignore */ }
+  }
 
   // trend
   let trend30vs30: 'up' | 'flat' | 'down' = 'flat'
-  if (totalCommits30d > totalCommits30_60 * 1.1) trend30vs30 = 'up'
-  else if (totalCommits30d < totalCommits30_60 * 0.9) trend30vs30 = 'down'
+  if (totalCommits30_60 > 0) {
+    if (totalCommits30d > totalCommits30_60 * 1.1) trend30vs30 = 'up'
+    else if (totalCommits30d < totalCommits30_60 * 0.9) trend30vs30 = 'down'
+  }
 
   return {
     totalRepos,
@@ -169,10 +154,8 @@ export async function getGitHubStats(): Promise<GitHubStats> {
     lastCommitAt,
     lastCommitRepo,
     repoActivity,
-    totalCommitsAllTime: totalCommitsAllTime || totalCommits30d * 4,
-    activeDaysAllTime: activeDaySetAll.size || activeDaySet30.size * 4,
-    firstCommitAt: firstCommitAt || '2026-01-25T00:00:00Z',
     trend30vs30,
+    rateLimited,
   }
 }
 

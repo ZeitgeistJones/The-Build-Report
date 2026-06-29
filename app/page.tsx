@@ -80,7 +80,7 @@ export default async function Home() {
         </div>
       </div>
 
-      {error && (
+      {(error || stats?.rateLimited) && (
         <div style={{
           background: 'var(--surface-1)',
           border: '1px solid var(--border)',
@@ -90,7 +90,13 @@ export default async function Home() {
           color: 'var(--text-secondary)',
           marginBottom: '24px',
         }}>
-          GitHub data unavailable right now — showing scores only. Add a GITHUB_TOKEN env var to increase rate limits.
+          {error
+            ? 'GitHub data unavailable — showing scores only.'
+            : 'GitHub rate limit reached — commit data is partial. Add a GITHUB_TOKEN env var for full data.'
+          }{' '}
+          <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
+            Create a free token →
+          </a>
         </div>
       )}
 
