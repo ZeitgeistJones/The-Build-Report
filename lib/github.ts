@@ -90,7 +90,8 @@ export async function getGitHubStats(): Promise<GitHubStats> {
   const repoActivity: Record<string, RepoActivity> = {}
 
   // Sequential fetching to respect rate limits — 18 requests, well within 60/hr unauthenticated
-  for (const slug of [...new Set(TRACKED_SLUGS)]) {
+  const uniqueSlugs = TRACKED_SLUGS.filter((s, i) => TRACKED_SLUGS.indexOf(s) === i)
+  for (const slug of uniqueSlugs) {
     try {
       const commits = await ghFetch(
         `/repos/${GITHUB_ORG}/${slug}/commits?since=${since60}&per_page=100`

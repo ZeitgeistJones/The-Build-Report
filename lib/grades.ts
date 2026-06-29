@@ -150,5 +150,6 @@ export function calcHolderRelevanceGrade(stats: GitHubStats, period: Period): Ho
       indirect: indirectActive,
       infra: infraActive,
     },
+    trend: score > 50 ? 'up' : score < 30 ? 'down' : 'flat' as 'up' | 'flat' | 'down',
   }
 }

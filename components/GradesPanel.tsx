@@ -142,7 +142,13 @@ export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade
             }}>
               {hg?.letter ?? '—'}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>holder relevance</div>
+            {hg && (
+              <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                <TrendArrow trend={hg.trend} />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>vs prev {period}</span>
+              </div>
+            )}
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>holder relevance</div>
           </div>
           <div>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '12px' }}>
