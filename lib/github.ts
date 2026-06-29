@@ -65,7 +65,7 @@ export async function getGitHubStats(): Promise<GitHubStats> {
   let repos: any[] = []
   let page = 1
   while (true) {
-    const batch = await ghFetch(`/users/${GITHUB_ORG}/repos?per_page=100&page=${page}&sort=updated`)
+    const batch = await ghFetch(`/users/${GITHUB_ORG}/repos?per_page=100&page=${page}&sort=pushed`)
     if (!batch.length) break
     repos = repos.concat(batch)
     if (batch.length < 100) break
@@ -79,7 +79,7 @@ export async function getGitHubStats(): Promise<GitHubStats> {
   // Step 2: fetch commits for all repos updated in last 30 days
   // This gives accurate totals including post-Chronicle repos
   const recentlyUpdated = repos
-    .filter(r => isWithinDays(r.updated_at, 30))
+    .filter(r => isWithinDays(r.pushed_at, 30))
     .slice(0, 40) // cap at 40 to stay within rate limits
 
   const activeDaySet30 = new Set<string>()
