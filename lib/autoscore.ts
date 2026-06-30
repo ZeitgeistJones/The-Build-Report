@@ -14,9 +14,7 @@ function getRedis() {
 }
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:'
-
-// Only score this many new repos per page load to avoid timeouts
-const MAX_NEW_PER_LOAD = 5
+const MAX_NEW_PER_RUN = 5
 
 export interface RawRepo {
   name: string
@@ -132,33 +130,67 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
     const clean = text.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
-    const holderRows: RubricRow[] | null = parsed.tag === 'infrastructure'
-      ? null
-      : parsed.holderRelevance
+    const holderRows: RubricRow[] | null =
+      parsed.tag === 'infrastructure' ? null : parsed.holderRelevance
 
-    const repo_out: Repo = {
+    const repoOut: Repo = {
       id: repo.name,
       name: repo.name,
       githubSlug: repo.name,
       tag: parsed.tag as Tag,
       status: parsed.status as Status,
       confidence: 'low',
-      scoredAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      scoredAt: new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
       holderRelevance: holderRows ? makeScore(holderRows) : null,
       builderIntegrity: makeScore(parsed.builderIntegrity),
       verdict: parsed.verdict,
       adminNote: parsed.adminNote,
     }
 
-    console.log(`[autoscore] done: ${repo.name} tag:${repo_out.tag} HR:${repo_out.holderRelevance?.letter ?? 'N/A'} BI:${repo_out.builderIntegrity.letter}`)
-    return repo_out
+    console.log(
+      `[autoscore] done: ${repo.name} tag:${repoOut.tag} HR:${repoOut.holderRelevance?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`
+    )
+    return repoOut
   } catch (err) {
     console.error(`[autoscore] FAILED for ${repo.name}:`, err)
     return null
   }
 }
 
+// HOMEPAGE-SAFE: cache only, no Anthropic calls
 export async function getAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
+  if (!newRepos.length) {
+    console.log('[autoscore] no new repos to read from cache')
+    return []
+  }
+
+  const r = getRedis()
+  const results: Repo[] = []
+
+  await Promise.all(
+    newRepos.map(async (repo) => {
+      const key = `${CACHE_KEY_PREFIX}${repo.name}`
+      try {
+        const cached = await r.get<Repo>(key)
+        if (cached) {
+          results.push(cached)
+        }
+      } catch {
+        // ignore cache read errors
+      }
+    })
+  )
+
+  console.log(`[autoscore] cache-only returning ${results.length} scored repos`)
+  return results
+}
+
+// CALL THIS FROM AN API ROUTE OR ADMIN ACTION, NOT app/page.tsx
+export async function runAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
   if (!newRepos.length) {
     console.log('[autoscore] no new repos to score')
     return []
@@ -170,39 +202,43 @@ export async function getAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
   const results: Repo[] = []
   const toInfer: RawRepo[] = []
 
-  // First pass: check cache for all
-  await Promise.all(newRepos.map(async (repo) => {
-    const key = `${CACHE_KEY_PREFIX}${repo.name}`
-    try {
-      const cached = await r.get<Repo>(key)
-      if (cached) {
-        console.log(`[autoscore] cache hit: ${repo.name}`)
-        results.push(cached)
-      } else {
+  await Promise.all(
+    newRepos.map(async (repo) => {
+      const key = `${CACHE_KEY_PREFIX}${repo.name}`
+      try {
+        const cached = await r.get<Repo>(key)
+        if (cached) {
+          console.log(`[autoscore] cache hit: ${repo.name}`)
+          results.push(cached)
+        } else {
+          toInfer.push(repo)
+        }
+      } catch {
         toInfer.push(repo)
       }
-    } catch {
-      toInfer.push(repo)
-    }
-  }))
+    })
+  )
 
   console.log(`[autoscore] ${results.length} from cache, ${toInfer.length} need inference`)
 
-  // Sort by most recently pushed — score freshest repos first
-  toInfer.sort((a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime())
+  toInfer.sort(
+    (a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime()
+  )
 
-  // Only infer up to MAX_NEW_PER_LOAD per page load to avoid timeouts
-  const batch = toInfer.slice(0, MAX_NEW_PER_LOAD)
-  if (toInfer.length > MAX_NEW_PER_LOAD) {
-    console.log(`[autoscore] capping at ${MAX_NEW_PER_LOAD} this load, ${toInfer.length - MAX_NEW_PER_LOAD} deferred to next load`)
+  const batch = toInfer.slice(0, MAX_NEW_PER_RUN)
+  if (toInfer.length > MAX_NEW_PER_RUN) {
+    console.log(
+      `[autoscore] capping at ${MAX_NEW_PER_RUN} this run, ${toInfer.length - MAX_NEW_PER_RUN} deferred`
+    )
   }
 
-  // Sequential to avoid hammering APIs in parallel
   for (const repo of batch) {
     const scored = await inferScore(repo)
     if (scored) {
       try {
-        await r.set(`${CACHE_KEY_PREFIX}${repo.name}`, scored, { ex: 60 * 60 * 24 * 7 })
+        await r.set(`${CACHE_KEY_PREFIX}${repo.name}`, scored, {
+          ex: 60 * 60 * 24 * 7,
+        })
       } catch {
         // non-fatal
       }
@@ -210,7 +246,7 @@ export async function getAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
     }
   }
 
-  console.log(`[autoscore] returning ${results.length} total`)
+  console.log(`[autoscore] run returning ${results.length} total`)
   return results
 }
 
