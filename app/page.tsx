@@ -26,6 +26,8 @@ export default async function Home() {
   const githubRepos = stats?.repos ?? []
 
   const unscoredRepos = githubRepos.filter((repo: any) => !knownRepoSlugs.has(repo.name))
+
+  // SAFE ONLY if getAutoScores is cache-only
   const autoScored = unscoredRepos.length ? await getAutoScores(unscoredRepos) : []
 
   const repos = [
