@@ -1,4 +1,4 @@
-import { REPOS, Tag } from './scores'
+import { REPOS } from './scores'
 import { GitHubStats } from './github'
 
 export type Period = '30d' | '7d'
@@ -20,7 +20,14 @@ export interface HolderRelevanceGrade {
   trend: 'up' | 'flat' | 'down'
 }
 
-const levelMap = { high: 3, mid: 2, low: 1 }
+export interface IntegrityGrade {
+  counts: { active: number; high: number; mid: number; low: number }
+  letter: string
+  pct: number
+  summary: string
+  signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
+  trend: 'up' | 'flat' | 'down'
+}
 
 function toLevel(pct: number): 'high' | 'mid' | 'low' {
   if (pct >= 0.66) return 'high'
@@ -35,122 +42,155 @@ function pctToLetter(pct: number): string {
   return 'D'
 }
 
+function avg(nums: number[]) {
+  if (!nums.length) return 0
+  return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length)
+}
+
+function trendFor(curr: number, prev: number): 'up' | 'flat' | 'down' {
+  if (curr > prev + 3) return 'up'
+  if (curr < prev - 3) return 'down'
+  return 'flat'
+}
+
 export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGrade {
   const commits = period === '30d' ? stats.totalCommits30d : stats.totalCommits7d
   const activeDays = period === '30d' ? stats.activeDays30d : stats.activeDays7d
   const newRepos = period === '30d' ? stats.newRepos30d : stats.newRepos7d
   const periodDays = period === '30d' ? 30 : 7
+  const activeRepos = Object.values(stats.repoActivity).filter(r => (period === '30d' ? r.commits30d : r.commits7d) > 0).length
 
-  // normalise signals 0-1
-  const commitPct = Math.min(commits / (periodDays * 15), 1)
-  const activePct = Math.min(activeDays / periodDays, 1)
-  const newRepoPct = Math.min(newRepos / (periodDays === 30 ? 3 : 1), 1)
+  const commitPct = Math.min(commits / (period === '30d' ? 60 : 14), 1)
+  const activeDaysPct = Math.min(activeDays / periodDays, 1)
+  const newReposPct = Math.min(newRepos / (period === '30d' ? 4 : 2), 1)
+  const activeReposPct = Math.min(activeRepos / Math.max(Object.keys(stats.repoActivity).length * 0.5, 1), 1)
+  const consistencyPct = Math.min(activeDays / Math.max(periodDays * 0.7, 1), 1)
 
-  // repos with new commits
-  const activeRepos = Object.values(stats.repoActivity).filter(r =>
-    period === '30d' ? r.commits30d > 0 : r.commits7d > 0
-  ).length
-  const activeRepoPct = Math.min(activeRepos / 8, 1)
+  const signalPcts = [commitPct, activeDaysPct, newReposPct, activeReposPct, consistencyPct]
+  const pct = Math.round((signalPcts.reduce((a, b) => a + b, 0) / signalPcts.length) * 100)
+  const letter = pctToLetter(pct)
 
-  // consistency — active days spread
-  const consistencyPct = activePct
-
-  const signals = [
-    { label: 'Commit frequency', pct: commitPct, level: toLevel(commitPct) },
-    { label: 'Active days', pct: activePct, level: toLevel(activePct) },
-    { label: 'New repos created', pct: newRepoPct, level: toLevel(newRepoPct) },
-    { label: 'Repos with new commits', pct: activeRepoPct, level: toLevel(activeRepoPct) },
-    { label: 'Consistency', pct: consistencyPct, level: toLevel(consistencyPct) },
-  ] as const
-
-  const avgPct = signals.reduce((s, sig) => s + sig.pct, 0) / signals.length
-  const score = Math.round(avgPct * 100)
-
-  let summary = ''
-  if (score >= 80) summary = `Consistently active over the last ${period}. High commit frequency with no long gaps.`
-  else if (score >= 60) summary = `Solid activity over the last ${period}. A few quieter stretches but building is ongoing.`
-  else if (score >= 40) summary = `Moderate activity over the last ${period}. Building is happening but the pace has slowed.`
-  else summary = `Lower than usual activity over the last ${period}. Worth watching.`
+  const trend = period === '30d'
+    ? stats.trend30vs30
+    : trendFor(stats.totalCommits7d, Math.round(stats.totalCommits30d / 4))
 
   return {
-    letter: pctToLetter(score),
-    pct: score,
-    summary,
-    signals: signals.map(s => ({ ...s, pct: Math.round(s.pct * 100) })),
-    trend: stats.trend30vs30,
+    letter,
+    pct,
+    trend,
+    summary:
+      pct >= 80
+        ? 'Strong recent build activity across commits, active days, and repo movement.'
+        : pct >= 60
+          ? 'Solid recent shipping pace with some unevenness across activity signals.'
+          : pct >= 40
+            ? 'Some activity is present, but the recent build cadence is mixed.'
+            : 'Recent build activity is light relative to the tracked repo set.',
+    signals: [
+      { label: 'Commit frequency', level: toLevel(commitPct), pct: Math.round(commitPct * 100) },
+      { label: 'Active days', level: toLevel(activeDaysPct), pct: Math.round(activeDaysPct * 100) },
+      { label: 'New repos', level: toLevel(newReposPct), pct: Math.round(newReposPct * 100) },
+      { label: 'Repos with commits', level: toLevel(activeReposPct), pct: Math.round(activeReposPct * 100) },
+      { label: 'Consistency', level: toLevel(consistencyPct), pct: Math.round(consistencyPct * 100) },
+    ],
   }
 }
 
 export function calcHolderRelevanceGrade(stats: GitHubStats, period: Period): HolderRelevanceGrade {
-  const tagOrder: Tag[] = ['direct', 'supply-lock', 'indirect', 'infrastructure', 'theoretical']
-  const tagWeight: Record<Tag, number> = {
-    'direct': 1.0,
-    'supply-lock': 0.7,
-    'indirect': 0.4,
-    'infrastructure': 0.1,
-    'theoretical': 0.0,
-  }
-
-  const reposByTag: Record<Tag, number> = {
-    'direct': 0, 'supply-lock': 0, 'indirect': 0, 'infrastructure': 0, 'theoretical': 0
-  }
-  const activeByTag: Record<Tag, number> = {
-    'direct': 0, 'supply-lock': 0, 'indirect': 0, 'infrastructure': 0, 'theoretical': 0
-  }
-
-  REPOS.forEach(repo => {
-    const activity = stats.repoActivity[repo.githubSlug]
-    const isActive = period === '30d'
-      ? (activity?.commits30d ?? 0) > 0
-      : (activity?.commits7d ?? 0) > 0
-    reposByTag[repo.tag]++
-    if (isActive) activeByTag[repo.tag]++
+  const activeRepos = REPOS.filter(repo => {
+    const live = stats.repoActivity[repo.githubSlug]
+    if (!live) return false
+    return period === '30d' ? live.commits30d > 0 : live.commits7d > 0
   })
 
-  // weighted score based on which tag types are active
-  let weightedSum = 0
-  let weightedTotal = 0
-  tagOrder.forEach(tag => {
-    if (reposByTag[tag] > 0) {
-      const activeFrac = activeByTag[tag] / reposByTag[tag]
-      weightedSum += activeFrac * tagWeight[tag]
-      weightedTotal += tagWeight[tag]
-    }
-  })
+  const counts = {
+    direct: activeRepos.filter(r => r.tag === 'direct').length,
+    lock: activeRepos.filter(r => r.tag === 'supply-lock').length,
+    indirect: activeRepos.filter(r => r.tag === 'indirect').length,
+    infra: activeRepos.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical').length,
+  }
 
-  const score = weightedTotal > 0 ? Math.round((weightedSum / weightedTotal) * 100) : 0
+  const total = activeRepos.length || 1
+  const pctRaw = ((counts.direct * 1 + counts.lock * 0.75 + counts.indirect * 0.55 + counts.infra * 0.2) / total) * 100
+  const pct = Math.round(pctRaw)
+  const letter = pctToLetter(pct)
 
-  const directActive = activeByTag['direct']
-  const lockActive = activeByTag['supply-lock']
-  const indirectActive = activeByTag['indirect']
-  const infraActive = activeByTag['infrastructure']
-  const theoreticalActive = activeByTag['theoretical']
-
-  const signals = [
-    { label: 'Direct burn repos active', pct: reposByTag['direct'] > 0 ? Math.round(directActive / reposByTag['direct'] * 100) : 0, level: toLevel(reposByTag['direct'] > 0 ? directActive / reposByTag['direct'] : 0) },
-    { label: 'Supply lock repos active', pct: reposByTag['supply-lock'] > 0 ? Math.round(lockActive / reposByTag['supply-lock'] * 100) : 0, level: toLevel(reposByTag['supply-lock'] > 0 ? lockActive / reposByTag['supply-lock'] : 0) },
-    { label: 'Indirect repos active', pct: reposByTag['indirect'] > 0 ? Math.round(indirectActive / reposByTag['indirect'] * 100) : 0, level: toLevel(reposByTag['indirect'] > 0 ? indirectActive / reposByTag['indirect'] : 0) },
-    { label: 'Infrastructure repos active', pct: reposByTag['infrastructure'] > 0 ? Math.round(infraActive / reposByTag['infrastructure'] * 100) : 0, level: toLevel(reposByTag['infrastructure'] > 0 ? infraActive / reposByTag['infrastructure'] : 0) },
-    { label: 'New holder-facing repos', pct: Math.min(Math.round((directActive + lockActive) / 3 * 100), 100), level: toLevel((directActive + lockActive) / 3) },
-  ] as const
-
-  let summary = ''
-  if (score >= 80) summary = 'Most active repos are holder-facing right now. Burn and lock mechanics are where the building is focused.'
-  else if (score >= 60) summary = 'Good mix of holder-facing and infrastructure work. Direct mechanics are live and being maintained.'
-  else if (score >= 40) summary = 'Current building is weighted toward infrastructure. Direct holder mechanics are live but not the active focus.'
-  else summary = 'Most active repos are infrastructure right now. Holder-facing mechanics exist but aren\'t where current building is concentrated.'
+  const prevPct = Math.round(Math.max(pct - (counts.direct > counts.infra ? 2 : -2), 0))
 
   return {
-    letter: pctToLetter(score),
-    pct: score,
-    summary,
-    signals: signals.map(s => ({ ...s })),
-    counts: {
-      direct: directActive,
-      lock: lockActive,
-      indirect: indirectActive,
-      infra: infraActive,
-    },
-    trend: score > 50 ? 'up' : score < 30 ? 'down' : 'flat' as 'up' | 'flat' | 'down',
+    counts,
+    letter,
+    pct,
+    trend: trendFor(pct, prevPct),
+    summary:
+      pct >= 80
+        ? 'Most recently active repos are directly aligned with holder value.'
+        : pct >= 60
+          ? 'A healthy share of recent activity points toward holder value, with some infra mixed in.'
+          : pct >= 40
+            ? 'Recent activity is split between holder-facing work and infrastructure.'
+            : 'Recent activity leans more toward infrastructure and R&D than direct holder value.',
+    signals: [
+      { label: 'Direct burn', level: toLevel(counts.direct / total), pct: Math.round((counts.direct / total) * 100) },
+      { label: 'Supply lock', level: toLevel(counts.lock / total), pct: Math.round((counts.lock / total) * 100) },
+      { label: 'Indirect value', level: toLevel(counts.indirect / total), pct: Math.round((counts.indirect / total) * 100) },
+      { label: 'Infra drag', level: toLevel(1 - counts.infra / total), pct: Math.round((1 - counts.infra / total) * 100) },
+    ],
+  }
+}
+
+export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, repoSet = REPOS): IntegrityGrade {
+  const activeRepos = !stats
+    ? repoSet
+    : repoSet.filter(repo => {
+        const live = stats.repoActivity[repo.githubSlug]
+        if (!live) return false
+        return period === '30d' ? live.commits30d > 0 : live.commits7d > 0
+      })
+
+  const sample = activeRepos.length ? activeRepos : repoSet
+  const scores = sample.map(repo => repo.builderIntegrity.pct)
+  const pct = avg(scores)
+  const prevSample = repoSet.slice(0, Math.max(sample.length - 1, 1))
+  const prevPct = avg(prevSample.map(repo => repo.builderIntegrity.pct))
+
+  const high = sample.filter(r => r.builderIntegrity.pct >= 80).length
+  const mid = sample.filter(r => r.builderIntegrity.pct >= 60 && r.builderIntegrity.pct < 80).length
+  const low = sample.filter(r => r.builderIntegrity.pct < 60).length
+
+  const visionAvg = avg(sample.map(r => {
+    const row = r.builderIntegrity.rubric.find(x => x.label === 'Serves stated vision at time of build')
+    return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
+  }))
+
+  const autonomyAvg = avg(sample.map(r => {
+    const row = r.builderIntegrity.rubric.find(x => x.label === 'Genuine autonomous build')
+    return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
+  }))
+
+  const walkawayAvg = avg(sample.map(r => {
+    const row = r.builderIntegrity.rubric.find(x => x.label === 'Passes walkaway test')
+    return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
+  }))
+
+  return {
+    counts: { active: sample.length, high, mid, low },
+    letter: pctToLetter(pct),
+    pct,
+    trend: trendFor(pct, prevPct),
+    summary:
+      pct >= 80
+        ? 'Recent active repos are strongly aligned with the original builder-values rubric.'
+        : pct >= 60
+          ? 'Most recent active repos still fit the stated builder-values frame, with some weaker walkaway or vision alignment.'
+          : pct >= 40
+            ? 'Integrity is mixed across the active repo set.'
+            : 'The active repo set scores weakly against the original builder-values rubric.',
+    signals: [
+      { label: 'Stated vision', level: toLevel(visionAvg / 100), pct: visionAvg },
+      { label: 'Autonomous build', level: toLevel(autonomyAvg / 100), pct: autonomyAvg },
+      { label: 'Walkaway test', level: toLevel(walkawayAvg / 100), pct: walkawayAvg },
+      { label: 'High-integrity share', level: toLevel(high / Math.max(sample.length, 1)), pct: Math.round((high / Math.max(sample.length, 1)) * 100) },
+    ],
   }
 }
