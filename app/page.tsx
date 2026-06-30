@@ -1,13 +1,13 @@
 import { getGitHubStats, timeAgo } from '@/lib/github'
 import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
-import { calcBuilderGrade, calcHolderRelevanceGrade } from '@/lib/grades'
 import { getAutoScores } from '@/lib/autoscore'
+import { calcBuilderGrade, calcHolderRelevanceGrade, calcIntegrityGrade } from '@/lib/grades'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 
-export const revalidate = 300 // refresh every 5 minutes
+export const revalidate = 300
 
 export default async function Home() {
   let stats
@@ -22,65 +22,54 @@ export default async function Home() {
 
   const adminNotes = await getAdminNotes()
 
-  const knownRepoSlugs = new Set(REPOS.map(r => r.githubSlug))
+  const existingSlugs = new Set(REPOS.map(r => r.githubSlug))
   const githubRepos = stats?.repos ?? []
+  const unscoredRepos = githubRepos.filter((repo: any) => !existingSlugs.has(repo.name))
+  const autoScored = unscoredRepos.length > 0 ? await getAutoScores(unscoredRepos) : []
 
-  const unscoredRepos = githubRepos.filter((repo: any) => !knownRepoSlugs.has(repo.name))
+  const allRepos = [...REPOS, ...autoScored]
 
-  // SAFE ONLY if getAutoScores is cache-only
-  const autoScored = unscoredRepos.length ? await getAutoScores(unscoredRepos) : []
-
-  const repos = [
-    ...REPOS.map(r => ({
-      ...r,
-      adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
-      lastCommitAt: stats?.repoActivity[r.githubSlug]?.lastCommitAt ?? null,
-      commits30d: stats?.repoActivity[r.githubSlug]?.commits30d ?? null,
-    })),
-    ...autoScored.map(r => ({
-      ...r,
-      adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
-      lastCommitAt: stats?.repoActivity[r.githubSlug]?.lastCommitAt ?? null,
-      commits30d: stats?.repoActivity[r.githubSlug]?.commits30d ?? null,
-    })),
-  ]
+  const repos = allRepos.map(r => ({
+    ...r,
+    adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
+    lastCommitAt: stats?.repoActivity[r.githubSlug]?.lastCommitAt ?? null,
+    commits30d: stats?.repoActivity[r.githubSlug]?.commits30d ?? null,
+  }))
 
   const builderGrade30 = stats ? calcBuilderGrade(stats, '30d') : null
   const builderGrade7 = stats ? calcBuilderGrade(stats, '7d') : null
   const holderGrade30 = stats ? calcHolderRelevanceGrade(stats, '30d') : null
   const holderGrade7 = stats ? calcHolderRelevanceGrade(stats, '7d') : null
+  const integrityGrade30 = stats ? calcIntegrityGrade(stats, '30d', allRepos) : calcIntegrityGrade(null, '30d', allRepos)
+  const integrityGrade7 = stats ? calcIntegrityGrade(stats, '7d', allRepos) : calcIntegrityGrade(null, '7d', allRepos)
 
   return (
     <>
       <div style={{ marginBottom: '32px' }}>
-        <h1
-          style={{
-            fontSize: '26px',
-            fontWeight: 600,
-            color: 'var(--text-primary)',
-            letterSpacing: '-0.02em',
-            marginBottom: '6px',
-          }}
-        >
+        <h1 style={{
+          fontSize: '26px',
+          fontWeight: 600,
+          color: 'var(--text-primary)',
+          letterSpacing: '-0.02em',
+          marginBottom: '6px',
+        }}>
           The Build Report
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           A plain English look at the repos, scored and sourced.
         </p>
-        <div
-          style={{
-            marginTop: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            padding: '8px 14px',
-            fontSize: '12px',
-            color: 'var(--text-muted)',
-          }}
-        >
+        <div style={{
+          marginTop: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'var(--surface-1)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          padding: '8px 14px',
+          fontSize: '12px',
+          color: 'var(--text-muted)',
+        }}>
           <span>
             Scores are interpretive — based on the{' '}
             <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">
@@ -97,17 +86,15 @@ export default async function Home() {
       </div>
 
       {(error || stats?.rateLimited) && (
-        <div
-          style={{
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            padding: '12px 16px',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-            marginBottom: '24px',
-          }}
-        >
+        <div style={{
+          background: 'var(--surface-1)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          padding: '12px 16px',
+          fontSize: '13px',
+          color: 'var(--text-secondary)',
+          marginBottom: '24px',
+        }}>
           {error
             ? 'GitHub data unavailable — showing scores only.'
             : 'GitHub rate limit reached — commit data is partial. Add a GITHUB_TOKEN env var for full data.'}{' '}
@@ -132,36 +119,23 @@ export default async function Home() {
         builderGrade7={builderGrade7}
         holderGrade30={holderGrade30}
         holderGrade7={holderGrade7}
-        stats30d={
-          stats
-            ? {
-                commits: stats.totalCommits30d,
-                activeDays: stats.activeDays30d,
-                newRepos: stats.newRepos30d,
-              }
-            : null
-        }
-        stats7d={
-          stats
-            ? {
-                commits: stats.totalCommits7d,
-                activeDays: stats.activeDays7d,
-                newRepos: stats.newRepos7d,
-              }
-            : null
-        }
+        integrityGrade30={integrityGrade30}
+        integrityGrade7={integrityGrade7}
+        stats30d={stats ? {
+          commits: stats.totalCommits30d,
+          activeDays: stats.activeDays30d,
+          newRepos: stats.newRepos30d,
+        } : null}
+        stats7d={stats ? {
+          commits: stats.totalCommits7d,
+          activeDays: stats.activeDays7d,
+          newRepos: stats.newRepos7d,
+        } : null}
       />
 
       <RepoList repos={repos} />
 
-      <div
-        id="how-we-score"
-        style={{
-          marginTop: '48px',
-          borderTop: '1px solid var(--border)',
-          paddingTop: '32px',
-        }}
-      >
+      <div id="how-we-score" style={{ marginTop: '48px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: 'var(--text-primary)' }}>
           How we score
         </h2>
@@ -184,7 +158,7 @@ export default async function Home() {
                 { label: 'Genuine autonomous build', weight: '35%' },
                 { label: 'Passes walkaway test', weight: '25%' },
               ],
-              note: "Repos are scored against clawdbotatg's stated goals at the time they were built. Goals change — a repo is judged against what the stated intent was then, not now. CV burns are not CLAWD burns. Supply lock is not a burn. Both matter but they are different things.",
+              note: 'Repos are scored against clawdbotatg\'s stated goals at the time they were built. Goals change — a repo is judged against what the stated intent was then, not now. CV burns are not CLAWD burns. Supply lock is not a burn. Both matter but they are different things.',
             },
             {
               title: 'Builder grade — GitHub signals, equally weighted',
@@ -195,62 +169,22 @@ export default async function Home() {
                 { label: 'Repos with new commits', weight: 'equal' },
                 { label: 'Consistency — no long gaps', weight: 'equal' },
               ],
-              note: 'A = 80–100 · B = 60–79 · C = 40–59 · D = below 40. Holder relevance grade measures what proportion of currently active repos are direct, supply lock, or indirect vs infrastructure and theoretical. Trend arrow compares last 30d to the 30d before that.',
+              note: 'A = 80–100 · B = 60–79 · C = 40–59 · D = below 40. Holder relevance grade measures what proportion of currently active repos are direct, supply lock, or indirect vs infrastructure and theoretical. Integrity grade is the average builder-integrity score of repos active in the selected period. Trend arrow compares the current period to the previous matching window.',
             },
           ].map(block => (
-            <div
-              key={block.title}
-              style={{
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: '14px 16px',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  color: 'var(--text-primary)',
-                  marginBottom: '10px',
-                }}
-              >
+            <div key={block.title} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 16px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '10px' }}>
                 {block.title}
               </div>
               {block.rows.map(row => (
-                <div
-                  key={row.label}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '13px',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '4px',
-                  }}
-                >
+                <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                   <span>{row.label}</span>
-                  <span
-                    style={{
-                      fontWeight: 500,
-                      color: 'var(--text-primary)',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '12px',
-                    }}
-                  >
+                  <span style={{ fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
                     {row.weight}
                   </span>
                 </div>
               ))}
-              <div
-                style={{
-                  marginTop: '10px',
-                  paddingTop: '10px',
-                  borderTop: '1px solid var(--border)',
-                  fontSize: '12px',
-                  color: 'var(--text-muted)',
-                  lineHeight: 1.6,
-                }}
-              >
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                 {block.note}
               </div>
             </div>
@@ -269,17 +203,7 @@ export default async function Home() {
               { tag: 'infrastructure', label: 'infrastructure — no token mechanic expected', color: 'var(--text-secondary)', bg: 'var(--surface-3)' },
               { tag: 'theoretical', label: 'theoretical — R&D, no live mechanic yet', color: '#d4943a', bg: 'rgba(212,148,58,0.1)' },
             ].map(t => (
-              <span
-                key={t.tag}
-                style={{
-                  fontSize: '11px',
-                  padding: '3px 10px',
-                  borderRadius: '99px',
-                  color: t.color,
-                  background: t.bg,
-                  fontWeight: 500,
-                }}
-              >
+              <span key={t.tag} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '99px', color: t.color, background: t.bg, fontWeight: 500 }}>
                 {t.label}
               </span>
             ))}
@@ -293,15 +217,7 @@ export default async function Home() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {CHANGELOG.map((entry, i) => (
               <div key={i} style={{ display: 'flex', gap: '12px', fontSize: '13px' }}>
-                <span
-                  style={{
-                    color: 'var(--text-muted)',
-                    whiteSpace: 'nowrap',
-                    minWidth: '80px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '12px',
-                  }}
-                >
+                <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: '80px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
                   {entry.date}
                 </span>
                 <span style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>{entry.note}</span>
@@ -311,12 +227,7 @@ export default async function Home() {
         </div>
 
         <div style={{ marginTop: '20px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          Primary source:{' '}
-          <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">
-            github.com/clawdbotatg
-          </a>{' '}
-          and the clawdbotatg Chronicle. Scores are interpretive and updated manually. If you think a score is wrong,
-          that conversation should happen in the open.
+          Primary source: <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">github.com/clawdbotatg</a> and the clawdbotatg Chronicle. Scores are interpretive and updated manually. If you think a score is wrong, that conversation should happen in the open.
         </div>
       </div>
     </>
