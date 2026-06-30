@@ -45,68 +45,167 @@ function GradeCard({
   footer?: React.ReactNode
 }) {
   return (
-    <div style={{
-      background: 'var(--surface-1)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-lg)',
-      padding: '14px 16px',
-      display: 'grid',
-      gridTemplateColumns: '72px 1fr',
-      gap: '14px',
-      alignItems: 'start',
-      minHeight: '100%',
-    }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{
-          fontSize: '38px',
-          fontWeight: 600,
-          lineHeight: 1,
-          fontFamily: 'var(--font-mono)',
-          color: grade ? gradeColor(grade.letter) : 'var(--text-muted)'
-        }}>
-          {grade?.letter ?? '—'}
-        </div>
-        {grade && (
-          <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
-            <TrendArrow trend={grade.trend} />
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>vs prev</span>
+    <div
+      style={{
+        background: 'var(--surface-1)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100%',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: '12px',
+          marginBottom: '12px',
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: '11px',
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              marginBottom: '8px',
+            }}
+          >
+            {label}
           </div>
-        )}
-        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.3 }}>
-          {label}
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '8px',
+              marginBottom: '6px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '40px',
+                lineHeight: 1,
+                fontWeight: 600,
+                fontFamily: 'var(--font-mono)',
+                color: grade ? gradeColor(grade.letter) : 'var(--text-muted)',
+              }}
+            >
+              {grade?.letter ?? '—'}
+            </span>
+
+            {grade && (
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <TrendArrow trend={grade.trend} />
+                vs prev
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      <div>
-        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: '8px' }}>
-          {summary}
-        </p>
+      <p
+        style={{
+          fontSize: '12px',
+          color: 'var(--text-secondary)',
+          lineHeight: 1.5,
+          marginBottom: '12px',
+          minHeight: '54px',
+        }}
+      >
+        {summary}
+      </p>
 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {grade?.signals.map(s => (
-          <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', flex: 1, lineHeight: 1.3 }}>
+          <div
+            key={s.label}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 64px 28px',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
               {s.label}
             </span>
-            <div style={{ width: '52px', height: '3px', background: 'var(--surface-3)', borderRadius: '99px', overflow: 'hidden', flexShrink: 0 }}>
-              <div style={{ width: `${s.pct}%`, height: '100%', borderRadius: '99px', background: levelColor(s.level) }} />
+
+            <div
+              style={{
+                width: '64px',
+                height: '4px',
+                background: 'var(--surface-3)',
+                borderRadius: '99px',
+                overflow: 'hidden',
+                justifySelf: 'end',
+              }}
+            >
+              <div
+                style={{
+                  width: `${s.pct}%`,
+                  height: '100%',
+                  borderRadius: '99px',
+                  background: levelColor(s.level),
+                }}
+              />
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)', width: '20px', textAlign: 'right', flexShrink: 0 }}>
+
+            <span
+              style={{
+                fontSize: '10px',
+                color: 'var(--text-muted)',
+                width: '28px',
+                textAlign: 'right',
+                textTransform: 'lowercase',
+              }}
+            >
               {s.level}
             </span>
           </div>
         ))}
-
-        {footer && (
-          <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
-            {footer}
-          </div>
-        )}
       </div>
+
+      {footer && (
+        <div
+          style={{
+            marginTop: '12px',
+            paddingTop: '10px',
+            borderTop: '1px solid var(--border)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px 12px',
+          }}
+        >
+          {footer}
+        </div>
+      )}
     </div>
   )
 }
 
-export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade30, holderGrade7, integrityGrade30, integrityGrade7, stats30d, stats7d }: Props) {
+export default function GradesPanel({
+  builderGrade30,
+  builderGrade7,
+  holderGrade30,
+  holderGrade7,
+  integrityGrade30,
+  integrityGrade7,
+  stats30d,
+  stats7d,
+}: Props) {
   const [period, setPeriod] = useState<'30d' | '7d'>('30d')
 
   const bg = period === '30d' ? builderGrade30 : builderGrade7
@@ -116,11 +215,34 @@ export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade
 
   return (
     <div style={{ marginBottom: '28px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px',
+        }}
+      >
+        <div
+          style={{
+            fontSize: '11px',
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}
+        >
           Grades
         </div>
-        <div style={{ display: 'flex', gap: '4px', background: 'var(--surface-1)', borderRadius: '6px', padding: '3px' }}>
+
+        <div
+          style={{
+            display: 'flex',
+            gap: '4px',
+            background: 'var(--surface-1)',
+            borderRadius: '6px',
+            padding: '3px',
+          }}
+        >
           {(['30d', '7d'] as const).map(p => (
             <button
               key={p}
@@ -145,7 +267,7 @@ export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gap: '10px',
+          gap: '12px',
           alignItems: 'stretch',
         }}
       >
@@ -153,41 +275,47 @@ export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade
           grade={bg}
           label="builder grade"
           summary={bg?.summary ?? 'GitHub data unavailable'}
-          footer={stats && (
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.commits} commits</span>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.activeDays} active days</span>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.newRepos} new repos</span>
-            </div>
-          )}
+          footer={
+            stats && (
+              <>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.commits} commits</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.activeDays} active days</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.newRepos} new repos</span>
+              </>
+            )
+          }
         />
 
         <GradeCard
           grade={hg}
           label="holder relevance"
           summary={hg?.summary ?? 'GitHub data unavailable'}
-          footer={hg?.counts && (
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              {hg.counts.direct > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.direct} direct</span>}
-              {hg.counts.lock > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.lock} lock</span>}
-              {hg.counts.indirect > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.indirect} indirect</span>}
-              {hg.counts.infra > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.infra} infra</span>}
-            </div>
-          )}
+          footer={
+            hg?.counts && (
+              <>
+                {hg.counts.direct > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.direct} direct</span>}
+                {hg.counts.lock > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.lock} lock</span>}
+                {hg.counts.indirect > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.indirect} indirect</span>}
+                {hg.counts.infra > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.infra} infra</span>}
+              </>
+            )
+          }
         />
 
         <GradeCard
           grade={ig}
           label="integrity grade"
           summary={ig?.summary ?? 'Integrity score unavailable'}
-          footer={ig && (
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.active} active</span>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.high} high</span>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.mid} mid</span>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.low} low</span>
-            </div>
-          )}
+          footer={
+            ig && (
+              <>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.active} active</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.high} high</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.mid} mid</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.low} low</span>
+              </>
+            )
+          }
         />
       </div>
     </div>
