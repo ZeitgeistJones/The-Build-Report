@@ -28,9 +28,9 @@ function gradeColor(letter: string) {
 }
 
 function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
-  if (trend === 'up') return <span style={{ color: 'var(--green)', fontSize: '13px' }}>↑</span>
-  if (trend === 'down') return <span style={{ color: 'var(--red)', fontSize: '13px' }}>↓</span>
-  return <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>→</span>
+  if (trend === 'up') return <span style={{ color: 'var(--green)', fontSize: '12px' }}>↑</span>
+  if (trend === 'down') return <span style={{ color: 'var(--red)', fontSize: '12px' }}>↓</span>
+  return <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>→</span>
 }
 
 function GradeCard({
@@ -49,38 +49,58 @@ function GradeCard({
       background: 'var(--surface-1)',
       border: '1px solid var(--border)',
       borderRadius: 'var(--radius-lg)',
-      padding: '18px 20px',
+      padding: '14px 16px',
       display: 'grid',
-      gridTemplateColumns: 'auto 1fr',
-      gap: '20px',
+      gridTemplateColumns: '72px 1fr',
+      gap: '14px',
       alignItems: 'start',
+      minHeight: '100%',
     }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '52px', fontWeight: 600, lineHeight: 1, fontFamily: 'var(--font-mono)', color: grade ? gradeColor(grade.letter) : 'var(--text-muted)' }}>
+        <div style={{
+          fontSize: '38px',
+          fontWeight: 600,
+          lineHeight: 1,
+          fontFamily: 'var(--font-mono)',
+          color: grade ? gradeColor(grade.letter) : 'var(--text-muted)'
+        }}>
           {grade?.letter ?? '—'}
         </div>
         {grade && (
           <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
             <TrendArrow trend={grade.trend} />
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>vs prev period</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>vs prev</span>
           </div>
         )}
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{label}</div>
+        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.3 }}>
+          {label}
+        </div>
       </div>
+
       <div>
-        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '12px' }}>
+        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.45, marginBottom: '8px' }}>
           {summary}
         </p>
+
         {grade?.signals.map(s => (
-          <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', flex: 1 }}>{s.label}</span>
-            <div style={{ width: '60px', height: '3px', background: 'var(--surface-3)', borderRadius: '99px', overflow: 'hidden' }}>
+          <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', flex: 1, lineHeight: 1.3 }}>
+              {s.label}
+            </span>
+            <div style={{ width: '52px', height: '3px', background: 'var(--surface-3)', borderRadius: '99px', overflow: 'hidden', flexShrink: 0 }}>
               <div style={{ width: `${s.pct}%`, height: '100%', borderRadius: '99px', background: levelColor(s.level) }} />
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)', width: '24px', textAlign: 'right' }}>{s.level}</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)', width: '20px', textAlign: 'right', flexShrink: 0 }}>
+              {s.level}
+            </span>
           </div>
         ))}
-        {footer && <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>{footer}</div>}
+
+        {footer && (
+          <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -95,7 +115,7 @@ export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade
   const stats = period === '30d' ? stats30d : stats7d
 
   return (
-    <div style={{ marginBottom: '32px' }}>
+    <div style={{ marginBottom: '28px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Grades
@@ -121,16 +141,23 @@ export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gap: '10px',
+          alignItems: 'stretch',
+        }}
+      >
         <GradeCard
           grade={bg}
           label="builder grade"
           summary={bg?.summary ?? 'GitHub data unavailable'}
           footer={stats && (
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{stats.commits} commits</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{stats.activeDays} active days</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{stats.newRepos} new repos</span>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.commits} commits</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.activeDays} active days</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.newRepos} new repos</span>
             </div>
           )}
         />
@@ -140,12 +167,11 @@ export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade
           label="holder relevance"
           summary={hg?.summary ?? 'GitHub data unavailable'}
           footer={hg?.counts && (
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              {hg.counts.direct > 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hg.counts.direct} direct</span>}
-              {hg.counts.lock > 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hg.counts.lock} supply lock</span>}
-              {hg.counts.indirect > 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hg.counts.indirect} indirect</span>}
-              {hg.counts.infra > 0 && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{hg.counts.infra} infra</span>}
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 'auto' }}>active repos ({period})</span>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {hg.counts.direct > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.direct} direct</span>}
+              {hg.counts.lock > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.lock} lock</span>}
+              {hg.counts.indirect > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.indirect} indirect</span>}
+              {hg.counts.infra > 0 && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.infra} infra</span>}
             </div>
           )}
         />
@@ -155,11 +181,11 @@ export default function GradesPanel({ builderGrade30, builderGrade7, holderGrade
           label="integrity grade"
           summary={ig?.summary ?? 'Integrity score unavailable'}
           footer={ig && (
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{ig.counts.active} active repos</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{ig.counts.high} high integrity</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{ig.counts.mid} mid integrity</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{ig.counts.low} low integrity</span>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.active} active</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.high} high</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.mid} mid</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.low} low</span>
             </div>
           )}
         />
