@@ -1,6 +1,7 @@
 import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
 import { Repo, Tag, Status, Level, RubricRow, Score } from './scores'
+import { shouldSkipRepo } from './repoFilters'
 
 let redis: Redis | null = null
 function getRedis() {
@@ -176,7 +177,7 @@ export async function getAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
       const key = `${CACHE_KEY_PREFIX}${repo.name}`
       try {
         const cached = await r.get<Repo>(key)
-        if (cached) {
+        if (cached && !shouldSkipRepo(cached.githubSlug)) {
           results.push(cached)
         }
       } catch {

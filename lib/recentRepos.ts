@@ -1,8 +1,9 @@
 import { Repo, Tag } from './scores'
 import { GitHubRepo } from './github'
+import { shouldSkipRepo } from './repoFilters'
 
-const RECENT_UNSCORED_DAYS = 30
-const RECENT_UNSCORED_LIMIT = 30
+const RECENT_UNSCORED_DAYS = 7
+const RECENT_UNSCORED_LIMIT = 1
 
 function daysAgo(dateStr: string): number {
   return (Date.now() - new Date(dateStr).getTime()) / 86400000
@@ -43,6 +44,7 @@ export function recentUnscoredRepos(githubRepos: GitHubRepo[], listedSlugs: Set<
   for (const gh of sorted) {
     if (recent.length >= RECENT_UNSCORED_LIMIT) break
     if (listedSlugs.has(gh.name)) continue
+    if (shouldSkipRepo(gh.name)) continue
     if (daysAgo(gh.pushedAt) > RECENT_UNSCORED_DAYS) continue
     recent.push(makeUnscoredRecentRepo(gh))
     listedSlugs.add(gh.name)

@@ -1,4 +1,5 @@
 import { REPOS } from './scores'
+import { shouldSkipRepo } from './repoFilters'
 
 const GITHUB_ORG = 'clawdbotatg'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
@@ -61,6 +62,8 @@ export interface GitHubStats {
   lastCommitRepo: string | null
   repoActivity: Record<string, RepoActivity>
   repos: GitHubRepo[]
+  /** GitHub repos eligible for listing/autoscore (noise repos excluded). */
+  trackableRepos: GitHubRepo[]
   rateLimited: boolean
 }
 
@@ -81,6 +84,11 @@ function isInDayRange(dateStr: string, minExclusive: number, maxInclusive: numbe
 
 function isCreatedInDayRange(dateStr: string, minExclusive: number, maxInclusive: number) {
   return isInDayRange(dateStr, minExclusive, maxInclusive)
+}
+
+/** Rolling N-day window can span N+1 unique calendar dates; cap for display and grades. */
+function capActiveDays(uniqueDayCount: number, periodDays: number): number {
+  return Math.min(uniqueDayCount, periodDays)
 }
 
 // Slugs used only for scoring card activity lookups
@@ -242,6 +250,35 @@ export async function getGitHubStats(): Promise<GitHubStats> {
     }
   }
 
+  const rawActiveDays7 = activeDaySet7.size
+  const rawActiveDays30 = activeDaySet30.size
+  const activeDays7d = capActiveDays(rawActiveDays7, 7)
+  const activeDays30d = capActiveDays(rawActiveDays30, 30)
+  const activeDays7_14 = capActiveDays(activeDaySet7_14.size, 7)
+  const activeDays30_60 = capActiveDays(activeDaySet30_60.size, 30)
+
+  // #region agent log
+  fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
+    body: JSON.stringify({
+      sessionId: 'a33a7a',
+      runId: 'post-fix',
+      hypothesisId: 'H-active-days',
+      location: 'lib/github.ts:getGitHubStats',
+      message: 'active days raw vs capped',
+      data: {
+        rawActiveDays7,
+        activeDays7d,
+        rawActiveDays30,
+        activeDays30d,
+        activeDays7Dates: Array.from(activeDaySet7).sort(),
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+
   const sortedRepos = repos
     .map((r: any) => ({
       name: r.name,
@@ -251,16 +288,41 @@ export async function getGitHubStats(): Promise<GitHubStats> {
       language: r.language ?? null,
     }))
     .sort((a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime())
+
+  const trackableRepos = sortedRepos.filter(r => !shouldSkipRepo(r.name))
+
+  // #region agent log
+  fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
+    body: JSON.stringify({
+      sessionId: 'a33a7a',
+      runId: 'skip-filter',
+      hypothesisId: 'H-job-filter',
+      location: 'lib/github.ts:getGitHubStats',
+      message: 'trackable vs skipped job repos',
+      data: {
+        totalGithubRepos: sortedRepos.length,
+        trackableCount: trackableRepos.length,
+        skippedJobRepos: sortedRepos.filter(r => r.name.startsWith('leftclaw-service-job')).length,
+        rawActiveDays7,
+        activeDays7d,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
+
   return {
     totalRepos,
     totalCommits30d,
     totalCommits7d,
     totalCommits7_14,
     totalCommits30_60,
-    activeDays30d: activeDaySet30.size,
-    activeDays7d: activeDaySet7.size,
-    activeDays7_14: activeDaySet7_14.size,
-    activeDays30_60: activeDaySet30_60.size,
+    activeDays30d,
+    activeDays7d,
+    activeDays7_14,
+    activeDays30_60,
     newRepos30d,
     newRepos7d,
     newRepos7_14,
@@ -269,6 +331,7 @@ export async function getGitHubStats(): Promise<GitHubStats> {
     lastCommitRepo,
     repoActivity,
     repos: sortedRepos,
+    trackableRepos,
     rateLimited,
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getGitHubStats } from '@/lib/github'
 import { REPOS } from '@/lib/scores'
 import { runAutoScores } from '@/lib/autoscore'
+import { shouldSkipRepo } from '@/lib/repoFilters'
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
@@ -14,8 +15,10 @@ export async function POST(req: NextRequest) {
   try {
     const stats = await getGitHubStats()
     const knownRepoSlugs = new Set(REPOS.map(r => r.githubSlug))
-    const githubRepos = stats?.repos ?? []
-    const unscoredRepos = githubRepos.filter(repo => !knownRepoSlugs.has(repo.name))
+    const githubRepos = stats?.trackableRepos ?? []
+    const unscoredRepos = githubRepos.filter(
+      repo => !knownRepoSlugs.has(repo.name) && !shouldSkipRepo(repo.name),
+    )
 
     const scored = await runAutoScores(unscoredRepos)
 

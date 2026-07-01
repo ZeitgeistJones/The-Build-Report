@@ -3,6 +3,7 @@ import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getAutoScores } from '@/lib/autoscore'
 import { recentUnscoredRepos } from '@/lib/recentRepos'
+import { shouldSkipRepo } from '@/lib/repoFilters'
 import { calcBuilderGrade, calcHolderRelevanceGrade, calcIntegrityGrade } from '@/lib/grades'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
@@ -24,17 +25,20 @@ export default async function Home() {
   const adminNotes = await getAdminNotes()
 
   const existingSlugs = new Set(REPOS.map(r => r.githubSlug))
-  const githubRepos = stats?.repos ?? []
-  const unscoredRepos = githubRepos.filter((repo: any) => !existingSlugs.has(repo.name))
-  const autoScored = unscoredRepos.length > 0 ? await getAutoScores(unscoredRepos) : []
+  const trackableGithub = stats?.trackableRepos ?? []
+  const unscoredRepos = trackableGithub.filter(repo => !existingSlugs.has(repo.name))
+  const autoScoredRaw = unscoredRepos.length > 0 ? await getAutoScores(unscoredRepos) : []
+  const autoScored = autoScoredRaw.filter(r => !shouldSkipRepo(r.githubSlug))
 
   const listedSlugs = new Set([
     ...REPOS.map(r => r.githubSlug),
     ...autoScored.map(r => r.githubSlug),
   ])
-  const recentUnscored = stats ? recentUnscoredRepos(stats.repos, listedSlugs) : []
+  const recentUnscored = stats ? recentUnscoredRepos(trackableGithub, listedSlugs) : []
 
-  const allRepos = [...REPOS, ...autoScored, ...recentUnscored]
+  const allRepos = [...REPOS, ...autoScored, ...recentUnscored].filter(
+    r => !shouldSkipRepo(r.githubSlug),
+  )
 
   const repos = allRepos.map(r => {
     const activity = stats?.repoActivity[r.githubSlug]
@@ -48,32 +52,30 @@ export default async function Home() {
     }
   })
 
-  // #region agent log
   const sortedForDebug = [...repos].sort((a, b) => {
     const ts = (r: typeof repos[0]) =>
       r.lastCommitAt ? new Date(r.lastCommitAt).getTime()
       : r.pushedAt ? new Date(r.pushedAt).getTime() : 0
     return ts(b) - ts(a)
   })
+
+  // #region agent log
   fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
     body: JSON.stringify({
       sessionId: 'a33a7a',
+      runId: 'post-fix',
+      hypothesisId: 'H-pending-count',
       location: 'app/page.tsx:repos',
-      message: 'repo list recency debug',
-      hypothesisId: 'H1-H3',
+      message: 'repo list pending count',
       data: {
         totalRepos: repos.length,
         recentUnscoredCount: recentUnscored.length,
-        hasLocalQuestion: repos.some(r => r.githubSlug === 'local-question'),
-        topFive: sortedForDebug.slice(0, 5).map(r => ({
-          slug: r.githubSlug,
-          lastCommitAt: r.lastCommitAt,
-          pushedAt: r.pushedAt,
-          unscored: (r.adminNote ?? '').startsWith('Unscored'),
-        })),
-        githubTopThree: stats?.repos.slice(0, 3).map(r => r.name) ?? [],
+        pendingSlugs: recentUnscored.map(r => r.githubSlug),
+        jobReposInList: repos.filter(r => shouldSkipRepo(r.githubSlug)).map(r => r.githubSlug),
+        activeDays7d: stats?.activeDays7d ?? null,
+        topThree: sortedForDebug.slice(0, 3).map(r => r.githubSlug),
       },
       timestamp: Date.now(),
     }),
@@ -82,8 +84,8 @@ export default async function Home() {
 
   const builderGrade30 = stats ? calcBuilderGrade(stats, '30d') : null
   const builderGrade7 = stats ? calcBuilderGrade(stats, '7d') : null
-  const holderGrade30 = stats ? calcHolderRelevanceGrade(stats, '30d', allRepos) : null
-  const holderGrade7 = stats ? calcHolderRelevanceGrade(stats, '7d', allRepos) : null
+  const holderGrade30 = stats ? calcHolderRelevanceGrade(stats, '30d', REPOS) : null
+  const holderGrade7 = stats ? calcHolderRelevanceGrade(stats, '7d', REPOS) : null
   const integrityGrade30 = stats ? calcIntegrityGrade(stats, '30d', allRepos) : calcIntegrityGrade(null, '30d', allRepos)
   const integrityGrade7 = stats ? calcIntegrityGrade(stats, '7d', allRepos) : calcIntegrityGrade(null, '7d', allRepos)
 
