@@ -19,7 +19,7 @@ export interface BuilderGrade {
 }
 
 export interface HolderRelevanceGrade {
-  counts: { direct: number; lock: number; indirect: number; infra: number }
+  counts: { direct: number; lock: number; indirect: number; infra: number; repos: number }
   letter: string
   pct: number
   summary: string
@@ -30,7 +30,7 @@ export interface HolderRelevanceGrade {
 }
 
 export interface IntegrityGrade {
-  counts: { active: number; high: number; mid: number; low: number }
+  counts: { active: number; high: number; mid: number; low: number; commitWeight: number }
   letter: string
   pct: number
   summary: string
@@ -162,24 +162,105 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
   }
 }
 
-function holderPctFromRepos(activeRepos: Repo[]): number {
-  const counts = {
-    direct: activeRepos.filter(r => r.tag === 'direct').length,
-    lock: activeRepos.filter(r => r.tag === 'supply-lock').length,
-    indirect: activeRepos.filter(r => r.tag === 'indirect').length,
-    infra: activeRepos.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical').length,
+function commitsForRepo(
+  stats: GitHubStats,
+  slug: string,
+  period: Period,
+  window: 'current' | 'prior',
+): number {
+  const live = stats.repoActivity[slug]
+  if (!live) return 0
+  if (period === '30d') {
+    return window === 'current' ? live.commits30d : live.commits30_60
   }
-  const total = activeRepos.length || 1
-  return Math.round(((counts.direct * 1 + counts.lock * 0.75 + counts.indirect * 0.55 + counts.infra * 0.2) / total) * 100)
+  return window === 'current' ? live.commits7d : live.commits7_14
 }
 
-function holderCounts(activeRepos: Repo[]) {
-  return {
-    direct: activeRepos.filter(r => r.tag === 'direct').length,
-    lock: activeRepos.filter(r => r.tag === 'supply-lock').length,
-    indirect: activeRepos.filter(r => r.tag === 'indirect').length,
-    infra: activeRepos.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical').length,
+const HOLDER_TAG_VALUE: Record<Repo['tag'], number> = {
+  direct: 1,
+  'supply-lock': 0.75,
+  indirect: 0.55,
+  infrastructure: 0.2,
+  theoretical: 0.2,
+}
+
+function holderPctWeighted(
+  stats: GitHubStats,
+  activeRepos: Repo[],
+  period: Period,
+  window: 'current' | 'prior',
+): number {
+  let weightedSum = 0
+  let totalCommits = 0
+  for (const repo of activeRepos) {
+    const w = commitsForRepo(stats, repo.githubSlug, period, window)
+    if (w <= 0) continue
+    weightedSum += HOLDER_TAG_VALUE[repo.tag] * w
+    totalCommits += w
   }
+  if (totalCommits === 0) return 0
+  return Math.round((weightedSum / totalCommits) * 100)
+}
+
+function holderCommitCounts(
+  stats: GitHubStats,
+  activeRepos: Repo[],
+  period: Period,
+  window: 'current' | 'prior',
+) {
+  const counts = { direct: 0, lock: 0, indirect: 0, infra: 0, repos: activeRepos.length }
+  for (const repo of activeRepos) {
+    const w = commitsForRepo(stats, repo.githubSlug, period, window)
+    if (repo.tag === 'direct') counts.direct += w
+    else if (repo.tag === 'supply-lock') counts.lock += w
+    else if (repo.tag === 'indirect') counts.indirect += w
+    else counts.infra += w
+  }
+  return counts
+}
+
+function holderTotalCommits(counts: { direct: number; lock: number; indirect: number; infra: number }): number {
+  return counts.direct + counts.lock + counts.indirect + counts.infra
+}
+
+function weightedAvgByCommits(
+  stats: GitHubStats,
+  repos: Repo[],
+  period: Period,
+  window: 'current' | 'prior',
+  scoreFn: (repo: Repo) => number,
+): number {
+  let sum = 0
+  let weight = 0
+  for (const repo of repos) {
+    const w = commitsForRepo(stats, repo.githubSlug, period, window)
+    if (w <= 0) continue
+    sum += scoreFn(repo) * w
+    weight += w
+  }
+  return weight ? Math.round(sum / weight) : 0
+}
+
+function integrityCommitCounts(
+  stats: GitHubStats,
+  repos: Repo[],
+  period: Period,
+  window: 'current' | 'prior',
+) {
+  let high = 0
+  let mid = 0
+  let low = 0
+  let total = 0
+  for (const repo of repos) {
+    if (repo.builderIntegrity.letter === '—') continue
+    const w = commitsForRepo(stats, repo.githubSlug, period, window)
+    if (w <= 0) continue
+    total += w
+    if (repo.builderIntegrity.pct >= 80) high += w
+    else if (repo.builderIntegrity.pct >= 60) mid += w
+    else low += w
+  }
+  return { active: repos.length, high, mid, low, commitWeight: total }
 }
 
 function reposActiveInWindow(stats: GitHubStats, repoSet: Repo[], period: Period, window: 'current' | 'prior') {
@@ -197,10 +278,10 @@ export function calcHolderRelevanceGrade(stats: GitHubStats, period: Period, rep
   const activeRepos = reposActiveInWindow(stats, repoSet, period, 'current')
   const priorActiveRepos = reposActiveInWindow(stats, repoSet, period, 'prior')
 
-  const counts = holderCounts(activeRepos)
-  const total = activeRepos.length || 1
-  const pct = holderPctFromRepos(activeRepos)
-  const priorPct = holderPctFromRepos(priorActiveRepos)
+  const counts = holderCommitCounts(stats, activeRepos, period, 'current')
+  const totalCommits = holderTotalCommits(counts) || 1
+  const pct = holderPctWeighted(stats, activeRepos, period, 'current')
+  const priorPct = holderPctWeighted(stats, priorActiveRepos, period, 'prior')
   const trendPct = pctChange(pct, priorPct)
   const letter = pctToLetter(pct)
 
@@ -212,17 +293,17 @@ export function calcHolderRelevanceGrade(stats: GitHubStats, period: Period, rep
     trend: trendFromPct(trendPct),
     summary:
       pct >= 80
-        ? 'Most recently active repos are directly aligned with holder value.'
+        ? 'Most commit volume in this window is on directly holder-aligned repos.'
         : pct >= 60
-          ? 'A healthy share of recent activity points toward holder value, with some infra mixed in.'
+          ? 'A healthy share of commits points toward holder value, with some infra mixed in.'
           : pct >= 40
-            ? 'Recent activity is split between holder-facing work and infrastructure.'
-            : 'Recent activity leans more toward infrastructure and R&D than direct holder value.',
+            ? 'Commit volume is split between holder-facing work and infrastructure.'
+            : 'Recent commits lean more toward infrastructure and R&D than direct holder value.',
     signals: [
-      { label: 'Direct burn', level: toLevel(counts.direct / total), pct: Math.round((counts.direct / total) * 100) },
-      { label: 'Supply lock', level: toLevel(counts.lock / total), pct: Math.round((counts.lock / total) * 100) },
-      { label: 'Indirect value', level: toLevel(counts.indirect / total), pct: Math.round((counts.indirect / total) * 100) },
-      { label: 'Non-infra share', level: toLevel(1 - counts.infra / total), pct: Math.round((1 - counts.infra / total) * 100) },
+      { label: 'Direct burn', level: toLevel(counts.direct / totalCommits), pct: Math.round((counts.direct / totalCommits) * 100) },
+      { label: 'Supply lock', level: toLevel(counts.lock / totalCommits), pct: Math.round((counts.lock / totalCommits) * 100) },
+      { label: 'Indirect value', level: toLevel(counts.indirect / totalCommits), pct: Math.round((counts.indirect / totalCommits) * 100) },
+      { label: 'Non-infra share', level: toLevel(1 - counts.infra / totalCommits), pct: Math.round((1 - counts.infra / totalCommits) * 100) },
     ],
   }
 }
@@ -239,49 +320,65 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
   const sample = activeRepos.length ? activeRepos : repoSet
   const priorSample = priorActiveRepos
 
-  const scores = sample.map(repo => repo.builderIntegrity.pct)
-  const pct = avg(scores)
-  const priorPct = priorSample.length ? avg(priorSample.map(repo => repo.builderIntegrity.pct)) : 0
+  const pct = !stats
+    ? avg(sample.map(repo => repo.builderIntegrity.pct))
+    : weightedAvgByCommits(stats, sample, period, 'current', r => r.builderIntegrity.pct)
+
+  const priorPct = !stats || !priorSample.length
+    ? 0
+    : weightedAvgByCommits(stats, priorSample, period, 'prior', r => r.builderIntegrity.pct)
+
   const trendPct = pctChange(pct, priorPct)
 
-  const high = sample.filter(r => r.builderIntegrity.pct >= 80).length
-  const mid = sample.filter(r => r.builderIntegrity.pct >= 60 && r.builderIntegrity.pct < 80).length
-  const low = sample.filter(r => r.builderIntegrity.pct < 60).length
+  const commitCounts = stats
+    ? integrityCommitCounts(stats, sample, period, 'current')
+    : {
+        active: sample.length,
+        high: sample.filter(r => r.builderIntegrity.pct >= 80).length,
+        mid: sample.filter(r => r.builderIntegrity.pct >= 60 && r.builderIntegrity.pct < 80).length,
+        low: sample.filter(r => r.builderIntegrity.pct < 60).length,
+        commitWeight: 0,
+      }
 
-  const visionAvg = avg(sample.map(r => {
-    const row = r.builderIntegrity.rubric.find(x => x.label === 'Serves stated vision at time of build')
-    return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
-  }))
+  const { high, mid, low, commitWeight } = commitCounts
+  const weightBase = commitWeight || 1
 
-  const autonomyAvg = avg(sample.map(r => {
-    const row = r.builderIntegrity.rubric.find(x => x.label === 'Genuine autonomous build')
+  const rubricScore = (repo: Repo, label: string) => {
+    const row = repo.builderIntegrity.rubric.find(x => x.label === label)
     return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
-  }))
+  }
 
-  const walkawayAvg = avg(sample.map(r => {
-    const row = r.builderIntegrity.rubric.find(x => x.label === 'Passes walkaway test')
-    return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
-  }))
+  const visionAvg = stats
+    ? weightedAvgByCommits(stats, sample, period, 'current', r => rubricScore(r, 'Serves stated vision at time of build'))
+    : avg(sample.map(r => rubricScore(r, 'Serves stated vision at time of build')))
+
+  const autonomyAvg = stats
+    ? weightedAvgByCommits(stats, sample, period, 'current', r => rubricScore(r, 'Genuine autonomous build'))
+    : avg(sample.map(r => rubricScore(r, 'Genuine autonomous build')))
+
+  const walkawayAvg = stats
+    ? weightedAvgByCommits(stats, sample, period, 'current', r => rubricScore(r, 'Passes walkaway test'))
+    : avg(sample.map(r => rubricScore(r, 'Passes walkaway test')))
 
   return {
-    counts: { active: sample.length, high, mid, low },
+    counts: { active: sample.length, high, mid, low, commitWeight },
     letter: pctToLetter(pct),
     pct,
     trendPct,
     trend: trendFromPct(trendPct),
     summary:
       pct >= 80
-        ? 'Recent active repos are strongly aligned with the original builder-values rubric.'
+        ? 'Repos seeing the most commits score strongly on the builder-values rubric.'
         : pct >= 60
-          ? 'Most recent active repos still fit the stated builder-values frame, with some weaker walkaway or vision alignment.'
+          ? 'Heavy commit repos mostly fit the stated builder-values frame, with some weaker alignment.'
           : pct >= 40
-            ? 'Integrity is mixed across the active repo set.'
-            : 'The active repo set scores weakly against the original builder-values rubric.',
+            ? 'Integrity is mixed across where commit volume landed this window.'
+            : 'Most commits this window landed on repos with weaker builder-values scores.',
     signals: [
       { label: 'Stated vision', level: toLevel(visionAvg / 100), pct: visionAvg },
       { label: 'Autonomous build', level: toLevel(autonomyAvg / 100), pct: autonomyAvg },
       { label: 'Walkaway test', level: toLevel(walkawayAvg / 100), pct: walkawayAvg },
-      { label: 'High-integrity share', level: toLevel(high / Math.max(sample.length, 1)), pct: Math.round((high / Math.max(sample.length, 1)) * 100) },
+      { label: 'High-integrity share', level: toLevel(high / weightBase), pct: Math.round((high / weightBase) * 100) },
     ],
   }
 }

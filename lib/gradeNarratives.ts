@@ -128,6 +128,8 @@ export function buildBuilderTrendExplanation(
     )
   }
 
+  bullets.push('List order still follows GitHub last-pushed; grades weight by commit volume.')
+
   const topPrior = topReposByCommits(stats, period, 'prior', 3)
   if (topPrior.length && trend === 'down') {
     bullets.push(
@@ -179,19 +181,43 @@ export function buildHolderTrendExplanation(
     )
   }
 
+  const repoCommits = (repo: Repo, window: 'current' | 'prior') => {
+    const live = stats.repoActivity[repo.githubSlug]
+    return live ? commitCount(live, period, window) : 0
+  }
+
+  const directNowCommits = activeNow
+    .filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
+    .reduce((sum, r) => sum + repoCommits(r, 'current'), 0)
+  const directPriorCommits = activePrior
+    .filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
+    .reduce((sum, r) => sum + repoCommits(r, 'prior'), 0)
+  const infraNowCommits = activeNow
+    .filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
+    .reduce((sum, r) => sum + repoCommits(r, 'current'), 0)
+  const infraPriorCommits = activePrior
+    .filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
+    .reduce((sum, r) => sum + repoCommits(r, 'prior'), 0)
+
+  if (directNowCommits !== directPriorCommits || infraNowCommits !== infraPriorCommits) {
+    bullets.push(
+      `Commit-weighted: ${directNowCommits} commits on holder-facing repos vs ${directPriorCommits} prior; ${infraNowCommits} on infra/R&D vs ${infraPriorCommits} prior.`,
+    )
+  }
+
   const directNow = activeNow.filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
   const directPrior = activePrior.filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
   if (directNow.length !== directPrior.length) {
     bullets.push(
-      `Holder-facing repos active: ${directNow.length} now vs ${directPrior.length} prior${directNow.length ? ` (${formatRepoList(directNow, 3)})` : ''}.`,
+      `Holder-facing repos with any commits: ${directNow.length} now vs ${directPrior.length} prior${directNow.length ? ` (${formatRepoList(directNow, 3)})` : ''}.`,
     )
   }
 
   const infraNow = activeNow.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
   const infraPrior = activePrior.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
-  if (infraNow.length > infraPrior.length && trend === 'down') {
+  if (infraNowCommits > infraPriorCommits && trend === 'down') {
     bullets.push(
-      `Infra/R&D share grew — ${infraNow.length} repos now vs ${infraPrior.length} prior (e.g. ${formatRepoList(infraNow, 3)}).`,
+      `Infra/R&D commit share grew — ${infraNowCommits} commits now vs ${infraPriorCommits} prior (e.g. ${formatRepoList(infraNow, 3)}).`,
     )
   }
 
@@ -202,10 +228,10 @@ export function buildHolderTrendExplanation(
   const trendLabel = formatTrendPct(trendPct, period)
   const headline =
     trend === 'up'
-      ? `Holder alignment improved (${trendLabel}) — more active work on direct, lock, or indirect repos.`
+      ? `Holder alignment improved (${trendLabel}) — more commit volume on direct, lock, or indirect repos.`
       : trend === 'down'
-        ? `Holder alignment dipped (${trendLabel}) — recent commits skew toward infra/R&D vs the prior window.`
-        : `Holder alignment stable (${trendLabel}) — similar tag mix across windows.`
+        ? `Holder alignment dipped (${trendLabel}) — commit volume skews toward infra/R&D vs the prior window.`
+        : `Holder alignment stable (${trendLabel}) — similar commit-weighted tag mix.`
 
   return { headline, bullets: bullets.slice(0, 5) }
 }
@@ -251,9 +277,16 @@ export function buildIntegrityTrendExplanation(
       `High-integrity repos quiet this window: ${formatRepoList(highDropped)}.`,
     )
   }
+  const topByCommits = topReposByCommits(stats, period, 'current', 5)
+  if (topByCommits.length) {
+    bullets.push(
+      `Where commits landed: ${topByCommits.map(r => `${r.name} (${r.commits})`).join(', ')}.`,
+    )
+  }
+
   if (highNow !== highPrior || lowNow !== lowPrior) {
     bullets.push(
-      `Integrity mix: ${highNow} high / ${lowNow} low now vs ${highPrior} high / ${lowPrior} low prior (among repos with scores).`,
+      `Repos with high/low integrity scores: ${highNow} high / ${lowNow} low now vs ${highPrior} high / ${lowPrior} low prior (unweighted repo count).`,
     )
   }
 
@@ -264,10 +297,10 @@ export function buildIntegrityTrendExplanation(
   const trendLabel = formatTrendPct(trendPct, period)
   const headline =
     trend === 'up'
-      ? `Integrity rose (${trendLabel}) — active repos score stronger on vision, autonomy, and walkaway.`
+      ? `Integrity rose (${trendLabel}) — repos with the most commits score stronger on vision, autonomy, and walkaway.`
       : trend === 'down'
-        ? `Integrity fell (${trendLabel}) — more low-scoring or auto-inferred repos in the active set.`
-        : `Integrity steady (${trendLabel}) — similar rubric average across windows.`
+        ? `Integrity fell (${trendLabel}) — commit volume shifted toward lower-scoring or auto-inferred repos.`
+        : `Integrity steady (${trendLabel}) — similar commit-weighted rubric average.`
 
   return { headline, bullets: bullets.slice(0, 5) }
 }

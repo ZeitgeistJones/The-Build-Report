@@ -359,23 +359,26 @@ export default function GradesPanel({
           grade={hg}
           label="holder relevance"
           period={period}
-          mini="Share of active work pointed at CLAWD holder value; infrastructure can be N/A."
+          mini="Share of commit volume pointed at CLAWD holder value (weighted by commits per repo)."
           summary={hg?.summary ?? 'Holder relevance score unavailable'}
           trendExplanation={hg?.trendExplanation}
           footer={
             hg?.counts && (
               <>
+                {hg.counts.repos > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.repos} active repos</span>
+                )}
                 {hg.counts.direct > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.direct} direct</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.direct} direct commits</span>
                 )}
                 {hg.counts.lock > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.lock} supply lock</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.lock} supply-lock commits</span>
                 )}
                 {hg.counts.indirect > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.indirect} indirect</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.indirect} indirect commits</span>
                 )}
                 {hg.counts.infra > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.infra} infra</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.infra} infra/R&D commits</span>
                 )}
               </>
             )
@@ -386,16 +389,25 @@ export default function GradesPanel({
           grade={ig}
           label="integrity grade"
           period={period}
-          mini="How well currently active repos fit the stated builder-values frame."
+          mini="Commit-weighted fit to the stated builder-values frame (by rubric scores)."
           summary={ig?.summary ?? 'Integrity score unavailable'}
           trendExplanation={ig?.trendExplanation}
           footer={
             ig && (
               <>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.active} repos in sample</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.high} high</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.mid} mid</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.low} low</span>
+                {ig.counts.commitWeight > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.commitWeight} commits weighted</span>
+                )}
+                {ig.counts.high > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.high} high-integrity commits</span>
+                )}
+                {ig.counts.mid > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.mid} mid commits</span>
+                )}
+                {ig.counts.low > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.low} low-integrity commits</span>
+                )}
               </>
             )
           }
