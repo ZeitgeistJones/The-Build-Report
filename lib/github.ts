@@ -3,7 +3,7 @@ import { REPOS } from './scores'
 const GITHUB_ORG = 'clawdbotatg'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 
-const PRIORITY_SLUGS = [...new Set(REPOS.map(r => r.githubSlug))]
+const PRIORITY_SLUGS = Array.from(new Set(REPOS.map(r => r.githubSlug)))
 
 async function ghFetch(path: string) {
   const headers: Record<string, string> = {
