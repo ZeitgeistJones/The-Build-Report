@@ -37,20 +37,14 @@ function gradeColor(letter: string) {
   return 'var(--red)'
 }
 
-function parseScoredAt(scoredAt: string): number {
-  const t = Date.parse(scoredAt)
-  return Number.isNaN(t) ? 0 : t
-}
-
-function recencyTimestamp(repo: RepoWithLive): number {
-  if (repo.lastCommitAt) return new Date(repo.lastCommitAt).getTime()
-  if (repo.pushedAt) return new Date(repo.pushedAt).getTime()
-  return parseScoredAt(repo.scoredAt)
+function githubOrderIndex(slug: string, order: string[]): number {
+  const idx = order.indexOf(slug)
+  return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
 }
 
 function activitySubtitle(repo: RepoWithLive): string {
-  if (repo.lastCommitAt) return `Last commit ${formatLastCommit(repo.lastCommitAt)}`
   if (repo.pushedAt) return `Last pushed ${formatLastCommit(repo.pushedAt)}`
+  if (repo.lastCommitAt) return `Last commit ${formatLastCommit(repo.lastCommitAt)}`
   return `Scored ${repo.scoredAt}`
 }
 
@@ -73,9 +67,10 @@ interface RepoWithLive extends Repo {
 
 interface Props {
   repos: RepoWithLive[]
+  githubSlugOrder?: string[]
 }
 
-export default function RepoList({ repos }: Props) {
+export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
   const [activeFilter, setActiveFilter] = useState<Tag | 'all'>('all')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
@@ -91,13 +86,15 @@ export default function RepoList({ repos }: Props) {
   const filtered = repos
     .filter(r => activeFilter === 'all' || r.tag === activeFilter)
     .sort((a, b) => {
-      const aTime = recencyTimestamp(a)
-      const bTime = recencyTimestamp(b)
-      if (aTime !== bTime) return bTime - aTime
+      if (githubSlugOrder.length) {
+        const aIdx = githubOrderIndex(a.githubSlug, githubSlugOrder)
+        const bIdx = githubOrderIndex(b.githubSlug, githubSlugOrder)
+        if (aIdx !== bIdx) return aIdx - bIdx
+      }
 
-      const aCommits = a.commits30d ?? 0
-      const bCommits = b.commits30d ?? 0
-      if (aCommits !== bCommits) return bCommits - aCommits
+      const aPushed = a.pushedAt ? new Date(a.pushedAt).getTime() : 0
+      const bPushed = b.pushedAt ? new Date(b.pushedAt).getTime() : 0
+      if (aPushed !== bPushed) return bPushed - aPushed
 
       return a.name.localeCompare(b.name)
     })

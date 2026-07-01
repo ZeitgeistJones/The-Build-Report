@@ -2,8 +2,9 @@ import { getGitHubStats, timeAgo } from '@/lib/github'
 import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getAutoScores } from '@/lib/autoscore'
-import { recentUnscoredRepos } from '@/lib/recentRepos'
+import { githubTopUnscoredRepos } from '@/lib/recentRepos'
 import { shouldSkipRepo } from '@/lib/repoFilters'
+import { mergeRepoSources, orderReposByGithub, githubSlugOrder } from '@/lib/repoOrder'
 import { calcBuilderGrade, calcHolderRelevanceGrade, calcIntegrityGrade } from '@/lib/grades'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
@@ -34,30 +35,28 @@ export default async function Home() {
     ...REPOS.map(r => r.githubSlug),
     ...autoScored.map(r => r.githubSlug),
   ])
-  const recentUnscored = stats ? recentUnscoredRepos(trackableGithub, listedSlugs) : []
+  const recentUnscored = stats ? githubTopUnscoredRepos(trackableGithub, listedSlugs) : []
 
-  const allRepos = [...REPOS, ...autoScored, ...recentUnscored].filter(
-    r => !shouldSkipRepo(r.githubSlug),
-  )
+  const allRepos = mergeRepoSources(REPOS, autoScored, recentUnscored)
 
-  const repos = allRepos.map(r => {
+  const reposRaw = allRepos.map(r => {
     const activity = stats?.repoActivity[r.githubSlug]
-    const githubRepo = stats?.repos.find(gr => gr.name === r.githubSlug)
+    const githubRepo = trackableGithub.find(gr => gr.name === r.githubSlug)
+      ?? stats?.repos.find(gr => gr.name === r.githubSlug)
     return {
       ...r,
       adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
       lastCommitAt: activity?.lastCommitAt ?? null,
-      pushedAt: activity?.pushedAt ?? githubRepo?.pushedAt ?? null,
+      pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
       commits30d: activity?.commits30d ?? null,
     }
   })
 
-  const sortedForDebug = [...repos].sort((a, b) => {
-    const ts = (r: typeof repos[0]) =>
-      r.lastCommitAt ? new Date(r.lastCommitAt).getTime()
-      : r.pushedAt ? new Date(r.pushedAt).getTime() : 0
-    return ts(b) - ts(a)
-  })
+  const repos = stats
+    ? orderReposByGithub(reposRaw, trackableGithub)
+    : reposRaw
+
+  const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
 
   // #region agent log
   fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
@@ -65,17 +64,20 @@ export default async function Home() {
     headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
     body: JSON.stringify({
       sessionId: 'a33a7a',
-      runId: 'post-fix',
-      hypothesisId: 'H-pending-count',
+      runId: 'github-order',
+      hypothesisId: 'H-github-order',
       location: 'app/page.tsx:repos',
-      message: 'repo list pending count',
+      message: 'github order vs site order',
       data: {
-        totalRepos: repos.length,
-        recentUnscoredCount: recentUnscored.length,
-        pendingSlugs: recentUnscored.map(r => r.githubSlug),
-        jobReposInList: repos.filter(r => shouldSkipRepo(r.githubSlug)).map(r => r.githubSlug),
-        activeDays7d: stats?.activeDays7d ?? null,
-        topThree: sortedForDebug.slice(0, 3).map(r => r.githubSlug),
+        githubTop8: trackableGithub.slice(0, 8).map(r => r.name),
+        siteTop8: repos.slice(0, 8).map(r => r.githubSlug),
+        match: trackableGithub.slice(0, 8).map(r => r.name).every(
+          (name, i) => repos.slice(0, 8)[i]?.githubSlug === name
+            || !repos.some(rep => rep.githubSlug === name),
+        ),
+        position1024x: repos.findIndex(r => r.githubSlug === '1024x'),
+        hasLocalQuestion: repos.some(r => r.githubSlug === 'local-question'),
+        localQuestionIndex: repos.findIndex(r => r.githubSlug === 'local-question'),
       },
       timestamp: Date.now(),
     }),
@@ -199,7 +201,7 @@ export default async function Home() {
         }
       />
 
-      <RepoList repos={repos} />
+      <RepoList repos={repos} githubSlugOrder={githubOrder} />
 
       <div id="how-we-score" style={{ marginTop: '48px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: 'var(--text-primary)' }}>
