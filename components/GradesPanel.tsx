@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BuilderGrade, HolderRelevanceGrade, IntegrityGrade, formatTrendPct } from '@/lib/grades'
+import { BuilderGrade, HolderRelevanceGrade, IntegrityGrade, formatTrendPct, TrendExplanation } from '@/lib/grades'
 
 interface Props {
   builderGrade30: BuilderGrade | null
@@ -40,6 +40,7 @@ function GradeCard({
   summary,
   period,
   footer,
+  trendExplanation,
 }: {
   grade: {
     letter: string
@@ -52,7 +53,10 @@ function GradeCard({
   summary: string
   period: '30d' | '7d'
   footer?: React.ReactNode
+  trendExplanation?: TrendExplanation
 }) {
+  const [showTrend, setShowTrend] = useState(false)
+
   return (
     <div
       style={{
@@ -142,11 +146,53 @@ function GradeCard({
           fontSize: '12px',
           color: 'var(--text-secondary)',
           lineHeight: 1.5,
-          marginBottom: '12px',
+          marginBottom: trendExplanation ? '8px' : '12px',
         }}
       >
         {summary}
       </p>
+
+      {trendExplanation && (
+        <div style={{ marginBottom: '12px' }}>
+          <button
+            type="button"
+            onClick={() => setShowTrend(v => !v)}
+            style={{
+              fontSize: '11px',
+              color: 'var(--text-muted)',
+              background: 'transparent',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span style={{ transform: showTrend ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▸</span>
+            Why this trend?
+          </button>
+          {showTrend && (
+            <div
+              style={{
+                marginTop: '8px',
+                padding: '10px 12px',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.55,
+              }}
+            >
+              <p style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>{trendExplanation.headline}</p>
+              <ul style={{ margin: 0, paddingLeft: '16px' }}>
+                {trendExplanation.bullets.map(b => (
+                  <li key={b} style={{ marginBottom: '4px' }}>{b}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {grade?.signals.map(s => (
@@ -297,6 +343,7 @@ export default function GradesPanel({
           period={period}
           mini="Recent GitHub activity quality across the selected window."
           summary={bg?.summary ?? 'GitHub data unavailable'}
+          trendExplanation={bg?.trendExplanation}
           footer={
             stats && (
               <>
@@ -314,6 +361,7 @@ export default function GradesPanel({
           period={period}
           mini="Share of active work pointed at CLAWD holder value; infrastructure can be N/A."
           summary={hg?.summary ?? 'Holder relevance score unavailable'}
+          trendExplanation={hg?.trendExplanation}
           footer={
             hg?.counts && (
               <>
@@ -340,6 +388,7 @@ export default function GradesPanel({
           period={period}
           mini="How well currently active repos fit the stated builder-values frame."
           summary={ig?.summary ?? 'Integrity score unavailable'}
+          trendExplanation={ig?.trendExplanation}
           footer={
             ig && (
               <>

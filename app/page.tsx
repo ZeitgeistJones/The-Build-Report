@@ -6,6 +6,11 @@ import { makeUnscoredRecentRepo } from '@/lib/recentRepos'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { mergeRepoSources, buildReposInGithubOrder, githubSlugOrder } from '@/lib/repoOrder'
 import { calcBuilderGrade, calcHolderRelevanceGrade, calcIntegrityGrade } from '@/lib/grades'
+import {
+  buildBuilderTrendExplanation,
+  buildHolderTrendExplanation,
+  buildIntegrityTrendExplanation,
+} from '@/lib/gradeNarratives'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
@@ -52,12 +57,31 @@ export default async function Home() {
 
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
 
-  const builderGrade30 = stats ? calcBuilderGrade(stats, '30d') : null
-  const builderGrade7 = stats ? calcBuilderGrade(stats, '7d') : null
-  const holderGrade30 = stats ? calcHolderRelevanceGrade(stats, '30d', REPOS) : null
-  const holderGrade7 = stats ? calcHolderRelevanceGrade(stats, '7d', REPOS) : null
-  const integrityGrade30 = stats ? calcIntegrityGrade(stats, '30d', allRepos) : calcIntegrityGrade(null, '30d', allRepos)
-  const integrityGrade7 = stats ? calcIntegrityGrade(stats, '7d', allRepos) : calcIntegrityGrade(null, '7d', allRepos)
+  const builderGrade30Raw = stats ? calcBuilderGrade(stats, '30d') : null
+  const builderGrade7Raw = stats ? calcBuilderGrade(stats, '7d') : null
+  const holderGrade30Raw = stats ? calcHolderRelevanceGrade(stats, '30d', allRepos) : null
+  const holderGrade7Raw = stats ? calcHolderRelevanceGrade(stats, '7d', allRepos) : null
+  const integrityGrade30Raw = stats ? calcIntegrityGrade(stats, '30d', allRepos) : calcIntegrityGrade(null, '30d', allRepos)
+  const integrityGrade7Raw = stats ? calcIntegrityGrade(stats, '7d', allRepos) : calcIntegrityGrade(null, '7d', allRepos)
+
+  const builderGrade30 = builderGrade30Raw && stats
+    ? { ...builderGrade30Raw, trendExplanation: buildBuilderTrendExplanation(stats, '30d', builderGrade30Raw.trendPct, builderGrade30Raw.trend) }
+    : builderGrade30Raw
+  const builderGrade7 = builderGrade7Raw && stats
+    ? { ...builderGrade7Raw, trendExplanation: buildBuilderTrendExplanation(stats, '7d', builderGrade7Raw.trendPct, builderGrade7Raw.trend) }
+    : builderGrade7Raw
+  const holderGrade30 = holderGrade30Raw && stats
+    ? { ...holderGrade30Raw, trendExplanation: buildHolderTrendExplanation(stats, '30d', allRepos, holderGrade30Raw.trendPct, holderGrade30Raw.trend) }
+    : holderGrade30Raw
+  const holderGrade7 = holderGrade7Raw && stats
+    ? { ...holderGrade7Raw, trendExplanation: buildHolderTrendExplanation(stats, '7d', allRepos, holderGrade7Raw.trendPct, holderGrade7Raw.trend) }
+    : holderGrade7Raw
+  const integrityGrade30 = integrityGrade30Raw && stats
+    ? { ...integrityGrade30Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '30d', allRepos, integrityGrade30Raw.trendPct, integrityGrade30Raw.trend) }
+    : integrityGrade30Raw
+  const integrityGrade7 = integrityGrade7Raw && stats
+    ? { ...integrityGrade7Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '7d', allRepos, integrityGrade7Raw.trendPct, integrityGrade7Raw.trend) }
+    : integrityGrade7Raw
 
   return (
     <>

@@ -1,0 +1,273 @@
+import { Repo, Tag } from './scores'
+import { GitHubStats, RepoActivity } from './github'
+import { Period, formatTrendPct, TrendExplanation } from './grades'
+
+export type { TrendExplanation }
+
+function priorWindowLabel(period: Period): string {
+  return period === '30d' ? 'prior 30d (days 31–60)' : 'prior 7d (days 8–14)'
+}
+
+function currentWindowLabel(period: Period): string {
+  return period === '30d' ? 'last 30 days' : 'last 7 days'
+}
+
+function commitCount(activity: RepoActivity, period: Period, window: 'current' | 'prior'): number {
+  if (period === '30d') {
+    return window === 'current' ? activity.commits30d : activity.commits30_60
+  }
+  return window === 'current' ? activity.commits7d : activity.commits7_14
+}
+
+function reposActiveInWindow(
+  stats: GitHubStats,
+  repoSet: Repo[],
+  period: Period,
+  window: 'current' | 'prior',
+): Repo[] {
+  return repoSet.filter(repo => {
+    const live = stats.repoActivity[repo.githubSlug]
+    if (!live) return false
+    return commitCount(live, period, window) > 0
+  })
+}
+
+function topReposByCommits(
+  stats: GitHubStats,
+  period: Period,
+  window: 'current' | 'prior',
+  limit = 5,
+): { name: string; commits: number }[] {
+  return Object.values(stats.repoActivity)
+    .map(a => ({ name: a.slug, commits: commitCount(a, period, window) }))
+    .filter(r => r.commits > 0)
+    .sort((a, b) => b.commits - a.commits)
+    .slice(0, limit)
+}
+
+function formatRepoList(repos: Repo[], max = 4): string {
+  if (!repos.length) return 'none'
+  const names = repos.slice(0, max).map(r => r.name)
+  const extra = repos.length > max ? ` +${repos.length - max} more` : ''
+  return names.join(', ') + extra
+}
+
+function tagLabel(tag: Tag): string {
+  if (tag === 'supply-lock') return 'supply lock'
+  if (tag === 'infrastructure' || tag === 'theoretical') return 'infra/R&D'
+  return tag
+}
+
+function holderWeight(tag: Tag): string {
+  if (tag === 'direct') return 'direct burn'
+  if (tag === 'supply-lock') return 'supply lock'
+  if (tag === 'indirect') return 'indirect'
+  return 'infra/R&D'
+}
+
+function diffMetricForPeriod(
+  label: string,
+  current: number,
+  prior: number,
+  period: Period,
+): string | null {
+  if (current === prior) return null
+  const dir = current > prior ? 'up' : 'down'
+  return `${label} ${dir}: ${current} this window vs ${prior} ${priorWindowLabel(period).split('(')[0].trim()}`
+}
+
+function builderInputs(stats: GitHubStats, period: Period, window: 'current' | 'prior') {
+  const activityCount = Object.keys(stats.repoActivity).length
+  if (period === '30d') {
+    const activeRepos = Object.values(stats.repoActivity).filter(r =>
+      window === 'current' ? r.commits30d > 0 : r.commits30_60 > 0,
+    ).length
+    return {
+      commits: window === 'current' ? stats.totalCommits30d : stats.totalCommits30_60,
+      activeDays: window === 'current' ? stats.activeDays30d : stats.activeDays30_60,
+      newRepos: window === 'current' ? stats.newRepos30d : stats.newRepos30_60,
+      activeRepos,
+      scannedRepos: activityCount,
+    }
+  }
+  const activeRepos = Object.values(stats.repoActivity).filter(r =>
+    window === 'current' ? r.commits7d > 0 : r.commits7_14 > 0,
+  ).length
+  return {
+    commits: window === 'current' ? stats.totalCommits7d : stats.totalCommits7_14,
+    activeDays: window === 'current' ? stats.activeDays7d : stats.activeDays7_14,
+    newRepos: window === 'current' ? stats.newRepos7d : stats.newRepos7_14,
+    activeRepos,
+    scannedRepos: activityCount,
+  }
+}
+
+export function buildBuilderTrendExplanation(
+  stats: GitHubStats,
+  period: Period,
+  trendPct: number | null,
+  trend: 'up' | 'flat' | 'down',
+): TrendExplanation {
+  const current = builderInputs(stats, period, 'current')
+  const prior = builderInputs(stats, period, 'prior')
+  const bullets: string[] = []
+
+  for (const line of [
+    diffMetricForPeriod('Commits', current.commits, prior.commits, period),
+    diffMetricForPeriod('Active days', current.activeDays, prior.activeDays, period),
+    diffMetricForPeriod('New repos', current.newRepos, prior.newRepos, period),
+    diffMetricForPeriod('Repos with commits', current.activeRepos, prior.activeRepos, period),
+  ]) {
+    if (line) bullets.push(line)
+  }
+
+  const topNow = topReposByCommits(stats, period, 'current', 5)
+  if (topNow.length) {
+    bullets.push(
+      `Most commits this window: ${topNow.map(r => `${r.name} (${r.commits})`).join(', ')}.`,
+    )
+  }
+
+  const topPrior = topReposByCommits(stats, period, 'prior', 3)
+  if (topPrior.length && trend === 'down') {
+    bullets.push(
+      `Prior window was led by ${topPrior.map(r => `${r.name} (${r.commits})`).join(', ')}.`,
+    )
+  }
+
+  if (!bullets.length) {
+    bullets.push('Activity levels are similar to the prior window across tracked repos.')
+  }
+
+  const trendLabel = formatTrendPct(trendPct, period)
+  const headline =
+    trend === 'up'
+      ? `Shipping pace rose (${trendLabel}) — more GitHub activity in the ${currentWindowLabel(period)} than ${priorWindowLabel(period)}.`
+      : trend === 'down'
+        ? `Shipping pace softened (${trendLabel}) — less activity in the ${currentWindowLabel(period)} than ${priorWindowLabel(period)}.`
+        : `Shipping pace held steady (${trendLabel}) compared with ${priorWindowLabel(period)}.`
+
+  return { headline, bullets: bullets.slice(0, 5) }
+}
+
+export function buildHolderTrendExplanation(
+  stats: GitHubStats,
+  period: Period,
+  repoSet: Repo[],
+  trendPct: number | null,
+  trend: 'up' | 'flat' | 'down',
+): TrendExplanation {
+  const activeNow = reposActiveInWindow(stats, repoSet, period, 'current')
+  const activePrior = reposActiveInWindow(stats, repoSet, period, 'prior')
+  const nowSlugs = new Set(activeNow.map(r => r.githubSlug))
+  const priorSlugs = new Set(activePrior.map(r => r.githubSlug))
+
+  const newlyActive = activeNow.filter(r => !priorSlugs.has(r.githubSlug))
+  const quietNow = activePrior.filter(r => !nowSlugs.has(r.githubSlug))
+
+  const bullets: string[] = []
+
+  if (newlyActive.length) {
+    bullets.push(
+      `Newly active this window: ${formatRepoList(newlyActive)} (${newlyActive.map(r => tagLabel(r.tag)).join(', ')}).`,
+    )
+  }
+
+  if (quietNow.length) {
+    bullets.push(
+      `Quiet this window (active prior): ${formatRepoList(quietNow)} (${quietNow.map(r => holderWeight(r.tag)).join(', ')}).`,
+    )
+  }
+
+  const directNow = activeNow.filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
+  const directPrior = activePrior.filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
+  if (directNow.length !== directPrior.length) {
+    bullets.push(
+      `Holder-facing repos active: ${directNow.length} now vs ${directPrior.length} prior${directNow.length ? ` (${formatRepoList(directNow, 3)})` : ''}.`,
+    )
+  }
+
+  const infraNow = activeNow.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
+  const infraPrior = activePrior.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
+  if (infraNow.length > infraPrior.length && trend === 'down') {
+    bullets.push(
+      `Infra/R&D share grew — ${infraNow.length} repos now vs ${infraPrior.length} prior (e.g. ${formatRepoList(infraNow, 3)}).`,
+    )
+  }
+
+  if (!bullets.length) {
+    bullets.push('The mix of active repo tags is similar to the prior window.')
+  }
+
+  const trendLabel = formatTrendPct(trendPct, period)
+  const headline =
+    trend === 'up'
+      ? `Holder alignment improved (${trendLabel}) — more active work on direct, lock, or indirect repos.`
+      : trend === 'down'
+        ? `Holder alignment dipped (${trendLabel}) — recent commits skew toward infra/R&D vs the prior window.`
+        : `Holder alignment stable (${trendLabel}) — similar tag mix across windows.`
+
+  return { headline, bullets: bullets.slice(0, 5) }
+}
+
+export function buildIntegrityTrendExplanation(
+  stats: GitHubStats,
+  period: Period,
+  repoSet: Repo[],
+  trendPct: number | null,
+  trend: 'up' | 'flat' | 'down',
+): TrendExplanation {
+  const activeNow = reposActiveInWindow(stats, repoSet, period, 'current')
+  const activePrior = reposActiveInWindow(stats, repoSet, period, 'prior')
+  const sample = activeNow.length ? activeNow : repoSet
+  const priorSample = activePrior
+
+  const nowSlugs = new Set(sample.map(r => r.githubSlug))
+  const priorSlugs = new Set(priorSample.map(r => r.githubSlug))
+
+  const added = sample.filter(r => !priorSlugs.has(r.githubSlug))
+  const dropped = priorSample.filter(r => !nowSlugs.has(r.githubSlug))
+
+  const lowAdded = added.filter(r => r.builderIntegrity.pct < 60 && r.builderIntegrity.letter !== '—')
+  const highDropped = dropped.filter(r => r.builderIntegrity.pct >= 80)
+
+  const highNow = sample.filter(r => r.builderIntegrity.pct >= 80).length
+  const highPrior = priorSample.filter(r => r.builderIntegrity.pct >= 80).length
+  const lowNow = sample.filter(r => r.builderIntegrity.pct < 60 && r.builderIntegrity.letter !== '—').length
+  const lowPrior = priorSample.filter(r => r.builderIntegrity.pct < 60 && r.builderIntegrity.letter !== '—').length
+
+  const bullets: string[] = []
+
+  if (added.length) {
+    bullets.push(`Repos newly active: ${formatRepoList(added)}.`)
+  }
+  if (lowAdded.length) {
+    bullets.push(
+      `Lower-integrity repos entering the sample: ${formatRepoList(lowAdded)} (auto-inferred or weaker rubric scores).`,
+    )
+  }
+  if (highDropped.length) {
+    bullets.push(
+      `High-integrity repos quiet this window: ${formatRepoList(highDropped)}.`,
+    )
+  }
+  if (highNow !== highPrior || lowNow !== lowPrior) {
+    bullets.push(
+      `Integrity mix: ${highNow} high / ${lowNow} low now vs ${highPrior} high / ${lowPrior} low prior (among repos with scores).`,
+    )
+  }
+
+  if (!bullets.length) {
+    bullets.push('The active repo sample and integrity mix are similar to the prior window.')
+  }
+
+  const trendLabel = formatTrendPct(trendPct, period)
+  const headline =
+    trend === 'up'
+      ? `Integrity rose (${trendLabel}) — active repos score stronger on vision, autonomy, and walkaway.`
+      : trend === 'down'
+        ? `Integrity fell (${trendLabel}) — more low-scoring or auto-inferred repos in the active set.`
+        : `Integrity steady (${trendLabel}) — similar rubric average across windows.`
+
+  return { headline, bullets: bullets.slice(0, 5) }
+}

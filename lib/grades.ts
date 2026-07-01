@@ -3,6 +3,11 @@ import { GitHubStats } from './github'
 
 export type Period = '30d' | '7d'
 
+export interface TrendExplanation {
+  headline: string
+  bullets: string[]
+}
+
 export interface BuilderGrade {
   letter: string
   pct: number
@@ -10,6 +15,7 @@ export interface BuilderGrade {
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   trendPct: number | null
   trend: 'up' | 'flat' | 'down'
+  trendExplanation?: TrendExplanation
 }
 
 export interface HolderRelevanceGrade {
@@ -20,6 +26,7 @@ export interface HolderRelevanceGrade {
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   trendPct: number | null
   trend: 'up' | 'flat' | 'down'
+  trendExplanation?: TrendExplanation
 }
 
 export interface IntegrityGrade {
@@ -30,6 +37,7 @@ export interface IntegrityGrade {
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   trendPct: number | null
   trend: 'up' | 'flat' | 'down'
+  trendExplanation?: TrendExplanation
 }
 
 export function pctChange(curr: number, prev: number): number | null {
