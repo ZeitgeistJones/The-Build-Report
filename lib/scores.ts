@@ -422,6 +422,26 @@ export const REPOS: Repo[] = [
     ]),
     verdict: 'An agent that builds agents. If this matures it multiplies clawdbotatg\'s shipping capacity significantly. Holder value is potential not present — we\'re scoring R&D and confidence is low accordingly.',
   },
+  {
+    id: 'clawd-harness',
+    name: 'clawd-harness',
+    githubSlug: 'clawd-harness',
+    tag: 'infrastructure',
+    status: 'active',
+    confidence: 'mid',
+    scoredAt: 'Jul 1, 2026',
+    holderRelevance: hr([
+      { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'mid', source: 'multi-session dev harness for shipping clawdbotatg apps faster' },
+      { label: 'Downstream path to holder value', weight: '30%', level: 'mid', source: 'fork of clawd-console — speeds interactive Claude Code builds' },
+      { label: 'Active and maintained', weight: '20%', level: 'high', source: 'pushed Jun 30, 2026 — active development' },
+    ]),
+    builderIntegrity: bi([
+      { label: 'Serves stated vision at time of build', weight: '40%', level: 'high', source: 'builder tooling aligned with autonomous shipping workflow' },
+      { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'forked from clawd-console, actively extended' },
+      { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires local/session setup to run' },
+    ]),
+    verdict: 'A multi-project web harness for interactive Claude Code sessions — builder infrastructure that speeds up shipping. Holder value is indirect: faster builds mean more consumer apps that can burn CLAWD.',
+  },
 ]
 
 export const CHANGELOG = [

@@ -2,6 +2,7 @@ import { getGitHubStats, timeAgo } from '@/lib/github'
 import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getAutoScores } from '@/lib/autoscore'
+import { recentUnscoredRepos } from '@/lib/recentRepos'
 import { calcBuilderGrade, calcHolderRelevanceGrade, calcIntegrityGrade } from '@/lib/grades'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
@@ -27,7 +28,13 @@ export default async function Home() {
   const unscoredRepos = githubRepos.filter((repo: any) => !existingSlugs.has(repo.name))
   const autoScored = unscoredRepos.length > 0 ? await getAutoScores(unscoredRepos) : []
 
-  const allRepos = [...REPOS, ...autoScored]
+  const listedSlugs = new Set([
+    ...REPOS.map(r => r.githubSlug),
+    ...autoScored.map(r => r.githubSlug),
+  ])
+  const recentUnscored = stats ? recentUnscoredRepos(stats.repos, listedSlugs) : []
+
+  const allRepos = [...REPOS, ...autoScored, ...recentUnscored]
 
   const repos = allRepos.map(r => {
     const activity = stats?.repoActivity[r.githubSlug]
@@ -40,6 +47,38 @@ export default async function Home() {
       commits30d: activity?.commits30d ?? null,
     }
   })
+
+  // #region agent log
+  const sortedForDebug = [...repos].sort((a, b) => {
+    const ts = (r: typeof repos[0]) =>
+      r.lastCommitAt ? new Date(r.lastCommitAt).getTime()
+      : r.pushedAt ? new Date(r.pushedAt).getTime() : 0
+    return ts(b) - ts(a)
+  })
+  fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
+    body: JSON.stringify({
+      sessionId: 'a33a7a',
+      location: 'app/page.tsx:repos',
+      message: 'repo list recency debug',
+      hypothesisId: 'H1-H3',
+      data: {
+        totalRepos: repos.length,
+        recentUnscoredCount: recentUnscored.length,
+        hasLocalQuestion: repos.some(r => r.githubSlug === 'local-question'),
+        topFive: sortedForDebug.slice(0, 5).map(r => ({
+          slug: r.githubSlug,
+          lastCommitAt: r.lastCommitAt,
+          pushedAt: r.pushedAt,
+          unscored: (r.adminNote ?? '').startsWith('Unscored'),
+        })),
+        githubTopThree: stats?.repos.slice(0, 3).map(r => r.name) ?? [],
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+  // #endregion
 
   const builderGrade30 = stats ? calcBuilderGrade(stats, '30d') : null
   const builderGrade7 = stats ? calcBuilderGrade(stats, '7d') : null
@@ -175,7 +214,7 @@ export default async function Home() {
                 { label: 'Takes CLAWD out of circulation', weight: '20%' },
               ],
               note:
-                'Each component rated low (1) / mid (2) / high (3). Score = (weighted sum ÷ 3) × 100. We score whether the mechanic exists and is live — not how much has actually burned. Consumer apps are scored directly here. Infrastructure and some theoretical repos may show NA at the repo level because no token mechanic is expected; their value shows up in the quality of downstream consumer apps.',
+                'Each component rated low (1) / mid (2) / high (3). Score = (weighted sum ÷ 3) × 100. We score whether the mechanic exists and is live — not how much has actually burned. Consumer apps are scored directly here. Infrastructure and some theoretical repos may show NA at the repo level because no token mechanic is expected; their value shows up in the quality of downstream consumer apps. Trend percentage compares this period\'s grade to the prior matching window.',
             },
             {
               title: 'Builder integrity — all repos',
@@ -185,19 +224,19 @@ export default async function Home() {
                 { label: 'Passes walkaway test', weight: '25%' },
               ],
               note:
-                "Repos are scored against clawdbotatg's stated goals at the time they were built. Goals change — a repo is judged against what the stated intent was then, not now. CV burns are not CLAWD burns. Supply lock is not a burn. Both matter but they are different things.",
+                "Repos are scored against clawdbotatg's stated goals at the time they were built. Goals change — a repo is judged against what the stated intent was then, not now. CV burns are not CLAWD burns. Supply lock is not a burn. Both matter but they are different things. Trend percentage compares this period's grade to the prior matching window.",
             },
             {
               title: 'Builder grade — GitHub signals, equally weighted',
               rows: [
-                { label: 'Commit frequency', weight: 'equal' },
-                { label: 'Active days in period', weight: 'equal' },
-                { label: 'New repos created', weight: 'equal' },
-                { label: 'Repos with new commits', weight: 'equal' },
-                { label: 'Consistency — no long gaps', weight: 'equal' },
+                { label: 'Commit frequency', weight: '20%' },
+                { label: 'Active days in period', weight: '20%' },
+                { label: 'New repos created', weight: '20%' },
+                { label: 'Repos with new commits', weight: '20%' },
+                { label: 'Consistency — no long gaps', weight: '20%' },
               ],
               note:
-                'A = 80–100 · B = 60–79 · C = 40–59 · D = below 40. Holder relevance grade measures what proportion of currently active repos are direct, supply lock, or indirect vs infrastructure and theoretical. Integrity grade is the average builder-integrity score of repos active in the selected period. Trend percentage compares the current period grade to the prior matching window (7d vs days 8–14, 30d vs days 31–60).',
+                'Five signals averaged equally (20% each). Letter grades: A = 80–100 · B = 60–79 · C = 40–59 · D = below 40. Trend percentage compares this period\'s builder grade to the prior matching window (7d vs days 8–14, 30d vs days 31–60).',
             },
           ].map(block => (
             <div

@@ -13,7 +13,7 @@ function getRedis() {
   return redis
 }
 
-const CACHE_KEY_PREFIX = 'build-report:autoscore:'
+const CACHE_KEY_PREFIX = 'build-report:autoscore:v2:'
 const MAX_NEW_PER_RUN = 5
 
 export interface RawRepo {
@@ -90,14 +90,15 @@ Last pushed: ${repo.pushedAt}
 Based on the repo name, description, and ecosystem context, infer:
 1. tag: one of direct | supply-lock | indirect | infrastructure | theoretical
 2. status: one of active | dormant | archived
-3. holderRelevance rubric (3 rows, null if infrastructure)
+3. holderRelevance rubric (3 rows — ALWAYS include, use adapted criteria for infrastructure/theoretical)
 4. builderIntegrity rubric (3 rows)
 5. verdict: 2-3 sentence plain English assessment
 6. adminNote: one sentence flagging this is auto-inferred, not hand-scored
 
 For rubric rows use these exact weights:
-- holderRelevance: "50%", "30%", "20%"
-- builderIntegrity: "40%", "35%", "25%"
+- holderRelevance consumer apps: "Burn mechanic exists and is live" (50%), "Revenue or burn path built in" (30%), "Takes CLAWD out of circulation" (20%)
+- holderRelevance infrastructure/theoretical (adapted): "Enables consumer apps that burn CLAWD" (50%), "Downstream path to holder value" (30%), "Active and maintained" (20%)
+- builderIntegrity: "Serves stated vision at time of build" (40%), "Genuine autonomous build" (35%), "Passes walkaway test" (25%)
 - level: "high" | "mid" | "low"
 - source: brief inference note like "inferred from repo name" or "inferred from ecosystem context"
 
@@ -130,8 +131,7 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
     const clean = text.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
-    const holderRows: RubricRow[] | null =
-      parsed.tag === 'infrastructure' ? null : parsed.holderRelevance
+    const holderRows: RubricRow[] = parsed.holderRelevance
 
     const repoOut: Repo = {
       id: repo.name,
@@ -145,7 +145,7 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
         day: 'numeric',
         year: 'numeric',
       }),
-      holderRelevance: holderRows ? makeScore(holderRows) : null,
+      holderRelevance: holderRows?.length ? makeScore(holderRows) : null,
       builderIntegrity: makeScore(parsed.builderIntegrity),
       verdict: parsed.verdict,
       adminNote: parsed.adminNote,

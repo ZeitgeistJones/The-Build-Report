@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Repo, Tag, Level } from '@/lib/scores'
+import { isUnscoredRecent } from '@/lib/recentRepos'
 
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
@@ -147,6 +148,7 @@ export default function RepoList({ repos }: Props) {
           const ts = TAG_STYLES[repo.tag]
           const ss = STATUS_STYLES[repo.status]
           const auto = isAutoInferred(repo)
+          const pending = isUnscoredRecent(repo)
 
           return (
             <div
@@ -209,6 +211,19 @@ export default function RepoList({ repos }: Props) {
                         ✦ auto-inferred
                       </span>
                     )}
+                    {pending && (
+                      <span style={{
+                        fontSize: '10px',
+                        padding: '2px 7px',
+                        borderRadius: '99px',
+                        color: 'var(--amber)',
+                        background: 'rgba(212,148,58,0.1)',
+                        border: '1px solid var(--border)',
+                        letterSpacing: '0.03em',
+                      }}>
+                        awaiting score
+                      </span>
+                    )}
                   </div>
 
                   <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
@@ -224,6 +239,15 @@ export default function RepoList({ repos }: Props) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexShrink: 0 }}>
+                  {pending ? (
+                    <div style={{ textAlign: 'center', minWidth: '88px', paddingTop: '3px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>Pending</div>
+                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.3 }}>
+                        not yet scored
+                      </div>
+                    </div>
+                  ) : (
+                  <>
                   <div style={{ textAlign: 'center', minWidth: '40px' }}>
                     {repo.holderRelevance ? (
                       <>
@@ -251,11 +275,27 @@ export default function RepoList({ repos }: Props) {
                   <div style={{ fontSize: '14px', color: 'var(--text-muted)', paddingTop: '3px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>
                     ↓
                   </div>
+                  </>
+                  )}
                 </div>
               </button>
 
               {isExpanded && (
                 <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
+                  {pending && (
+                    <div style={{
+                      marginBottom: '12px',
+                      padding: '8px 12px',
+                      background: 'var(--surface-2)',
+                      borderRadius: 'var(--radius)',
+                      border: '1px solid var(--border)',
+                      fontSize: '12px',
+                      color: 'var(--text-muted)',
+                      lineHeight: 1.5,
+                    }}>
+                      This repo was recently pushed on GitHub and appears here for recency tracking. Run autoscore or hand-score to add rubric grades.
+                    </div>
+                  )}
                   {auto && (
                     <div style={{
                       marginBottom: '12px',
@@ -273,7 +313,7 @@ export default function RepoList({ repos }: Props) {
                   )}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '14px' }}>
-                    {repo.holderRelevance && (
+                    {!pending && repo.holderRelevance && (
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
                           Holder relevance
@@ -301,7 +341,7 @@ export default function RepoList({ repos }: Props) {
                       </div>
                     )}
 
-                    {!repo.holderRelevance && (
+                    {!pending && !repo.holderRelevance && (
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
                           Holder relevance
@@ -312,6 +352,7 @@ export default function RepoList({ repos }: Props) {
                       </div>
                     )}
 
+                    {!pending && (
                     <div>
                       <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
                         Builder integrity
@@ -337,6 +378,7 @@ export default function RepoList({ repos }: Props) {
                         </div>
                       ))}
                     </div>
+                    )}
                   </div>
 
                   <div style={{

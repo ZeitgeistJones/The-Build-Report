@@ -105,22 +105,36 @@ export const SCORED_SLUGS = [
 ]
 
 function selectReposForActivityScan(repos: any[], maxCount = 40): any[] {
-  const prioritySet = new Set(PRIORITY_SLUGS)
-  const recentlyPushed = repos.filter(r => isWithinDays(r.pushed_at, 30))
-  const priority = recentlyPushed.filter(r => prioritySet.has(r.name))
-  const rest = recentlyPushed.filter(r => !prioritySet.has(r.name))
-  const priorityOlder = repos.filter(
-    r => prioritySet.has(r.name) && !isWithinDays(r.pushed_at, 30) && isWithinDays(r.pushed_at, 60),
+  const sorted = [...repos].sort(
+    (a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime(),
   )
 
   const selected: any[] = []
   const seen = new Set<string>()
-  for (const repo of [...priority, ...rest, ...priorityOlder]) {
-    if (selected.length >= maxCount) break
-    if (seen.has(repo.name)) continue
+
+  // Always include the most recently pushed repos (captures local-question, etc.)
+  for (const repo of sorted) {
+    if (selected.length >= 15) break
+    if (!isWithinDays(repo.pushed_at, 60)) continue
     selected.push(repo)
     seen.add(repo.name)
   }
+
+  for (const repo of sorted) {
+    if (selected.length >= maxCount) break
+    if (seen.has(repo.name)) continue
+    if (!PRIORITY_SLUGS.includes(repo.name)) continue
+    selected.push(repo)
+    seen.add(repo.name)
+  }
+
+  for (const repo of sorted) {
+    if (selected.length >= maxCount) break
+    if (seen.has(repo.name) || !isWithinDays(repo.pushed_at, 30)) continue
+    selected.push(repo)
+    seen.add(repo.name)
+  }
+
   return selected
 }
 
@@ -215,7 +229,7 @@ export async function getGitHubStats(): Promise<GitHubStats> {
 
   for (const repo of repos) {
     if (repoActivity[repo.name]) continue
-    if (!PRIORITY_SLUGS.includes(repo.name)) continue
+    if (!PRIORITY_SLUGS.includes(repo.name) && !isWithinDays(repo.pushed_at, 14)) continue
     repoActivity[repo.name] = {
       slug: repo.name,
       commits30d: 0,
@@ -228,6 +242,15 @@ export async function getGitHubStats(): Promise<GitHubStats> {
     }
   }
 
+  const sortedRepos = repos
+    .map((r: any) => ({
+      name: r.name,
+      description: r.description ?? null,
+      createdAt: r.created_at,
+      pushedAt: r.pushed_at,
+      language: r.language ?? null,
+    }))
+    .sort((a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime())
   return {
     totalRepos,
     totalCommits30d,
@@ -245,13 +268,7 @@ export async function getGitHubStats(): Promise<GitHubStats> {
     lastCommitAt,
     lastCommitRepo,
     repoActivity,
-    repos: repos.map((r: any) => ({
-      name: r.name,
-      description: r.description ?? null,
-      createdAt: r.created_at,
-      pushedAt: r.pushed_at,
-      language: r.language ?? null,
-    })),
+    repos: sortedRepos,
     rateLimited,
   }
 }
