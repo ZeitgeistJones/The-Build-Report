@@ -15,7 +15,22 @@ function getRedis() {
 }
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v2:'
+const CACHE_KEY_PREFIX_V1 = 'build-report:autoscore:'
 const MAX_NEW_PER_RUN = 5
+
+async function readCachedScore(r: Redis, repoName: string): Promise<Repo | null> {
+  try {
+    const v2 = await r.get<Repo>(`${CACHE_KEY_PREFIX}${repoName}`)
+    if (v2 && !shouldSkipRepo(v2.githubSlug)) return v2
+
+    const v1 = await r.get<Repo>(`${CACHE_KEY_PREFIX_V1}${repoName}`)
+    if (v1 && !shouldSkipRepo(v1.githubSlug)) return v1
+
+    return null
+  } catch {
+    return null
+  }
+}
 
 export interface RawRepo {
   name: string
@@ -174,16 +189,9 @@ export async function getAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
 
   await Promise.all(
     newRepos.map(async (repo) => {
-      const key = `${CACHE_KEY_PREFIX}${repo.name}`
-      try {
-        const cached = await r.get<Repo>(key)
-        if (cached && !shouldSkipRepo(cached.githubSlug)) {
-          results.push(cached)
-        }
-      } catch {
-        // ignore cache read errors
-      }
-    })
+      const cached = await readCachedScore(r, repo.name)
+      if (cached) results.push(cached)
+    }),
   )
 
   console.log(`[autoscore] cache-only returning ${results.length} scored repos`)
@@ -205,19 +213,14 @@ export async function runAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
 
   await Promise.all(
     newRepos.map(async (repo) => {
-      const key = `${CACHE_KEY_PREFIX}${repo.name}`
-      try {
-        const cached = await r.get<Repo>(key)
-        if (cached) {
-          console.log(`[autoscore] cache hit: ${repo.name}`)
-          results.push(cached)
-        } else {
-          toInfer.push(repo)
-        }
-      } catch {
+      const cached = await readCachedScore(r, repo.name)
+      if (cached) {
+        console.log(`[autoscore] cache hit: ${repo.name}`)
+        results.push(cached)
+      } else {
         toInfer.push(repo)
       }
-    })
+    }),
   )
 
   console.log(`[autoscore] ${results.length} from cache, ${toInfer.length} need inference`)
@@ -254,13 +257,21 @@ export async function runAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
 export async function flushAutoScore(repoName: string): Promise<void> {
   const r = getRedis()
   await r.del(`${CACHE_KEY_PREFIX}${repoName}`)
+  await r.del(`${CACHE_KEY_PREFIX_V1}${repoName}`)
 }
 
 export async function listCachedAutoScores(): Promise<string[]> {
   const r = getRedis()
   try {
-    const keys = await r.keys(`${CACHE_KEY_PREFIX}*`)
-    return keys.map((k: string) => k.replace(CACHE_KEY_PREFIX, ''))
+    const keysV2 = await r.keys(`${CACHE_KEY_PREFIX}*`)
+    const keysV1 = await r.keys(`${CACHE_KEY_PREFIX_V1}*`)
+    const names = new Set<string>()
+    for (const k of keysV2) names.add(k.replace(CACHE_KEY_PREFIX, ''))
+    for (const k of keysV1) {
+      const name = k.replace(CACHE_KEY_PREFIX_V1, '')
+      if (name && !name.startsWith('v2:')) names.add(name)
+    }
+    return Array.from(names)
   } catch {
     return []
   }

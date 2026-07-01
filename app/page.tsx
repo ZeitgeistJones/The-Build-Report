@@ -2,8 +2,8 @@ import { getGitHubStats, timeAgo } from '@/lib/github'
 import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getAutoScores } from '@/lib/autoscore'
-import { githubTopUnscoredRepos } from '@/lib/recentRepos'
-import { shouldSkipRepo } from '@/lib/repoFilters'
+import { githubTopUnscoredRepos, isUnscoredRecent } from '@/lib/recentRepos'
+import { shouldSkipRepo, isAutoInferredNote } from '@/lib/repoFilters'
 import { mergeRepoSources, orderReposByGithub, githubSlugOrder } from '@/lib/repoOrder'
 import { calcBuilderGrade, calcHolderRelevanceGrade, calcIntegrityGrade } from '@/lib/grades'
 import RepoList from '@/components/RepoList'
@@ -76,8 +76,9 @@ export default async function Home() {
             || !repos.some(rep => rep.githubSlug === name),
         ),
         position1024x: repos.findIndex(r => r.githubSlug === '1024x'),
-        hasLocalQuestion: repos.some(r => r.githubSlug === 'local-question'),
-        localQuestionIndex: repos.findIndex(r => r.githubSlug === 'local-question'),
+        autoScoredCount: autoScored.length,
+        autoInferredTop8: repos.filter(r => isAutoInferredNote(r.adminNote)).slice(0, 8).map(r => r.githubSlug),
+        pendingTop8: repos.filter(r => isUnscoredRecent(r)).slice(0, 8).map(r => r.githubSlug),
       },
       timestamp: Date.now(),
     }),

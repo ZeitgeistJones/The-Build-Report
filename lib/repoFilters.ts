@@ -6,3 +6,7 @@ export function shouldSkipRepo(name: string): boolean {
   if (name.startsWith('job-')) return true
   return false
 }
+
+export function isAutoInferredNote(note: string | undefined): boolean {
+  return (note ?? '').startsWith('Scores auto-inferred')
+}

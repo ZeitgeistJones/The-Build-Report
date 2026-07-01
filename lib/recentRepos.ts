@@ -2,8 +2,6 @@ import { Repo, Tag } from './scores'
 import { GitHubRepo } from './github'
 import { shouldSkipRepo } from './repoFilters'
 
-const GITHUB_TOP_K = 15
-
 export function makeUnscoredRecentRepo(gh: GitHubRepo): Repo {
   const scoredAt = new Date(gh.createdAt).toLocaleDateString('en-US', {
     month: 'short',
@@ -30,16 +28,14 @@ export function makeUnscoredRecentRepo(gh: GitHubRepo): Repo {
   }
 }
 
-/** Include unscored repos that appear in GitHub's top-K by pushed_at (matches github.com order). */
+/** Placeholder for the most recent GitHub repo with no hand-score or autoscore cache yet. */
 export function githubTopUnscoredRepos(githubRepos: GitHubRepo[], listedSlugs: Set<string>): Repo[] {
-  const recent: Repo[] = []
-  for (const gh of githubRepos.slice(0, GITHUB_TOP_K)) {
+  for (const gh of githubRepos) {
     if (listedSlugs.has(gh.name)) continue
     if (shouldSkipRepo(gh.name)) continue
-    recent.push(makeUnscoredRecentRepo(gh))
-    listedSlugs.add(gh.name)
+    return [makeUnscoredRecentRepo(gh)]
   }
-  return recent
+  return []
 }
 
 export function isUnscoredRecent(repo: Repo): boolean {

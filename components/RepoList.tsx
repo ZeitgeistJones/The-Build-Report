@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Repo, Tag, Level } from '@/lib/scores'
 import { isUnscoredRecent } from '@/lib/recentRepos'
+import { isAutoInferredNote } from '@/lib/repoFilters'
 
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
@@ -100,7 +101,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     })
 
   function isAutoInferred(repo: RepoWithLive) {
-    return (repo.adminNote ?? '').startsWith('Scores auto-inferred')
+    return isAutoInferredNote(repo.adminNote)
   }
 
   function toggleExpand(id: string) {
