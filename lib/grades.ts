@@ -1,4 +1,4 @@
-import { REPOS } from './scores'
+import { Repo } from './scores'
 import { GitHubStats } from './github'
 
 export type Period = '30d' | '7d'
@@ -8,6 +8,7 @@ export interface BuilderGrade {
   pct: number
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
+  trendPct: number | null
   trend: 'up' | 'flat' | 'down'
 }
 
@@ -17,6 +18,7 @@ export interface HolderRelevanceGrade {
   pct: number
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
+  trendPct: number | null
   trend: 'up' | 'flat' | 'down'
 }
 
@@ -26,7 +28,20 @@ export interface IntegrityGrade {
   pct: number
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
+  trendPct: number | null
   trend: 'up' | 'flat' | 'down'
+}
+
+export function pctChange(curr: number, prev: number): number | null {
+  if (prev === 0) return curr > 0 ? null : 0
+  return Math.round(((curr - prev) / prev) * 100)
+}
+
+export function trendFromPct(change: number | null): 'up' | 'flat' | 'down' {
+  if (change === null) return 'up'
+  if (change > 3) return 'up'
+  if (change < -3) return 'down'
+  return 'flat'
 }
 
 function toLevel(pct: number): 'high' | 'mid' | 'low' {
@@ -47,37 +62,86 @@ function avg(nums: number[]) {
   return Math.round(nums.reduce((a, b) => a + b, 0) / nums.length)
 }
 
-function trendFor(curr: number, prev: number): 'up' | 'flat' | 'down' {
-  if (curr > prev + 3) return 'up'
-  if (curr < prev - 3) return 'down'
-  return 'flat'
+interface BuilderInputs {
+  commits: number
+  activeDays: number
+  newRepos: number
+  activeRepos: number
+  scannedRepos: number
+  periodDays: number
 }
 
-export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGrade {
-  const commits = period === '30d' ? stats.totalCommits30d : stats.totalCommits7d
-  const activeDays = period === '30d' ? stats.activeDays30d : stats.activeDays7d
-  const newRepos = period === '30d' ? stats.newRepos30d : stats.newRepos7d
+function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'current' | 'prior'): BuilderInputs {
   const periodDays = period === '30d' ? 30 : 7
-  const activeRepos = Object.values(stats.repoActivity).filter(r => (period === '30d' ? r.commits30d : r.commits7d) > 0).length
+  const activityCount = Object.keys(stats.repoActivity).length
 
+  if (period === '30d') {
+    const activeRepos = Object.values(stats.repoActivity).filter(r =>
+      window === 'current' ? r.commits30d > 0 : r.commits30_60 > 0,
+    ).length
+    return {
+      commits: window === 'current' ? stats.totalCommits30d : stats.totalCommits30_60,
+      activeDays: window === 'current' ? stats.activeDays30d : stats.activeDays30_60,
+      newRepos: window === 'current' ? stats.newRepos30d : stats.newRepos30_60,
+      activeRepos,
+      scannedRepos: activityCount,
+      periodDays,
+    }
+  }
+
+  const activeRepos = Object.values(stats.repoActivity).filter(r =>
+    window === 'current' ? r.commits7d > 0 : r.commits7_14 > 0,
+  ).length
+  return {
+    commits: window === 'current' ? stats.totalCommits7d : stats.totalCommits7_14,
+    activeDays: window === 'current' ? stats.activeDays7d : stats.activeDays7_14,
+    newRepos: window === 'current' ? stats.newRepos7d : stats.newRepos7_14,
+    activeRepos,
+    scannedRepos: activityCount,
+    periodDays,
+  }
+}
+
+function calcBuilderPct(inputs: BuilderInputs, period: Period): number {
+  const { commits, activeDays, newRepos, activeRepos, scannedRepos, periodDays } = inputs
   const commitPct = Math.min(commits / (period === '30d' ? 60 : 14), 1)
   const activeDaysPct = Math.min(activeDays / periodDays, 1)
   const newReposPct = Math.min(newRepos / (period === '30d' ? 4 : 2), 1)
-  const activeReposPct = Math.min(activeRepos / Math.max(Object.keys(stats.repoActivity).length * 0.5, 1), 1)
+  const activeReposPct = Math.min(activeRepos / Math.max(scannedRepos * 0.5, 1), 1)
   const consistencyPct = Math.min(activeDays / Math.max(periodDays * 0.7, 1), 1)
-
   const signalPcts = [commitPct, activeDaysPct, newReposPct, activeReposPct, consistencyPct]
-  const pct = Math.round((signalPcts.reduce((a, b) => a + b, 0) / signalPcts.length) * 100)
-  const letter = pctToLetter(pct)
+  return Math.round((signalPcts.reduce((a, b) => a + b, 0) / signalPcts.length) * 100)
+}
 
-  const trend = period === '30d'
-    ? stats.trend30vs30
-    : trendFor(stats.totalCommits7d, Math.round(stats.totalCommits30d / 4))
+function builderSignals(inputs: BuilderInputs, period: Period) {
+  const { commits, activeDays, newRepos, activeRepos, scannedRepos, periodDays } = inputs
+  const commitPct = Math.min(commits / (period === '30d' ? 60 : 14), 1)
+  const activeDaysPct = Math.min(activeDays / periodDays, 1)
+  const newReposPct = Math.min(newRepos / (period === '30d' ? 4 : 2), 1)
+  const activeReposPct = Math.min(activeRepos / Math.max(scannedRepos * 0.5, 1), 1)
+  const consistencyPct = Math.min(activeDays / Math.max(periodDays * 0.7, 1), 1)
+  return [
+    { label: 'Commit frequency', level: toLevel(commitPct), pct: Math.round(commitPct * 100) },
+    { label: 'Active days', level: toLevel(activeDaysPct), pct: Math.round(activeDaysPct * 100) },
+    { label: 'New repos', level: toLevel(newReposPct), pct: Math.round(newReposPct * 100) },
+    { label: 'Repos with commits', level: toLevel(activeReposPct), pct: Math.round(activeReposPct * 100) },
+    { label: 'Consistency', level: toLevel(consistencyPct), pct: Math.round(consistencyPct * 100) },
+  ]
+}
+
+export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGrade {
+  const current = builderInputsFromStats(stats, period, 'current')
+  const prior = builderInputsFromStats(stats, period, 'prior')
+  const pct = calcBuilderPct(current, period)
+  const priorPct = calcBuilderPct(prior, period)
+  const trendPct = pctChange(pct, priorPct)
+  const letter = pctToLetter(pct)
 
   return {
     letter,
     pct,
-    trend,
+    trendPct,
+    trend: trendFromPct(trendPct),
     summary:
       pct >= 80
         ? 'Strong recent build activity across commits, active days, and repo movement.'
@@ -86,42 +150,58 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
           : pct >= 40
             ? 'Some activity is present, but the recent build cadence is mixed.'
             : 'Recent build activity is light relative to the tracked repo set.',
-    signals: [
-      { label: 'Commit frequency', level: toLevel(commitPct), pct: Math.round(commitPct * 100) },
-      { label: 'Active days', level: toLevel(activeDaysPct), pct: Math.round(activeDaysPct * 100) },
-      { label: 'New repos', level: toLevel(newReposPct), pct: Math.round(newReposPct * 100) },
-      { label: 'Repos with commits', level: toLevel(activeReposPct), pct: Math.round(activeReposPct * 100) },
-      { label: 'Consistency', level: toLevel(consistencyPct), pct: Math.round(consistencyPct * 100) },
-    ],
+    signals: builderSignals(current, period),
   }
 }
 
-export function calcHolderRelevanceGrade(stats: GitHubStats, period: Period): HolderRelevanceGrade {
-  const activeRepos = REPOS.filter(repo => {
-    const live = stats.repoActivity[repo.githubSlug]
-    if (!live) return false
-    return period === '30d' ? live.commits30d > 0 : live.commits7d > 0
-  })
-
+function holderPctFromRepos(activeRepos: Repo[]): number {
   const counts = {
     direct: activeRepos.filter(r => r.tag === 'direct').length,
     lock: activeRepos.filter(r => r.tag === 'supply-lock').length,
     indirect: activeRepos.filter(r => r.tag === 'indirect').length,
     infra: activeRepos.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical').length,
   }
-
   const total = activeRepos.length || 1
-  const pctRaw = ((counts.direct * 1 + counts.lock * 0.75 + counts.indirect * 0.55 + counts.infra * 0.2) / total) * 100
-  const pct = Math.round(pctRaw)
-  const letter = pctToLetter(pct)
+  return Math.round(((counts.direct * 1 + counts.lock * 0.75 + counts.indirect * 0.55 + counts.infra * 0.2) / total) * 100)
+}
 
-  const prevPct = Math.round(Math.max(pct - (counts.direct > counts.infra ? 2 : -2), 0))
+function holderCounts(activeRepos: Repo[]) {
+  return {
+    direct: activeRepos.filter(r => r.tag === 'direct').length,
+    lock: activeRepos.filter(r => r.tag === 'supply-lock').length,
+    indirect: activeRepos.filter(r => r.tag === 'indirect').length,
+    infra: activeRepos.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical').length,
+  }
+}
+
+function reposActiveInWindow(stats: GitHubStats, repoSet: Repo[], period: Period, window: 'current' | 'prior') {
+  return repoSet.filter(repo => {
+    const live = stats.repoActivity[repo.githubSlug]
+    if (!live) return false
+    if (period === '30d') {
+      return window === 'current' ? live.commits30d > 0 : live.commits30_60 > 0
+    }
+    return window === 'current' ? live.commits7d > 0 : live.commits7_14 > 0
+  })
+}
+
+export function calcHolderRelevanceGrade(stats: GitHubStats, period: Period, repoSet: Repo[]): HolderRelevanceGrade {
+  const activeRepos = reposActiveInWindow(stats, repoSet, period, 'current')
+  const priorActiveRepos = reposActiveInWindow(stats, repoSet, period, 'prior')
+
+  const counts = holderCounts(activeRepos)
+  const total = activeRepos.length || 1
+  const pct = holderPctFromRepos(activeRepos)
+  const priorPct = holderPctFromRepos(priorActiveRepos)
+  const trendPct = pctChange(pct, priorPct)
+  const letter = pctToLetter(pct)
 
   return {
     counts,
     letter,
     pct,
-    trend: trendFor(pct, prevPct),
+    trendPct,
+    trend: trendFromPct(trendPct),
     summary:
       pct >= 80
         ? 'Most recently active repos are directly aligned with holder value.'
@@ -134,25 +214,27 @@ export function calcHolderRelevanceGrade(stats: GitHubStats, period: Period): Ho
       { label: 'Direct burn', level: toLevel(counts.direct / total), pct: Math.round((counts.direct / total) * 100) },
       { label: 'Supply lock', level: toLevel(counts.lock / total), pct: Math.round((counts.lock / total) * 100) },
       { label: 'Indirect value', level: toLevel(counts.indirect / total), pct: Math.round((counts.indirect / total) * 100) },
-      { label: 'Infra drag', level: toLevel(1 - counts.infra / total), pct: Math.round((1 - counts.infra / total) * 100) },
+      { label: 'Non-infra share', level: toLevel(1 - counts.infra / total), pct: Math.round((1 - counts.infra / total) * 100) },
     ],
   }
 }
 
-export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, repoSet = REPOS): IntegrityGrade {
+export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, repoSet: Repo[]): IntegrityGrade {
   const activeRepos = !stats
     ? repoSet
-    : repoSet.filter(repo => {
-        const live = stats.repoActivity[repo.githubSlug]
-        if (!live) return false
-        return period === '30d' ? live.commits30d > 0 : live.commits7d > 0
-      })
+    : reposActiveInWindow(stats, repoSet, period, 'current')
+
+  const priorActiveRepos = !stats
+    ? repoSet
+    : reposActiveInWindow(stats, repoSet, period, 'prior')
 
   const sample = activeRepos.length ? activeRepos : repoSet
+  const priorSample = priorActiveRepos
+
   const scores = sample.map(repo => repo.builderIntegrity.pct)
   const pct = avg(scores)
-  const prevSample = repoSet.slice(0, Math.max(sample.length - 1, 1))
-  const prevPct = avg(prevSample.map(repo => repo.builderIntegrity.pct))
+  const priorPct = priorSample.length ? avg(priorSample.map(repo => repo.builderIntegrity.pct)) : 0
+  const trendPct = pctChange(pct, priorPct)
 
   const high = sample.filter(r => r.builderIntegrity.pct >= 80).length
   const mid = sample.filter(r => r.builderIntegrity.pct >= 60 && r.builderIntegrity.pct < 80).length
@@ -177,7 +259,8 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
     counts: { active: sample.length, high, mid, low },
     letter: pctToLetter(pct),
     pct,
-    trend: trendFor(pct, prevPct),
+    trendPct,
+    trend: trendFromPct(trendPct),
     summary:
       pct >= 80
         ? 'Recent active repos are strongly aligned with the original builder-values rubric.'
@@ -193,4 +276,12 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
       { label: 'High-integrity share', level: toLevel(high / Math.max(sample.length, 1)), pct: Math.round((high / Math.max(sample.length, 1)) * 100) },
     ],
   }
+}
+
+export function formatTrendPct(trendPct: number | null, period: Period): string {
+  const windowLabel = period === '30d' ? 'prior 30d' : 'prior 7d'
+  if (trendPct === null) return `new vs ${windowLabel}`
+  if (trendPct > 0) return `+${trendPct}% vs ${windowLabel}`
+  if (trendPct < 0) return `${trendPct}% vs ${windowLabel}`
+  return `0% vs ${windowLabel}`
 }

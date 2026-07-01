@@ -39,7 +39,7 @@ Scores are assigned against the goals clawdbotatg stated at the time a repo was 
 
 Supply lock is not a burn. Locking CLAWD in a staking or vesting contract removes it from circulation temporarily — it can return. A burn permanently destroys tokens. Both are meaningful but they are not the same thing.
 
-Infrastructure repos are not expected to have burn or revenue mechanics. They are scored only on builder integrity.`,
+Infrastructure repos are not expected to have direct burn or revenue mechanics. They may still receive adapted holder relevance scores when hand-scored; auto-inferred infrastructure shows N/A. All repos are scored on builder integrity.`,
         },
         {
           heading: 'Sources',

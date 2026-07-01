@@ -29,17 +29,22 @@ export default async function Home() {
 
   const allRepos = [...REPOS, ...autoScored]
 
-  const repos = allRepos.map(r => ({
-    ...r,
-    adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
-    lastCommitAt: stats?.repoActivity[r.githubSlug]?.lastCommitAt ?? null,
-    commits30d: stats?.repoActivity[r.githubSlug]?.commits30d ?? null,
-  }))
+  const repos = allRepos.map(r => {
+    const activity = stats?.repoActivity[r.githubSlug]
+    const githubRepo = stats?.repos.find(gr => gr.name === r.githubSlug)
+    return {
+      ...r,
+      adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
+      lastCommitAt: activity?.lastCommitAt ?? null,
+      pushedAt: activity?.pushedAt ?? githubRepo?.pushedAt ?? null,
+      commits30d: activity?.commits30d ?? null,
+    }
+  })
 
   const builderGrade30 = stats ? calcBuilderGrade(stats, '30d') : null
   const builderGrade7 = stats ? calcBuilderGrade(stats, '7d') : null
-  const holderGrade30 = stats ? calcHolderRelevanceGrade(stats, '30d') : null
-  const holderGrade7 = stats ? calcHolderRelevanceGrade(stats, '7d') : null
+  const holderGrade30 = stats ? calcHolderRelevanceGrade(stats, '30d', allRepos) : null
+  const holderGrade7 = stats ? calcHolderRelevanceGrade(stats, '7d', allRepos) : null
   const integrityGrade30 = stats ? calcIntegrityGrade(stats, '30d', allRepos) : calcIntegrityGrade(null, '30d', allRepos)
   const integrityGrade7 = stats ? calcIntegrityGrade(stats, '7d', allRepos) : calcIntegrityGrade(null, '7d', allRepos)
 
@@ -83,7 +88,7 @@ export default async function Home() {
           </span>
           {stats?.lastCommitAt && (
             <span style={{ flexShrink: 0, marginLeft: '12px' }}>
-              Last synced {timeAgo(stats.lastCommitAt)}
+              Latest commit {timeAgo(stats.lastCommitAt)} · data refreshes every 5 min
             </span>
           )}
         </div>
@@ -114,7 +119,13 @@ export default async function Home() {
         <AllTimeStats
           totalRepos={stats.totalRepos}
           totalCommits30d={stats.totalCommits30d}
+          totalCommits7d={stats.totalCommits7d}
+          totalCommits30_60={stats.totalCommits30_60}
+          totalCommits7_14={stats.totalCommits7_14}
           activeDays30d={stats.activeDays30d}
+          activeDays7d={stats.activeDays7d}
+          activeDays30_60={stats.activeDays30_60}
+          activeDays7_14={stats.activeDays7_14}
           lastCommitAt={stats.lastCommitAt}
           lastCommitRepo={stats.lastCommitRepo}
         />
@@ -157,7 +168,7 @@ export default async function Home() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
           {[
             {
-              title: 'Holder relevance — consumer apps only',
+              title: 'Holder relevance — consumer apps (infra may show N/A)',
               rows: [
                 { label: 'Burn mechanic exists and is live', weight: '50%' },
                 { label: 'Revenue or burn path built in', weight: '30%' },
@@ -186,7 +197,7 @@ export default async function Home() {
                 { label: 'Consistency — no long gaps', weight: 'equal' },
               ],
               note:
-                'A = 80–100 · B = 60–79 · C = 40–59 · D = below 40. Holder relevance grade measures what proportion of currently active repos are direct, supply lock, or indirect vs infrastructure and theoretical. Integrity grade is the average builder-integrity score of repos active in the selected period. Trend arrow compares the current period to the previous matching window.',
+                'A = 80–100 · B = 60–79 · C = 40–59 · D = below 40. Holder relevance grade measures what proportion of currently active repos are direct, supply lock, or indirect vs infrastructure and theoretical. Integrity grade is the average builder-integrity score of repos active in the selected period. Trend percentage compares the current period grade to the prior matching window (7d vs days 8–14, 30d vs days 31–60).',
             },
           ].map(block => (
             <div

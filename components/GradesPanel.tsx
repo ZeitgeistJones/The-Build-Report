@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BuilderGrade, HolderRelevanceGrade, IntegrityGrade } from '@/lib/grades'
+import { BuilderGrade, HolderRelevanceGrade, IntegrityGrade, formatTrendPct } from '@/lib/grades'
 
 interface Props {
   builderGrade30: BuilderGrade | null
@@ -38,16 +38,19 @@ function GradeCard({
   label,
   mini,
   summary,
+  period,
   footer,
 }: {
   grade: {
     letter: string
     trend: 'up' | 'flat' | 'down'
+    trendPct: number | null
     signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   } | null
   label: string
   mini: string
   summary: string
+  period: '30d' | '7d'
   footer?: React.ReactNode
 }) {
   return (
@@ -112,10 +115,11 @@ function GradeCard({
                   gap: '4px',
                   fontSize: '11px',
                   color: 'var(--text-muted)',
+                  fontFamily: 'var(--font-mono)',
                 }}
               >
                 <TrendArrow trend={grade.trend} />
-                vs prev
+                {formatTrendPct(grade.trendPct, period)}
               </span>
             )}
           </div>
@@ -290,6 +294,7 @@ export default function GradesPanel({
         <GradeCard
           grade={bg}
           label="builder grade"
+          period={period}
           mini="Recent GitHub activity quality across the selected window."
           summary={bg?.summary ?? 'GitHub data unavailable'}
           footer={
@@ -306,6 +311,7 @@ export default function GradesPanel({
         <GradeCard
           grade={hg}
           label="holder relevance"
+          period={period}
           mini="Share of active work pointed at CLAWD holder value; infrastructure can be N/A."
           summary={hg?.summary ?? 'Holder relevance score unavailable'}
           footer={
@@ -315,7 +321,7 @@ export default function GradesPanel({
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.direct} direct</span>
                 )}
                 {hg.counts.lock > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.lock} lock</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.lock} supply lock</span>
                 )}
                 {hg.counts.indirect > 0 && (
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.indirect} indirect</span>
@@ -331,12 +337,13 @@ export default function GradesPanel({
         <GradeCard
           grade={ig}
           label="integrity grade"
+          period={period}
           mini="How well currently active repos fit the stated builder-values frame."
           summary={ig?.summary ?? 'Integrity score unavailable'}
           footer={
             ig && (
               <>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.active} active</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.active} repos in sample</span>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.high} high</span>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.mid} mid</span>
                 <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.low} low</span>

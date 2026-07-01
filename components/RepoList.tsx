@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import { Repo, Tag, Level } from '@/lib/scores'
 
-const TAG_ORDER: Tag[] = ['direct', 'supply-lock', 'indirect', 'infrastructure', 'theoretical']
-
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
   'supply-lock': { color: '#5b9bd5', bg: 'rgba(91,155,213,0.12)', label: 'supply lock' },
@@ -14,9 +12,9 @@ const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
 }
 
 const STATUS_STYLES = {
-  active: { color: '#5cb87a', bg: 'rgba(92,184,122,0.08)', label: 'active' },
-  dormant: { color: '#e05c5c', bg: 'rgba(224,92,92,0.08)', label: 'dormant' },
-  archived: { color: '#5e5a55', bg: 'rgba(94,90,85,0.08)', label: 'archived' },
+  active: { color: '#5cb87a', bg: 'rgba(92,184,122,0.08)', label: 'active', title: 'Editorial status at time of scoring' },
+  dormant: { color: '#e05c5c', bg: 'rgba(224,92,92,0.08)', label: 'dormant', title: 'Editorial status at time of scoring' },
+  archived: { color: '#5e5a55', bg: 'rgba(94,90,85,0.08)', label: 'archived', title: 'Editorial status at time of scoring' },
 }
 
 const LEVEL_STYLES: Record<Level, { color: string; bg: string }> = {
@@ -28,7 +26,7 @@ const LEVEL_STYLES: Record<Level, { color: string; bg: string }> = {
 const CONFIDENCE_LABEL: Record<string, string> = {
   high: 'High confidence',
   mid: 'Medium confidence',
-  low: 'Low confidence — R&D',
+  low: 'Low confidence — auto-inferred',
 }
 
 function gradeColor(letter: string) {
@@ -36,6 +34,23 @@ function gradeColor(letter: string) {
   if (letter === 'B') return 'var(--green)'
   if (letter === 'C') return 'var(--amber)'
   return 'var(--red)'
+}
+
+function parseScoredAt(scoredAt: string): number {
+  const t = Date.parse(scoredAt)
+  return Number.isNaN(t) ? 0 : t
+}
+
+function recencyTimestamp(repo: RepoWithLive): number {
+  if (repo.lastCommitAt) return new Date(repo.lastCommitAt).getTime()
+  if (repo.pushedAt) return new Date(repo.pushedAt).getTime()
+  return parseScoredAt(repo.scoredAt)
+}
+
+function activitySubtitle(repo: RepoWithLive): string {
+  if (repo.lastCommitAt) return `Last commit ${formatLastCommit(repo.lastCommitAt)}`
+  if (repo.pushedAt) return `Last pushed ${formatLastCommit(repo.pushedAt)}`
+  return `Scored ${repo.scoredAt}`
 }
 
 function formatLastCommit(dateStr: string | null) {
@@ -51,6 +66,7 @@ function formatLastCommit(dateStr: string | null) {
 
 interface RepoWithLive extends Repo {
   lastCommitAt: string | null
+  pushedAt: string | null
   commits30d: number | null
 }
 
@@ -74,25 +90,13 @@ export default function RepoList({ repos }: Props) {
   const filtered = repos
     .filter(r => activeFilter === 'all' || r.tag === activeFilter)
     .sort((a, b) => {
-      const aAuto = a.confidence === 'low' && (a.adminNote ?? '').startsWith('Scores auto-inferred')
-      const bAuto = b.confidence === 'low' && (b.adminNote ?? '').startsWith('Scores auto-inferred')
-      if (aAuto !== bAuto) return aAuto ? 1 : -1
-
-      const aTime = a.lastCommitAt ? new Date(a.lastCommitAt).getTime() : 0
-      const bTime = b.lastCommitAt ? new Date(b.lastCommitAt).getTime() : 0
+      const aTime = recencyTimestamp(a)
+      const bTime = recencyTimestamp(b)
       if (aTime !== bTime) return bTime - aTime
 
       const aCommits = a.commits30d ?? 0
       const bCommits = b.commits30d ?? 0
       if (aCommits !== bCommits) return bCommits - aCommits
-
-      const scoreA = a.holderRelevance?.pct ?? a.builderIntegrity.pct
-      const scoreB = b.holderRelevance?.pct ?? b.builderIntegrity.pct
-      if (scoreA !== scoreB) return scoreB - scoreA
-
-      const tagA = TAG_ORDER.indexOf(a.tag)
-      const tagB = TAG_ORDER.indexOf(b.tag)
-      if (tagA !== tagB) return tagA - tagB
 
       return a.name.localeCompare(b.name)
     })
@@ -180,7 +184,9 @@ export default function RepoList({ repos }: Props) {
                     }}>
                       {ts.label}
                     </span>
-                    <span style={{
+                    <span
+                      title={ss.title}
+                      style={{
                       fontSize: '11px',
                       padding: '2px 8px',
                       borderRadius: '99px',
@@ -210,7 +216,7 @@ export default function RepoList({ repos }: Props) {
                   </div>
 
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {repo.lastCommitAt ? `Last commit ${formatLastCommit(repo.lastCommitAt)}` : `Scored ${repo.scoredAt}`}
+                    {activitySubtitle(repo)}
                     {repo.commits30d !== null && repo.commits30d > 0 && (
                       <span style={{ marginLeft: '8px' }}>· {repo.commits30d} commits (30d)</span>
                     )}
@@ -301,7 +307,7 @@ export default function RepoList({ repos }: Props) {
                           Holder relevance
                         </div>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                          Not scored — infrastructure repos are not expected to have a token mechanic. Their value shows up in the quality of consumer apps built on top.
+                          Not scored — auto-inferred infrastructure repos are not expected to have a token mechanic. Hand-scored infrastructure may use adapted criteria. Value shows up in downstream consumer apps.
                         </p>
                       </div>
                     )}

@@ -1,11 +1,18 @@
 'use client'
 
 import { useState } from 'react'
+import { pctChange } from '@/lib/grades'
 
 interface Props {
   totalRepos: number
   totalCommits30d: number
+  totalCommits7d: number
+  totalCommits30_60: number
+  totalCommits7_14: number
   activeDays30d: number
+  activeDays7d: number
+  activeDays30_60: number
+  activeDays7_14: number
   lastCommitAt: string | null
   lastCommitRepo: string | null
 }
@@ -20,14 +27,23 @@ function formatLastCommit(dateStr: string) {
   return `${days}d ago`
 }
 
+function formatStatTrend(curr: number, prev: number, windowLabel: string): string {
+  const change = pctChange(curr, prev)
+  if (change === null) return `new vs ${windowLabel}`
+  if (change > 0) return `+${change}% vs ${windowLabel}`
+  if (change < 0) return `${change}% vs ${windowLabel}`
+  return `0% vs ${windowLabel}`
+}
+
 interface StatCardProps {
   label: string
   value: string
   sub: string
+  trend?: string
   tooltip?: string
 }
 
-function StatCard({ label, value, sub, tooltip }: StatCardProps) {
+function StatCard({ label, value, sub, trend, tooltip }: StatCardProps) {
   const [show, setShow] = useState(false)
   return (
     <div style={{
@@ -70,6 +86,11 @@ function StatCard({ label, value, sub, tooltip }: StatCardProps) {
       <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
         {sub}
       </div>
+      {trend && (
+        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+          {trend}
+        </div>
+      )}
       {tooltip && show && (
         <div style={{
           position: 'absolute',
@@ -82,7 +103,7 @@ function StatCard({ label, value, sub, tooltip }: StatCardProps) {
           fontSize: '12px',
           color: 'var(--text-secondary)',
           lineHeight: 1.5,
-          width: '200px',
+          width: '220px',
           zIndex: 10,
           pointerEvents: 'none',
         }}>
@@ -93,37 +114,76 @@ function StatCard({ label, value, sub, tooltip }: StatCardProps) {
   )
 }
 
-export default function AllTimeStats({ totalRepos, totalCommits30d, activeDays30d, lastCommitAt, lastCommitRepo }: Props) {
+export default function AllTimeStats({
+  totalRepos,
+  totalCommits30d,
+  totalCommits7d,
+  totalCommits30_60,
+  totalCommits7_14,
+  activeDays30d,
+  activeDays7d,
+  activeDays30_60,
+  activeDays7_14,
+  lastCommitAt,
+  lastCommitRepo,
+}: Props) {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(4, 1fr)',
-      gap: '10px',
-      marginBottom: '24px',
-    }}>
-      <StatCard
-        label="Total repos"
-        value={totalRepos.toString()}
-        sub="all public on GitHub"
-        tooltip="Total number of public repositories on the clawdbotatg GitHub account."
-      />
-      <StatCard
-        label="Commits"
-        value={totalCommits30d.toLocaleString()}
-        sub="last 30 days"
-        tooltip="Total commits across all tracked repos in the last 30 days."
-      />
-      <StatCard
-        label="Active days"
-        value={activeDays30d.toString()}
-        sub="last 30 days"
-        tooltip="Number of calendar days in the last 30 with at least one commit across any tracked repo."
-      />
-      <StatCard
-        label="Last commit"
-        value={lastCommitAt ? formatLastCommit(lastCommitAt) : '—'}
-        sub={lastCommitRepo ?? ''}
-      />
+    <div style={{ marginBottom: '24px' }}>
+      <div style={{
+        fontSize: '11px',
+        color: 'var(--text-muted)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        marginBottom: '10px',
+      }}>
+        Activity snapshot
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '10px',
+      }}>
+        <StatCard
+          label="Total repos"
+          value={totalRepos.toString()}
+          sub="all public on GitHub"
+          tooltip="Total number of public repositories on the clawdbotatg GitHub account."
+        />
+        <StatCard
+          label="Commits (30d)"
+          value={totalCommits30d.toLocaleString()}
+          sub="last 30 days"
+          trend={formatStatTrend(totalCommits30d, totalCommits30_60, 'prior 30d')}
+          tooltip="Commits across up to 40 repos pushed in the last 30 days (scored repos prioritized). Compared to days 31–60."
+        />
+        <StatCard
+          label="Commits (7d)"
+          value={totalCommits7d.toLocaleString()}
+          sub="last 7 days"
+          trend={formatStatTrend(totalCommits7d, totalCommits7_14, 'prior 7d')}
+          tooltip="Commits across up to 40 repos pushed in the last 30 days (scored repos prioritized). Compared to days 8–14."
+        />
+        <StatCard
+          label="Active days (30d)"
+          value={activeDays30d.toString()}
+          sub="last 30 days"
+          trend={formatStatTrend(activeDays30d, activeDays30_60, 'prior 30d')}
+          tooltip="Calendar days with at least one commit in the sampled repo set. Compared to days 31–60."
+        />
+        <StatCard
+          label="Active days (7d)"
+          value={activeDays7d.toString()}
+          sub="last 7 days"
+          trend={formatStatTrend(activeDays7d, activeDays7_14, 'prior 7d')}
+          tooltip="Calendar days with at least one commit in the sampled repo set. Compared to days 8–14."
+        />
+        <StatCard
+          label="Last commit"
+          value={lastCommitAt ? formatLastCommit(lastCommitAt) : '—'}
+          sub={lastCommitRepo ?? ''}
+          tooltip="Most recent commit found while scanning the sampled repo set."
+        />
+      </div>
     </div>
   )
 }

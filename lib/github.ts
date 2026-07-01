@@ -1,5 +1,9 @@
+import { REPOS } from './scores'
+
 const GITHUB_ORG = 'clawdbotatg'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
+
+const PRIORITY_SLUGS = [...new Set(REPOS.map(r => r.githubSlug))]
 
 async function ghFetch(path: string) {
   const headers: Record<string, string> = {
@@ -24,7 +28,10 @@ export interface RepoActivity {
   slug: string
   commits30d: number
   commits7d: number
+  commits7_14: number
+  commits30_60: number
   lastCommitAt: string | null
+  pushedAt: string
   isActive: boolean
 }
 
@@ -40,22 +47,40 @@ export interface GitHubStats {
   totalRepos: number
   totalCommits30d: number
   totalCommits7d: number
+  totalCommits7_14: number
+  totalCommits30_60: number
   activeDays30d: number
   activeDays7d: number
+  activeDays7_14: number
+  activeDays30_60: number
   newRepos30d: number
   newRepos7d: number
+  newRepos7_14: number
+  newRepos30_60: number
   lastCommitAt: string | null
   lastCommitRepo: string | null
   repoActivity: Record<string, RepoActivity>
   repos: GitHubRepo[]
-  trend30vs30: 'up' | 'flat' | 'down'
   rateLimited: boolean
 }
 
-function isWithinDays(dateStr: string, days: number) {
+function daysAgo(dateStr: string): number {
   const d = new Date(dateStr)
   const now = new Date()
-  return (now.getTime() - d.getTime()) / 86400000 <= days
+  return (now.getTime() - d.getTime()) / 86400000
+}
+
+function isWithinDays(dateStr: string, days: number) {
+  return daysAgo(dateStr) <= days
+}
+
+function isInDayRange(dateStr: string, minExclusive: number, maxInclusive: number) {
+  const days = daysAgo(dateStr)
+  return days > minExclusive && days <= maxInclusive
+}
+
+function isCreatedInDayRange(dateStr: string, minExclusive: number, maxInclusive: number) {
+  return isInDayRange(dateStr, minExclusive, maxInclusive)
 }
 
 // Slugs used only for scoring card activity lookups
@@ -79,10 +104,28 @@ export const SCORED_SLUGS = [
   'yet-another-builder-agent',
 ]
 
+function selectReposForActivityScan(repos: any[], maxCount = 40): any[] {
+  const prioritySet = new Set(PRIORITY_SLUGS)
+  const recentlyPushed = repos.filter(r => isWithinDays(r.pushed_at, 30))
+  const priority = recentlyPushed.filter(r => prioritySet.has(r.name))
+  const rest = recentlyPushed.filter(r => !prioritySet.has(r.name))
+  const priorityOlder = repos.filter(
+    r => prioritySet.has(r.name) && !isWithinDays(r.pushed_at, 30) && isWithinDays(r.pushed_at, 60),
+  )
+
+  const selected: any[] = []
+  const seen = new Set<string>()
+  for (const repo of [...priority, ...rest, ...priorityOlder]) {
+    if (selected.length >= maxCount) break
+    if (seen.has(repo.name)) continue
+    selected.push(repo)
+    seen.add(repo.name)
+  }
+  return selected
+}
+
 export async function getGitHubStats(): Promise<GitHubStats> {
-  const now = new Date()
-  const since30 = new Date(now.getTime() - 30 * 86400000).toISOString()
-  const since60 = new Date(now.getTime() - 60 * 86400000).toISOString()
+  const since60 = new Date(Date.now() - 60 * 86400000).toISOString()
 
   let repos: any[] = []
   let page = 1
@@ -98,13 +141,18 @@ export async function getGitHubStats(): Promise<GitHubStats> {
   const totalRepos = repos.length
   const newRepos30d = repos.filter(r => isWithinDays(r.created_at, 30)).length
   const newRepos7d = repos.filter(r => isWithinDays(r.created_at, 7)).length
+  const newRepos7_14 = repos.filter(r => isCreatedInDayRange(r.created_at, 7, 14)).length
+  const newRepos30_60 = repos.filter(r => isCreatedInDayRange(r.created_at, 30, 60)).length
 
-  const recentlyUpdated = repos.filter(r => isWithinDays(r.pushed_at, 30)).slice(0, 40)
+  const reposToScan = selectReposForActivityScan(repos)
 
   const activeDaySet30 = new Set<string>()
   const activeDaySet7 = new Set<string>()
+  const activeDaySet7_14 = new Set<string>()
+  const activeDaySet30_60 = new Set<string>()
   let totalCommits30d = 0
   let totalCommits7d = 0
+  let totalCommits7_14 = 0
   let totalCommits30_60 = 0
   let lastCommitAt: string | null = null
   let lastCommitRepo: string | null = null
@@ -112,16 +160,18 @@ export async function getGitHubStats(): Promise<GitHubStats> {
 
   const repoActivity: Record<string, RepoActivity> = {}
 
-  for (const repo of recentlyUpdated) {
+  for (const repo of reposToScan) {
     try {
       const commits = await ghFetch(`/repos/${GITHUB_ORG}/${repo.name}/commits?since=${since60}&per_page=100`)
 
       const c30 = commits.filter((c: any) => isWithinDays(c.commit.author.date, 30))
       const c7 = commits.filter((c: any) => isWithinDays(c.commit.author.date, 7))
-      const c30_60 = commits.filter((c: any) => !isWithinDays(c.commit.author.date, 30))
+      const c7_14 = commits.filter((c: any) => isInDayRange(c.commit.author.date, 7, 14))
+      const c30_60 = commits.filter((c: any) => isInDayRange(c.commit.author.date, 30, 60))
 
       totalCommits30d += c30.length
       totalCommits7d += c7.length
+      totalCommits7_14 += c7_14.length
       totalCommits30_60 += c30_60.length
 
       c30.forEach((c: any) => {
@@ -137,11 +187,22 @@ export async function getGitHubStats(): Promise<GitHubStats> {
         activeDaySet7.add(c.commit.author.date.slice(0, 10))
       })
 
+      c7_14.forEach((c: any) => {
+        activeDaySet7_14.add(c.commit.author.date.slice(0, 10))
+      })
+
+      c30_60.forEach((c: any) => {
+        activeDaySet30_60.add(c.commit.author.date.slice(0, 10))
+      })
+
       repoActivity[repo.name] = {
         slug: repo.name,
         commits30d: c30.length,
         commits7d: c7.length,
+        commits7_14: c7_14.length,
+        commits30_60: c30_60.length,
         lastCommitAt: commits[0]?.commit?.author?.date ?? null,
+        pushedAt: repo.pushed_at,
         isActive: c30.length > 0,
       }
     } catch (err: any) {
@@ -152,20 +213,35 @@ export async function getGitHubStats(): Promise<GitHubStats> {
     }
   }
 
-  let trend30vs30: 'up' | 'flat' | 'down' = 'flat'
-  if (totalCommits30_60 > 0) {
-    if (totalCommits30d > totalCommits30_60 * 1.1) trend30vs30 = 'up'
-    else if (totalCommits30d < totalCommits30_60 * 0.9) trend30vs30 = 'down'
+  for (const repo of repos) {
+    if (repoActivity[repo.name]) continue
+    if (!PRIORITY_SLUGS.includes(repo.name)) continue
+    repoActivity[repo.name] = {
+      slug: repo.name,
+      commits30d: 0,
+      commits7d: 0,
+      commits7_14: 0,
+      commits30_60: 0,
+      lastCommitAt: null,
+      pushedAt: repo.pushed_at,
+      isActive: isWithinDays(repo.pushed_at, 30),
+    }
   }
 
   return {
     totalRepos,
     totalCommits30d,
     totalCommits7d,
+    totalCommits7_14,
+    totalCommits30_60,
     activeDays30d: activeDaySet30.size,
     activeDays7d: activeDaySet7.size,
+    activeDays7_14: activeDaySet7_14.size,
+    activeDays30_60: activeDaySet30_60.size,
     newRepos30d,
     newRepos7d,
+    newRepos7_14,
+    newRepos30_60,
     lastCommitAt,
     lastCommitRepo,
     repoActivity,
@@ -176,7 +252,6 @@ export async function getGitHubStats(): Promise<GitHubStats> {
       pushedAt: r.pushed_at,
       language: r.language ?? null,
     })),
-    trend30vs30,
     rateLimited,
   }
 }
