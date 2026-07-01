@@ -194,7 +194,7 @@ export default function AdminPage() {
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Auto-inferred scores</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Unscored GitHub repos are inferred by Claude and cached in Redis. Runs automatically every hour on Vercel, or trigger manually below. Priority follows GitHub repo order (visible list first).
+              Unscored GitHub repos are inferred by Claude and cached in Redis. On Vercel Hobby, autoscore runs once daily via cron (up to 15 repos per run). Use the button below to score immediately. Priority follows GitHub repo order (visible list first).
             </p>
           </div>
           <button
