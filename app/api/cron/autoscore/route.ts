@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runAutoscorePipeline } from '@/lib/autoscorePipeline'
 
+export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}))
-  const password = body?.password
+export async function GET(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) {
+    return NextResponse.json({ ok: false, error: 'CRON_SECRET not configured' }, { status: 503 })
+  }
 
-  if (password !== process.env.ADMIN_PASSWORD) {
+  const auth = req.headers.get('authorization')
+  if (auth !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -15,7 +19,7 @@ export async function POST(req: NextRequest) {
     const result = await runAutoscorePipeline()
     return NextResponse.json({ ok: true, ...result })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Autoscore failed'
+    const message = err instanceof Error ? err.message : 'Autoscore cron failed'
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

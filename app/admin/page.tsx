@@ -13,6 +13,39 @@ export default function AdminPage() {
   const [saved, setSaved] = useState<string | null>(null)
   const [flushing, setFlushing] = useState<string | null>(null)
   const [flushed, setFlushed] = useState<string | null>(null)
+  const [autoscoreRunning, setAutoscoreRunning] = useState(false)
+  const [autoscoreResult, setAutoscoreResult] = useState<string | null>(null)
+
+  async function runAutoscore() {
+    setAutoscoreRunning(true)
+    setAutoscoreResult(null)
+    try {
+      const res = await fetch('/api/autoscore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        const inferred = (data.inferred as string[] | undefined) ?? []
+        setAutoscoreResult(
+          inferred.length
+            ? `Scored ${inferred.length} repo(s): ${inferred.join(', ')}${data.deferred ? ` · ${data.deferred} still queued` : ''}`
+            : data.deferred
+              ? `No new scores this run · ${data.deferred} still queued`
+              : 'All trackable repos are scored.',
+        )
+        if (inferred.length) {
+          setAutoScored(prev => Array.from(new Set([...inferred, ...prev])).sort())
+        }
+      } else {
+        setAutoscoreResult(data.error ?? 'Autoscore failed')
+      }
+    } catch {
+      setAutoscoreResult('Autoscore request failed')
+    }
+    setAutoscoreRunning(false)
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -156,13 +189,49 @@ export default function AdminPage() {
       </div>
 
       {/* Auto-scored repos */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Auto-inferred scores</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Unscored GitHub repos are inferred by Claude and cached in Redis. Runs automatically every hour on Vercel, or trigger manually below. Priority follows GitHub repo order (visible list first).
+            </p>
+          </div>
+          <button
+            onClick={runAutoscore}
+            disabled={autoscoreRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {autoscoreRunning ? 'Running autoscore…' : 'Run autoscore now'}
+          </button>
+        </div>
+        {autoscoreResult && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {autoscoreResult}
+          </div>
+        )}
+      </div>
+
       {autoScored.length > 0 && (
         <div>
-          <div style={{ marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Auto-inferred scores</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              These repos appeared on GitHub and were scored automatically by Claude. Flush a score to re-infer it, or add a context note above after manually reviewing.
-            </p>
+          <div style={{ marginBottom: '12px', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>
+            Cached auto-inferred ({autoScored.length})
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -213,7 +282,7 @@ export default function AdminPage() {
           fontSize: '13px',
           color: 'var(--text-muted)',
         }}>
-          No auto-inferred scores cached yet. New repos will appear here after first page load.
+          No auto-inferred scores cached yet. Use Run autoscore now to score unscored repos from GitHub.
         </div>
       )}
     </div>

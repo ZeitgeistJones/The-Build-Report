@@ -3,7 +3,7 @@ import { GitHubRepo } from './github'
 import { shouldSkipRepo } from './repoFilters'
 
 /** Merge repo sources; hand-scored REPOS entries win over auto-scored duplicates. */
-export function mergeRepoSources(handScored: Repo[], autoScored: Repo[], recentUnscored: Repo[]): Repo[] {
+export function mergeRepoSources(handScored: Repo[], autoScored: Repo[], recentUnscored: Repo[] = []): Repo[] {
   const bySlug = new Map<string, Repo>()
   for (const repo of recentUnscored) {
     if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, repo)
@@ -17,24 +17,49 @@ export function mergeRepoSources(handScored: Repo[], autoScored: Repo[], recentU
   return Array.from(bySlug.values())
 }
 
-/** Sort repos to match GitHub's pushed_at order (same as github.com/.../repositories). */
-export function orderReposByGithub<T extends { githubSlug: string }>(
-  repos: T[],
+function scoredBySlug(handScored: Repo[], autoScored: Repo[]): Map<string, Repo> {
+  const bySlug = new Map<string, Repo>()
+  for (const repo of autoScored) {
+    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, repo)
+  }
+  for (const repo of handScored) {
+    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, repo)
+  }
+  return bySlug
+}
+
+/**
+ * Walk GitHub's trackable repo list in pushed_at order and emit one card per repo.
+ * Uses hand-scored / autoscore cache when available; otherwise an unscored placeholder.
+ * Matches https://github.com/clawdbotatg?tab=repositories without skipping rows.
+ */
+export function buildReposInGithubOrder(
   githubOrder: GitHubRepo[],
-): T[] {
-  const bySlug = new Map(repos.map(r => [r.githubSlug, r]))
-  const ordered: T[] = []
-  const seen = new Set<string>()
+  handScored: Repo[],
+  autoScored: Repo[],
+  makeUnscored: (gh: GitHubRepo) => Repo,
+  maxRows = 80,
+): Repo[] {
+  const scored = scoredBySlug(handScored, autoScored)
+  const ordered: Repo[] = []
+  const includedIds = new Set<string>()
 
   for (const gh of githubOrder) {
-    const repo = bySlug.get(gh.name)
-    if (!repo) continue
-    ordered.push(repo)
-    seen.add(gh.name)
+    if (shouldSkipRepo(gh.name)) continue
+
+    const entry = scored.get(gh.name) ?? makeUnscored(gh)
+    ordered.push(entry)
+    includedIds.add(entry.id)
+
+    if (ordered.length >= maxRows) break
   }
 
-  for (const repo of repos) {
-    if (!seen.has(repo.githubSlug)) ordered.push(repo)
+  // Hand-scored entries with a unique id not yet shown (e.g. duplicate githubSlug rows)
+  for (const repo of handScored) {
+    if (shouldSkipRepo(repo.githubSlug)) continue
+    if (includedIds.has(repo.id)) continue
+    ordered.push(repo)
+    includedIds.add(repo.id)
   }
 
   return ordered

@@ -2,9 +2,9 @@ import { getGitHubStats, timeAgo } from '@/lib/github'
 import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getAutoScores } from '@/lib/autoscore'
-import { githubTopUnscoredRepos, isUnscoredRecent } from '@/lib/recentRepos'
-import { shouldSkipRepo, isAutoInferredNote } from '@/lib/repoFilters'
-import { mergeRepoSources, orderReposByGithub, githubSlugOrder } from '@/lib/repoOrder'
+import { makeUnscoredRecentRepo } from '@/lib/recentRepos'
+import { shouldSkipRepo } from '@/lib/repoFilters'
+import { mergeRepoSources, buildReposInGithubOrder, githubSlugOrder } from '@/lib/repoOrder'
 import { calcBuilderGrade, calcHolderRelevanceGrade, calcIntegrityGrade } from '@/lib/grades'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
@@ -31,15 +31,13 @@ export default async function Home() {
   const autoScoredRaw = unscoredRepos.length > 0 ? await getAutoScores(unscoredRepos) : []
   const autoScored = autoScoredRaw.filter(r => !shouldSkipRepo(r.githubSlug))
 
-  const listedSlugs = new Set([
-    ...REPOS.map(r => r.githubSlug),
-    ...autoScored.map(r => r.githubSlug),
-  ])
-  const recentUnscored = stats ? githubTopUnscoredRepos(trackableGithub, listedSlugs) : []
+  const allRepos = mergeRepoSources(REPOS, autoScored)
 
-  const allRepos = mergeRepoSources(REPOS, autoScored, recentUnscored)
+  const reposBase = stats
+    ? buildReposInGithubOrder(trackableGithub, REPOS, autoScored, makeUnscoredRecentRepo, 80)
+    : allRepos
 
-  const reposRaw = allRepos.map(r => {
+  const repos = reposBase.map(r => {
     const activity = stats?.repoActivity[r.githubSlug]
     const githubRepo = trackableGithub.find(gr => gr.name === r.githubSlug)
       ?? stats?.repos.find(gr => gr.name === r.githubSlug)
@@ -52,38 +50,7 @@ export default async function Home() {
     }
   })
 
-  const repos = stats
-    ? orderReposByGithub(reposRaw, trackableGithub)
-    : reposRaw
-
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
-
-  // #region agent log
-  fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
-    body: JSON.stringify({
-      sessionId: 'a33a7a',
-      runId: 'github-order',
-      hypothesisId: 'H-github-order',
-      location: 'app/page.tsx:repos',
-      message: 'github order vs site order',
-      data: {
-        githubTop8: trackableGithub.slice(0, 8).map(r => r.name),
-        siteTop8: repos.slice(0, 8).map(r => r.githubSlug),
-        match: trackableGithub.slice(0, 8).map(r => r.name).every(
-          (name, i) => repos.slice(0, 8)[i]?.githubSlug === name
-            || !repos.some(rep => rep.githubSlug === name),
-        ),
-        position1024x: repos.findIndex(r => r.githubSlug === '1024x'),
-        autoScoredCount: autoScored.length,
-        autoInferredTop8: repos.filter(r => isAutoInferredNote(r.adminNote)).slice(0, 8).map(r => r.githubSlug),
-        pendingTop8: repos.filter(r => isUnscoredRecent(r)).slice(0, 8).map(r => r.githubSlug),
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
-  // #endregion
 
   const builderGrade30 = stats ? calcBuilderGrade(stats, '30d') : null
   const builderGrade7 = stats ? calcBuilderGrade(stats, '7d') : null

@@ -16,7 +16,12 @@ function getRedis() {
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v2:'
 const CACHE_KEY_PREFIX_V1 = 'build-report:autoscore:'
-const MAX_NEW_PER_RUN = 5
+
+function maxNewPerRun(): number {
+  const raw = process.env.AUTOSCORE_MAX_PER_RUN
+  const n = raw ? parseInt(raw, 10) : 15
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 30) : 15
+}
 
 async function readCachedScore(r: Redis, repoName: string): Promise<Repo | null> {
   try {
@@ -198,12 +203,29 @@ export async function getAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
   return results
 }
 
+function rankForInference(name: string, githubOrder: string[]): number {
+  const idx = githubOrder.indexOf(name)
+  return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
+}
+
+export interface AutoScoreRunResult {
+  repos: Repo[]
+  inferred: string[]
+  deferred: number
+}
+
 // CALL THIS FROM AN API ROUTE OR ADMIN ACTION, NOT app/page.tsx
-export async function runAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
+export async function runAutoScores(
+  newRepos: RawRepo[],
+  options?: { githubOrder?: string[] },
+): Promise<AutoScoreRunResult> {
   if (!newRepos.length) {
     console.log('[autoscore] no new repos to score')
-    return []
+    return { repos: [], inferred: [], deferred: 0 }
   }
+
+  const maxPerRun = maxNewPerRun()
+  const githubOrder = options?.githubOrder ?? []
 
   console.log(`[autoscore] ${newRepos.length} unscored repos found`)
 
@@ -225,16 +247,21 @@ export async function runAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
 
   console.log(`[autoscore] ${results.length} from cache, ${toInfer.length} need inference`)
 
-  toInfer.sort(
-    (a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime()
-  )
+  toInfer.sort((a, b) => {
+    const aRank = rankForInference(a.name, githubOrder)
+    const bRank = rankForInference(b.name, githubOrder)
+    if (aRank !== bRank) return aRank - bRank
+    return new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime()
+  })
 
-  const batch = toInfer.slice(0, MAX_NEW_PER_RUN)
-  if (toInfer.length > MAX_NEW_PER_RUN) {
+  const batch = toInfer.slice(0, maxPerRun)
+  if (toInfer.length > maxPerRun) {
     console.log(
-      `[autoscore] capping at ${MAX_NEW_PER_RUN} this run, ${toInfer.length - MAX_NEW_PER_RUN} deferred`
+      `[autoscore] capping at ${maxPerRun} this run, ${toInfer.length - maxPerRun} deferred`,
     )
   }
+
+  const inferred: string[] = []
 
   for (const repo of batch) {
     const scored = await inferScore(repo)
@@ -247,11 +274,12 @@ export async function runAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
         // non-fatal
       }
       results.push(scored)
+      inferred.push(repo.name)
     }
   }
 
-  console.log(`[autoscore] run returning ${results.length} total`)
-  return results
+  console.log(`[autoscore] run returning ${results.length} total (${inferred.length} newly inferred)`)
+  return { repos: results, inferred, deferred: toInfer.length - inferred.length }
 }
 
 export async function flushAutoScore(repoName: string): Promise<void> {
