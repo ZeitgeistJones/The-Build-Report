@@ -13,7 +13,7 @@ import {
   buildTokenMechanicTrendExplanation,
   buildIntegrityTrendExplanation,
 } from '@/lib/gradeNarratives'
-import { calcOverallGrade, calcOverallGradeWithTrend, countReposScored, buildOverallGradeContext } from '@/lib/overallGrade'
+import { calcOverallGradeWithTrend, countReposScored, buildOverallGradeContext } from '@/lib/overallGrade'
 import { getOverallSummary } from '@/lib/overallSummary'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
