@@ -181,24 +181,6 @@ export default async function Home() {
         </div>
       )}
 
-      {stats && (
-      <div style={{ marginBottom: '40px' }}>
-        <AllTimeStats
-          totalRepos={stats.totalRepos}
-          totalCommits30d={stats.totalCommits30d}
-          totalCommits7d={stats.totalCommits7d}
-          totalCommits30_60={stats.totalCommits30_60}
-          totalCommits7_14={stats.totalCommits7_14}
-          activeDays30d={stats.activeDays30d}
-          activeDays7d={stats.activeDays7d}
-          activeDays30_60={stats.activeDays30_60}
-          activeDays7_14={stats.activeDays7_14}
-          lastCommitAt={stats.lastCommitAt}
-          lastCommitRepo={stats.lastCommitRepo}
-        />
-      </div>
-      )}
-
       <div style={{ marginBottom: '40px' }}>
       <GradesPanel
         builderGrade30={builderGrade30}
@@ -227,6 +209,24 @@ export default async function Home() {
         }
       />
       </div>
+
+      {stats && (
+      <div style={{ marginBottom: '40px' }}>
+        <AllTimeStats
+          totalRepos={stats.totalRepos}
+          totalCommits30d={stats.totalCommits30d}
+          totalCommits7d={stats.totalCommits7d}
+          totalCommits30_60={stats.totalCommits30_60}
+          totalCommits7_14={stats.totalCommits7_14}
+          activeDays30d={stats.activeDays30d}
+          activeDays7d={stats.activeDays7d}
+          activeDays30_60={stats.activeDays30_60}
+          activeDays7_14={stats.activeDays7_14}
+          lastCommitAt={stats.lastCommitAt}
+          lastCommitRepo={stats.lastCommitRepo}
+        />
+      </div>
+      )}
 
       <div style={{ marginBottom: '40px' }}>
       <RepoList repos={repos} githubSlugOrder={githubOrder} />
