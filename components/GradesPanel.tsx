@@ -16,12 +16,6 @@ interface Props {
   stats7d: { commits: number; activeDays: number; newRepos: number } | null
 }
 
-function levelColor(level: 'high' | 'mid' | 'low') {
-  if (level === 'high') return 'var(--green)'
-  if (level === 'mid') return 'var(--amber)'
-  return 'var(--red)'
-}
-
 function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
   if (trend === 'up') return <span style={{ color: 'var(--green)', fontSize: '12px' }}>↑</span>
   if (trend === 'down') return <span style={{ color: 'var(--red)', fontSize: '12px' }}>↓</span>
@@ -42,7 +36,6 @@ function GradeCard({
     pct: number
     trend: 'up' | 'flat' | 'down'
     trendPct: number | null
-    signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   } | null
   label: string
   mini: string
@@ -204,60 +197,10 @@ function GradeCard({
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {grade?.signals.map(s => (
-          <div
-            key={s.label}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 64px 28px',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.35 }}>
-              {s.label}
-            </span>
-
-            <div
-              style={{
-                width: '64px',
-                height: '4px',
-                background: 'var(--surface-3)',
-                borderRadius: '99px',
-                overflow: 'hidden',
-                justifySelf: 'end',
-              }}
-            >
-              <div
-                style={{
-                  width: `${s.pct}%`,
-                  height: '100%',
-                  borderRadius: '99px',
-                  background: levelColor(s.level),
-                }}
-              />
-            </div>
-
-            <span
-              style={{
-                fontSize: '10px',
-                color: 'var(--text-muted)',
-                width: '28px',
-                textAlign: 'right',
-                textTransform: 'lowercase',
-              }}
-            >
-              {s.level}
-            </span>
-          </div>
-        ))}
-      </div>
-
       {footer && (
         <div
           style={{
-            marginTop: '12px',
+            marginTop: 'auto',
             paddingTop: '10px',
             borderTop: '1px solid var(--border)',
             display: 'flex',
