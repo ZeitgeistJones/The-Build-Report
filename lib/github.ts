@@ -6,7 +6,7 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 
 const PRIORITY_SLUGS = Array.from(new Set(REPOS.map(r => r.githubSlug)))
 
-async function ghFetch(path: string) {
+async function ghFetch(path: string, options?: { fresh?: boolean }) {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github.v3+json',
   }
@@ -14,7 +14,9 @@ async function ghFetch(path: string) {
 
   const res = await fetch(`https://api.github.com${path}`, {
     headers,
-    next: { revalidate: 3600 },
+    ...(options?.fresh
+      ? { cache: 'no-store' as const }
+      : { next: { revalidate: 3600, tags: ['github-stats'] } }),
   })
 
   if (!res.ok) {
@@ -146,14 +148,15 @@ function selectReposForActivityScan(repos: any[], maxCount = 40): any[] {
   return selected
 }
 
-export async function getGitHubStats(): Promise<GitHubStats> {
+export async function getGitHubStats(options?: { fresh?: boolean }): Promise<GitHubStats> {
   const since60 = new Date(Date.now() - 60 * 86400000).toISOString()
+  const fresh = options?.fresh ?? false
 
   let repos: any[] = []
   let page = 1
 
   while (true) {
-    const batch = await ghFetch(`/users/${GITHUB_ORG}/repos?per_page=100&page=${page}&sort=pushed`)
+    const batch = await ghFetch(`/users/${GITHUB_ORG}/repos?per_page=100&page=${page}&sort=pushed`, { fresh })
     if (!batch.length) break
     repos = repos.concat(batch)
     if (batch.length < 100) break
@@ -184,7 +187,7 @@ export async function getGitHubStats(): Promise<GitHubStats> {
 
   for (const repo of reposToScan) {
     try {
-      const commits = await ghFetch(`/repos/${GITHUB_ORG}/${repo.name}/commits?since=${since60}&per_page=100`)
+      const commits = await ghFetch(`/repos/${GITHUB_ORG}/${repo.name}/commits?since=${since60}&per_page=100`, { fresh })
 
       const c30 = commits.filter((c: any) => isWithinDays(c.commit.author.date, 30))
       const c7 = commits.filter((c: any) => isWithinDays(c.commit.author.date, 7))
