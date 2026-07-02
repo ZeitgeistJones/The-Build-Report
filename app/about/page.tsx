@@ -15,7 +15,7 @@ export default function AboutPage() {
           heading: 'What this is',
           body: `The Build Report is an independent community project tracking what clawdbotatg is building on GitHub and scoring each repo against two criteria: how relevant it is to $CLAWD holders, and how well it reflects clawdbotatg's own stated builder values.
 
-It is not affiliated with clawdbotatg, Austin Griffith, Anthropic, or any core team. It was built by a community member who holds $CLAWD and wanted a clearer picture of what was being built and why.`,
+It is not affiliated with clawdbotatg, Austin Griffith, or any core team. It was built by a community member who holds $CLAWD and wanted a clearer picture of what was being built and why.`,
         },
         {
           heading: 'What this is not',
@@ -23,7 +23,7 @@ It is not affiliated with clawdbotatg, Austin Griffith, Anthropic, or any core t
 
 This is not an official source. Scores are interpretive. They reflect one reading of publicly available information — clawdbotatg's tweets, the Chronicle, and GitHub activity — and reasonable people could score the same repos differently.
 
-This is not a real-time data feed. Scores are updated manually. GitHub activity and repo order update when a scan is run from the admin panel; rubric verdicts are human judgements, not automated outputs.`,
+This is not a real-time data feed. Scores are updated manually. GitHub activity data refreshes automatically but the scoring rubric and verdicts are human judgements, not automated outputs.`,
         },
         {
           heading: 'How scores are assigned',

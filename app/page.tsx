@@ -1,5 +1,5 @@
-import { timeAgo } from '@/lib/github'
-import { getCachedGitHubStats, getLastGithubScanAt, formatScanAt } from '@/lib/githubScan'
+import { getGitHubStats, timeAgo } from '@/lib/github'
+import { getLastGithubScanAt, formatScanAt } from '@/lib/githubScan'
 import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getAutoScores } from '@/lib/autoscore'
@@ -24,8 +24,7 @@ export default async function Home() {
   const lastGithubScanAt = await getLastGithubScanAt()
 
   try {
-    stats = await getCachedGitHubStats()
-    if (!stats) error = true
+    stats = await getGitHubStats()
   } catch {
     error = true
     stats = null
@@ -145,18 +144,12 @@ export default async function Home() {
             marginBottom: '24px',
           }}
         >
-          {!stats
-            ? 'No GitHub scan cached yet — repo order and activity stats need a scan from the admin panel. Hand scores and auto-inferred grades still show below.'
-            : 'GitHub rate limit reached during the last scan — commit data may be partial. Add a GITHUB_TOKEN env var for full data.'}{' '}
-          <a href="/admin">Run a scan from admin →</a>
-          {!stats && (
-            <>
-              {' '}
-              <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
-                Create a free token →
-              </a>
-            </>
-          )}
+          {error
+            ? 'GitHub data unavailable — showing scores only.'
+            : 'GitHub rate limit reached — commit data is partial. Add a GITHUB_TOKEN env var for full data.'}{' '}
+          <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
+            Create a free token →
+          </a>
         </div>
       )}
 

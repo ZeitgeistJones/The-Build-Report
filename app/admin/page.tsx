@@ -15,35 +15,6 @@ export default function AdminPage() {
   const [flushed, setFlushed] = useState<string | null>(null)
   const [autoscoreRunning, setAutoscoreRunning] = useState(false)
   const [autoscoreResult, setAutoscoreResult] = useState<string | null>(null)
-  const [scanRunning, setScanRunning] = useState(false)
-  const [scanResult, setScanResult] = useState<string | null>(null)
-  const [lastGithubScanLabel, setLastGithubScanLabel] = useState<string | null>(null)
-
-  async function runGithubScan() {
-    setScanRunning(true)
-    setScanResult(null)
-    try {
-      const res = await fetch('/api/admin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'scan', password }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        setLastGithubScanLabel(data.scannedAtLabel ?? null)
-        setScanResult(
-          data.rateLimited
-            ? `Scan complete (${data.trackableRepos} trackable repos) · rate limit hit — data may be partial.`
-            : `Scan complete — ${data.trackableRepos} trackable repos. Last scan: ${data.scannedAtLabel}.`,
-        )
-      } else {
-        setScanResult(data.error ?? 'GitHub scan failed')
-      }
-    } catch {
-      setScanResult('GitHub scan request failed')
-    }
-    setScanRunning(false)
-  }
 
   async function runAutoscore() {
     setAutoscoreRunning(true)
@@ -88,7 +59,6 @@ export default function AdminPage() {
       setAuthed(true)
       setNotes(data.notes ?? {})
       setAutoScored(data.autoScored ?? [])
-      setLastGithubScanLabel(data.lastGithubScanLabel ?? null)
     } else {
       setAuthError('Wrong password.')
     }
@@ -161,51 +131,6 @@ export default function AdminPage() {
 
   return (
     <div>
-      {/* GitHub scan */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>GitHub scan</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Fetches repo list, commit activity, and grades from GitHub and caches the result in Redis. The public site reads this cache — run a scan after new repos or pushes you want reflected on the home page.
-              {lastGithubScanLabel && (
-                <span style={{ display: 'block', marginTop: '6px', color: 'var(--text-secondary)' }}>
-                  Last scan: {lastGithubScanLabel}
-                </span>
-              )}
-            </p>
-          </div>
-          <button
-            onClick={runGithubScan}
-            disabled={scanRunning}
-            style={{
-              fontSize: '12px',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius)',
-              background: 'var(--surface-3)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-strong)',
-              flexShrink: 0,
-            }}
-          >
-            {scanRunning ? 'Scanning GitHub…' : 'Run GitHub scan'}
-          </button>
-        </div>
-        {scanResult && (
-          <div style={{
-            marginBottom: '12px',
-            padding: '10px 14px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-          }}>
-            {scanResult}
-          </div>
-        )}
-      </div>
-
       {/* Context notes */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
