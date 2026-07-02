@@ -25,6 +25,14 @@
   --radius: 8px;
   --radius-lg: 12px;
   --card-elevated: 0 1px 0 rgba(255,255,255,0.05), 0 8px 32px rgba(0,0,0,0.4);
+  --content-max-width: 1200px;
+  --content-padding-x: 24px;
+  /* Letter grade colors — harmonized; F bumped from #991b1b to pass 4.5:1 on #1c1c1c */
+  --grade-a: rgba(200, 240, 96, 0.9);
+  --grade-b: #4ade80;
+  --grade-c: #fb923c;
+  --grade-d: #f87171;
+  --grade-f: #c44444;
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }

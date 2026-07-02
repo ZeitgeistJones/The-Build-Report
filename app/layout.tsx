@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
           </div>
         </nav>
-        <main style={{ maxWidth: '820px', margin: '0 auto', padding: '32px 24px 80px' }}>
+        <main style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', padding: '32px var(--content-padding-x) 80px' }}>
           {children}
         </main>
         <footer style={{

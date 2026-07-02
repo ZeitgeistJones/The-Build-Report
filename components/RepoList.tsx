@@ -247,9 +247,9 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                           Holder relevance
                         </div>
                         {repo.holderRelevance.rubric.map((row, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, lineHeight: 1.4 }}>{row.label}</span>
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '28px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
+                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '6px', flexWrap: 'nowrap' }}>
+                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
                             <span style={{
                               fontSize: '11px',
                               fontWeight: 500,
@@ -261,7 +261,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                             }}>
                               {row.level}
                             </span>
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '140px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
                               {row.source}
                             </span>
                           </div>
@@ -286,9 +286,9 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                         Builder integrity
                       </div>
                       {repo.builderIntegrity.rubric.map((row, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, lineHeight: 1.4 }}>{row.label}</span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '28px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '6px', flexWrap: 'nowrap' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
                           <span style={{
                             fontSize: '11px',
                             fontWeight: 500,
@@ -300,7 +300,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                           }}>
                             {row.level}
                           </span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '140px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
                             {row.source}
                           </span>
                         </div>

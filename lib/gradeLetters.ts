@@ -14,11 +14,11 @@ export function pctToLetter(pct: number): string {
   return 'F'
 }
 
-/** Maps extended letter grades to existing palette buckets. F uses muted gray — terminal, not a low D. */
+/** Maps extended letter grades to harmonized CSS variables in globals.css. */
 export function gradeColor(letter: string): string {
-  if (letter === 'F') return 'var(--text-muted)'
-  if (letter.startsWith('A')) return 'var(--accent)'
-  if (letter.startsWith('B')) return 'var(--green)'
-  if (letter.startsWith('C')) return 'var(--amber)'
-  return 'var(--red)' // D+, D, D-
+  if (letter === 'F') return 'var(--grade-f)'
+  if (letter.startsWith('A')) return 'var(--grade-a)'
+  if (letter.startsWith('B')) return 'var(--grade-b)'
+  if (letter.startsWith('C')) return 'var(--grade-c)'
+  return 'var(--grade-d)' // D+, D, D-
 }
