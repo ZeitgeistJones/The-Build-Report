@@ -43,6 +43,24 @@ async function chronicleFetch(path: string): Promise<any> {
   return res.json()
 }
 
+async function fetchCommitDiff(sha: string): Promise<string | null> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.diff',
+  }
+  if (GITHUB_TOKEN) headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${CHRONICLE_REPO}/commits/${sha}`, {
+      headers,
+      next: { revalidate: 3600, tags: ['github-chronicle'] },
+    })
+    if (!res.ok) return null
+    return await res.text()
+  } catch {
+    return null
+  }
+}
+
 function firstLine(message: string): string {
   return message.split('\n')[0].trim()
 }
@@ -69,9 +87,14 @@ function parseCommits(raw: any[]): ChronicleCommit[] {
   })).filter(c => c.date && c.message)
 }
 
+function truncateDiff(text: string, max = 12000): string {
+  if (text.length <= max) return text
+  return `${text.slice(0, max)}\n\n[diff truncated]`
+}
+
 async function fetchChronicleCommits(): Promise<ChronicleCommit[]> {
   try {
-    const raw = await chronicleFetch(`/repos/${CHRONICLE_REPO}/commits?per_page=5`)
+    const raw = await chronicleFetch(`/repos/${CHRONICLE_REPO}/commits?per_page=1`)
     if (!Array.isArray(raw)) return []
     return parseCommits(raw)
   } catch {
@@ -79,17 +102,19 @@ async function fetchChronicleCommits(): Promise<ChronicleCommit[]> {
   }
 }
 
-async function generateChronicleSummary(commits: ChronicleCommit[]): Promise<string | null> {
-  if (!process.env.ANTHROPIC_API_KEY || commits.length === 0) return null
+async function generateChronicleSummary(latest: ChronicleCommit, diff: string): Promise<string | null> {
+  if (!process.env.ANTHROPIC_API_KEY || !diff.trim()) return null
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const list = commits.map((c, i) => `${i + 1}. ${c.message}`).join('\n')
 
-  const prompt = `The clawdbotatg Chronicle is a living document tracking what the builder is working on. Here are the 5 most recent commit messages:
+  const prompt = `The clawdbotatg Chronicle is a living document tracking what the builder is working on.
 
-${list}
+Most recent commit: ${latest.message}
 
-Write 3–4 sentences of plain English summarizing what was recently added or updated in the Chronicle. No bullet points, no markdown.`
+Diff of what changed:
+${truncateDiff(diff)}
+
+Write 3–4 sentences of plain English summarizing what was added or updated in this Chronicle commit. No bullet points, no markdown.`
 
   try {
     const message = await client.messages.create({
@@ -105,7 +130,7 @@ Write 3–4 sentences of plain English summarizing what was recently added or up
   }
 }
 
-async function getChronicleSummary(commits: ChronicleCommit[]): Promise<string | null> {
+async function getChronicleSummary(latest: ChronicleCommit): Promise<string | null> {
   try {
     const r = getRedis()
     const cached = await r.get<string>(SUMMARY_KEY)
@@ -114,7 +139,10 @@ async function getChronicleSummary(commits: ChronicleCommit[]): Promise<string |
     // fall through to generate
   }
 
-  const summary = await generateChronicleSummary(commits)
+  const diff = await fetchCommitDiff(latest.sha)
+  if (!diff) return null
+
+  const summary = await generateChronicleSummary(latest, diff)
   if (!summary) return null
 
   try {
@@ -142,7 +170,7 @@ export async function getChronicleBannerData(): Promise<ChronicleBannerData> {
     message: truncate(latest.message),
   }
 
-  const summary = await getChronicleSummary(commits)
+  const summary = await getChronicleSummary(latest)
 
   return { lastUpdated, summary }
 }
