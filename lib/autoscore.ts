@@ -15,7 +15,8 @@ function getRedis() {
   return redis
 }
 
-const CACHE_KEY_PREFIX = 'build-report:autoscore:v2:'
+const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
+const CACHE_KEY_PREFIX_V2 = 'build-report:autoscore:v2:'
 const CACHE_KEY_PREFIX_V1 = 'build-report:autoscore:'
 
 function maxNewPerRun(): number {
@@ -24,15 +25,28 @@ function maxNewPerRun(): number {
   return Number.isFinite(n) && n > 0 ? Math.min(n, 30) : 15
 }
 
+function normalizeCachedRepo(raw: Record<string, unknown> | null): Repo | null {
+  if (!raw || typeof raw.githubSlug !== 'string' || shouldSkipRepo(raw.githubSlug)) return null
+  if (raw.tokenMechanic !== undefined) return raw as unknown as Repo
+  if (raw.holderRelevance !== undefined) {
+    const { holderRelevance, ...rest } = raw
+    return { ...rest, tokenMechanic: holderRelevance } as unknown as Repo
+  }
+  return raw as unknown as Repo
+}
+
 async function readCachedScore(r: Redis, repoName: string): Promise<Repo | null> {
   try {
-    const v2 = await r.get<Repo>(`${CACHE_KEY_PREFIX}${repoName}`)
-    if (v2 && !shouldSkipRepo(v2.githubSlug)) return v2
+    const v3 = await r.get<Record<string, unknown>>(`${CACHE_KEY_PREFIX}${repoName}`)
+    const fromV3 = normalizeCachedRepo(v3)
+    if (fromV3) return fromV3
 
-    const v1 = await r.get<Repo>(`${CACHE_KEY_PREFIX_V1}${repoName}`)
-    if (v1 && !shouldSkipRepo(v1.githubSlug)) return v1
+    const v2 = await r.get<Record<string, unknown>>(`${CACHE_KEY_PREFIX_V2}${repoName}`)
+    const fromV2 = normalizeCachedRepo(v2)
+    if (fromV2) return fromV2
 
-    return null
+    const v1 = await r.get<Record<string, unknown>>(`${CACHE_KEY_PREFIX_V1}${repoName}`)
+    return normalizeCachedRepo(v1)
   } catch {
     return null
   }
@@ -105,14 +119,19 @@ Last pushed: ${repo.pushedAt}
 Based on the repo name, description, and ecosystem context, infer:
 1. tag: one of direct | supply-lock | indirect | infrastructure | theoretical
 2. status: one of active | dormant | archived
-3. holderRelevance rubric (3 rows — ALWAYS include, use adapted criteria for infrastructure/theoretical)
+3. tokenMechanic rubric (3 rows — ALWAYS include, use adapted criteria for infrastructure/theoretical)
 4. builderIntegrity rubric (3 rows)
 5. verdict: 2-3 sentence plain English assessment
 6. adminNote: one sentence flagging this is auto-inferred, not hand-scored
 
+When writing verdict and adminNote, frame low scores constructively and acknowledge the repo's role even when it scores low. Still be accurate — do not invent positive framing that is not warranted. Examples:
+- Infrastructure repos scoring low on token mechanic: say "foundational layer — value shows up in downstream consumer apps" rather than only "no burn mechanic."
+- Dormant repos that are stable: note "stable; foundational work complete" rather than only "low activity."
+- A low token mechanic score during an infrastructure-heavy phase: frame as "infrastructure phase — consumer apps are the expected next unlock" rather than "fails to deliver holder value."
+
 For rubric rows use these exact weights:
-- holderRelevance consumer apps: "Burn mechanic exists and is live" (50%), "Revenue or burn path built in" (30%), "Takes CLAWD out of circulation" (20%)
-- holderRelevance infrastructure/theoretical (adapted): "Enables consumer apps that burn CLAWD" (50%), "Downstream path to holder value" (30%), "Active and maintained" (20%)
+- tokenMechanic consumer apps: "Burn mechanic exists and is live" (50%), "Revenue or burn path built in" (30%), "Takes CLAWD out of circulation" (20%)
+- tokenMechanic infrastructure/theoretical (adapted): "Enables consumer apps that burn CLAWD" (50%), "Downstream path to holder value" (30%), "Active and maintained" (20%)
 - builderIntegrity: "Serves stated vision at time of build" (40%), "Genuine autonomous build" (35%), "Passes walkaway test" (25%)
 - level: "high" | "mid" | "low"
 - source: brief inference note like "inferred from repo name" or "inferred from ecosystem context"
@@ -121,7 +140,7 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
 {
   "tag": "infrastructure",
   "status": "active",
-  "holderRelevance": [
+  "tokenMechanic": [
     { "label": "...", "weight": "50%", "level": "low", "source": "..." },
     { "label": "...", "weight": "30%", "level": "low", "source": "..." },
     { "label": "...", "weight": "20%", "level": "mid", "source": "..." }
@@ -146,7 +165,7 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
     const clean = text.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
-    const holderRows: RubricRow[] = parsed.holderRelevance
+    const tokenMechanicRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
 
     const repoOut: Repo = {
       id: repo.name,
@@ -160,14 +179,14 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
         day: 'numeric',
         year: 'numeric',
       }),
-      holderRelevance: holderRows?.length ? makeScore(holderRows) : null,
+      tokenMechanic: tokenMechanicRows?.length ? makeScore(tokenMechanicRows) : null,
       builderIntegrity: makeScore(parsed.builderIntegrity),
       verdict: parsed.verdict,
       adminNote: parsed.adminNote,
     }
 
     console.log(
-      `[autoscore] done: ${repo.name} tag:${repoOut.tag} HR:${repoOut.holderRelevance?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`
+      `[autoscore] done: ${repo.name} tag:${repoOut.tag} TM:${repoOut.tokenMechanic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`
     )
     return repoOut
   } catch (err) {
@@ -279,19 +298,22 @@ export async function runAutoScores(
 export async function flushAutoScore(repoName: string): Promise<void> {
   const r = getRedis()
   await r.del(`${CACHE_KEY_PREFIX}${repoName}`)
+  await r.del(`${CACHE_KEY_PREFIX_V2}${repoName}`)
   await r.del(`${CACHE_KEY_PREFIX_V1}${repoName}`)
 }
 
 export async function listCachedAutoScores(): Promise<string[]> {
   const r = getRedis()
   try {
-    const keysV2 = await r.keys(`${CACHE_KEY_PREFIX}*`)
+    const keysV3 = await r.keys(`${CACHE_KEY_PREFIX}*`)
+    const keysV2 = await r.keys(`${CACHE_KEY_PREFIX_V2}*`)
     const keysV1 = await r.keys(`${CACHE_KEY_PREFIX_V1}*`)
     const names = new Set<string>()
-    for (const k of keysV2) names.add(k.replace(CACHE_KEY_PREFIX, ''))
+    for (const k of keysV3) names.add(k.replace(CACHE_KEY_PREFIX, ''))
+    for (const k of keysV2) names.add(k.replace(CACHE_KEY_PREFIX_V2, ''))
     for (const k of keysV1) {
       const name = k.replace(CACHE_KEY_PREFIX_V1, '')
-      if (name && !name.startsWith('v2:')) names.add(name)
+      if (name && !name.startsWith('v2:') && !name.startsWith('v3:')) names.add(name)
     }
     return Array.from(names)
   } catch {

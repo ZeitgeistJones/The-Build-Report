@@ -193,17 +193,17 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                   ) : (
                   <>
                   <div style={{ textAlign: 'center', minWidth: '40px' }}>
-                    {repo.holderRelevance ? (
+                    {repo.tokenMechanic ? (
                       <>
-                        <div style={{ fontSize: '20px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.holderRelevance.letter) }}>
-                          {repo.holderRelevance.letter}
+                        <div style={{ fontSize: '20px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.tokenMechanic.letter) }}>
+                          {repo.tokenMechanic.letter}
                         </div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.holderRelevance.pct}%</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.tokenMechanic.pct}%</div>
                       </>
                     ) : (
                       <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
                     )}
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>holder<br />relevance</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
                   </div>
 
                   <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
@@ -241,12 +241,12 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     </div>
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '14px' }}>
-                    {!pending && repo.holderRelevance && (
+                    {!pending && repo.tokenMechanic && (
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                          Holder relevance
+                          Token mechanic
                         </div>
-                        {repo.holderRelevance.rubric.map((row, i) => (
+                        {repo.tokenMechanic.rubric.map((row, i) => (
                           <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '6px', flexWrap: 'nowrap' }}>
                             <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
                             <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
@@ -269,10 +269,10 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                       </div>
                     )}
 
-                    {!pending && !repo.holderRelevance && (
+                    {!pending && !repo.tokenMechanic && (
                       <div>
                         <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-                          Holder relevance
+                          Token mechanic
                         </div>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
                           Not scored — infrastructure repos are not expected to have a direct token mechanic. Value shows up in downstream consumer apps.

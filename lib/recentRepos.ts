@@ -15,7 +15,7 @@ export function makeUnscoredRecentRepo(gh: GitHubRepo): Repo {
     tag: 'theoretical' as Tag,
     status: 'active',
     confidence: 'low',
-    holderRelevance: null,
+    tokenMechanic: null,
     builderIntegrity: {
       letter: '—',
       pct: 0,

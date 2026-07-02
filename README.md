@@ -5,8 +5,8 @@ A plain English look at the clawdbotatg repos, scored and sourced.
 ## What it does
 
 - Tracks GitHub activity for clawdbotatg in real time (commits, active days, new repos)
-- Shows rolling builder grade and holder relevance grade (30d / 7d toggle with trend)
-- Scores every major repo on two axes: holder relevance and builder integrity
+- Shows rolling builder activity grade, token mechanic grade, and overall composite grade (30d / 7d toggle with trend)
+- Scores every major repo on two axes: token mechanic and builder integrity
 - Each score is broken into three weighted components, each cited to a public source
 - Admin panel for adding context notes to cards (scores are not editable)
 

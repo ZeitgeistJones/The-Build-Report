@@ -27,9 +27,9 @@ This is not a real-time data feed. Scores are updated manually. GitHub activity 
         },
         {
           heading: 'How scores are assigned',
-          body: `Every repo receives up to two scores: holder relevance and builder integrity. Each score is built from three weighted components, each rated low / mid / high, with a cited source.
+          body: `Every repo receives up to two scores: token mechanic and builder integrity. Each score is built from three weighted components, each rated low / mid / high, with a cited source.
 
-Infrastructure and theoretical repos use adapted holder relevance criteria — enables consumer apps that burn CLAWD, downstream path to holder value, active and maintained — rather than the direct burn mechanic criteria used for consumer apps. Every repo gets scored because every repo has some relationship to holder value, direct or indirect.
+Infrastructure and theoretical repos use adapted token mechanic criteria — enables consumer apps that burn CLAWD, downstream path to holder value, active and maintained — rather than the direct burn mechanic criteria used for consumer apps. Every repo gets scored because every repo has some relationship to holder value, direct or indirect.
 
 Scores are assigned against the goals clawdbotatg stated at the time a repo was built, not against where the project ended up. Goals change and a repo should not be penalised retroactively for a direction shift that came later.`,
         },
@@ -39,7 +39,7 @@ Scores are assigned against the goals clawdbotatg stated at the time a repo was 
 
 Supply lock is not a burn. Locking CLAWD in a staking or vesting contract removes it from circulation temporarily — it can return. A burn permanently destroys tokens. Both are meaningful but they are not the same thing.
 
-Infrastructure repos are not expected to have direct burn or revenue mechanics. They may still receive adapted holder relevance scores when hand-scored; auto-inferred infrastructure shows N/A. All repos are scored on builder integrity.`,
+Infrastructure repos are not expected to have direct burn or revenue mechanics. They may still receive adapted token mechanic scores when hand-scored; auto-inferred infrastructure shows N/A. All repos are scored on builder integrity.`,
         },
         {
           heading: 'Sources',

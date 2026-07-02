@@ -58,7 +58,7 @@ function tagLabel(tag: Tag): string {
   return tag
 }
 
-function holderWeight(tag: Tag): string {
+function tokenMechanicWeight(tag: Tag): string {
   if (tag === 'direct') return 'direct burn'
   if (tag === 'supply-lock') return 'supply lock'
   if (tag === 'indirect') return 'indirect'
@@ -152,7 +152,7 @@ export function buildBuilderTrendExplanation(
   return { headline, bullets: bullets.slice(0, 5) }
 }
 
-export function buildHolderTrendExplanation(
+export function buildTokenMechanicTrendExplanation(
   stats: GitHubStats,
   period: Period,
   repoSet: Repo[],
@@ -177,7 +177,7 @@ export function buildHolderTrendExplanation(
 
   if (quietNow.length) {
     bullets.push(
-      `Quiet this window (active prior): ${formatRepoList(quietNow)} (${quietNow.map(r => holderWeight(r.tag)).join(', ')}).`,
+      `Quiet this window (active prior): ${formatRepoList(quietNow)} (${quietNow.map(r => tokenMechanicWeight(r.tag)).join(', ')}).`,
     )
   }
 
@@ -228,10 +228,10 @@ export function buildHolderTrendExplanation(
   const trendLabel = formatTrendPct(trendPct, period)
   const headline =
     trend === 'up'
-      ? `Holder alignment improved (${trendLabel}) — more commit volume on direct, lock, or indirect repos.`
+      ? `Token mechanic alignment improved (${trendLabel}) — more commit volume on direct, lock, or indirect repos.`
       : trend === 'down'
-        ? `Holder alignment dipped (${trendLabel}) — commit volume skews toward infra/R&D vs the prior window.`
-        : `Holder alignment stable (${trendLabel}) — similar commit-weighted tag mix.`
+        ? `Token mechanic alignment dipped (${trendLabel}) — commit volume skews toward infra/R&D vs the prior window.`
+        : `Token mechanic alignment stable (${trendLabel}) — similar commit-weighted tag mix.`
 
   return { headline, bullets: bullets.slice(0, 5) }
 }

@@ -7,15 +7,18 @@ import { getAutoScores } from '@/lib/autoscore'
 import { makeUnscoredRecentRepo } from '@/lib/recentRepos'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { mergeRepoSources, buildReposInGithubOrder, githubSlugOrder } from '@/lib/repoOrder'
-import { calcBuilderGrade, calcHolderRelevanceGrade, calcIntegrityGrade } from '@/lib/grades'
+import { calcBuilderGrade, calcTokenMechanicGrade, calcIntegrityGrade } from '@/lib/grades'
 import {
   buildBuilderTrendExplanation,
-  buildHolderTrendExplanation,
+  buildTokenMechanicTrendExplanation,
   buildIntegrityTrendExplanation,
 } from '@/lib/gradeNarratives'
+import { calcOverallGrade, countReposScored, buildOverallGradeContext } from '@/lib/overallGrade'
+import { getOverallSummary } from '@/lib/overallSummary'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
+import OverallGrade from '@/components/OverallGrade'
 
 export const revalidate = 300
 
@@ -63,8 +66,8 @@ export default async function Home() {
 
   const builderGrade30Raw = stats ? calcBuilderGrade(stats, '30d') : null
   const builderGrade7Raw = stats ? calcBuilderGrade(stats, '7d') : null
-  const holderGrade30Raw = stats ? calcHolderRelevanceGrade(stats, '30d', allRepos) : null
-  const holderGrade7Raw = stats ? calcHolderRelevanceGrade(stats, '7d', allRepos) : null
+  const tokenMechanicGrade30Raw = stats ? calcTokenMechanicGrade(stats, '30d', allRepos) : null
+  const tokenMechanicGrade7Raw = stats ? calcTokenMechanicGrade(stats, '7d', allRepos) : null
   const integrityGrade30Raw = stats ? calcIntegrityGrade(stats, '30d', allRepos) : calcIntegrityGrade(null, '30d', allRepos)
   const integrityGrade7Raw = stats ? calcIntegrityGrade(stats, '7d', allRepos) : calcIntegrityGrade(null, '7d', allRepos)
 
@@ -74,18 +77,38 @@ export default async function Home() {
   const builderGrade7 = builderGrade7Raw && stats
     ? { ...builderGrade7Raw, trendExplanation: buildBuilderTrendExplanation(stats, '7d', builderGrade7Raw.trendPct, builderGrade7Raw.trend) }
     : builderGrade7Raw
-  const holderGrade30 = holderGrade30Raw && stats
-    ? { ...holderGrade30Raw, trendExplanation: buildHolderTrendExplanation(stats, '30d', allRepos, holderGrade30Raw.trendPct, holderGrade30Raw.trend) }
-    : holderGrade30Raw
-  const holderGrade7 = holderGrade7Raw && stats
-    ? { ...holderGrade7Raw, trendExplanation: buildHolderTrendExplanation(stats, '7d', allRepos, holderGrade7Raw.trendPct, holderGrade7Raw.trend) }
-    : holderGrade7Raw
+  const tokenMechanicGrade30 = tokenMechanicGrade30Raw && stats
+    ? { ...tokenMechanicGrade30Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '30d', allRepos, tokenMechanicGrade30Raw.trendPct, tokenMechanicGrade30Raw.trend) }
+    : tokenMechanicGrade30Raw
+  const tokenMechanicGrade7 = tokenMechanicGrade7Raw && stats
+    ? { ...tokenMechanicGrade7Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '7d', allRepos, tokenMechanicGrade7Raw.trendPct, tokenMechanicGrade7Raw.trend) }
+    : tokenMechanicGrade7Raw
   const integrityGrade30 = integrityGrade30Raw && stats
     ? { ...integrityGrade30Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '30d', allRepos, integrityGrade30Raw.trendPct, integrityGrade30Raw.trend) }
     : integrityGrade30Raw
   const integrityGrade7 = integrityGrade7Raw && stats
     ? { ...integrityGrade7Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '7d', allRepos, integrityGrade7Raw.trendPct, integrityGrade7Raw.trend) }
     : integrityGrade7Raw
+
+  const reposScored = countReposScored(allRepos)
+  const overallGradeRaw = calcOverallGrade(
+    tokenMechanicGrade30,
+    builderGrade30,
+    integrityGrade30,
+    reposScored,
+  )
+  const overallSummary = overallGradeRaw
+    ? await getOverallSummary(
+        buildOverallGradeContext(
+          overallGradeRaw,
+          tokenMechanicGrade30,
+          builderGrade30,
+          integrityGrade30!,
+          allRepos,
+          stats,
+        ),
+      ).catch(() => null)
+    : null
 
   return (
     <>
@@ -104,6 +127,9 @@ export default async function Home() {
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           A plain English look at the repos, scored and sourced.
         </p>
+        {overallGradeRaw && (
+          <OverallGrade overall={overallGradeRaw} summary={overallSummary} />
+        )}
         <div
           style={{
             marginTop: '12px',
@@ -176,8 +202,8 @@ export default async function Home() {
       <GradesPanel
         builderGrade30={builderGrade30}
         builderGrade7={builderGrade7}
-        holderGrade30={holderGrade30}
-        holderGrade7={holderGrade7}
+        tokenMechanicGrade30={tokenMechanicGrade30}
+        tokenMechanicGrade7={tokenMechanicGrade7}
         integrityGrade30={integrityGrade30}
         integrityGrade7={integrityGrade7}
         stats30d={
@@ -230,17 +256,44 @@ export default async function Home() {
           How we score
         </h2>
 
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '20px' }}>
+          All three axes measure holder value from different angles. Builder activity tells you if the project is alive and shipping. Token mechanic tells you if value flows back to holders economically through burns, staking, or fee distribution. Builder integrity tells you if the builder can be trusted to keep delivering on their stated vision. Together they answer: is this worth holding?
+        </p>
+
+        <div
+          style={{
+            marginBottom: '24px',
+            padding: '14px 16px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.6,
+          }}
+        >
+          <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            Overall grade weights
+          </div>
+          <div>Token mechanic — 40%: economic return path to holders (burns, locks, fee distribution).</div>
+          <div>Builder activity — 30%: shipping velocity and consistency on GitHub.</div>
+          <div>Builder integrity — 30%: trust and alignment with stated builder vision.</div>
+          <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+            When GitHub data is unavailable, the 30% activity weight redistributes proportionally between token mechanic and builder integrity.
+          </div>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
           {[
             {
-              title: 'Holder relevance — consumer apps (infra may show N/A)',
+              title: 'Token mechanic — consumer apps (infra may show N/A)',
               rows: [
                 { label: 'Burn mechanic exists and is live', weight: '50%' },
                 { label: 'Revenue or burn path built in', weight: '30%' },
                 { label: 'Takes CLAWD out of circulation', weight: '20%' },
               ],
               note:
-                'Each component rated low (1) / mid (2) / high (3). Score = (weighted sum ÷ 3) × 100. We score whether the mechanic exists and is live — not how much has actually burned. Consumer apps are scored directly here. Infrastructure and some theoretical repos may show NA at the repo level because no token mechanic is expected; their value shows up in the quality of downstream consumer apps. Trend percentage compares this period\'s grade to the prior matching window.',
+                'Measures whether value flows back to holders economically. Each component rated low (1) / mid (2) / high (3). Score = (weighted sum ÷ 3) × 100. Consumer apps are scored directly; infrastructure may show N/A at the repo level because no token mechanic is expected — value shows up in downstream consumer apps.',
             },
             {
               title: 'Builder integrity — all repos',
@@ -250,10 +303,10 @@ export default async function Home() {
                 { label: 'Passes walkaway test', weight: '25%' },
               ],
               note:
-                "Repos are scored against clawdbotatg's stated goals at the time they were built. Goals change — a repo is judged against what the stated intent was then, not now. CV burns are not CLAWD burns. Supply lock is not a burn. Both matter but they are different things. Trend percentage compares this period's grade to the prior matching window.",
+                "Measures whether the builder can be trusted to keep delivering on their stated vision. Repos are scored against clawdbotatg's stated goals at the time they were built. CV burns are not CLAWD burns. Supply lock is not a burn.",
             },
             {
-              title: 'Builder grade — GitHub signals, equally weighted',
+              title: 'Builder activity — GitHub signals, equally weighted',
               rows: [
                 { label: 'Commit frequency', weight: '20%' },
                 { label: 'Active days in period', weight: '20%' },
@@ -262,7 +315,7 @@ export default async function Home() {
                 { label: 'Consistency — no long gaps', weight: '20%' },
               ],
               note:
-                'Five signals averaged equally (20% each). Letter grades: A+ 97–100 · A 93–96 · A- 90–92 · B+ 87–89 · B 83–86 · B- 80–82 · C+ 77–79 · C 73–76 · C- 70–72 · D+ 67–69 · D 63–66 · D- 60–62 · F below 60. Trend percentage compares this period\'s builder grade to the prior matching window (7d vs days 8–14, 30d vs days 31–60).',
+                'Measures whether the project is alive and shipping. Five signals averaged equally (20% each). Letter grades: A+ 97–100 · A 93–96 · A- 90–92 · B+ 87–89 · B 83–86 · B- 80–82 · C+ 77–79 · C 73–76 · C- 70–72 · D+ 67–69 · D 63–66 · D- 60–62 · F below 60.',
             },
           ].map(block => (
             <div

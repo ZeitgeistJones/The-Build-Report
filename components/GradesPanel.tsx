@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { BuilderGrade, HolderRelevanceGrade, IntegrityGrade, formatTrendPct, TrendExplanation } from '@/lib/grades'
+import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation } from '@/lib/grades'
 import { gradeColor } from '@/lib/gradeLetters'
 
 interface Props {
   builderGrade30: BuilderGrade | null
   builderGrade7: BuilderGrade | null
-  holderGrade30: HolderRelevanceGrade | null
-  holderGrade7: HolderRelevanceGrade | null
+  tokenMechanicGrade30: TokenMechanicGrade | null
+  tokenMechanicGrade7: TokenMechanicGrade | null
   integrityGrade30: IntegrityGrade | null
   integrityGrade7: IntegrityGrade | null
   stats30d: { commits: number; activeDays: number; newRepos: number } | null
@@ -260,8 +260,8 @@ function GradeCard({
 export default function GradesPanel({
   builderGrade30,
   builderGrade7,
-  holderGrade30,
-  holderGrade7,
+  tokenMechanicGrade30,
+  tokenMechanicGrade7,
   integrityGrade30,
   integrityGrade7,
   stats30d,
@@ -270,7 +270,7 @@ export default function GradesPanel({
   const [period, setPeriod] = useState<'30d' | '7d'>('30d')
 
   const bg = period === '30d' ? builderGrade30 : builderGrade7
-  const hg = period === '30d' ? holderGrade30 : holderGrade7
+  const tg = period === '30d' ? tokenMechanicGrade30 : tokenMechanicGrade7
   const ig = period === '30d' ? integrityGrade30 : integrityGrade7
   const stats = period === '30d' ? stats30d : stats7d
 
@@ -335,7 +335,7 @@ export default function GradesPanel({
       >
         <GradeCard
           grade={bg}
-          label="builder grade"
+          label="builder activity"
           period={period}
           mini="Recent GitHub activity quality across the selected window."
           summary={bg?.summary ?? 'GitHub data unavailable'}
@@ -352,29 +352,29 @@ export default function GradesPanel({
         />
 
         <GradeCard
-          grade={hg}
-          label="holder relevance"
+          grade={tg}
+          label="token mechanic"
           period={period}
           mini="Share of commit volume pointed at CLAWD holder value (weighted by commits per repo)."
-          summary={hg?.summary ?? 'Holder relevance score unavailable'}
-          trendExplanation={hg?.trendExplanation}
+          summary={tg?.summary ?? 'Token mechanic score unavailable'}
+          trendExplanation={tg?.trendExplanation}
           footer={
-            hg?.counts && (
+            tg?.counts && (
               <>
-                {hg.counts.repos > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.repos} active repos</span>
+                {tg.counts.repos > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.repos} active repos</span>
                 )}
-                {hg.counts.direct > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.direct} direct commits</span>
+                {tg.counts.direct > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.direct} direct commits</span>
                 )}
-                {hg.counts.lock > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.lock} supply-lock commits</span>
+                {tg.counts.lock > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.lock} supply-lock commits</span>
                 )}
-                {hg.counts.indirect > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.indirect} indirect commits</span>
+                {tg.counts.indirect > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.indirect} indirect commits</span>
                 )}
-                {hg.counts.infra > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{hg.counts.infra} infra/R&D commits</span>
+                {tg.counts.infra > 0 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.infra} infra/R&D commits</span>
                 )}
               </>
             )

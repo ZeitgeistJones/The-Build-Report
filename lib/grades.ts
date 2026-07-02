@@ -19,7 +19,7 @@ export interface BuilderGrade {
   trendExplanation?: TrendExplanation
 }
 
-export interface HolderRelevanceGrade {
+export interface TokenMechanicGrade {
   counts: { direct: number; lock: number; indirect: number; infra: number; repos: number }
   letter: string
   pct: number
@@ -178,7 +178,7 @@ const HOLDER_TAG_VALUE: Record<Repo['tag'], number> = {
   theoretical: 0.2,
 }
 
-function holderPctWeighted(
+function tokenMechanicPctWeighted(
   stats: GitHubStats,
   activeRepos: Repo[],
   period: Period,
@@ -196,7 +196,7 @@ function holderPctWeighted(
   return Math.round((weightedSum / totalCommits) * 100)
 }
 
-function holderCommitCounts(
+function tokenMechanicCommitCounts(
   stats: GitHubStats,
   activeRepos: Repo[],
   period: Period,
@@ -213,7 +213,7 @@ function holderCommitCounts(
   return counts
 }
 
-function holderTotalCommits(counts: { direct: number; lock: number; indirect: number; infra: number }): number {
+function tokenMechanicTotalCommits(counts: { direct: number; lock: number; indirect: number; infra: number }): number {
   return counts.direct + counts.lock + counts.indirect + counts.infra
 }
 
@@ -268,14 +268,14 @@ function reposActiveInWindow(stats: GitHubStats, repoSet: Repo[], period: Period
   })
 }
 
-export function calcHolderRelevanceGrade(stats: GitHubStats, period: Period, repoSet: Repo[]): HolderRelevanceGrade {
+export function calcTokenMechanicGrade(stats: GitHubStats, period: Period, repoSet: Repo[]): TokenMechanicGrade {
   const activeRepos = reposActiveInWindow(stats, repoSet, period, 'current')
   const priorActiveRepos = reposActiveInWindow(stats, repoSet, period, 'prior')
 
-  const counts = holderCommitCounts(stats, activeRepos, period, 'current')
-  const totalCommits = holderTotalCommits(counts) || 1
-  const pct = holderPctWeighted(stats, activeRepos, period, 'current')
-  const priorPct = holderPctWeighted(stats, priorActiveRepos, period, 'prior')
+  const counts = tokenMechanicCommitCounts(stats, activeRepos, period, 'current')
+  const totalCommits = tokenMechanicTotalCommits(counts) || 1
+  const pct = tokenMechanicPctWeighted(stats, activeRepos, period, 'current')
+  const priorPct = tokenMechanicPctWeighted(stats, priorActiveRepos, period, 'prior')
   const trendPct = pctChange(pct, priorPct)
   const letter = pctToLetter(pct)
 

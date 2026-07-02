@@ -25,7 +25,7 @@ export interface Repo {
   tag: Tag
   status: Status
   confidence: Confidence
-  holderRelevance: Score | null
+  tokenMechanic: Score | null
   builderIntegrity: Score
   verdict: string
   scoredAt: string
@@ -46,7 +46,7 @@ function calcScore(rows: RubricRow[]): number {
   return Math.round((total / 3) * 100)
 }
 
-function hr(rows: RubricRow[]): Score {
+function tm(rows: RubricRow[]): Score {
   const pct = calcScore(rows)
   return { letter: pctToLetter(pct), pct, rubric: rows }
 }
@@ -65,7 +65,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: 'Chronicle ch.7, Mar 7 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'high', source: 'buy-and-burn on USDC payments' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'mid', source: 'burn on payment, not on access' },
@@ -85,7 +85,7 @@ export const REPOS: Repo[] = [
     status: 'dormant',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '10M per call — Chronicle ch.3' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'high', source: 'caller incentive keeps it running' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'high', source: 'permanent destruction by design' },
@@ -105,7 +105,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '20% of every pot burned — Chronicle ch.5' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'high', source: '25% dividends to key holders' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'high', source: '139M burned across rounds — Feb 3 tweet' },
@@ -125,7 +125,7 @@ export const REPOS: Repo[] = [
     status: 'dormant',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '25% of stakes burned — Jan 29 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: '65% to winners, one-off mechanic' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'mid', source: '4.1M burned in winning round' },
@@ -145,7 +145,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '1% on every bet and win — Feb 21 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'high', source: 'dual burn on both sides of every play' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'high', source: 'ownership burned, fully immutable' },
@@ -165,7 +165,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'low', source: 'CV burns are not CLAWD burns' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'governance unlocks Leftclaw access' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'high', source: '8% of supply staked — Chronicle ch.9' },
@@ -175,7 +175,7 @@ export const REPOS: Repo[] = [
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'written audited deployed — Chronicle ch.6' },
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires governance participation' },
     ]),
-    verdict: 'Burning CV is not burning CLAWD — important distinction. What LarvAI does do is lock supply: 8% of total CLAWD in a contract clawdbotatg wrote and deployed. That\'s real. Holder relevance is mid because the direct burn mechanic isn\'t there, but the supply lock is significant.',
+    verdict: 'Burning CV is not burning CLAWD — important distinction. What LarvAI does do is lock supply: 8% of total CLAWD in a contract clawdbotatg wrote and deployed. That\'s real. Token mechanic is mid because the direct burn mechanic isn\'t there, but the supply lock is significant.',
   },
   {
     id: 'clawd-vesting',
@@ -185,7 +185,7 @@ export const REPOS: Repo[] = [
     status: 'dormant',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'low', source: 'vesting not burning — no destruction' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'low', source: 'pure lock mechanic, no revenue path' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'high', source: '1.23B locked for 30 days — Chronicle ch.1' },
@@ -205,7 +205,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'mid',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'low', source: 'liquidity lock, not a burn' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'earns swap fees during vest period' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'high', source: 'locked in Uniswap V3 position' },
@@ -225,7 +225,7 @@ export const REPOS: Repo[] = [
     status: 'dormant',
     confidence: 'mid',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '10% of all stakes burned — Feb 18 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'community-judged payouts' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'mid', source: 'one round run, dormant since' },
@@ -245,7 +245,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'mid',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'mid', source: 'accepts CLAWD as payment — Mar 23 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'payment path exists, burn path less clear' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'low', source: 'small anonymity set, early stage' },
@@ -265,7 +265,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'mid',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'low', source: 'no direct burn mechanic' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'limited to CLAWD stakers — Mar 17 tweet' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'low', source: 'access gated not burn-gated' },
@@ -275,7 +275,7 @@ export const REPOS: Repo[] = [
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'LiFi + Zerion + Claude Opus integration' },
       { label: 'Passes walkaway test', weight: '25%', level: 'low', source: 'expensive to run, requires subsidy' },
     ]),
-    verdict: 'Plain English to onchain execution is a genuinely useful idea. Holder relevance is low because access is staker-gated rather than burn-gated — holding CLAWD gets you in but nothing burns when you use it. Good for holders indirectly, not directly.',
+    verdict: 'Plain English to onchain execution is a genuinely useful idea. Token mechanic is low because access is staker-gated rather than burn-gated — holding CLAWD gets you in but nothing burns when you use it. Good for holders indirectly, not directly.',
   },
   {
     id: 'clawdlabs',
@@ -285,7 +285,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '10 CLAWD burned per submission — Feb 5 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'stake to surface ideas, burn to submit' },
       { label: 'Takes CLAWD out of circulation', weight: '20%', level: 'mid', source: 'staking temporary, burns permanent' },
@@ -305,7 +305,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'high', source: 'directly improves quality of shipped apps' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'mid', source: 'indirect — better tools, better burns' },
       { label: 'Active and maintained', weight: '20%', level: 'high', source: '6+ PRs merged Feb 2026 — Chronicle ch.3' },
@@ -325,7 +325,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'high', source: 'powers Leftclaw worker fleet directly' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'high', source: 'Leftclaw burns CLAWD on every job — Mar 28' },
       { label: 'Active and maintained', weight: '20%', level: 'high', source: 'pip package, multi-provider — Mar 28 tweet' },
@@ -345,7 +345,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'high', source: 'keeps the worker bot fleet running' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'high', source: 'if this breaks, Leftclaw stops, burns stop' },
       { label: 'Active and maintained', weight: '20%', level: 'high', source: '5 agent types operational — Chronicle ch.9' },
@@ -365,7 +365,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'high',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'low', source: 'read-only, no downstream burn path' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'low', source: 'informs holders but does not move CLAWD' },
       { label: 'Active and maintained', weight: '20%', level: 'high', source: 'IPFS hosted, ENS set onchain — Chronicle ch.7' },
@@ -375,7 +375,7 @@ export const REPOS: Repo[] = [
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'IPFS hosted, ENS content hash set onchain' },
       { label: 'Passes walkaway test', weight: '25%', level: 'high', source: 'read-only, no management needed' },
     ]),
-    verdict: 'A window into the ecosystem, not an engine for it. Useful for holders wanting live price and stats but it doesn\'t move CLAWD in any direction. Holder relevance is low by design — that\'s what it is.',
+    verdict: 'A window into the ecosystem, not an engine for it. Useful for holders wanting live price and stats but it doesn\'t move CLAWD in any direction. Token mechanic is low by design — that\'s what it is.',
   },
   {
     id: 'sponsored-8004',
@@ -385,7 +385,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'mid',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'mid', source: 'expands agent ecosystem that uses CLAWD' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'low', source: 'theoretical — more agents could mean more burns' },
       { label: 'Active and maintained', weight: '20%', level: 'mid', source: 'gasless registration operational — Mar 2026' },
@@ -405,7 +405,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'low',
     scoredAt: 'Jun 15, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'mid', source: 'if mature, multiplies shipping capacity significantly' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'low', source: 'potential only — no live mechanic yet' },
       { label: 'Active and maintained', weight: '20%', level: 'high', source: '25/25 pipeline steps passing — Apr 9 tweet' },
@@ -425,7 +425,7 @@ export const REPOS: Repo[] = [
     status: 'active',
     confidence: 'mid',
     scoredAt: 'Jul 1, 2026',
-    holderRelevance: hr([
+    tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'mid', source: 'multi-session dev harness for shipping clawdbotatg apps faster' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'mid', source: 'fork of clawd-console — speeds interactive Claude Code builds' },
       { label: 'Active and maintained', weight: '20%', level: 'high', source: 'pushed Jun 30, 2026 — active development' },
@@ -446,7 +446,7 @@ export const CHANGELOG = [
   },
   {
     date: 'Jun 15, 2026',
-    note: 'LarvAI holder relevance scored low on burn mechanic after confirming CV burns are not CLAWD burns.',
+    note: 'LarvAI token mechanic scored low on burn mechanic after confirming CV burns are not CLAWD burns.',
   },
   {
     date: 'Jun 15, 2026',
