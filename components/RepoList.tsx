@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Repo, Tag, Level } from '@/lib/scores'
 import { timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
@@ -23,10 +23,59 @@ const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
   theoretical: '#a78bfa',
 }
 
-function formatDescription(raw: string | null | undefined): string | null {
-  const text = raw?.trim()
-  if (!text) return null
+type Density = 'compact' | 'comfortable'
+
+const DENSITY_STYLES = {
+  compact: { cardPadding: '14px 16px', name: 14, preview: 12, lastPushed: 12, gradeLetter: 20 },
+  comfortable: { cardPadding: '18px 16px', name: 15, preview: 13, lastPushed: 13, gradeLetter: 22 },
+} as const
+
+function truncate120(text: string): string {
   return text.length > 120 ? `${text.slice(0, 119)}…` : text
+}
+
+function firstSentenceOr120(text: string): string {
+  const periodIdx = text.indexOf('.')
+  const cutAt = periodIdx === -1 ? 120 : Math.min(periodIdx, 120)
+  return text.slice(0, cutAt).trim()
+}
+
+function formatPreviewLine(
+  description: string | null | undefined,
+  verdict: string | undefined,
+  pending: boolean,
+): string | null {
+  const gh = description?.trim()
+  if (gh) return truncate120(gh)
+  if (pending || !verdict?.trim()) return null
+  return truncate120(firstSentenceOr120(verdict.trim()))
+}
+
+function PillButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        fontSize: '12px',
+        padding: '4px 11px',
+        borderRadius: '99px',
+        border: `1px solid ${active ? 'var(--accent-border)' : 'var(--border)'}`,
+        background: active ? 'var(--accent-dim)' : 'transparent',
+        color: active ? 'var(--accent)' : 'var(--text-muted)',
+        transition: 'all 0.15s',
+      }}
+    >
+      {children}
+    </button>
+  )
 }
 
 const LEVEL_STYLES: Record<Level, { color: string; bg: string }> = {
@@ -60,7 +109,9 @@ interface Props {
 
 export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
   const [activeFilter, setActiveFilter] = useState<Tag | 'all'>('all')
+  const [density, setDensity] = useState<Density>('compact')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const d = DENSITY_STYLES[density]
 
   const filters: { key: Tag | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -109,24 +160,23 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
             ? ` · ${repos.length}`
             : ` · ${filtered.length} of ${repos.length}`}
         </div>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
           {filters.map(f => (
-            <button
+            <PillButton
               key={f.key}
+              active={activeFilter === f.key}
               onClick={() => setActiveFilter(f.key)}
-              style={{
-                fontSize: '12px',
-                padding: '4px 11px',
-                borderRadius: '99px',
-                border: `1px solid ${activeFilter === f.key ? 'var(--accent-border)' : 'var(--border)'}`,
-                background: activeFilter === f.key ? 'var(--accent-dim)' : 'transparent',
-                color: activeFilter === f.key ? 'var(--accent)' : 'var(--text-muted)',
-                transition: 'all 0.15s',
-              }}
             >
               {f.label}
-            </button>
+            </PillButton>
           ))}
+          <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 4px' }} />
+          <PillButton active={density === 'compact'} onClick={() => setDensity('compact')}>
+            Compact
+          </PillButton>
+          <PillButton active={density === 'comfortable'} onClick={() => setDensity('comfortable')}>
+            Comfortable
+          </PillButton>
         </div>
       </div>
 
@@ -135,9 +185,9 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
           const isExpanded = expandedIds.has(repo.id)
           const ts = TAG_STYLES[repo.tag]
           const borderColor = TAG_BORDER_COLORS[repo.tag]
-          const description = formatDescription(repo.description)
           const auto = isAutoInferred(repo)
           const pending = isUnscoredRecent(repo)
+          const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
 
           return (
             <div
@@ -155,7 +205,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                 onClick={() => toggleExpand(repo.id)}
                 style={{
                   width: '100%',
-                  padding: '14px 16px',
+                  padding: d.cardPadding,
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '12px',
@@ -191,24 +241,24 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     )}
                   </div>
 
-                  <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
+                  <div style={{ fontSize: `${d.name}px`, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
                     {repo.name}
                   </div>
 
-                  {description && (
+                  {previewLine && (
                     <div style={{
-                      fontSize: '12px',
+                      fontSize: `${d.preview}px`,
                       color: 'var(--text-muted)',
                       marginTop: '2px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}>
-                      {description}
+                      {previewLine}
                     </div>
                   )}
 
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: `${d.lastPushed}px`, color: 'var(--text-muted)', marginTop: '2px' }}>
                     Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}
                   </div>
                 </div>
@@ -226,7 +276,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                   <div style={{ textAlign: 'center', minWidth: '40px' }}>
                     {repo.tokenMechanic ? (
                       <>
-                        <div style={{ fontSize: '20px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.tokenMechanic.letter) }}>
+                        <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.tokenMechanic.letter) }}>
                           {repo.tokenMechanic.letter}
                         </div>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.tokenMechanic.pct}%</div>
@@ -240,7 +290,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                   <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
 
                   <div style={{ textAlign: 'center', minWidth: '40px' }}>
-                    <div style={{ fontSize: '20px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.builderIntegrity.letter) }}>
+                    <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.builderIntegrity.letter) }}>
                       {repo.builderIntegrity.letter}
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
