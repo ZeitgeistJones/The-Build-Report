@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { BuilderGrade, HolderRelevanceGrade, IntegrityGrade, formatTrendPct, TrendExplanation } from '@/lib/grades'
+import { gradeColor } from '@/lib/gradeLetters'
 
 interface Props {
   builderGrade30: BuilderGrade | null
@@ -17,13 +18,6 @@ interface Props {
 function levelColor(level: 'high' | 'mid' | 'low') {
   if (level === 'high') return 'var(--green)'
   if (level === 'mid') return 'var(--amber)'
-  return 'var(--red)'
-}
-
-function gradeColor(letter: string) {
-  if (letter === 'A') return 'var(--accent)'
-  if (letter === 'B') return 'var(--green)'
-  if (letter === 'C') return 'var(--amber)'
   return 'var(--red)'
 }
 
@@ -67,6 +61,7 @@ function GradeCard({
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100%',
+        boxShadow: 'var(--card-elevated)',
       }}
     >
       <div
@@ -101,7 +96,7 @@ function GradeCard({
           >
             <span
               style={{
-                fontSize: '40px',
+                fontSize: '36px',
                 lineHeight: 1,
                 fontWeight: 600,
                 fontFamily: 'var(--font-mono)',
@@ -280,7 +275,7 @@ export default function GradesPanel({
   const stats = period === '30d' ? stats30d : stats7d
 
   return (
-    <div style={{ marginBottom: '28px' }}>
+    <div style={{ marginBottom: '40px' }}>
       <div
         style={{
           display: 'flex',
@@ -292,9 +287,9 @@ export default function GradesPanel({
         <div
           style={{
             fontSize: '11px',
-            color: 'var(--text-muted)',
+            color: 'var(--accent)',
             textTransform: 'uppercase',
-            letterSpacing: '0.05em',
+            letterSpacing: '0.06em',
           }}
         >
           Grades
@@ -317,9 +312,10 @@ export default function GradesPanel({
                 fontSize: '12px',
                 padding: '4px 12px',
                 borderRadius: '4px',
-                background: period === p ? 'var(--surface-3)' : 'transparent',
-                color: period === p ? 'var(--text-primary)' : 'var(--text-muted)',
+                background: period === p ? 'var(--accent-dim)' : 'transparent',
+                color: period === p ? 'var(--accent)' : 'var(--text-muted)',
                 fontWeight: period === p ? 500 : 400,
+                border: period === p ? '1px solid var(--accent-border)' : '1px solid transparent',
                 transition: 'all 0.15s',
               }}
             >

@@ -89,7 +89,7 @@ export default async function Home() {
 
   return (
     <>
-      <div style={{ marginBottom: '32px' }}>
+      <div style={{ marginBottom: '40px', paddingBottom: '24px', borderBottom: '1px solid var(--border-strong)' }}>
         <h1
           style={{
             fontSize: '26px',
@@ -155,6 +155,7 @@ export default async function Home() {
       )}
 
       {stats && (
+      <div style={{ marginBottom: '40px' }}>
         <AllTimeStats
           totalRepos={stats.totalRepos}
           totalCommits30d={stats.totalCommits30d}
@@ -168,8 +169,10 @@ export default async function Home() {
           lastCommitAt={stats.lastCommitAt}
           lastCommitRepo={stats.lastCommitRepo}
         />
+      </div>
       )}
 
+      <div style={{ marginBottom: '40px' }}>
       <GradesPanel
         builderGrade30={builderGrade30}
         builderGrade7={builderGrade7}
@@ -196,8 +199,11 @@ export default async function Home() {
             : null
         }
       />
+      </div>
 
+      <div style={{ marginBottom: '40px' }}>
       <RepoList repos={repos} githubSlugOrder={githubOrder} />
+      </div>
 
       {(chronicle?.lastUpdated || chronicle?.summary) && (
         <div style={{ marginTop: '48px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
@@ -256,7 +262,7 @@ export default async function Home() {
                 { label: 'Consistency — no long gaps', weight: '20%' },
               ],
               note:
-                'Five signals averaged equally (20% each). Letter grades: A = 80–100 · B = 60–79 · C = 40–59 · D = below 40. Trend percentage compares this period\'s builder grade to the prior matching window (7d vs days 8–14, 30d vs days 31–60).',
+                'Five signals averaged equally (20% each). Letter grades: A+ 97–100 · A 93–96 · A- 90–92 · B+ 87–89 · B 83–86 · B- 80–82 · C+ 77–79 · C 73–76 · C- 70–72 · D+ 67–69 · D 63–66 · D- 60–62 · F below 60. Trend percentage compares this period\'s builder grade to the prior matching window (7d vs days 8–14, 30d vs days 31–60).',
             },
           ].map(block => (
             <div

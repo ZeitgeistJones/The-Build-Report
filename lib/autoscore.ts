@@ -1,6 +1,7 @@
 import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
 import { Repo, Tag, Status, Level, RubricRow, Score } from './scores'
+import { pctToLetter } from './gradeLetters'
 import { shouldSkipRepo } from './repoFilters'
 
 let redis: Redis | null = null
@@ -58,16 +59,9 @@ function calcScore(rows: RubricRow[]): number {
   return Math.round((total / 3) * 100)
 }
 
-function letter(pct: number): string {
-  if (pct >= 80) return 'A'
-  if (pct >= 60) return 'B'
-  if (pct >= 40) return 'C'
-  return 'D'
-}
-
 function makeScore(rows: RubricRow[]): Score {
   const pct = calcScore(rows)
-  return { letter: letter(pct), pct, rubric: rows }
+  return { letter: pctToLetter(pct), pct, rubric: rows }
 }
 
 const ECOSYSTEM_CONTEXT = `

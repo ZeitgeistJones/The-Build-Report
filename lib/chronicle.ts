@@ -2,7 +2,7 @@ import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
 
 const CHRONICLE_REPO = 'clawdbotatg/clawd-chronicle'
-const SUMMARY_KEY = 'build-report:chronicle-summary'
+const SUMMARY_KEY_PREFIX = 'build-report:chronicle-summary:'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 
 let redis: Redis | null = null
@@ -92,6 +92,16 @@ function truncateDiff(text: string, max = 12000): string {
   return `${text.slice(0, max)}\n\n[diff truncated]`
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^#+\s*/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 async function fetchChronicleCommits(): Promise<ChronicleCommit[]> {
   try {
     const raw = await chronicleFetch(`/repos/${CHRONICLE_REPO}/commits?per_page=1`)
@@ -124,17 +134,19 @@ Write 3–4 sentences of plain English summarizing what was added or updated in 
     })
 
     const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-    return text || null
+    return text ? stripMarkdown(text) : null
   } catch {
     return null
   }
 }
 
 async function getChronicleSummary(latest: ChronicleCommit): Promise<string | null> {
+  const summaryKey = `${SUMMARY_KEY_PREFIX}${latest.sha}`
+
   try {
     const r = getRedis()
-    const cached = await r.get<string>(SUMMARY_KEY)
-    if (cached) return cached
+    const cached = await r.get<string>(summaryKey)
+    if (cached) return stripMarkdown(cached)
   } catch {
     // fall through to generate
   }
@@ -147,7 +159,7 @@ async function getChronicleSummary(latest: ChronicleCommit): Promise<string | nu
 
   try {
     const r = getRedis()
-    await r.set(SUMMARY_KEY, summary, { ex: 86400 })
+    await r.set(summaryKey, summary, { ex: 86400 })
   } catch {
     // non-fatal
   }

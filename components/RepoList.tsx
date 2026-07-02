@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Repo, Tag, Level } from '@/lib/scores'
 import { timeAgo } from '@/lib/github'
+import { gradeColor } from '@/lib/gradeLetters'
 import { isUnscoredRecent } from '@/lib/recentRepos'
 import { isAutoInferredNote } from '@/lib/repoFilters'
 
@@ -24,13 +25,6 @@ const CONFIDENCE_LABEL: Record<string, string> = {
   high: 'High confidence',
   mid: 'Medium confidence',
   low: 'Low confidence',
-}
-
-function gradeColor(letter: string) {
-  if (letter === 'A') return 'var(--accent)'
-  if (letter === 'B') return 'var(--green)'
-  if (letter === 'C') return 'var(--amber)'
-  return 'var(--red)'
 }
 
 function githubOrderIndex(slug: string, order: string[]): number {
@@ -94,7 +88,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: '11px', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Repos
           {activeFilter === 'all'
             ? ` · ${repos.length}`
@@ -109,9 +103,9 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                 fontSize: '12px',
                 padding: '4px 11px',
                 borderRadius: '99px',
-                border: `1px solid ${activeFilter === f.key ? 'var(--border-strong)' : 'var(--border)'}`,
-                background: activeFilter === f.key ? 'var(--surface-3)' : 'transparent',
-                color: activeFilter === f.key ? 'var(--text-primary)' : 'var(--text-muted)',
+                border: `1px solid ${activeFilter === f.key ? 'var(--accent-border)' : 'var(--border)'}`,
+                background: activeFilter === f.key ? 'var(--accent-dim)' : 'transparent',
+                color: activeFilter === f.key ? 'var(--accent)' : 'var(--text-muted)',
                 transition: 'all 0.15s',
               }}
             >
@@ -136,6 +130,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius-lg)',
                 overflow: 'hidden',
+                boxShadow: 'var(--card-elevated)',
               }}
             >
               <button
@@ -178,12 +173,12 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     )}
                   </div>
 
-                  <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
                     {repo.name}
                   </div>
 
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    Last pushed {timeAgo(repo.pushedAt)}
+                    Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}
                   </div>
                 </div>
 

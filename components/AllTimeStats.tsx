@@ -52,6 +52,7 @@ function StatCard({ label, value, sub, trend, tooltip }: StatCardProps) {
       borderRadius: 'var(--radius)',
       padding: '14px 16px',
       position: 'relative',
+      boxShadow: 'var(--card-elevated)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '6px' }}>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -128,12 +129,12 @@ export default function AllTimeStats({
   lastCommitRepo,
 }: Props) {
   return (
-    <div style={{ marginBottom: '24px' }}>
+    <div style={{ marginBottom: '40px' }}>
       <div style={{
         fontSize: '11px',
-        color: 'var(--text-muted)',
+        color: 'var(--accent)',
         textTransform: 'uppercase',
-        letterSpacing: '0.05em',
+        letterSpacing: '0.06em',
         marginBottom: '10px',
       }}>
         Activity snapshot

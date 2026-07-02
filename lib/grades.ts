@@ -1,5 +1,6 @@
 import { Repo } from './scores'
 import { GitHubStats } from './github'
+import { pctToLetter } from './gradeLetters'
 
 export type Period = '30d' | '7d'
 
@@ -56,13 +57,6 @@ function toLevel(pct: number): 'high' | 'mid' | 'low' {
   if (pct >= 0.66) return 'high'
   if (pct >= 0.33) return 'mid'
   return 'low'
-}
-
-function pctToLetter(pct: number): string {
-  if (pct >= 80) return 'A'
-  if (pct >= 60) return 'B'
-  if (pct >= 40) return 'C'
-  return 'D'
 }
 
 function avg(nums: number[]) {

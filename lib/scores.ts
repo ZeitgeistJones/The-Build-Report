@@ -1,3 +1,5 @@
+import { pctToLetter } from './gradeLetters'
+
 export type Tag = 'direct' | 'supply-lock' | 'indirect' | 'infrastructure' | 'theoretical'
 export type Status = 'active' | 'dormant' | 'archived'
 export type Level = 'high' | 'mid' | 'low'
@@ -44,21 +46,14 @@ function calcScore(rows: RubricRow[]): number {
   return Math.round((total / 3) * 100)
 }
 
-function letter(pct: number): string {
-  if (pct >= 80) return 'A'
-  if (pct >= 60) return 'B'
-  if (pct >= 40) return 'C'
-  return 'D'
-}
-
 function hr(rows: RubricRow[]): Score {
   const pct = calcScore(rows)
-  return { letter: letter(pct), pct, rubric: rows }
+  return { letter: pctToLetter(pct), pct, rubric: rows }
 }
 
 function bi(rows: RubricRow[]): Score {
   const pct = calcScore(rows)
-  return { letter: letter(pct), pct, rubric: rows }
+  return { letter: pctToLetter(pct), pct, rubric: rows }
 }
 
 export const REPOS: Repo[] = [
