@@ -130,17 +130,6 @@ export default async function Home() {
             {lastGithubScanAt && ` Last scan: ${formatScanAt(lastGithubScanAt)}.`}
             {stats?.lastCommitAt && ` Latest commit ${timeAgo(stats.lastCommitAt)}.`}
           </span>
-          {chronicle?.lastUpdated && (
-            <span>
-              <a href="https://github.com/clawdbotatg/clawd-chronicle" target="_blank" rel="noopener noreferrer">
-                Chronicle
-              </a>{' '}
-              last updated {chronicle.lastUpdated.label} — {chronicle.lastUpdated.message}
-            </span>
-          )}
-          {chronicle?.summary && (
-            <span style={{ lineHeight: 1.6 }}>{chronicle.summary}</span>
-          )}
         </div>
       </div>
 
@@ -209,6 +198,26 @@ export default async function Home() {
       />
 
       <RepoList repos={repos} githubSlugOrder={githubOrder} />
+
+      {(chronicle?.lastUpdated || chronicle?.summary) && (
+        <div style={{ marginTop: '48px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: 'var(--text-primary)' }}>
+            <a href="https://github.com/clawdbotatg/clawd-chronicle" target="_blank" rel="noopener noreferrer">
+              Chronicle
+            </a>
+          </h2>
+          {chronicle?.lastUpdated && (
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: chronicle.summary ? '10px' : 0, lineHeight: 1.6 }}>
+              Last updated {chronicle.lastUpdated.label} — {chronicle.lastUpdated.message}
+            </p>
+          )}
+          {chronicle?.summary && (
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>
+              {chronicle.summary}
+            </p>
+          )}
+        </div>
+      )}
 
       <div id="how-we-score" style={{ marginTop: '48px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: 'var(--text-primary)' }}>
