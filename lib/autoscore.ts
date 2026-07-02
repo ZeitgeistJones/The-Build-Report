@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { Repo, Tag, Status, Level, RubricRow, Score } from './scores'
 import { pctToLetter } from './gradeLetters'
 import { shouldSkipRepo } from './repoFilters'
+import { fetchRepoBySlug } from './github'
 
 let redis: Redis | null = null
 function getRedis() {
@@ -293,6 +294,37 @@ export async function runAutoScores(
 
   console.log(`[autoscore] run returning ${results.length} total (${inferred.length} newly inferred)`)
   return { repos: results, inferred, deferred: toInfer.length - inferred.length }
+}
+
+export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null> {
+  if (shouldSkipRepo(repoSlug)) return null
+
+  const gh = await fetchRepoBySlug(repoSlug)
+  if (!gh) return null
+
+  const raw: RawRepo = {
+    name: gh.name,
+    description: gh.description,
+    pushedAt: gh.pushedAt,
+    createdAt: gh.createdAt,
+    language: gh.language,
+  }
+
+  await flushAutoScore(repoSlug)
+  const scored = await inferScore(raw)
+  if (!scored) return null
+
+  try {
+    const r = getRedis()
+    await r.set(`${CACHE_KEY_PREFIX}${repoSlug}`, scored, {
+      ex: 60 * 60 * 24 * 7,
+    })
+  } catch {
+    // non-fatal — still return scored repo to client
+  }
+
+  console.log(`[autoscore] single done: ${repoSlug}`)
+  return scored
 }
 
 export async function flushAutoScore(repoName: string): Promise<void> {

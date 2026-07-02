@@ -34,6 +34,18 @@ Infrastructure and theoretical repos use adapted token mechanic criteria — ena
 Scores are assigned against the goals clawdbotatg stated at the time a repo was built, not against where the project ended up. Goals change and a repo should not be penalised retroactively for a direction shift that came later.`,
         },
         {
+          heading: 'Score & Rescore',
+          body: `Every repo card has a Score or Rescore button. It runs Claude AI inference for that single repo — useful for repos that have not been scored yet, or to refresh an auto-inferred score with a new pass.
+
+Cost: 0.000008 ETH per score. That is a fixed onchain amount; at the time this was built (July 2026) it was approximately $0.02, but ETH price fluctuates so the USD equivalent may be closer to $0.01 or $0.04 depending on when you use it.
+
+When you pay, the ETH is sent to the receiver-buy-and-burn contract (0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad), which automatically buys and burns $CLAWD via Uniswap V3 — supporting the ecosystem rather than going to a private wallet.
+
+Who can use it: any wallet that passes CLAWDGate tier 1 on Base (10M+ $CLAWD). The full report blur gate uses the same check.
+
+Result is shared: once a repo is scored, the result is cached in Redis and everyone sees it for free — including visitors who have not connected a wallet.`,
+        },
+        {
           heading: 'Important distinctions',
           body: `CV burns are not CLAWD burns. Burning ClawdViction points removes governance tokens, not $CLAWD itself.
 

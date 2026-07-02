@@ -8,7 +8,8 @@ A plain English look at the clawdbotatg repos, scored and sourced.
 - Shows rolling builder activity grade, token mechanic grade, and overall composite grade (30d / 7d toggle with trend)
 - Scores every major repo on two axes: token mechanic and builder integrity
 - Each score is broken into three weighted components, each cited to a public source
-- Admin panel for adding context notes to cards (scores are not editable)
+- Wallet connect on Base mainnet — CLAWDGate tier 1 (10M+ $CLAWD) unlocks the full report
+- Per-repo Score/Rescore via paid autoscore (0.000008 ETH to receiver-buy-and-burn)
 
 ## Setup
 
@@ -43,7 +44,8 @@ Scores are in `lib/scores.ts`. Edit the rubric rows and verdicts directly. Add c
 ## Stack
 
 - Next.js 14 (App Router)
-- Upstash Redis (admin notes)
+- wagmi + viem (Base wallet connect, CLAWDGate, paid scoring)
+- Upstash Redis (admin notes + autoscore cache)
 - GitHub public API (live activity data)
 - Vercel (deployment)
 

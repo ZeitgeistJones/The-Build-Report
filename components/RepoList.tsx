@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { Repo, Tag, Level } from '@/lib/scores'
 import { timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { isUnscoredRecent } from '@/lib/recentRepos'
 import { isAutoInferredNote } from '@/lib/repoFilters'
+import { getScoringStatus } from '@/lib/scoringStatus'
+import GateBlur from '@/components/wallet/GateBlur'
+import GateOverlay from '@/components/wallet/GateOverlay'
+import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
+import RepoScoreButton from '@/components/RepoScoreButton'
 
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
@@ -128,7 +133,30 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
   const [activeFilter, setActiveFilter] = useState<Tag | 'all'>('all')
   const [density, setDensity] = useState<Density>('compact')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [repoItems, setRepoItems] = useState(repos)
+  const { unlocked } = useClawdAccess()
   const d = DENSITY_STYLES[density]
+
+  useEffect(() => {
+    setRepoItems(repos)
+  }, [repos])
+
+  function handleScored(updated: Repo) {
+    setRepoItems(prev =>
+      prev.map(r =>
+        r.githubSlug === updated.githubSlug
+          ? {
+              ...r,
+              ...updated,
+              description: r.description,
+              lastCommitAt: r.lastCommitAt,
+              pushedAt: r.pushedAt,
+              commits30d: r.commits30d,
+            }
+          : r,
+      ),
+    )
+  }
 
   const filters: { key: Tag | 'all'; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -139,7 +167,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     { key: 'theoretical', label: 'Theoretical' },
   ]
 
-  const filtered = repos
+  const filtered = repoItems
     .filter(r => activeFilter === 'all' || r.tag === activeFilter)
     .sort((a, b) => {
       if (githubSlugOrder.length) {
@@ -168,14 +196,265 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     })
   }
 
+  const visibleRepos = unlocked ? filtered : filtered.slice(0, 3)
+  const gatedRepos = unlocked ? [] : filtered.slice(3)
+
+  function renderRepoCard(repo: RepoWithLive) {
+    const isExpanded = expandedIds.has(repo.id)
+    const ts = TAG_STYLES[repo.tag]
+    const borderColor = TAG_BORDER_COLORS[repo.tag]
+    const auto = isAutoInferred(repo)
+    const pending = isUnscoredRecent(repo)
+    const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
+
+    return (
+      <div
+        key={repo.id}
+        style={{
+          background: 'var(--surface-1)',
+          border: '1px solid var(--border)',
+          ...(borderColor ? { borderLeft: `3px solid ${borderColor}` } : {}),
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          boxShadow: 'var(--card-elevated)',
+        }}
+      >
+        <button
+          onClick={() => toggleExpand(repo.id)}
+          style={{
+            width: '100%',
+            padding: d.cardPadding,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px',
+            textAlign: 'left',
+            background: 'transparent',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', gap: '5px', marginBottom: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{
+                fontSize: '11px',
+                padding: '2px 8px',
+                borderRadius: '99px',
+                fontWeight: 500,
+                color: ts.color,
+                background: ts.bg,
+              }}>
+                {ts.label}
+              </span>
+              {pending && (
+                <span style={{
+                  fontSize: '10px',
+                  padding: '2px 7px',
+                  borderRadius: '99px',
+                  color: 'var(--amber)',
+                  background: 'rgba(212,148,58,0.1)',
+                  border: '1px solid var(--border)',
+                  letterSpacing: '0.03em',
+                }}>
+                  awaiting score
+                </span>
+              )}
+            </div>
+
+            <div style={{ fontSize: `${d.name}px`, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
+              {repo.name}
+            </div>
+
+            {previewLine && (
+              <div style={{
+                fontSize: `${d.preview}px`,
+                color: CARD_META_COLOR,
+                marginTop: '2px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {previewLine}
+              </div>
+            )}
+
+            <div style={{ fontSize: `${d.lastPushed}px`, color: CARD_META_COLOR, marginTop: '2px' }}>
+              Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexShrink: 0 }}>
+            {pending ? (
+              <div style={{ textAlign: 'center', minWidth: '88px', paddingTop: '3px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>Pending</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.3 }}>
+                  not yet scored
+                </div>
+              </div>
+            ) : (
+            <>
+            <div style={{ textAlign: 'center', minWidth: '40px' }}>
+              {repo.tokenMechanic ? (
+                <>
+                  <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.tokenMechanic.letter) }}>
+                    {repo.tokenMechanic.letter}
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.tokenMechanic.pct}%</div>
+                </>
+              ) : (
+                <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
+              )}
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
+            </div>
+
+            <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
+
+            <div style={{ textAlign: 'center', minWidth: '40px' }}>
+              <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.builderIntegrity.letter) }}>
+                {repo.builderIntegrity.letter}
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>builder<br />integrity</div>
+            </div>
+
+            <div style={{ fontSize: '14px', color: 'var(--text-muted)', paddingTop: '3px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>
+              ↓
+            </div>
+            </>
+            )}
+            <RepoScoreButton
+              repoSlug={repo.githubSlug}
+              scoringStatus={getScoringStatus(repo)}
+              onScored={handleScored}
+            />
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
+            {pending && (
+              <div style={{
+                marginBottom: '12px',
+                padding: '8px 12px',
+                background: 'var(--surface-2)',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--border)',
+                fontSize: '12px',
+                color: 'var(--text-muted)',
+                lineHeight: 1.5,
+              }}>
+                This repo was recently pushed on GitHub and appears here for recency tracking. Run autoscore or hand-score to add rubric grades.
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '14px' }}>
+              {!pending && repo.tokenMechanic && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                    Token mechanic
+                  </div>
+                  {repo.tokenMechanic.rubric.map((row, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '6px', flexWrap: 'nowrap' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        padding: '2px 8px',
+                        borderRadius: '99px',
+                        color: LEVEL_STYLES[row.level].color,
+                        background: LEVEL_STYLES[row.level].bg,
+                        flexShrink: 0,
+                      }}>
+                        {row.level}
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
+                        {row.source}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!pending && !repo.tokenMechanic && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+                    Token mechanic
+                  </div>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    Not scored — infrastructure repos are not expected to have a direct token mechanic. Value shows up in downstream consumer apps.
+                  </p>
+                </div>
+              )}
+
+              {!pending && (
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                  Builder integrity
+                </div>
+                {repo.builderIntegrity.rubric.map((row, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '6px', flexWrap: 'nowrap' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 500,
+                      padding: '2px 8px',
+                      borderRadius: '99px',
+                      color: LEVEL_STYLES[row.level].color,
+                      background: LEVEL_STYLES[row.level].bg,
+                      flexShrink: 0,
+                    }}>
+                      {row.level}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
+                      {row.source}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              )}
+            </div>
+
+            <div style={{
+              borderTop: '1px solid var(--border)',
+              paddingTop: '12px',
+              fontSize: '13px',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+            }}>
+              {repo.verdict}
+            </div>
+
+            {repo.adminNote && !auto && (
+              <div style={{
+                marginTop: '10px',
+                padding: '8px 12px',
+                background: 'var(--surface-2)',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--border)',
+                fontSize: '12px',
+                color: 'var(--text-muted)',
+              }}>
+                <span style={{ color: 'var(--accent)', fontWeight: 500, marginRight: '6px' }}>Note:</span>
+                {repo.adminNote}
+              </div>
+            )}
+
+            <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
+              {CONFIDENCE_LABEL[repo.confidence]}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <div style={{ fontSize: '11px', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Repos
           {activeFilter === 'all'
-            ? ` · ${repos.length}`
-            : ` · ${filtered.length} of ${repos.length}`}
+            ? ` · ${repoItems.length}`
+            : ` · ${filtered.length} of ${repoItems.length}`}
         </div>
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
           {filters.map(f => (
@@ -198,248 +477,17 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {filtered.map(repo => {
-          const isExpanded = expandedIds.has(repo.id)
-          const ts = TAG_STYLES[repo.tag]
-          const borderColor = TAG_BORDER_COLORS[repo.tag]
-          const auto = isAutoInferred(repo)
-          const pending = isUnscoredRecent(repo)
-          const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
-
-          return (
-            <div
-              key={repo.id}
-              style={{
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border)',
-                ...(borderColor ? { borderLeft: `3px solid ${borderColor}` } : {}),
-                borderRadius: 'var(--radius-lg)',
-                overflow: 'hidden',
-                boxShadow: 'var(--card-elevated)',
-              }}
-            >
-              <button
-                onClick={() => toggleExpand(repo.id)}
-                style={{
-                  width: '100%',
-                  padding: d.cardPadding,
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  textAlign: 'left',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: '5px', marginBottom: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{
-                      fontSize: '11px',
-                      padding: '2px 8px',
-                      borderRadius: '99px',
-                      fontWeight: 500,
-                      color: ts.color,
-                      background: ts.bg,
-                    }}>
-                      {ts.label}
-                    </span>
-                    {pending && (
-                      <span style={{
-                        fontSize: '10px',
-                        padding: '2px 7px',
-                        borderRadius: '99px',
-                        color: 'var(--amber)',
-                        background: 'rgba(212,148,58,0.1)',
-                        border: '1px solid var(--border)',
-                        letterSpacing: '0.03em',
-                      }}>
-                        awaiting score
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ fontSize: `${d.name}px`, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
-                    {repo.name}
-                  </div>
-
-                  {previewLine && (
-                    <div style={{
-                      fontSize: `${d.preview}px`,
-                      color: CARD_META_COLOR,
-                      marginTop: '2px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {previewLine}
-                    </div>
-                  )}
-
-                  <div style={{ fontSize: `${d.lastPushed}px`, color: CARD_META_COLOR, marginTop: '2px' }}>
-                    Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexShrink: 0 }}>
-                  {pending ? (
-                    <div style={{ textAlign: 'center', minWidth: '88px', paddingTop: '3px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>Pending</div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.3 }}>
-                        not yet scored
-                      </div>
-                    </div>
-                  ) : (
-                  <>
-                  <div style={{ textAlign: 'center', minWidth: '40px' }}>
-                    {repo.tokenMechanic ? (
-                      <>
-                        <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.tokenMechanic.letter) }}>
-                          {repo.tokenMechanic.letter}
-                        </div>
-                        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.tokenMechanic.pct}%</div>
-                      </>
-                    ) : (
-                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
-                    )}
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
-                  </div>
-
-                  <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
-
-                  <div style={{ textAlign: 'center', minWidth: '40px' }}>
-                    <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.builderIntegrity.letter) }}>
-                      {repo.builderIntegrity.letter}
-                    </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>builder<br />integrity</div>
-                  </div>
-
-                  <div style={{ fontSize: '14px', color: 'var(--text-muted)', paddingTop: '3px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>
-                    ↓
-                  </div>
-                  </>
-                  )}
-                </div>
-              </button>
-
-              {isExpanded && (
-                <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
-                  {pending && (
-                    <div style={{
-                      marginBottom: '12px',
-                      padding: '8px 12px',
-                      background: 'var(--surface-2)',
-                      borderRadius: 'var(--radius)',
-                      border: '1px solid var(--border)',
-                      fontSize: '12px',
-                      color: 'var(--text-muted)',
-                      lineHeight: 1.5,
-                    }}>
-                      This repo was recently pushed on GitHub and appears here for recency tracking. Run autoscore or hand-score to add rubric grades.
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '14px' }}>
-                    {!pending && repo.tokenMechanic && (
-                      <div>
-                        <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                          Token mechanic
-                        </div>
-                        {repo.tokenMechanic.rubric.map((row, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '6px', flexWrap: 'nowrap' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
-                            <span style={{
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              padding: '2px 8px',
-                              borderRadius: '99px',
-                              color: LEVEL_STYLES[row.level].color,
-                              background: LEVEL_STYLES[row.level].bg,
-                              flexShrink: 0,
-                            }}>
-                              {row.level}
-                            </span>
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
-                              {row.source}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {!pending && !repo.tokenMechanic && (
-                      <div>
-                        <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-                          Token mechanic
-                        </div>
-                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                          Not scored — infrastructure repos are not expected to have a direct token mechanic. Value shows up in downstream consumer apps.
-                        </p>
-                      </div>
-                    )}
-
-                    {!pending && (
-                    <div>
-                      <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                        Builder integrity
-                      </div>
-                      {repo.builderIntegrity.rubric.map((row, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '6px', flexWrap: 'nowrap' }}>
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
-                          <span style={{
-                            fontSize: '11px',
-                            fontWeight: 500,
-                            padding: '2px 8px',
-                            borderRadius: '99px',
-                            color: LEVEL_STYLES[row.level].color,
-                            background: LEVEL_STYLES[row.level].bg,
-                            flexShrink: 0,
-                          }}>
-                            {row.level}
-                          </span>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
-                            {row.source}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    )}
-                  </div>
-
-                  <div style={{
-                    borderTop: '1px solid var(--border)',
-                    paddingTop: '12px',
-                    fontSize: '13px',
-                    color: 'var(--text-secondary)',
-                    lineHeight: 1.6,
-                  }}>
-                    {repo.verdict}
-                  </div>
-
-                  {repo.adminNote && !auto && (
-                    <div style={{
-                      marginTop: '10px',
-                      padding: '8px 12px',
-                      background: 'var(--surface-2)',
-                      borderRadius: 'var(--radius)',
-                      border: '1px solid var(--border)',
-                      fontSize: '12px',
-                      color: 'var(--text-muted)',
-                    }}>
-                      <span style={{ color: 'var(--accent)', fontWeight: 500, marginRight: '6px' }}>Note:</span>
-                      {repo.adminNote}
-                    </div>
-                  )}
-
-                  <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
-                    {CONFIDENCE_LABEL[repo.confidence]}
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })}
+        {visibleRepos.map(repo => renderRepoCard(repo))}
+        {gatedRepos.length > 0 && (
+          <div style={{ position: 'relative' }}>
+            <GateBlur locked>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {gatedRepos.map(repo => renderRepoCard(repo))}
+              </div>
+            </GateBlur>
+            <GateOverlay />
+          </div>
+        )}
       </div>
     </div>
   )

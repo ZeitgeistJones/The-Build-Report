@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { pctChange } from '@/lib/grades'
+import GateBlur from '@/components/wallet/GateBlur'
+import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 
 interface Props {
   totalRepos: number
@@ -41,11 +43,12 @@ interface StatCardProps {
   sub: string
   trend?: string
   tooltip?: string
+  gated?: boolean
 }
 
-function StatCard({ label, value, sub, trend, tooltip }: StatCardProps) {
+function StatCard({ label, value, sub, trend, tooltip, gated }: StatCardProps) {
   const [show, setShow] = useState(false)
-  return (
+  const card = (
     <div style={{
       background: 'var(--surface-1)',
       border: '1px solid var(--border)',
@@ -113,6 +116,11 @@ function StatCard({ label, value, sub, trend, tooltip }: StatCardProps) {
       )}
     </div>
   )
+
+  if (gated) {
+    return <GateBlur locked>{card}</GateBlur>
+  }
+  return card
 }
 
 export default function AllTimeStats({
@@ -128,6 +136,9 @@ export default function AllTimeStats({
   lastCommitAt,
   lastCommitRepo,
 }: Props) {
+  const { unlocked } = useClawdAccess()
+  const gated = !unlocked
+
   return (
     <div style={{ marginBottom: '40px' }}>
       <div style={{
@@ -163,6 +174,7 @@ export default function AllTimeStats({
           sub="last 7 days"
           trend={formatStatTrend(totalCommits7d, totalCommits7_14, 'prior 7d')}
           tooltip="Commits across up to 40 repos pushed in the last 30 days (scored repos prioritized). Compared to days 8–14."
+          gated={gated}
         />
         <StatCard
           label="Active days (30d)"
@@ -170,6 +182,7 @@ export default function AllTimeStats({
           sub="last 30 days"
           trend={formatStatTrend(activeDays30d, activeDays30_60, 'prior 30d')}
           tooltip="Calendar days with at least one commit in the sampled repo set. Compared to days 31–60."
+          gated={gated}
         />
         <StatCard
           label="Active days (7d)"
@@ -177,12 +190,14 @@ export default function AllTimeStats({
           sub="last 7 days"
           trend={formatStatTrend(activeDays7d, activeDays7_14, 'prior 7d')}
           tooltip="Calendar days with at least one commit in the sampled repo set. Compared to days 8–14."
+          gated={gated}
         />
         <StatCard
           label="Last commit"
           value={lastCommitAt ? formatLastCommit(lastCommitAt) : '—'}
           sub={lastCommitRepo ?? ''}
           tooltip="Most recent commit found while scanning the sampled repo set."
+          gated={gated}
         />
       </div>
     </div>

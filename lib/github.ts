@@ -295,6 +295,21 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
   }
 }
 
+export async function fetchRepoBySlug(slug: string): Promise<GitHubRepo | null> {
+  try {
+    const data = await ghFetch(`/repos/${GITHUB_ORG}/${slug}`)
+    return {
+      name: data.name,
+      description: data.description ?? null,
+      createdAt: data.created_at,
+      pushedAt: data.pushed_at,
+      language: data.language ?? null,
+    }
+  } catch {
+    return null
+  }
+}
+
 export function timeAgo(dateStr: string | null): string {
   if (!dateStr) return 'unknown'
   const d = new Date(dateStr)
