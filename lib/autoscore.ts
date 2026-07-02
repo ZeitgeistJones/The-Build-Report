@@ -130,8 +130,8 @@ When writing verdict and adminNote, frame low scores constructively and acknowle
 - A low token mechanic score during an infrastructure-heavy phase: frame as "infrastructure phase — consumer apps are the expected next unlock" rather than "fails to deliver holder value."
 
 For rubric rows use these exact weights:
-- tokenMechanic consumer apps: "Burn mechanic exists and is live" (50%), "Revenue or burn path built in" (30%), "Takes CLAWD out of circulation" (20%)
-- tokenMechanic infrastructure/theoretical (adapted): "Enables consumer apps that burn CLAWD" (50%), "Downstream path to holder value" (30%), "Active and maintained" (20%)
+- tokenMechanic consumer apps: "Burn mechanic exists and is live" (50%), "Revenue or burn path built in" (30%), "Mechanic is operational" (20%)
+- tokenMechanic infrastructure/theoretical (adapted): "Enables consumer apps that burn CLAWD" (50%), "Downstream path to holder value" (30%), "Mechanic is operational" (20%)
 - builderIntegrity: "Serves stated vision at time of build" (40%), "Genuine autonomous build" (35%), "Passes walkaway test" (25%)
 - level: "high" | "mid" | "low"
 - source: brief inference note like "inferred from repo name" or "inferred from ecosystem context"

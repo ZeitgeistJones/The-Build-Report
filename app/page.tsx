@@ -291,10 +291,10 @@ export default async function Home() {
               rows: [
                 { label: 'Burn mechanic exists and is live', weight: '50%' },
                 { label: 'Revenue or burn path built in', weight: '30%' },
-                { label: 'Takes CLAWD out of circulation', weight: '20%' },
+                { label: 'Mechanic is operational', weight: '20%' },
               ],
               note:
-                'Measures whether value flows back to holders economically. Each component rated low (1) / mid (2) / high (3). Score = (weighted sum ÷ 3) × 100. Consumer apps are scored directly; infrastructure may show N/A at the repo level because no token mechanic is expected — value shows up in downstream consumer apps.',
+                'Measures whether value flows back to holders economically. Each component rated low (1) / mid (2) / high (3). Score = (weighted sum ÷ 3) × 100. Consumer apps are scored directly; infrastructure may show N/A at the repo level because no token mechanic is expected — value shows up in downstream consumer apps. Operational status is included because a dormant mechanic isn\'t delivering holder value — a burn contract that hasn\'t been triggered in months scores lower than one running daily.',
             },
             {
               title: 'Builder integrity — all repos',
