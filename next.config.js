@@ -1,3 +1,13 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {}
+const nextConfig = {
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@metamask/sdk': false,
+      '@react-native-async-storage/async-storage': false,
+      'pino-pretty': false,
+    }
+    return config
+  },
+}
 module.exports = nextConfig

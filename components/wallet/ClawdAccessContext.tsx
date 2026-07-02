@@ -8,7 +8,6 @@ import {
   useReadContract,
   useSwitchChain,
 } from 'wagmi'
-import { injected } from 'wagmi/connectors'
 import { base } from 'wagmi/chains'
 import {
   CLAWD_GATE_ABI,
@@ -33,7 +32,7 @@ const ClawdAccessContext = createContext<ClawdAccessContextValue | null>(null)
 
 export function ClawdAccessProvider({ children }: { children: ReactNode }) {
   const { address, isConnected, chainId } = useAccount()
-  const { connect, isPending: isConnecting } = useConnect()
+  const { connect, connectors, isPending: isConnecting } = useConnect()
   const { disconnect } = useDisconnect()
   const { switchChain, isPending: isSwitching } = useSwitchChain()
 
@@ -52,8 +51,9 @@ export function ClawdAccessProvider({ children }: { children: ReactNode }) {
   const unlocked = isConnected && !isWrongChain && hasAccess
 
   const connectWallet = useCallback(() => {
-    connect({ connector: injected(), chainId: base.id })
-  }, [connect])
+    const connector = connectors[0]
+    if (connector) connect({ connector, chainId: base.id })
+  }, [connect, connectors])
 
   const disconnectWallet = useCallback(() => {
     disconnect()
