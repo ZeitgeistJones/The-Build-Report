@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Repo, Tag, Level } from '@/lib/scores'
+import { timeAgo } from '@/lib/github'
 import { isUnscoredRecent } from '@/lib/recentRepos'
 import { isAutoInferredNote } from '@/lib/repoFilters'
 
@@ -11,12 +12,6 @@ const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'indirect': { color: '#a07cd5', bg: 'rgba(160,124,213,0.12)', label: 'indirect' },
   'infrastructure': { color: '#7a7670', bg: 'rgba(122,118,112,0.12)', label: 'infrastructure' },
   'theoretical': { color: '#d4943a', bg: 'rgba(212,148,58,0.12)', label: 'theoretical' },
-}
-
-const STATUS_STYLES = {
-  active: { color: '#5cb87a', bg: 'rgba(92,184,122,0.08)', label: 'active', title: 'Editorial status at time of scoring' },
-  dormant: { color: '#e05c5c', bg: 'rgba(224,92,92,0.08)', label: 'dormant', title: 'Editorial status at time of scoring' },
-  archived: { color: '#5e5a55', bg: 'rgba(94,90,85,0.08)', label: 'archived', title: 'Editorial status at time of scoring' },
 }
 
 const LEVEL_STYLES: Record<Level, { color: string; bg: string }> = {
@@ -41,23 +36,6 @@ function gradeColor(letter: string) {
 function githubOrderIndex(slug: string, order: string[]): number {
   const idx = order.indexOf(slug)
   return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
-}
-
-function activitySubtitle(repo: RepoWithLive): string {
-  if (repo.pushedAt) return `Last pushed ${formatLastCommit(repo.pushedAt)}`
-  if (repo.lastCommitAt) return `Last commit ${formatLastCommit(repo.lastCommitAt)}`
-  return `Scored ${repo.scoredAt}`
-}
-
-function formatLastCommit(dateStr: string | null) {
-  if (!dateStr) return null
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
 }
 
 interface RepoWithLive extends Repo {
@@ -147,7 +125,6 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
         {filtered.map(repo => {
           const isExpanded = expandedIds.has(repo.id)
           const ts = TAG_STYLES[repo.tag]
-          const ss = STATUS_STYLES[repo.status]
           const auto = isAutoInferred(repo)
           const pending = isUnscoredRecent(repo)
 
@@ -186,18 +163,6 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     }}>
                       {ts.label}
                     </span>
-                    <span
-                      title={ss.title}
-                      style={{
-                      fontSize: '11px',
-                      padding: '2px 8px',
-                      borderRadius: '99px',
-                      fontWeight: 500,
-                      color: ss.color,
-                      background: ss.bg,
-                    }}>
-                      {ss.label}
-                    </span>
                     {pending && (
                       <span style={{
                         fontSize: '10px',
@@ -218,10 +183,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                   </div>
 
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {activitySubtitle(repo)}
-                    {repo.commits30d !== null && repo.commits30d > 0 && (
-                      <span style={{ marginLeft: '8px' }}>· {repo.commits30d} commits (30d)</span>
-                    )}
+                    Last pushed {timeAgo(repo.pushedAt)}
                   </div>
                 </div>
 
@@ -377,9 +339,8 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                    <span>Scored {repo.scoredAt}</span>
-                    <span>{CONFIDENCE_LABEL[repo.confidence]}</span>
+                  <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
+                    {CONFIDENCE_LABEL[repo.confidence]}
                   </div>
                 </div>
               )}
