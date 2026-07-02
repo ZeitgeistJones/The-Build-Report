@@ -383,7 +383,7 @@ export default function GradesPanel({
 
         <GradeCard
           grade={ig}
-          label="integrity grade"
+          label="Builder Integrity"
           period={period}
           mini="Commit-weighted fit to the stated builder-values frame (by rubric scores)."
           summary={ig?.summary ?? 'Integrity score unavailable'}
