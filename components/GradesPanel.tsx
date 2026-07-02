@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation } from '@/lib/grades'
 import { gradeColor } from '@/lib/gradeLetters'
+import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
 
 interface Props {
   builderGrade30: BuilderGrade | null
@@ -38,6 +39,7 @@ function GradeCard({
 }: {
   grade: {
     letter: string
+    pct: number
     trend: 'up' | 'flat' | 'down'
     trendPct: number | null
     signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
@@ -105,6 +107,19 @@ function GradeCard({
             >
               {grade?.letter ?? '—'}
             </span>
+
+            {grade && (
+              <span
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-mono)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                {grade.pct}%
+              </span>
+            )}
 
             {grade && (
               <span
@@ -267,7 +282,7 @@ export default function GradesPanel({
   stats30d,
   stats7d,
 }: Props) {
-  const [period, setPeriod] = useState<'30d' | '7d'>('30d')
+  const { period } = useGradePeriod()
 
   const bg = period === '30d' ? builderGrade30 : builderGrade7
   const tg = period === '30d' ? tokenMechanicGrade30 : tokenMechanicGrade7
@@ -295,34 +310,7 @@ export default function GradesPanel({
           Grades
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            gap: '4px',
-            background: 'var(--surface-1)',
-            borderRadius: '6px',
-            padding: '3px',
-          }}
-        >
-          {(['30d', '7d'] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              style={{
-                fontSize: '12px',
-                padding: '4px 12px',
-                borderRadius: '4px',
-                background: period === p ? 'var(--accent-dim)' : 'transparent',
-                color: period === p ? 'var(--accent)' : 'var(--text-muted)',
-                fontWeight: period === p ? 500 : 400,
-                border: period === p ? '1px solid var(--accent-border)' : '1px solid transparent',
-                transition: 'all 0.15s',
-              }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
+        <PeriodToggle />
       </div>
 
       <div

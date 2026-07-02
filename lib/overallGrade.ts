@@ -2,12 +2,18 @@ import { Repo, Tag } from './scores'
 import { GitHubStats } from './github'
 import { pctToLetter } from './gradeLetters'
 import { isUnscoredRecent } from './recentRepos'
+import { pctChange, trendFromPct } from './grades'
 
 export interface OverallGrade {
   letter: string
   pct: number
   reposScored: number
   weightsUsed: { tokenMechanic: number; builder: number; integrity: number }
+}
+
+export interface OverallGradeWithTrend extends OverallGrade {
+  trendPct: number | null
+  trend: 'up' | 'flat' | 'down'
 }
 
 export interface OverallGradeContext {
@@ -55,6 +61,37 @@ export function calcOverallGrade(
     pct,
     reposScored,
     weightsUsed,
+  }
+}
+
+function priorPctFromTrend(curr: number, trendPct: number | null): number {
+  if (trendPct === null) return 0
+  if (trendPct === 0) return curr
+  return Math.round(curr / (1 + trendPct / 100))
+}
+
+export function calcOverallGradeWithTrend(
+  tokenMechanic: { pct: number; trendPct: number | null } | null,
+  builder: { pct: number; trendPct: number | null } | null,
+  integrity: { pct: number; trendPct: number | null },
+  reposScored: number,
+): OverallGradeWithTrend | null {
+  const overall = calcOverallGrade(tokenMechanic, builder, integrity, reposScored)
+  if (!overall) return null
+
+  const priorOverall = calcOverallGrade(
+    tokenMechanic ? { pct: priorPctFromTrend(tokenMechanic.pct, tokenMechanic.trendPct) } : null,
+    builder ? { pct: priorPctFromTrend(builder.pct, builder.trendPct) } : null,
+    { pct: priorPctFromTrend(integrity.pct, integrity.trendPct) },
+    reposScored,
+  )
+
+  const trendPct = pctChange(overall.pct, priorOverall?.pct ?? 0)
+
+  return {
+    ...overall,
+    trendPct,
+    trend: trendFromPct(trendPct),
   }
 }
 

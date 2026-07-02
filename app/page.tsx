@@ -13,12 +13,13 @@ import {
   buildTokenMechanicTrendExplanation,
   buildIntegrityTrendExplanation,
 } from '@/lib/gradeNarratives'
-import { calcOverallGrade, countReposScored, buildOverallGradeContext } from '@/lib/overallGrade'
+import { calcOverallGrade, calcOverallGradeWithTrend, countReposScored, buildOverallGradeContext } from '@/lib/overallGrade'
 import { getOverallSummary } from '@/lib/overallSummary'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 import OverallGrade from '@/components/OverallGrade'
+import { GradePeriodProvider } from '@/components/GradePeriodContext'
 
 export const revalidate = 300
 
@@ -92,16 +93,22 @@ export default async function Home() {
     : integrityGrade7Raw
 
   const reposScored = countReposScored(allRepos)
-  const overallGradeRaw = calcOverallGrade(
+  const overallGrade30 = calcOverallGradeWithTrend(
     tokenMechanicGrade30,
     builderGrade30,
-    integrityGrade30,
+    integrityGrade30!,
     reposScored,
   )
-  const overallSummary = overallGradeRaw
+  const overallGrade7 = calcOverallGradeWithTrend(
+    tokenMechanicGrade7,
+    builderGrade7,
+    integrityGrade7!,
+    reposScored,
+  )
+  const overallSummary = overallGrade30
     ? await getOverallSummary(
         buildOverallGradeContext(
-          overallGradeRaw,
+          overallGrade30,
           tokenMechanicGrade30,
           builderGrade30,
           integrityGrade30!,
@@ -112,6 +119,7 @@ export default async function Home() {
     : null
 
   return (
+    <GradePeriodProvider>
     <>
       <div style={{ marginBottom: '40px', paddingBottom: '24px', borderBottom: '1px solid var(--border-strong)' }}>
         <h1
@@ -128,8 +136,12 @@ export default async function Home() {
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           A plain English look at the repos, scored and sourced.
         </p>
-        {overallGradeRaw && (
-          <OverallGrade overall={overallGradeRaw} summary={overallSummary} />
+        {overallGrade30 && overallGrade7 && (
+          <OverallGrade
+            overall30={overallGrade30}
+            overall7={overallGrade7}
+            summary={overallSummary}
+          />
         )}
         <div
           style={{
@@ -433,5 +445,6 @@ export default async function Home() {
         </div>
       </div>
     </>
+    </GradePeriodProvider>
   )
 }
