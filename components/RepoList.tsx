@@ -118,6 +118,9 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Repos
+          {activeFilter === 'all'
+            ? ` · ${repos.length}`
+            : ` · ${filtered.length} of ${repos.length}`}
         </div>
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           {filters.map(f => (

@@ -39,7 +39,7 @@ export default async function Home() {
   const allRepos = mergeRepoSources(REPOS, autoScored)
 
   const reposBase = stats
-    ? buildReposInGithubOrder(trackableGithub, REPOS, autoScored, makeUnscoredRecentRepo, 80)
+    ? buildReposInGithubOrder(trackableGithub, REPOS, autoScored, makeUnscoredRecentRepo)
     : allRepos
 
   const repos = reposBase.map(r => {

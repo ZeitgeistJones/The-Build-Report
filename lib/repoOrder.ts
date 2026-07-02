@@ -38,7 +38,6 @@ export function buildReposInGithubOrder(
   handScored: Repo[],
   autoScored: Repo[],
   makeUnscored: (gh: GitHubRepo) => Repo,
-  maxRows = 80,
 ): Repo[] {
   const scored = scoredBySlug(handScored, autoScored)
   const ordered: Repo[] = []
@@ -50,8 +49,6 @@ export function buildReposInGithubOrder(
     const entry = scored.get(gh.name) ?? makeUnscored(gh)
     ordered.push(entry)
     includedIds.add(entry.id)
-
-    if (ordered.length >= maxRows) break
   }
 
   // Hand-scored entries with a unique id not yet shown (e.g. duplicate githubSlug rows)
