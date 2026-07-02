@@ -15,6 +15,20 @@ const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'theoretical': { color: '#d4943a', bg: 'rgba(212,148,58,0.12)', label: 'theoretical' },
 }
 
+const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
+  direct: '#c8f060',
+  'supply-lock': '#4ade80',
+  indirect: '#60a5fa',
+  infrastructure: '#6b7280',
+  theoretical: '#a78bfa',
+}
+
+function formatDescription(raw: string | null | undefined): string | null {
+  const text = raw?.trim()
+  if (!text) return null
+  return text.length > 120 ? `${text.slice(0, 119)}…` : text
+}
+
 const LEVEL_STYLES: Record<Level, { color: string; bg: string }> = {
   high: { color: '#5cb87a', bg: 'rgba(92,184,122,0.1)' },
   mid: { color: '#d4943a', bg: 'rgba(212,148,58,0.1)' },
@@ -33,6 +47,7 @@ function githubOrderIndex(slug: string, order: string[]): number {
 }
 
 interface RepoWithLive extends Repo {
+  description: string | null
   lastCommitAt: string | null
   pushedAt: string | null
   commits30d: number | null
@@ -119,6 +134,8 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
         {filtered.map(repo => {
           const isExpanded = expandedIds.has(repo.id)
           const ts = TAG_STYLES[repo.tag]
+          const borderColor = TAG_BORDER_COLORS[repo.tag]
+          const description = formatDescription(repo.description)
           const auto = isAutoInferred(repo)
           const pending = isUnscoredRecent(repo)
 
@@ -128,6 +145,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
               style={{
                 background: 'var(--surface-1)',
                 border: '1px solid var(--border)',
+                ...(borderColor ? { borderLeft: `3px solid ${borderColor}` } : {}),
                 borderRadius: 'var(--radius-lg)',
                 overflow: 'hidden',
                 boxShadow: 'var(--card-elevated)',
@@ -176,6 +194,19 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                   <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
                     {repo.name}
                   </div>
+
+                  {description && (
+                    <div style={{
+                      fontSize: '12px',
+                      color: 'var(--text-muted)',
+                      marginTop: '2px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {description}
+                    </div>
+                  )}
 
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
                     Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}

@@ -56,6 +56,7 @@ export default async function Home() {
     return {
       ...r,
       adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
+      description: githubRepo?.description?.trim() || null,
       lastCommitAt: activity?.lastCommitAt ?? null,
       pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
       commits30d: activity?.commits30d ?? null,
