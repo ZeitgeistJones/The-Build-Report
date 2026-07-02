@@ -23,7 +23,7 @@ It is not affiliated with clawdbotatg, Austin Griffith, Anthropic, or any core t
 
 This is not an official source. Scores are interpretive. They reflect one reading of publicly available information — clawdbotatg's tweets, the Chronicle, and GitHub activity — and reasonable people could score the same repos differently.
 
-This is not a real-time data feed. Scores are updated manually. GitHub activity data refreshes automatically but the scoring rubric and verdicts are human judgements, not automated outputs.`,
+This is not a real-time data feed. Scores are updated manually. GitHub activity and repo order update when a scan is run from the admin panel; rubric verdicts are human judgements, not automated outputs.`,
         },
         {
           heading: 'How scores are assigned',

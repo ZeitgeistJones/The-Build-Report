@@ -1,4 +1,5 @@
-import { getGitHubStats, GitHubRepo } from './github'
+import { getCachedGitHubStats } from './githubScan'
+import { GitHubRepo } from './github'
 import { REPOS } from './scores'
 import { shouldSkipRepo } from './repoFilters'
 import { runAutoScores, RawRepo } from './autoscore'
@@ -23,7 +24,10 @@ export function listUnscoredTrackable(
 }
 
 export async function runAutoscorePipeline() {
-  const stats = await getGitHubStats()
+  const stats = await getCachedGitHubStats()
+  if (!stats) {
+    throw new Error('No GitHub scan cached. Run a GitHub scan from the admin panel first.')
+  }
   const trackable = stats?.trackableRepos ?? []
   const knownRepoSlugs = new Set(REPOS.map(r => r.githubSlug))
   const unscoredRepos = listUnscoredTrackable(trackable, knownRepoSlugs)
