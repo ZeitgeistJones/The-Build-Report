@@ -30,14 +30,27 @@ const DENSITY_STYLES = {
   comfortable: { cardPadding: '18px 16px', name: 15, preview: 13, lastPushed: 13, gradeLetter: 22 },
 } as const
 
+const CARD_META_COLOR = '#9a9590'
+
 function truncate120(text: string): string {
   return text.length > 120 ? `${text.slice(0, 119)}…` : text
 }
 
-function firstSentenceOr120(text: string): string {
-  const periodIdx = text.indexOf('.')
-  const cutAt = periodIdx === -1 ? 120 : Math.min(periodIdx, 120)
-  return text.slice(0, cutAt).trim()
+function twoSentencesMax(text: string): string {
+  const trimmed = text.trim()
+  if (!trimmed) return ''
+
+  const firstPeriod = trimmed.indexOf('.')
+  if (firstPeriod === -1) return trimmed
+
+  const secondPeriod = trimmed.indexOf('.', firstPeriod + 1)
+  if (secondPeriod === -1) {
+    return trimmed.slice(0, firstPeriod + 1).trim()
+  }
+
+  const throughSecond = trimmed.slice(0, secondPeriod + 1).trim()
+  const hasMore = trimmed.slice(secondPeriod + 1).trim().length > 0
+  return hasMore ? `${throughSecond}…` : throughSecond
 }
 
 function formatPreviewLine(
@@ -46,9 +59,13 @@ function formatPreviewLine(
   pending: boolean,
 ): string | null {
   const gh = description?.trim()
-  if (gh) return truncate120(gh)
+  if (gh) {
+    const preview = truncate120(twoSentencesMax(gh))
+    return preview || null
+  }
   if (pending || !verdict?.trim()) return null
-  return truncate120(firstSentenceOr120(verdict.trim()))
+  const preview = truncate120(twoSentencesMax(verdict.trim()))
+  return preview || null
 }
 
 function PillButton({
@@ -248,7 +265,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                   {previewLine && (
                     <div style={{
                       fontSize: `${d.preview}px`,
-                      color: 'var(--text-muted)',
+                      color: CARD_META_COLOR,
                       marginTop: '2px',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -258,7 +275,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     </div>
                   )}
 
-                  <div style={{ fontSize: `${d.lastPushed}px`, color: 'var(--text-muted)', marginTop: '2px' }}>
+                  <div style={{ fontSize: `${d.lastPushed}px`, color: CARD_META_COLOR, marginTop: '2px' }}>
                     Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}
                   </div>
                 </div>
