@@ -11,12 +11,14 @@ export default function GateOverlay() {
         position: 'absolute',
         inset: 0,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '24px',
-        background: 'rgba(14, 14, 14, 0.55)',
+        padding: '12px 24px 24px',
+        background:
+          'linear-gradient(to bottom, transparent 0px, rgba(14, 14, 14, 0.45) 80px, rgba(14, 14, 14, 0.55) 100%)',
         borderRadius: 'var(--radius-lg)',
         zIndex: 2,
+        pointerEvents: 'none',
       }}
     >
       <button
@@ -36,6 +38,7 @@ export default function GateOverlay() {
           textAlign: 'center',
           lineHeight: 1.5,
           maxWidth: '360px',
+          pointerEvents: 'auto',
         }}
       >
         Connect wallet — hold 10M $CLAWD to unlock the full report

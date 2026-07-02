@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useSendTransaction } from 'wagmi'
 import { waitForTransactionReceipt } from '@wagmi/core'
 import { base } from 'wagmi/chains'
@@ -22,11 +23,25 @@ interface Props {
 export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: Props) {
   const { isConnected, hasAccess, connectWallet, address, isWrongChain, switchToBase } = useClawdAccess()
   const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null)
   const [inlineMsg, setInlineMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<'idle' | 'paying' | 'scoring'>('idle')
+  const tooltipAnchorRef = useRef<HTMLButtonElement>(null)
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction()
+
+  useLayoutEffect(() => {
+    if (!showTooltip || !tooltipAnchorRef.current) {
+      setTooltipPos(null)
+      return
+    }
+    const rect = tooltipAnchorRef.current.getBoundingClientRect()
+    setTooltipPos({
+      top: rect.top - 6,
+      left: Math.max(8, rect.right - 240),
+    })
+  }, [showTooltip])
 
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
   const busy = phase !== 'idle' || isSending
@@ -110,6 +125,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
           {busy ? (phase === 'paying' || isSending ? 'Paying…' : 'Scoring…') : label}
         </button>
         <button
+          ref={tooltipAnchorRef}
           type="button"
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
@@ -144,12 +160,13 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
           {error}
         </div>
       )}
-      {showTooltip && (
+      {showTooltip && tooltipPos && createPortal(
         <div
           style={{
-            position: 'absolute',
-            bottom: 'calc(100% + 6px)',
-            right: 0,
+            position: 'fixed',
+            top: tooltipPos.top,
+            left: tooltipPos.left,
+            transform: 'translateY(-100%)',
             background: 'var(--surface-3)',
             border: '1px solid var(--border-strong)',
             borderRadius: 'var(--radius)',
@@ -158,13 +175,14 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
             color: 'var(--text-secondary)',
             lineHeight: 1.5,
             width: '240px',
-            zIndex: 20,
+            zIndex: 9999,
             pointerEvents: 'none',
             textAlign: 'left',
           }}
         >
           {TOOLTIP}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

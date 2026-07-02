@@ -48,7 +48,24 @@ interface StatCardProps {
 
 function StatCard({ label, value, sub, trend, tooltip, gated }: StatCardProps) {
   const [show, setShow] = useState(false)
-  const card = (
+
+  const valueContent = (
+    <>
+      <div style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>
+        {value}
+      </div>
+      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
+        {sub}
+      </div>
+      {trend && (
+        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+          {trend}
+        </div>
+      )}
+    </>
+  )
+
+  return (
     <div style={{
       background: 'var(--surface-1)',
       border: '1px solid var(--border)',
@@ -84,17 +101,7 @@ function StatCard({ label, value, sub, trend, tooltip, gated }: StatCardProps) {
           </button>
         )}
       </div>
-      <div style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>
-        {value}
-      </div>
-      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
-        {sub}
-      </div>
-      {trend && (
-        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-          {trend}
-        </div>
-      )}
+      {gated ? <GateBlur locked>{valueContent}</GateBlur> : valueContent}
       {tooltip && show && (
         <div style={{
           position: 'absolute',
@@ -116,11 +123,6 @@ function StatCard({ label, value, sub, trend, tooltip, gated }: StatCardProps) {
       )}
     </div>
   )
-
-  if (gated) {
-    return <GateBlur locked>{card}</GateBlur>
-  }
-  return card
 }
 
 export default function AllTimeStats({
