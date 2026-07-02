@@ -3,7 +3,7 @@
 import { gradeColor } from '@/lib/gradeLetters'
 import { formatTrendPct } from '@/lib/grades'
 import { OverallGradeWithTrend } from '@/lib/overallGrade'
-import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
+import { useGradePeriod } from './GradePeriodContext'
 
 function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
   if (trend === 'up') return <span style={{ color: 'var(--green)', fontSize: '12px' }}>↑</span>
@@ -24,8 +24,7 @@ export default function OverallGrade({ overall30, overall7, summary }: Props) {
   return (
     <div
       style={{
-        marginTop: '16px',
-        marginBottom: '20px',
+        marginBottom: '12px',
         padding: '16px 18px',
         background: 'var(--surface-1)',
         border: '1px solid var(--border)',
@@ -35,23 +34,14 @@ export default function OverallGrade({ overall30, overall7, summary }: Props) {
     >
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          fontSize: '11px',
+          color: 'var(--text-muted)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
           marginBottom: '10px',
         }}
       >
-        <div
-          style={{
-            fontSize: '11px',
-            color: 'var(--text-muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-          }}
-        >
-          Overall grade
-        </div>
-        <PeriodToggle />
+        Overall grade
       </div>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '6px', flexWrap: 'wrap' }}>
@@ -91,13 +81,19 @@ export default function OverallGrade({ overall30, overall7, summary }: Props) {
         </span>
       </div>
 
-      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: summary && period === '30d' ? '10px' : 0 }}>
+      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: period === '30d' && summary ? '10px' : period === '7d' ? '10px' : 0 }}>
         Based on {overall.reposScored} repos scored
       </div>
 
-      {summary && period === '30d' && (
+      {period === '30d' && summary && (
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>
           {summary}
+        </p>
+      )}
+
+      {period === '7d' && (
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0, fontStyle: 'italic' }}>
+          Summary is available for the 30d window only.
         </p>
       )}
     </div>

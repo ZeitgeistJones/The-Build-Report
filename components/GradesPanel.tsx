@@ -4,8 +4,13 @@ import { useState } from 'react'
 import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation } from '@/lib/grades'
 import { gradeColor } from '@/lib/gradeLetters'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
+import OverallGrade from './OverallGrade'
+import { OverallGradeWithTrend } from '@/lib/overallGrade'
 
 interface Props {
+  overall30: OverallGradeWithTrend | null
+  overall7: OverallGradeWithTrend | null
+  overallSummary: string | null
   builderGrade30: BuilderGrade | null
   builderGrade7: BuilderGrade | null
   tokenMechanicGrade30: TokenMechanicGrade | null
@@ -216,6 +221,9 @@ function GradeCard({
 }
 
 export default function GradesPanel({
+  overall30,
+  overall7,
+  overallSummary,
   builderGrade30,
   builderGrade7,
   tokenMechanicGrade30,
@@ -255,6 +263,14 @@ export default function GradesPanel({
 
         <PeriodToggle />
       </div>
+
+      {overall30 && overall7 && (
+        <OverallGrade
+          overall30={overall30}
+          overall7={overall7}
+          summary={overallSummary}
+        />
+      )}
 
       <div
         style={{

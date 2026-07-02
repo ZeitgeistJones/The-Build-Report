@@ -37,6 +37,9 @@ export default function NavBar() {
         <a href="/about" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
           About
         </a>
+        <a href="/#how-we-score" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+          How we score
+        </a>
         <a
           href="https://github.com/clawdbotatg"
           target="_blank"

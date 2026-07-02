@@ -18,7 +18,6 @@ import { getOverallSummary } from '@/lib/overallSummary'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
-import OverallGrade from '@/components/OverallGrade'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
 
 export const revalidate = 300
@@ -136,13 +135,6 @@ export default async function Home() {
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           A plain English look at the repos, scored and sourced.
         </p>
-        {overallGrade30 && overallGrade7 && (
-          <OverallGrade
-            overall30={overallGrade30}
-            overall7={overallGrade7}
-            summary={overallSummary}
-          />
-        )}
         <div
           style={{
             marginTop: '12px',
@@ -195,6 +187,9 @@ export default async function Home() {
 
       <div style={{ marginBottom: '40px' }}>
       <GradesPanel
+        overall30={overallGrade30}
+        overall7={overallGrade7}
+        overallSummary={overallSummary}
         builderGrade30={builderGrade30}
         builderGrade7={builderGrade7}
         tokenMechanicGrade30={tokenMechanicGrade30}
