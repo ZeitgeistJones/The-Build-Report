@@ -1,4 +1,5 @@
 import { getGitHubStats, timeAgo } from '@/lib/github'
+import { getChronicleBannerData } from '@/lib/chronicle'
 import { getLastGithubScanAt, formatScanAt } from '@/lib/githubScan'
 import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
@@ -22,6 +23,7 @@ export default async function Home() {
   let stats
   let error = false
   const lastGithubScanAt = await getLastGithubScanAt()
+  const chronicle = await getChronicleBannerData().catch(() => null)
 
   try {
     stats = await getGitHubStats()
@@ -128,6 +130,17 @@ export default async function Home() {
             {lastGithubScanAt && ` Last scan: ${formatScanAt(lastGithubScanAt)}.`}
             {stats?.lastCommitAt && ` Latest commit ${timeAgo(stats.lastCommitAt)}.`}
           </span>
+          {chronicle?.lastUpdated && (
+            <span>
+              <a href="https://github.com/clawdbotatg/clawd-chronicle" target="_blank" rel="noopener noreferrer">
+                Chronicle
+              </a>{' '}
+              last updated {chronicle.lastUpdated.label} — {chronicle.lastUpdated.message}
+            </span>
+          )}
+          {chronicle?.summary && (
+            <span style={{ lineHeight: 1.6 }}>{chronicle.summary}</span>
+          )}
         </div>
       </div>
 
