@@ -106,8 +106,8 @@ export default async function Home() {
           style={{
             marginTop: '12px',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            flexDirection: 'column',
+            gap: '6px',
             background: 'var(--surface-1)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius)',
@@ -123,10 +123,9 @@ export default async function Home() {
             </a>{' '}
             and public GitHub data. Not financial advice. <a href="/about">Full disclaimer →</a>
           </span>
-          <span style={{ flexShrink: 0, marginLeft: '12px' }}>
-            {lastGithubScanAt
-              ? `Data updates when a scan is run from the admin panel. Last scan: ${formatScanAt(lastGithubScanAt)}.`
-              : 'GitHub data updates when a scan is run from the admin panel.'}
+          <span>
+            GitHub data updates when a scan is run from the admin panel.
+            {lastGithubScanAt && ` Last scan: ${formatScanAt(lastGithubScanAt)}.`}
             {stats?.lastCommitAt && ` Latest commit ${timeAgo(stats.lastCommitAt)}.`}
           </span>
         </div>

@@ -28,7 +28,7 @@ const LEVEL_STYLES: Record<Level, { color: string; bg: string }> = {
 const CONFIDENCE_LABEL: Record<string, string> = {
   high: 'High confidence',
   mid: 'Medium confidence',
-  low: 'Low confidence — auto-inferred',
+  low: 'Low confidence',
 }
 
 function gradeColor(letter: string) {
@@ -156,10 +156,9 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
               key={repo.id}
               style={{
                 background: 'var(--surface-1)',
-                border: `1px solid ${auto ? 'rgba(255,255,255,0.05)' : 'var(--border)'}`,
+                border: '1px solid var(--border)',
                 borderRadius: 'var(--radius-lg)',
                 overflow: 'hidden',
-                opacity: auto ? 0.85 : 1,
               }}
             >
               <button
@@ -199,19 +198,6 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     }}>
                       {ss.label}
                     </span>
-                    {auto && (
-                      <span style={{
-                        fontSize: '10px',
-                        padding: '2px 7px',
-                        borderRadius: '99px',
-                        color: 'var(--text-muted)',
-                        background: 'var(--surface-3)',
-                        border: '1px solid var(--border)',
-                        letterSpacing: '0.03em',
-                      }}>
-                        ✦ auto-inferred
-                      </span>
-                    )}
                     {pending && (
                       <span style={{
                         fontSize: '10px',
@@ -297,22 +283,6 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                       This repo was recently pushed on GitHub and appears here for recency tracking. Run autoscore or hand-score to add rubric grades.
                     </div>
                   )}
-                  {auto && (
-                    <div style={{
-                      marginBottom: '12px',
-                      padding: '8px 12px',
-                      background: 'var(--surface-2)',
-                      borderRadius: 'var(--radius)',
-                      border: '1px solid var(--border)',
-                      fontSize: '12px',
-                      color: 'var(--text-muted)',
-                      lineHeight: 1.5,
-                    }}>
-                      <span style={{ color: 'var(--amber)', fontWeight: 500, marginRight: '6px' }}>✦ Auto-inferred:</span>
-                      This repo was not in the original scored set. Scores were generated automatically by Claude based on the repo name, description, and ecosystem context. They are a starting point, not a verdict. Hand scoring will replace this.
-                    </div>
-                  )}
-
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '14px' }}>
                     {!pending && repo.holderRelevance && (
                       <div>
@@ -348,7 +318,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                           Holder relevance
                         </div>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                          Not scored — auto-inferred infrastructure repos are not expected to have a token mechanic. Hand-scored infrastructure may use adapted criteria. Value shows up in downstream consumer apps.
+                          Not scored — infrastructure repos are not expected to have a direct token mechanic. Value shows up in downstream consumer apps.
                         </p>
                       </div>
                     )}
@@ -409,7 +379,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)' }}>
                     <span>Scored {repo.scoredAt}</span>
-                    <span>{auto ? 'Auto-inferred — low confidence' : CONFIDENCE_LABEL[repo.confidence]}</span>
+                    <span>{CONFIDENCE_LABEL[repo.confidence]}</span>
                   </div>
                 </div>
               )}
