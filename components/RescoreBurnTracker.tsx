@@ -4,16 +4,17 @@ import { useState } from 'react'
 import { formatClawdBurned } from '@/lib/rescoreBurns'
 
 const TOOLTIP =
-  'Approximate — calculated at time of each rescore using CoinGecko ETH/CLAWD prices. Actual amount may vary slightly due to swap fees and price movement.'
+  'Approximate — calculated at time of each rescore using CoinGecko ETH/CLAWD prices. Actual amount may vary slightly due to swap fees and price movement. Falls back to cached or estimated rates if live prices are unavailable.'
 
 interface Props {
-  clawdTotal: number
+  count: number
+  clawdDisplay: number
 }
 
-export default function RescoreBurnTracker({ clawdTotal }: Props) {
+export default function RescoreBurnTracker({ count, clawdDisplay }: Props) {
   const [showTooltip, setShowTooltip] = useState(false)
 
-  if (clawdTotal <= 0) return null
+  if (count <= 0 && clawdDisplay <= 0) return null
 
   return (
     <div style={{ position: 'relative', flexShrink: 0, textAlign: 'right' }}>
@@ -54,7 +55,7 @@ export default function RescoreBurnTracker({ clawdTotal }: Props) {
           lineHeight: 1.1,
         }}
       >
-        {formatClawdBurned(clawdTotal)}
+        {formatClawdBurned(clawdDisplay)}
       </div>
       {showTooltip && (
         <div

@@ -1,9 +1,10 @@
 import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
-import { Repo, Tag, Status, Level, RubricRow, Score, calcRubricPct, normalizeRepoScores } from './scores'
+import { Repo, Tag, Status, Level, RubricRow, Score, calcRubricPct, normalizeRepoScores, REPOS } from './scores'
 import { pctToLetter } from './gradeLetters'
 import { shouldSkipRepo } from './repoFilters'
 import { getExcludedSlugs } from './repoExclude'
+import { getChronicleContext } from './chronicleContext'
 import { fetchRepoBySlug } from './github'
 
 let redis: Redis | null = null
@@ -94,13 +95,17 @@ Tag definitions:
 The project's stated goals: every consumer app burns CLAWD, autonomous operation, walkaway test (runs without clawdbotatg intervention).
 `.trim()
 
-async function inferScore(repo: RawRepo): Promise<Repo | null> {
+async function inferScore(repo: RawRepo, options?: { chronicleContext?: string }): Promise<Repo | null> {
   console.log(`[autoscore] inferring: ${repo.name}`)
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+  const chronicleBlock = options?.chronicleContext?.trim()
+    ? `Chronicle context (condensed):\n${options.chronicleContext.trim()}\n\n`
+    : ''
+
   const prompt = `You are scoring a GitHub repository for the clawdbotatg CLAWD ecosystem.
 
-${ECOSYSTEM_CONTEXT}
+${chronicleBlock}${ECOSYSTEM_CONTEXT}
 
 Repo to score:
 Name: ${repo.name}
@@ -292,6 +297,17 @@ export async function runAutoScores(
   return { repos: results, inferred, deferred: toInfer.length - inferred.length }
 }
 
+export async function resolveRepoBeforeRescore(repoSlug: string): Promise<Repo | null> {
+  if (shouldSkipRepo(repoSlug)) return null
+
+  const r = getRedis()
+  const cached = await readCachedScore(r, repoSlug)
+  if (cached) return cached
+
+  const handScored = REPOS.find(repo => repo.githubSlug === repoSlug)
+  return handScored ? normalizeRepoScores(handScored) : null
+}
+
 export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null> {
   if (shouldSkipRepo(repoSlug)) return null
 
@@ -306,8 +322,10 @@ export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null>
     language: gh.language,
   }
 
+  const chronicleContext = await getChronicleContext().catch(() => null)
+
   await flushAutoScore(repoSlug)
-  const scored = await inferScore(raw)
+  const scored = await inferScore(raw, { chronicleContext: chronicleContext ?? undefined })
   if (!scored) return null
 
   try {

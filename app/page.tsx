@@ -216,8 +216,8 @@ export default async function Home() {
               </a>{' '}
               and public GitHub data. Not financial advice. <a href="/about">Full disclaimer →</a>
             </span>
-            {rescoreBurns && rescoreBurns.clawdTotal > 0 && (
-              <RescoreBurnTracker clawdTotal={rescoreBurns.clawdTotal} />
+            {rescoreBurns && (rescoreBurns.count > 0 || rescoreBurns.clawdDisplay > 0) && (
+              <RescoreBurnTracker count={rescoreBurns.count} clawdDisplay={rescoreBurns.clawdDisplay} />
             )}
           </div>
           <span>

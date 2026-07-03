@@ -219,7 +219,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     setRepoItems(repos)
   }, [repos])
 
-  function handleScored(updated: Repo) {
+  function handleScored(updated: Repo, _changeSummary?: string | null) {
     setRepoItems(prev =>
       prev.map(r =>
         r.githubSlug === updated.githubSlug

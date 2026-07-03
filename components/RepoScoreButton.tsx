@@ -17,7 +17,7 @@ const TOOLTIP =
 interface Props {
   repoSlug: string
   scoringStatus: ScoringStatus
-  onScored: (repo: Repo) => void
+  onScored: (repo: Repo, changeSummary?: string | null) => void
 }
 
 export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: Props) {
@@ -27,6 +27,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
   const [inlineMsg, setInlineMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<'idle' | 'paying' | 'scoring'>('idle')
+  const [changeSummary, setChangeSummary] = useState<string | null>(null)
   const tooltipAnchorRef = useRef<HTMLButtonElement>(null)
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction()
@@ -51,6 +52,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
     e.preventDefault()
     setError(null)
     setInlineMsg(null)
+    setChangeSummary(null)
 
     if (!isConnected) {
       connectWallet()
@@ -93,7 +95,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
       if (!data.ok) {
         throw new Error(data.error || 'Scoring failed')
       }
-      onScored(data.repo as Repo)
+      const summary = typeof data.changeSummary === 'string' ? data.changeSummary : null
+      setChangeSummary(summary)
+      onScored(data.repo as Repo, summary)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -158,6 +162,19 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
       {error && (
         <div style={{ fontSize: '10px', color: 'var(--red)', marginTop: '4px', lineHeight: 1.3 }}>
           {error}
+        </div>
+      )}
+      {changeSummary && (
+        <div style={{
+          marginTop: '6px',
+          fontSize: '10px',
+          color: 'var(--text-muted)',
+          lineHeight: 1.4,
+          textAlign: 'left',
+          maxWidth: '180px',
+        }}>
+          <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>What changed: </span>
+          {changeSummary}
         </div>
       )}
       {showTooltip && tooltipPos && createPortal(

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
-import { runAutoscoreSingle } from '@/lib/autoscore'
+import { resolveRepoBeforeRescore, runAutoscoreSingle } from '@/lib/autoscore'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { isRepoExcluded } from '@/lib/repoExclude'
+import { fetchRecentCommitMessages } from '@/lib/github'
 import { bustOverallSummaryCache } from '@/lib/overallSummary'
 import { recordRescoreBurn } from '@/lib/rescoreBurns'
+import { generateRescoreChangeSummary } from '@/lib/rescoreChangeSummary'
 import { PAID_TX_KEY_PREFIX } from '@/lib/web3/constants'
 import { verifyPaymentTx } from '@/lib/web3/verifyPayment'
 
@@ -45,16 +47,25 @@ export async function POST(req: NextRequest) {
 
     await verifyPaymentTx(txHash, walletAddress)
 
+    const oldRepo = await resolveRepoBeforeRescore(repoSlug)
+    const commitMessages = await fetchRecentCommitMessages(repoSlug)
+
     const repo = await runAutoscoreSingle(repoSlug)
     if (!repo) {
       return NextResponse.json({ ok: false, error: 'Could not score repo' }, { status: 500 })
     }
 
+    const changeSummary = await generateRescoreChangeSummary({
+      oldRepo,
+      newRepo: repo,
+      commitMessages,
+    })
+
     await redis.set(paidKey, repoSlug, { ex: 60 * 60 * 24 * 7 })
     await bustOverallSummaryCache(redis)
     await recordRescoreBurn(redis)
 
-    return NextResponse.json({ ok: true, repo })
+    return NextResponse.json({ ok: true, repo, changeSummary })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Request failed'
     return NextResponse.json({ ok: false, error: message }, { status: 400 })

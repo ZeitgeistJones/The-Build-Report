@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getAdminNotes, setAdminNote, verifyAdminPassword } from '@/lib/admin'
 import { flushAutoScore, listCachedAutoScores } from '@/lib/autoscore'
+import { getChronicleContext, setChronicleContext } from '@/lib/chronicleContext'
 import { getExcludedSlugs, setRepoExcluded } from '@/lib/repoExclude'
 
 export async function POST(req: NextRequest) {
@@ -15,12 +16,20 @@ export async function POST(req: NextRequest) {
     const notes = await getAdminNotes()
     const autoScored = await listCachedAutoScores()
     const excluded = await getExcludedSlugs()
+    const chronicleContext = await getChronicleContext()
     return NextResponse.json({
       ok: true,
       notes,
       autoScored,
       excluded,
+      chronicleContext: chronicleContext ?? '',
     })
+  }
+
+  if (action === 'saveChronicleContext') {
+    const text = typeof body.chronicleContext === 'string' ? body.chronicleContext : ''
+    await setChronicleContext(text)
+    return NextResponse.json({ ok: true })
   }
 
   if (action === 'save') {

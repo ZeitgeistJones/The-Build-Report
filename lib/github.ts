@@ -310,6 +310,22 @@ export async function fetchRepoBySlug(slug: string): Promise<GitHubRepo | null> 
   }
 }
 
+export async function fetchRecentCommitMessages(slug: string, limit = 10): Promise<string[]> {
+  try {
+    const commits = await ghFetch(
+      `/repos/${GITHUB_ORG}/${slug}/commits?per_page=${Math.min(limit, 100)}`,
+      { fresh: true },
+    )
+    if (!Array.isArray(commits)) return []
+    return commits
+      .map((c: { commit?: { message?: string } }) => c.commit?.message?.split('\n')[0]?.trim())
+      .filter((m): m is string => Boolean(m))
+      .slice(0, limit)
+  } catch {
+    return []
+  }
+}
+
 export function timeAgo(dateStr: string | null): string {
   if (!dateStr) return 'unknown'
   const d = new Date(dateStr)

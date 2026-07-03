@@ -19,6 +19,9 @@ export default function AdminPage() {
   const [autoscoreResult, setAutoscoreResult] = useState<string | null>(null)
   const [refreshRunning, setRefreshRunning] = useState(false)
   const [refreshResult, setRefreshResult] = useState<string | null>(null)
+  const [chronicleContext, setChronicleContextText] = useState('')
+  const [savingChronicle, setSavingChronicle] = useState(false)
+  const [chronicleSaved, setChronicleSaved] = useState(false)
 
   async function refreshGitHubData() {
     setRefreshRunning(true)
@@ -89,6 +92,7 @@ export default function AdminPage() {
       setNotes(data.notes ?? {})
       setExcluded(data.excluded ?? {})
       setAutoScored(data.autoScored ?? [])
+      setChronicleContextText(data.chronicleContext ?? '')
     } else {
       setAuthError('Wrong password.')
     }
@@ -112,6 +116,18 @@ export default function AdminPage() {
       return next
     })
     setTogglingExclude(null)
+  }
+
+  async function saveChronicleContext() {
+    setSavingChronicle(true)
+    await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'saveChronicleContext', password, chronicleContext }),
+    })
+    setSavingChronicle(false)
+    setChronicleSaved(true)
+    setTimeout(() => setChronicleSaved(false), 2200)
   }
 
   async function saveNote(repoId: string) {
@@ -219,6 +235,49 @@ export default function AdminPage() {
             {refreshResult}
           </div>
         )}
+      </div>
+
+      {/* Chronicle context for rescores */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Chronicle context</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px' }}>
+            Paste a condensed Chronicle summary here. It is prepended to paid rescore prompts so new scores can reference the same grounding as original hand-scored repos.
+          </p>
+        </div>
+        <textarea
+          value={chronicleContext}
+          onChange={e => setChronicleContextText(e.target.value)}
+          placeholder="Condensed Chronicle summary for rescore grounding..."
+          rows={8}
+          style={{
+            width: '100%',
+            maxWidth: '720px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            padding: '10px 14px',
+            color: 'var(--text-primary)',
+            fontSize: '13px',
+            fontFamily: 'var(--font-sans)',
+            resize: 'vertical',
+            marginBottom: '8px',
+          }}
+        />
+        <button
+          onClick={saveChronicleContext}
+          disabled={savingChronicle}
+          style={{
+            fontSize: '12px',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius)',
+            background: chronicleSaved ? 'var(--accent-dim)' : 'var(--surface-3)',
+            color: chronicleSaved ? 'var(--accent)' : 'var(--text-primary)',
+            border: `1px solid ${chronicleSaved ? 'var(--accent-border)' : 'var(--border-strong)'}`,
+          }}
+        >
+          {savingChronicle ? 'Saving…' : chronicleSaved ? 'Saved ✓' : 'Save Chronicle context'}
+        </button>
       </div>
 
       {/* Context notes */}
