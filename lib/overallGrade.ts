@@ -16,13 +16,21 @@ export interface OverallGradeWithTrend extends OverallGrade {
   trend: 'up' | 'flat' | 'down'
 }
 
+export type LetterBucketDistribution = Record<'A' | 'B' | 'C' | 'D' | 'F', number>
+
+function emptyDistribution(): LetterBucketDistribution {
+  return { A: 0, B: 0, C: 0, D: 0, F: 0 }
+}
+
 export interface OverallGradeContext {
   period: Period
   overall: OverallGrade
   tokenMechanic: { letter: string; pct: number } | null
   builder: { letter: string; pct: number } | null
   integrity: { letter: string; pct: number }
-  gradeDistribution: Record<'A' | 'B' | 'C' | 'D' | 'F', number>
+  reposWithTokenMechanicGrade: number
+  tokenMechanicDistribution: LetterBucketDistribution
+  builderIntegrityDistribution: LetterBucketDistribution
   dominantTags: { tag: Tag; count: number }[]
   mostActiveRepos: { name: string; commits: number }[]
   builderStats: { commits: number; activeDays: number; newRepos: number } | null
@@ -124,19 +132,16 @@ export function buildOverallGradeContext(
   period: Period,
 ): OverallGradeContext {
   const scored = repos.filter(r => !isUnscoredRecent(r))
-  const gradeDistribution: Record<'A' | 'B' | 'C' | 'D' | 'F', number> = {
-    A: 0,
-    B: 0,
-    C: 0,
-    D: 0,
-    F: 0,
-  }
+  const tokenMechanicDistribution = emptyDistribution()
+  const builderIntegrityDistribution = emptyDistribution()
+  let reposWithTokenMechanicGrade = 0
 
   for (const repo of scored) {
     if (repo.tokenMechanic) {
-      gradeDistribution[letterBucket(repo.tokenMechanic.letter)]++
+      reposWithTokenMechanicGrade++
+      tokenMechanicDistribution[letterBucket(repo.tokenMechanic.letter)]++
     }
-    gradeDistribution[letterBucket(repo.builderIntegrity.letter)]++
+    builderIntegrityDistribution[letterBucket(repo.builderIntegrity.letter)]++
   }
 
   const tagCounts = new Map<Tag, number>()
@@ -181,15 +186,11 @@ export function buildOverallGradeContext(
     tokenMechanic,
     builder,
     integrity,
-    gradeDistribution,
+    reposWithTokenMechanicGrade,
+    tokenMechanicDistribution,
+    builderIntegrityDistribution,
     dominantTags,
     mostActiveRepos,
-    builderStats: stats
-      ? {
-          commits: stats.totalCommits30d,
-          activeDays: stats.activeDays30d,
-          newRepos: stats.newRepos30d,
-        }
-      : null,
+    builderStats,
   }
 }

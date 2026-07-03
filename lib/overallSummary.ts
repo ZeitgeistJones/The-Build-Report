@@ -1,13 +1,13 @@
 import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
 import { stripMarkdown } from './textCleanup'
-import { OverallGradeContext } from './overallGrade'
+import { LetterBucketDistribution, OverallGradeContext } from './overallGrade'
 import { Period } from './grades'
 
 const SUMMARY_KEYS: Record<Period, string> = {
-  '30d': 'build-report:overall-summary',
-  '7d': 'build-report:overall-summary-7d',
-  '60d': 'build-report:overall-summary-60d',
+  '30d': 'build-report:overall-summary-v2',
+  '7d': 'build-report:overall-summary-7d-v2',
+  '60d': 'build-report:overall-summary-60d-v2',
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
@@ -34,6 +34,13 @@ function getRedis() {
   return redis
 }
 
+function formatDistribution(dist: LetterBucketDistribution): string {
+  return Object.entries(dist)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${k}: ${n}`)
+    .join(', ') || 'none'
+}
+
 function formatContext(ctx: OverallGradeContext): string {
   const tm = ctx.tokenMechanic
     ? `Token mechanic: ${ctx.tokenMechanic.letter} (${ctx.tokenMechanic.pct}%)`
@@ -42,12 +49,8 @@ function formatContext(ctx: OverallGradeContext): string {
     ? `Builder activity: ${ctx.builder.letter} (${ctx.builder.pct}%)`
     : 'Builder activity: unavailable (GitHub data missing — weight redistributed)'
   const integrity = `Builder integrity: ${ctx.integrity.letter} (${ctx.integrity.pct}%)`
-  const overall = `Overall (${PERIOD_LABELS[ctx.period]} window): ${ctx.overall.letter} (${ctx.overall.pct}%) — ${ctx.overall.reposScored} repos scored`
-
-  const dist = Object.entries(ctx.gradeDistribution)
-    .filter(([, n]) => n > 0)
-    .map(([k, n]) => `${k}: ${n}`)
-    .join(', ')
+  const overall = `Overall (${PERIOD_LABELS[ctx.period]} window): ${ctx.overall.letter} (${ctx.overall.pct}%)`
+  const reposScored = `Repos scored: ${ctx.overall.reposScored}`
 
   const tags = ctx.dominantTags
     .slice(0, 4)
@@ -64,10 +67,13 @@ function formatContext(ctx: OverallGradeContext): string {
 
   return [
     overall,
+    reposScored,
     tm,
     builder,
     integrity,
-    `Grade distribution (repo scores): ${dist}`,
+    `Repos with token mechanic grade: ${ctx.reposWithTokenMechanicGrade}`,
+    `Token mechanic grade distribution (${ctx.reposWithTokenMechanicGrade} grades): ${formatDistribution(ctx.tokenMechanicDistribution)}`,
+    `Builder integrity grade distribution (${ctx.overall.reposScored} grades): ${formatDistribution(ctx.builderIntegrityDistribution)}`,
     `Dominant tags: ${tags}`,
     `Most active repos (${ctx.period}): ${active || 'none'}`,
     activity,
@@ -78,6 +84,7 @@ const SUMMARY_RULES = `Write exactly 2 sentences of plain English. Sound like a 
 
 Rules:
 - Be accurate about the scores shown. Acknowledge weaknesses honestly.
+- Distribution numbers are grade counts per axis, not repo counts. Never say "X F-graded repos" unless X equals repos scored. If many token mechanic grades are F, say that — do not imply more repos exist than repos scored.
 - Frame the picture in terms of trajectory and context, not a demoralizing snapshot.
 - Avoid stiff phrasing like "foundational layers are expected to surface holder value through downstream consumer applications." Prefer plain talk: "the infrastructure being laid now should pay off when consumer apps with real burn mechanics ship."
 - Heavy infra phase with low token mechanic: say the build work should matter once consumer apps with burns go live — don't dress it up in jargon.
