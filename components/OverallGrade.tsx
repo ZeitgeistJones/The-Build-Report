@@ -82,6 +82,11 @@ export default function OverallGrade({ overall30, overall7, overall60, summary }
           {formatTrendPct(overall.trendPct, period)}
         </span>
         )}
+        {period === '60d' && (
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+            Trend requires 120d scan history
+          </span>
+        )}
       </div>
 
       <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: period === '30d' && summary ? '10px' : period === '7d' || period === '60d' ? '10px' : 0 }}>

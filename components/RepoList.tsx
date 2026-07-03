@@ -11,6 +11,8 @@ import GateBlur from '@/components/wallet/GateBlur'
 import GateOverlay from '@/components/wallet/GateOverlay'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import RepoScoreButton from '@/components/RepoScoreButton'
+import { useGradePeriod } from '@/components/GradePeriodContext'
+import { Period } from '@/lib/grades'
 
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
@@ -117,11 +119,19 @@ function githubOrderIndex(slug: string, order: string[]): number {
   return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
 }
 
+function repoCommitsForPeriod(repo: RepoWithLive, period: Period): number {
+  if (period === '7d') return repo.commits7d ?? 0
+  if (period === '30d') return repo.commits30d ?? 0
+  return (repo.commits30d ?? 0) + (repo.commits30_60 ?? 0)
+}
+
 interface RepoWithLive extends Repo {
   description: string | null
   lastCommitAt: string | null
   pushedAt: string | null
   commits30d: number | null
+  commits7d: number | null
+  commits30_60: number | null
 }
 
 export type { RepoWithLive }
@@ -137,6 +147,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
   const { unlocked } = useClawdAccess()
+  const { period } = useGradePeriod()
   const d = DENSITY_STYLES[density]
 
   useEffect(() => {
@@ -154,6 +165,8 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
               lastCommitAt: r.lastCommitAt,
               pushedAt: r.pushedAt,
               commits30d: r.commits30d,
+              commits7d: r.commits7d,
+              commits30_60: r.commits30_60,
             }
           : r,
       ),
@@ -208,6 +221,8 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     const auto = isAutoInferred(repo)
     const pending = isUnscoredRecent(repo)
     const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
+    const periodCommits = repoCommitsForPeriod(repo, period)
+    const commitSuffix = periodCommits > 0 ? ` · ${periodCommits} commits (${period})` : ''
 
     return (
       <div
@@ -289,7 +304,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
               )}
 
               <div style={{ fontSize: `${d.lastPushed}px`, color: CARD_META_COLOR, marginTop: '2px' }}>
-                Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}
+                Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}{commitSuffix}
               </div>
             </div>
 

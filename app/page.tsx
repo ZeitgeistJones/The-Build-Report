@@ -65,6 +65,8 @@ export default async function Home() {
       lastCommitAt: activity?.lastCommitAt ?? null,
       pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
       commits30d: activity?.commits30d ?? null,
+      commits7d: activity?.commits7d ?? null,
+      commits30_60: activity?.commits30_60 ?? null,
     }
   })
 
@@ -345,13 +347,33 @@ export default async function Home() {
             Grade periods
           </div>
           <div style={{ marginBottom: '6px' }}>
-            <strong>30d</strong> — weighted by commits in the last 30 days. Best for: what&apos;s being built right now.
+            <strong>7d</strong> — weighted by commits in the last 7 days. Best for: very recent momentum.
           </div>
           <div style={{ marginBottom: '6px' }}>
-            <strong>7d</strong> — weighted by commits in the last 7 days. Best for: very recent momentum.
+            <strong>30d</strong> — weighted by commits in the last 30 days. Best for: what&apos;s being built right now.
           </div>
           <div>
             <strong>60d</strong> — weighted by commits in the last 60 days. Best for: broader recent picture, less affected by short-term bursts. Repos being actively built carry more influence than dormant ones.
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginBottom: '24px',
+            padding: '14px 16px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.6,
+          }}
+        >
+          <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            Letter grade scale
+          </div>
+          <div>
+            A+ 97–100 · A 93–96 · A- 90–92 · B+ 87–89 · B 83–86 · B- 80–82 · C+ 77–79 · C 73–76 · C- 70–72 · D+ 67–69 · D 63–66 · D- 60–62 · F+ 50–59 · F 40–49 · F- below 40
           </div>
         </div>
 
@@ -387,7 +409,7 @@ export default async function Home() {
                 { label: 'Consistency — no long gaps', weight: '20%' },
               ],
               note:
-                'Measures whether the project is alive and shipping. Five signals averaged equally (20% each). Letter grades: A+ 97–100 · A 93–96 · A- 90–92 · B+ 87–89 · B 83–86 · B- 80–82 · C+ 77–79 · C 73–76 · C- 70–72 · D+ 67–69 · D 63–66 · D- 60–62 · F below 60.',
+                'Measures whether the project is alive and shipping. Five signals averaged equally (20% each). Uses the letter grade scale above.',
             },
           ].map(block => (
             <div

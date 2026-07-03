@@ -100,7 +100,7 @@ export function countReposScored(repos: Repo[]): number {
 }
 
 function letterBucket(letter: string): 'A' | 'B' | 'C' | 'D' | 'F' {
-  if (letter === 'F') return 'F'
+  if (letter.startsWith('F')) return 'F'
   if (letter.startsWith('A')) return 'A'
   if (letter.startsWith('B')) return 'B'
   if (letter.startsWith('C')) return 'C'

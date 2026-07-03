@@ -2,6 +2,13 @@ import { Repo } from './scores'
 import { GitHubStats } from './github'
 import { pctToLetter } from './gradeLetters'
 
+export { pctToLetter }
+
+/** Map numeric score (0–100) to letter grade. Delegates to {@link pctToLetter}. */
+export function letterGrade(pct: number): string {
+  return pctToLetter(pct)
+}
+
 export type Period = '30d' | '7d' | '60d'
 
 export interface TrendExplanation {

@@ -1,4 +1,4 @@
-/** Map numeric score (0–100) to letter grade. F is below 60%. */
+/** Map numeric score (0–100) to letter grade. F tiers below 60%. */
 export function pctToLetter(pct: number): string {
   const n = Math.round(Math.max(0, Math.min(100, pct)))
   if (n >= 97) return 'A+'
@@ -13,12 +13,14 @@ export function pctToLetter(pct: number): string {
   if (n >= 67) return 'D+'
   if (n >= 63) return 'D'
   if (n >= 60) return 'D-'
-  return 'F'
+  if (n >= 50) return 'F+'
+  if (n >= 40) return 'F'
+  return 'F-'
 }
 
 /** Maps extended letter grades to harmonized CSS variables in globals.css. */
 export function gradeColor(letter: string): string {
-  if (letter === 'F') return 'var(--grade-f)'
+  if (letter.startsWith('F')) return 'var(--grade-f)'
   if (letter.startsWith('A')) return 'var(--grade-a)'
   if (letter.startsWith('B')) return 'var(--grade-b)'
   if (letter.startsWith('C')) return 'var(--grade-c)'

@@ -27,6 +27,8 @@ interface Props {
   stats60d: { commits: number; activeDays: number; newRepos: number } | null
 }
 
+const TREND_UNAVAILABLE_60D = 'Trend requires 120d scan history'
+
 function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
   if (trend === 'up') return <span style={{ color: 'var(--green)', fontSize: '12px' }}>↑</span>
   if (trend === 'down') return <span style={{ color: 'var(--red)', fontSize: '12px' }}>↓</span>
@@ -140,6 +142,19 @@ function GradeCard({
                 {formatTrendPct(grade.trendPct, period)}
               </span>
             )}
+
+            {grade && period === '60d' && (
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--text-muted)',
+                  lineHeight: 1.3,
+                  maxWidth: 140,
+                }}
+              >
+                {TREND_UNAVAILABLE_60D}
+              </span>
+            )}
           </div>
 
           <div
@@ -166,7 +181,7 @@ function GradeCard({
         {summary}
       </p>
 
-      {trendExplanation && (
+      {trendExplanation && period !== '60d' && (
         <div style={{ marginBottom: '12px' }}>
           <button
             type="button"
