@@ -7,18 +7,23 @@ export const ABOUT_SCORE_TYPES_SECTIONS = [
   },
   {
     title: 'Live AI score',
-    body: `Claude runs at score time from the repo name, description, and GitHub activity. Useful for repos that did not exist at launch or have not received a baseline grade. Lower confidence, and rubric rows do not carry row-by-row Chronicle citations. Treat as a starting-point estimate.`,
+    body: `Claude runs at score time from the repo name, description, and GitHub activity. Useful for repos that did not exist at launch or have not received a baseline grade. Lower confidence, and rubric rows do not carry row-by-row Chronicle citations. Treat as a starting-point estimate.
+
+Early live AI scores used repo metadata and a short ecosystem summary only. Paid Rescores can now optionally include condensed Chronicle context that an admin pastes in — when that is set. That is still not the same as baseline row-by-row citations. Older and newer Live AI grades may not be directly comparable even though both show the same badge.`,
   },
   {
     title: 'Rescore',
-    body: `The same live AI pass, triggered on demand when someone pays. The result is cached and shared with everyone. Rescore compares against whatever grade was there before — usually the launch baseline on first run.
+    body: `The same live AI pass, triggered on demand when someone pays. The result is cached and shared with everyone. Rescore compares against whatever grade was there before — usually the launch baseline on first run. Rescore today uses the current live AI method, which may include optional Chronicle context if the admin has configured it — not a re-review of the baseline.
 
 First rescore on a baseline grade often moves the letter by a lot. That usually means a different scoring pass and a newer date, not that the repo changed overnight. Later rescores tend to move less because they compare AI-to-AI.`,
   },
 ] as const
 
 export const ABOUT_SCORE_TYPES_CALLOUT =
-  'Both baseline and live AI scoring can involve Claude. The difference is a fixed, source-cited editorial snapshot versus an on-demand inference pass on today\'s repo data.'
+  'Both baseline and live AI scoring can involve Claude. Baseline is a fixed, source-cited snapshot. Live AI is on-demand inference — and the prompt has improved since launch.'
+
+export const ABOUT_LIVE_AI_EVOLUTION_CALLOUT =
+  'Cards show two types: Baseline and Live AI. Live AI is one badge, but the method behind it got better over time. We are not re-running old scores — Rescore only affects the repo you pay for.'
 
 export const RESCORE_SUMMARY_NOTE =
   'Rescore uses live AI on today\'s repo data — different from the launch baseline.'
@@ -33,7 +38,7 @@ export const BASELINE_CONFIDENCE_TOOLTIP =
   'Launch baseline. Published Jun 15 with cited Chronicle and tweet sources. Editorial snapshot — not re-run automatically.'
 
 export const LIVE_AI_CONFIDENCE_TOOLTIP =
-  'Live AI inference from repo metadata. A starting-point estimate — Rescore can refresh it.'
+  'Live AI inference from repo metadata. Newer Rescores may include optional Chronicle context; older ones did not. Still not the same as a baseline grade — Rescore can refresh it.'
 
 export const RESCORE_BUTTON_TOOLTIP =
   'Score this repo using Claude AI. Cost: 0.000008 ETH (~$0.02 at time of writing — ETH price fluctuates so actual USD cost may vary). Payment is burned as $CLAWD via the receiver-buy-and-burn contract, supporting the ecosystem. Result is cached — community benefits from your score. First rescore on a baseline grade often shifts the letter — different scoring pass, not always a repo change.'
@@ -45,7 +50,7 @@ export const SCORE_TYPE_BASELINE_TOOLTIP =
   'Launch baseline — fixed Jun 15 grade with cited Chronicle and tweet sources. Editorial snapshot, not re-run automatically.'
 
 export const SCORE_TYPE_LIVE_AI_TOOLTIP =
-  'Live AI score — Claude inferred this from repo metadata and GitHub activity. A starting-point estimate; Rescore can refresh it.'
+  'Live AI score — Claude inferred this from repo metadata and GitHub activity. Newer paid Rescores may include optional Chronicle context; older ones did not. Still not the same as baseline — Rescore can refresh it.'
 
 export const SCORE_TYPE_STYLES = {
   baseline: {

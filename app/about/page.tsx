@@ -1,4 +1,5 @@
 import {
+  ABOUT_LIVE_AI_EVOLUTION_CALLOUT,
   ABOUT_SCORE_TYPES_CALLOUT,
   ABOUT_SCORE_TYPES_SECTIONS,
 } from '@/lib/scoringCopy'
@@ -29,7 +30,7 @@ This is not a real-time data feed. Launch baseline grades are a fixed Jun 15 sna
     },
     {
       heading: 'Score & Rescore',
-      body: `Every repo card has a Score or Rescore button. It runs Claude AI inference for that single repo — useful for repos that have not been scored yet, or to refresh a live AI score with a new pass.
+      body: `Every repo card has a Score or Rescore button. It runs Claude AI inference for that single repo — useful for repos that have not been scored yet, or to refresh a live AI score with a new pass. Rescore runs the current live AI method — which may include optional Chronicle context — not a re-review of the baseline.
 
 Cost: 0.000008 ETH per score. That is a fixed onchain amount; at the time this was built (July 2026) it was approximately $0.02, but ETH price fluctuates so the USD equivalent may be closer to $0.01 or $0.04 depending on when you use it.
 
@@ -128,6 +129,18 @@ If you hold $CLAWD and have opinions on what should change, that conversation sh
                 lineHeight: 1.6,
               }}>
                 {ABOUT_SCORE_TYPES_CALLOUT}
+              </div>
+              <div style={{
+                marginTop: '10px',
+                padding: '12px 14px',
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                fontSize: '13px',
+                color: 'var(--text-muted)',
+                lineHeight: 1.6,
+              }}>
+                {ABOUT_LIVE_AI_EVOLUTION_CALLOUT}
               </div>
             </>
           ) : (

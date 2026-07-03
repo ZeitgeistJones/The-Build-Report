@@ -348,7 +348,7 @@ export default async function Home() {
           <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>launch baseline</strong>{' '}
           (fixed Jun 15 snapshot),{' '}
           <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>live AI</strong>{' '}
-          (auto-inferred or paid Rescore). They use different methods — see{' '}
+          (auto-inferred or paid Rescore). They use different methods — and live AI has improved since launch. See{' '}
           <a href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</a>.
         </div>
 
