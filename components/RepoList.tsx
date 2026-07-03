@@ -40,6 +40,13 @@ const DENSITY_STYLES = {
 const META_MUTED = '#5e5a55'
 const STALE_AMBER = '#f59e0b'
 const STALE_RED = '#ef4444'
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+const GITHUB_COMMITS_CAP = 100
+
+type CommitsSinceScoredDisplay =
+  | { kind: 'hidden' }
+  | { kind: 'recently_scored' }
+  | { kind: 'count'; count: number; capped: boolean }
 
 function truncate120(text: string): string {
   return text.length > 120 ? `${text.slice(0, 119)}…` : text
@@ -127,23 +134,53 @@ function repoCommitsForPeriod(repo: RepoWithLive, period: Period): number {
   return (repo.commits30d ?? 0) + (repo.commits30_60 ?? 0)
 }
 
-function isScoredWithinOneDay(scoredAt: string | null | undefined): boolean {
-  if (!scoredAt) return true
+function parseScoredAt(scoredAt: string | null | undefined): Date | null {
+  if (!scoredAt) return null
   const scored = new Date(scoredAt)
-  if (Number.isNaN(scored.getTime())) return true
-  return Date.now() - scored.getTime() < 24 * 60 * 60 * 1000
+  return Number.isNaN(scored.getTime()) ? null : scored
+}
+
+function daysSinceScored(scoredAt: string | null | undefined): number | null {
+  const scored = parseScoredAt(scoredAt)
+  if (!scored) return null
+  return (Date.now() - scored.getTime()) / MS_PER_DAY
+}
+
+/** Estimate commits since score using available GitHub windows. */
+function estimateCommitsSinceScored(
+  daysSince: number,
+  commits30d: number,
+  commits7d: number,
+): number {
+  if (daysSince > 30) return commits30d
+  const tail = Math.max(0, commits30d - commits7d)
+  const factor = Math.min(1, Math.max(0, (daysSince - 7) / 23))
+  return Math.round(commits7d + tail * factor)
+}
+
+function getCommitsSinceScoredDisplay(
+  repo: RepoWithLive,
+  pending: boolean,
+): CommitsSinceScoredDisplay {
+  if (pending || !repo.scoredAt) return { kind: 'hidden' }
+
+  const days = daysSinceScored(repo.scoredAt)
+  if (days === null || days < 1) return { kind: 'hidden' }
+
+  if (days <= 7) return { kind: 'recently_scored' }
+
+  const commits30d = repo.commits30d ?? 0
+  const commits7d = repo.commits7d ?? 0
+  const count = estimateCommitsSinceScored(days, commits30d, commits7d)
+  const capped = commits30d >= GITHUB_COMMITS_CAP && days > 30
+
+  return { kind: 'count', count, capped }
 }
 
 function commitsSinceScoredColor(count: number): string {
   if (count > 50) return STALE_RED
   if (count > 20) return STALE_AMBER
   return META_MUTED
-}
-
-function shouldShowCommitsSinceScored(repo: RepoWithLive, pending: boolean): boolean {
-  if (pending) return false
-  if (!repo.scoredAt) return false
-  return !isScoredWithinOneDay(repo.scoredAt)
 }
 
 interface RepoWithLive extends Repo {
@@ -244,8 +281,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
     const periodCommits = repoCommitsForPeriod(repo, period)
     const commitSuffix = periodCommits > 0 ? ` · ${periodCommits} commits (${period})` : ''
-    const commitsSinceScored = repo.commits30d ?? 0
-    const showSinceScored = shouldShowCommitsSinceScored(repo, pending)
+    const sinceScored = getCommitsSinceScoredDisplay(repo, pending)
 
     return (
       <div
@@ -328,11 +364,17 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
 
               <div style={{ fontSize: `${d.lastPushed}px`, color: META_MUTED, marginTop: '2px' }}>
                 Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}{commitSuffix}
-                {showSinceScored && (
+                {sinceScored.kind === 'recently_scored' && (
                   <>
                     {' · '}
-                    <span style={{ color: commitsSinceScoredColor(commitsSinceScored) }}>
-                      {commitsSinceScored} commits since scored
+                    <span style={{ color: META_MUTED }}>recently scored</span>
+                  </>
+                )}
+                {sinceScored.kind === 'count' && (
+                  <>
+                    {' · '}
+                    <span style={{ color: commitsSinceScoredColor(sinceScored.capped ? GITHUB_COMMITS_CAP : sinceScored.count) }}>
+                      {sinceScored.capped ? '100+' : sinceScored.count} commits since scored
                     </span>
                   </>
                 )}
