@@ -17,52 +17,57 @@ export default function RescoreBurnTracker({ count, clawdDisplay }: Props) {
   if (count <= 0 && clawdDisplay <= 0) return null
 
   return (
-    <div style={{ position: 'relative', flexShrink: 0, textAlign: 'right' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '5px', marginBottom: '4px' }}>
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          CLAWD BURNED 🔥
-        </div>
-        <button
-          type="button"
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
-          onClick={() => setShowTooltip(s => !s)}
-          aria-label="About CLAWD burned total"
-          style={{
-            width: '14px',
-            height: '14px',
-            borderRadius: '50%',
-            background: 'var(--surface-3)',
-            color: 'var(--text-muted)',
-            fontSize: '9px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            cursor: 'default',
-          }}
-        >
-          ⓘ
-        </button>
-      </div>
-      <div
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <span
         style={{
-          fontSize: '28px',
+          fontSize: '11px',
+          color: 'var(--text-muted)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}
+      >
+        CLAWD BURNED 🔥
+      </span>
+      <span
+        style={{
+          fontSize: '16px',
           fontWeight: 600,
-          color: 'var(--accent)',
+          color: '#f97316',
           fontFamily: 'var(--font-mono)',
           letterSpacing: '-0.02em',
-          lineHeight: 1.1,
         }}
       >
         {formatClawdBurned(clawdDisplay)}
-      </div>
+      </span>
+      <button
+        type="button"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        onClick={() => setShowTooltip(s => !s)}
+        aria-label="About CLAWD burned total"
+        style={{
+          width: '14px',
+          height: '14px',
+          borderRadius: '50%',
+          background: 'transparent',
+          color: 'var(--text-muted)',
+          fontSize: '11px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          cursor: 'default',
+          padding: 0,
+        }}
+      >
+        ⓘ
+      </button>
       {showTooltip && (
         <div
           style={{
             position: 'absolute',
             top: 'calc(100% + 6px)',
-            right: 0,
+            left: 0,
             background: 'var(--surface-3)',
             border: '1px solid var(--border-strong)',
             borderRadius: 'var(--radius)',
