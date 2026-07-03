@@ -245,39 +245,43 @@ export default function AdminPage() {
             Paste a condensed Chronicle summary here. It is prepended to paid rescore prompts so new scores can reference the same grounding as original hand-scored repos.
           </p>
         </div>
-        <textarea
-          value={chronicleContext}
-          onChange={e => setChronicleContextText(e.target.value)}
-          placeholder="Condensed Chronicle summary for rescore grounding..."
-          rows={8}
-          style={{
-            width: '100%',
-            maxWidth: '720px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            padding: '10px 14px',
-            color: 'var(--text-primary)',
-            fontSize: '13px',
-            fontFamily: 'var(--font-sans)',
-            resize: 'vertical',
-            marginBottom: '8px',
-          }}
-        />
-        <button
-          onClick={saveChronicleContext}
-          disabled={savingChronicle}
-          style={{
-            fontSize: '12px',
-            padding: '8px 16px',
-            borderRadius: 'var(--radius)',
-            background: chronicleSaved ? 'var(--accent-dim)' : 'var(--surface-3)',
-            color: chronicleSaved ? 'var(--accent)' : 'var(--text-primary)',
-            border: `1px solid ${chronicleSaved ? 'var(--accent-border)' : 'var(--border-strong)'}`,
-          }}
-        >
-          {savingChronicle ? 'Saving…' : chronicleSaved ? 'Saved ✓' : 'Save Chronicle context'}
-        </button>
+        <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <textarea
+            value={chronicleContext}
+            onChange={e => setChronicleContextText(e.target.value)}
+            placeholder="Condensed Chronicle summary for rescore grounding..."
+            rows={8}
+            style={{
+              display: 'block',
+              width: '100%',
+              boxSizing: 'border-box',
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: '10px 14px',
+              color: 'var(--text-primary)',
+              fontSize: '13px',
+              fontFamily: 'var(--font-sans)',
+              resize: 'vertical',
+              marginBottom: '8px',
+            }}
+          />
+          <button
+            onClick={saveChronicleContext}
+            disabled={savingChronicle}
+            style={{
+              display: 'block',
+              fontSize: '12px',
+              padding: '5px 14px',
+              borderRadius: 'var(--radius)',
+              background: chronicleSaved ? 'var(--accent-dim)' : 'var(--surface-3)',
+              color: chronicleSaved ? 'var(--accent)' : 'var(--text-secondary)',
+              border: `1px solid ${chronicleSaved ? 'var(--accent-border)' : 'var(--border)'}`,
+            }}
+          >
+            {savingChronicle ? 'Saving…' : chronicleSaved ? 'Saved ✓' : 'Save Chronicle context'}
+          </button>
+        </div>
       </div>
 
       {/* Context notes */}
