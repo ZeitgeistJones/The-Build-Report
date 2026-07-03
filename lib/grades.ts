@@ -1,6 +1,24 @@
 import { Repo } from './scores'
 import { GitHubStats } from './github'
 import { pctToLetter } from './gradeLetters'
+import {
+  BUILDER_ACTIVITY_SIGNALS,
+  builderActivitySummary,
+  computeBuilderActivityScore,
+  computeSignalRatio,
+  periodToWindowKey,
+  type BuilderActivityActuals,
+  windowLengthDays,
+} from './rubrics/builderActivity'
+import {
+  BI_ROW_LABELS,
+  LEGACY_BI_LABELS,
+} from './rubrics/builderIntegrity'
+import {
+  LEGACY_TM_LABELS,
+  TM_CONSUMER_LABELS,
+  tmRubricLevelScore,
+} from './rubrics/tokenMechanic'
 
 export { pctToLetter }
 
@@ -130,35 +148,33 @@ function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'cur
   }
 }
 
+function builderActualsFromInputs(inputs: BuilderInputs): BuilderActivityActuals {
+  return {
+    totalCommits: inputs.commits,
+    activeDays: inputs.activeDays,
+    newRepos: inputs.newRepos,
+    reposWithCommits: inputs.activeRepos,
+  }
+}
+
 function calcBuilderPct(inputs: BuilderInputs, period: Period): number {
-  const { commits, activeDays, newRepos, activeRepos, scannedRepos, periodDays } = inputs
-  const commitTarget = period === '60d' ? 120 : period === '30d' ? 60 : 14
-  const newRepoTarget = period === '60d' ? 8 : period === '30d' ? 4 : 2
-  const commitPct = Math.min(commits / commitTarget, 1)
-  const activeDaysPct = Math.min(activeDays / periodDays, 1)
-  const newReposPct = Math.min(newRepos / newRepoTarget, 1)
-  const activeReposPct = Math.min(activeRepos / Math.max(scannedRepos * 0.5, 1), 1)
-  const consistencyPct = Math.min(activeDays / Math.max(periodDays * 0.7, 1), 1)
-  const signalPcts = [commitPct, activeDaysPct, newReposPct, activeReposPct, consistencyPct]
-  return Math.round((signalPcts.reduce((a, b) => a + b, 0) / signalPcts.length) * 100)
+  return computeBuilderActivityScore(period, builderActualsFromInputs(inputs))
 }
 
 function builderSignals(inputs: BuilderInputs, period: Period) {
-  const { commits, activeDays, newRepos, activeRepos, scannedRepos, periodDays } = inputs
-  const commitTarget = period === '60d' ? 120 : period === '30d' ? 60 : 14
-  const newRepoTarget = period === '60d' ? 8 : period === '30d' ? 4 : 2
-  const commitPct = Math.min(commits / commitTarget, 1)
-  const activeDaysPct = Math.min(activeDays / periodDays, 1)
-  const newReposPct = Math.min(newRepos / newRepoTarget, 1)
-  const activeReposPct = Math.min(activeRepos / Math.max(scannedRepos * 0.5, 1), 1)
-  const consistencyPct = Math.min(activeDays / Math.max(periodDays * 0.7, 1), 1)
-  return [
-    { label: 'Commit frequency', level: toLevel(commitPct), pct: Math.round(commitPct * 100) },
-    { label: 'Active days', level: toLevel(activeDaysPct), pct: Math.round(activeDaysPct * 100) },
-    { label: 'New repos', level: toLevel(newReposPct), pct: Math.round(newReposPct * 100) },
-    { label: 'Repos with commits', level: toLevel(activeReposPct), pct: Math.round(activeReposPct * 100) },
-    { label: 'Consistency', level: toLevel(consistencyPct), pct: Math.round(consistencyPct * 100) },
-  ]
+  const actuals = builderActualsFromInputs(inputs)
+  const window = periodToWindowKey(period)
+  const windowDays = windowLengthDays(period)
+
+  return BUILDER_ACTIVITY_SIGNALS.map(sig => {
+    const target = sig.targets[window]
+    const ratio = computeSignalRatio(sig.label, window, actuals, windowDays, target)
+    return {
+      label: sig.displayLabel,
+      level: toLevel(ratio),
+      pct: Math.round(ratio * 100),
+    }
+  })
 }
 
 export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGrade {
@@ -173,14 +189,7 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
       priorPct: null,
       trendPct: null,
       trend: 'flat',
-      summary:
-        pct >= 80
-          ? 'Strong build activity across the last 60 days — commits, active days, and repo movement.'
-          : pct >= 60
-            ? 'Solid 60-day shipping pace with some unevenness across activity signals.'
-            : pct >= 40
-              ? 'Some activity over 60 days, but the build cadence is mixed.'
-              : 'Build activity over the last 60 days is light relative to the tracked repo set.',
+      summary: builderActivitySummary(pct),
       signals: builderSignals(current, period),
     }
   }
@@ -195,14 +204,7 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
     priorPct,
     trendPct,
     trend: trendFromPct(trendPct),
-    summary:
-      pct >= 80
-        ? 'Strong recent build activity across commits, active days, and repo movement.'
-        : pct >= 60
-          ? 'Solid recent shipping pace with some unevenness across activity signals.'
-          : pct >= 40
-            ? 'Some activity is present, but the recent build cadence is mixed.'
-            : 'Recent build activity is light relative to the tracked repo set.',
+    summary: builderActivitySummary(pct),
     signals: builderSignals(current, period),
   }
 }
@@ -321,9 +323,14 @@ function tokenMechanicRubricCommitCounts(
   return { high, mid, low, commitWeight: total, repos: repos.length }
 }
 
-function tmRubricScore(repo: Repo, label: string): number {
-  const row = repo.tokenMechanic?.rubric.find(x => x.label === label)
-  return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
+function biRubricLevelScore(repo: Repo, labels: string[]): number {
+  for (const label of labels) {
+    const row = repo.builderIntegrity.rubric.find(x => x.label === label)
+    if (row) {
+      return row.level === 'high' ? 100 : row.level === 'mid' ? 67 : 33
+    }
+  }
+  return 33
 }
 
 function tokenMechanicSummary(pct: number, period: Period): string {
@@ -370,14 +377,14 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
   const rubricCounts = tokenMechanicRubricCommitCounts(stats, sample, period)
   const weightBase = rubricCounts.commitWeight || 1
 
-  const burnAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
-    tmRubricScore(r, 'Burn mechanic exists and is live'),
+  const impactAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
+    tmRubricLevelScore(r, [...TM_CONSUMER_LABELS, ...LEGACY_TM_LABELS.slice(0, 1)]),
   )
-  const revenueAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
-    tmRubricScore(r, 'Revenue or burn path built in'),
+  const clarityAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
+    tmRubricLevelScore(r, [TM_CONSUMER_LABELS[1], LEGACY_TM_LABELS[1]]),
   )
-  const operationalAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
-    tmRubricScore(r, 'Mechanic is operational'),
+  const alignmentAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
+    tmRubricLevelScore(r, [TM_CONSUMER_LABELS[2], LEGACY_TM_LABELS[2]]),
   )
 
   const tagCommits =
@@ -401,9 +408,9 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
     trend: period === '60d' ? 'flat' : trendFromPct(trendPct),
     summary: tokenMechanicSummary(pct, period),
     signals: [
-      { label: 'Burn mechanic', level: toLevel(burnAvg / 100), pct: burnAvg },
-      { label: 'Revenue path', level: toLevel(revenueAvg / 100), pct: revenueAvg },
-      { label: 'Operational', level: toLevel(operationalAvg / 100), pct: operationalAvg },
+      { label: 'CLAWD economic impact', level: toLevel(impactAvg / 100), pct: impactAvg },
+      { label: 'Mechanism clarity', level: toLevel(clarityAvg / 100), pct: clarityAvg },
+      { label: 'Economic alignment', level: toLevel(alignmentAvg / 100), pct: alignmentAvg },
       {
         label: 'High-TM share',
         level: toLevel(rubricCounts.high / weightBase),
@@ -453,22 +460,25 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
   const { high, mid, low, commitWeight } = commitCounts
   const weightBase = commitWeight || 1
 
-  const rubricScore = (repo: Repo, label: string) => {
-    const row = repo.builderIntegrity.rubric.find(x => x.label === label)
-    return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
-  }
+  const rubricScore = (repo: Repo, labels: string[]) => biRubricLevelScore(repo, labels)
 
-  const visionAvg = stats
-    ? weightedAvgByCommits(stats, sample, period, 'current', r => rubricScore(r, 'Serves stated vision at time of build'))
-    : avg(sample.map(r => rubricScore(r, 'Serves stated vision at time of build')))
+  const onChainAvg = stats
+    ? weightedAvgByCommits(stats, sample, period, 'current', r =>
+        rubricScore(r, [BI_ROW_LABELS[0], LEGACY_BI_LABELS[0]]),
+      )
+    : avg(sample.map(r => rubricScore(r, [BI_ROW_LABELS[0], LEGACY_BI_LABELS[0]])))
 
-  const autonomyAvg = stats
-    ? weightedAvgByCommits(stats, sample, period, 'current', r => rubricScore(r, 'Genuine autonomous build'))
-    : avg(sample.map(r => rubricScore(r, 'Genuine autonomous build')))
+  const safetyAvg = stats
+    ? weightedAvgByCommits(stats, sample, period, 'current', r =>
+        rubricScore(r, [BI_ROW_LABELS[1], LEGACY_BI_LABELS[1]]),
+      )
+    : avg(sample.map(r => rubricScore(r, [BI_ROW_LABELS[1], LEGACY_BI_LABELS[1]])))
 
-  const walkawayAvg = stats
-    ? weightedAvgByCommits(stats, sample, period, 'current', r => rubricScore(r, 'Passes walkaway test'))
-    : avg(sample.map(r => rubricScore(r, 'Passes walkaway test')))
+  const transparencyAvg = stats
+    ? weightedAvgByCommits(stats, sample, period, 'current', r =>
+        rubricScore(r, [BI_ROW_LABELS[2], LEGACY_BI_LABELS[2]]),
+      )
+    : avg(sample.map(r => rubricScore(r, [BI_ROW_LABELS[2], LEGACY_BI_LABELS[2]])))
 
   return {
     counts: { active: sample.length, high, mid, low, commitWeight },
@@ -494,9 +504,9 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
             ? 'Integrity is mixed across where commit volume landed this window.'
             : 'Most commits this window landed on repos with weaker builder-values scores.',
     signals: [
-      { label: 'Stated vision', level: toLevel(visionAvg / 100), pct: visionAvg },
-      { label: 'Autonomous build', level: toLevel(autonomyAvg / 100), pct: autonomyAvg },
-      { label: 'Walkaway test', level: toLevel(walkawayAvg / 100), pct: walkawayAvg },
+      { label: 'On-chain commitments', level: toLevel(onChainAvg / 100), pct: onChainAvg },
+      { label: 'User safety', level: toLevel(safetyAvg / 100), pct: safetyAvg },
+      { label: 'Transparency', level: toLevel(transparencyAvg / 100), pct: transparencyAvg },
       { label: 'High-integrity share', level: toLevel(high / weightBase), pct: Math.round((high / weightBase) * 100) },
     ],
   }

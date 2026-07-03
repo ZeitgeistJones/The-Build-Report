@@ -448,36 +448,38 @@ export default async function Home() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
           {[
             {
-              title: 'Token mechanic — consumer apps (infra may show N/A)',
+              title: 'Token mechanic — consumer apps (infra uses adapted rows)',
               rows: [
-                { label: 'Burn mechanic exists and is live', weight: '50%' },
-                { label: 'Revenue or burn path built in', weight: '30%' },
-                { label: 'Mechanic is operational', weight: '20%' },
+                { label: 'Direct CLAWD economic impact', weight: '50%' },
+                { label: 'Mechanism clarity and holder relevance', weight: '30%' },
+                { label: 'Alignment with CLAWD economic story', weight: '20%' },
               ],
               note:
-                'Measures whether value flows back to holders economically. Each component rated low (1) / mid (2) / high (3). Score = (weighted sum ÷ 3) × 100. Consumer apps are scored directly; infrastructure may show N/A at the repo level because no token mechanic is expected — value shows up in downstream consumer apps. Operational status is included because a dormant mechanic isn\'t delivering holder value — a burn contract that hasn\'t been triggered in months scores lower than one running daily.',
+                'Measures CLAWD-facing economic impact from repo evidence and Chronicle context. Each row rated low / mid / high; score = (weighted sum ÷ 3) × 100. Infrastructure repos use adapted row labels (enablement, economic role, alignment). Low TM on infra or landing repos is expected — not a quality failure.',
             },
             {
-              title: 'Builder integrity — all repos',
+              title: 'Builder integrity — all repos (5 rows)',
               rows: [
-                { label: 'Serves stated vision at time of build', weight: '40%' },
-                { label: 'Genuine autonomous build', weight: '35%' },
-                { label: 'Passes walkaway test', weight: '25%' },
+                { label: 'On-chain commitments and constraints', weight: '22%' },
+                { label: 'User funds, risk, and safety posture', weight: '20%' },
+                { label: 'Transparency and verifiability', weight: '18%' },
+                { label: 'Governance, token-economics, and ecosystem alignment', weight: '20%' },
+                { label: 'Security, testing, and cryptographic rigor', weight: '20%' },
               ],
               note:
-                "Measures whether the builder can be trusted to keep delivering on their stated vision. Repos are scored against clawdbotatg's stated goals at the time they were built. CV burns are not CLAWD burns. Supply lock is not a burn.",
+                'Measures builder trustworthiness — enforceable commitments, safety, verifiability, ecosystem alignment, and rigor. Rows scored high (100) / mid (67) / low (33), then weighted sum. CV is not CLAWD; supply lock is not a burn.',
             },
             {
-              title: 'Builder activity — GitHub signals, equally weighted',
+              title: 'Builder activity — GitHub signals (ecosystem-wide)',
               rows: [
-                { label: 'Commit frequency', weight: '20%' },
-                { label: 'Active days in period', weight: '20%' },
+                { label: 'Total commits in window', weight: '20%' },
+                { label: 'Active days in window', weight: '20%' },
                 { label: 'New repos created', weight: '20%' },
                 { label: 'Repos with new commits', weight: '20%' },
-                { label: 'Consistency — no long gaps', weight: '20%' },
+                { label: 'Commit consistency ratio', weight: '20%' },
               ],
               note:
-                'Measures whether the project is alive and shipping. Five signals averaged equally (20% each). Uses the letter grade scale above.',
+                'Measures whether clawdbotatg is alive and shipping across ~150–200 repos. Each signal = min(actual ÷ target, 1) × 20%; consistency uses activeDays ÷ windowDays vs ratio targets (0.7 / 0.5 / 0.4 for 7d / 30d / 60d). Not the same as token mechanic or per-repo integrity.',
             },
           ].map(block => (
             <div

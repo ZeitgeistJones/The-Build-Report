@@ -3,17 +3,9 @@ import { GitHubRepo } from './github'
 import { REPOS } from './scores'
 import { shouldSkipRepo } from './repoFilters'
 import { getExcludedSlugs } from './repoExclude'
-import { runAutoScores, RawRepo } from './autoscore'
+import { runAutoScores, RawRepo, toRawRepo } from './autoscore'
 
-export function toRawRepo(gh: GitHubRepo): RawRepo {
-  return {
-    name: gh.name,
-    description: gh.description,
-    pushedAt: gh.pushedAt,
-    createdAt: gh.createdAt,
-    language: gh.language,
-  }
-}
+export { toRawRepo }
 
 export function listUnscoredTrackable(
   trackable: GitHubRepo[],

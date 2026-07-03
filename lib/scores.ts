@@ -1,4 +1,5 @@
 import { pctToLetter } from './gradeLetters'
+import { calcBuilderIntegrityPct } from './rubrics/builderIntegrity'
 
 export type Tag = 'direct' | 'supply-lock' | 'indirect' | 'infrastructure' | 'theoretical'
 export type Status = 'active' | 'dormant' | 'archived'
@@ -47,9 +48,26 @@ function calcScore(rows: RubricRow[]): number {
   return Math.round((total / 3) * 100)
 }
 
-/** Rubric rows → numeric score (0–100). Letter grades use {@link pctToLetter}. */
-export function calcRubricPct(rows: RubricRow[]): number {
+/** Token mechanic rubric (3 rows, 50/30/20): (weighted sum ÷ 3) × 100. */
+export function calcTokenMechanicPct(rows: RubricRow[]): number {
   return calcScore(rows)
+}
+
+/** Rubric rows → numeric score (0–100). Uses TM formula; prefer {@link calcTokenMechanicPct} or {@link calcBuilderIntegrityPct}. */
+export function calcRubricPct(rows: RubricRow[]): number {
+  return calcTokenMechanicPct(rows)
+}
+
+export function normalizeTokenMechanicScore(score: Score): Score {
+  if (!score.rubric.length || score.letter === '—') return score
+  const pct = calcTokenMechanicPct(score.rubric)
+  return { ...score, pct, letter: pctToLetter(pct) }
+}
+
+export function normalizeBuilderIntegrityScore(score: Score): Score {
+  if (!score.rubric.length || score.letter === '—') return score
+  const pct = calcBuilderIntegrityPct(score.rubric)
+  return { ...score, pct, letter: pctToLetter(pct) }
 }
 
 export function normalizeScore(score: Score): Score {
@@ -65,8 +83,8 @@ export function normalizeRepoScores(repo: Repo): Repo {
   }
   return {
     ...repo,
-    tokenMechanic: repo.tokenMechanic ? normalizeScore(repo.tokenMechanic) : null,
-    builderIntegrity: normalizeScore(repo.builderIntegrity),
+    tokenMechanic: repo.tokenMechanic ? normalizeTokenMechanicScore(repo.tokenMechanic) : null,
+    builderIntegrity: normalizeBuilderIntegrityScore(repo.builderIntegrity),
   }
 }
 

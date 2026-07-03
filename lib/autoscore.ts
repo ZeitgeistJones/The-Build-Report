@@ -1,6 +1,6 @@
 import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
-import { Repo, Tag, Status, RubricRow, Score, calcRubricPct, normalizeRepoScores, REPOS } from './scores'
+import { Repo, Tag, Status, RubricRow, Score, calcTokenMechanicPct, normalizeRepoScores, REPOS } from './scores'
 import { pctToLetter } from './gradeLetters'
 import { shouldSkipRepo } from './repoFilters'
 import { getExcludedSlugs } from './repoExclude'
@@ -8,6 +8,17 @@ import { getChronicleContext } from './chronicleContext'
 import { DEFAULT_ECOSYSTEM_CONTEXT, getEcosystemContext } from './ecosystemContext'
 import { getRedis } from './redis'
 import { fetchRepoBySlug } from './github'
+import {
+  BI_PROMPT_ROWS,
+  calcBuilderIntegrityPct,
+  validateBuilderIntegrityRows,
+} from './rubrics/builderIntegrity'
+import {
+  TM_CONSUMER_PROMPT,
+  TM_EDGE_RULES,
+  TM_INFRA_PROMPT,
+  validateTokenMechanicRows,
+} from './rubrics/tokenMechanic'
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
 const CACHE_KEY_PREFIX_V2 = 'build-report:autoscore:v2:'
@@ -67,27 +78,34 @@ function deriveStatus(repo: RawRepo): Status {
   return 'active'
 }
 
-function makeScore(rows: RubricRow[]): Score {
-  const pct = calcRubricPct(rows)
+function makeTmScore(rows: RubricRow[]): Score {
+  const pct = calcTokenMechanicPct(rows)
+  return { letter: pctToLetter(pct), pct, rubric: rows }
+}
+
+function makeBiScore(rows: RubricRow[]): Score {
+  const pct = calcBuilderIntegrityPct(rows)
   return { letter: pctToLetter(pct), pct, rubric: rows }
 }
 
 const VALID_TAGS = new Set(['direct', 'supply-lock', 'indirect', 'infrastructure', 'theoretical'])
-const VALID_LEVELS = new Set(['high', 'mid', 'low'])
-const TM_WEIGHTS = new Set(['50%', '30%', '20%'])
-const BI_WEIGHTS = new Set(['40%', '35%', '25%'])
 
-function validateRubricRows(rows: unknown[], weights: Set<string>): rows is RubricRow[] {
-  if (!Array.isArray(rows) || rows.length !== 3) return false
-  return rows.every(
-    r =>
-      typeof r === 'object' &&
-      r !== null &&
-      typeof (r as RubricRow).label === 'string' &&
-      weights.has((r as RubricRow).weight) &&
-      VALID_LEVELS.has((r as RubricRow).level) &&
-      typeof (r as RubricRow).source === 'string',
-  )
+export function toRawRepo(gh: {
+  name: string
+  description: string | null
+  pushedAt: string
+  createdAt: string
+  language: string | null
+  archived?: boolean
+}): RawRepo {
+  return {
+    name: gh.name,
+    description: gh.description,
+    pushedAt: gh.pushedAt,
+    createdAt: gh.createdAt,
+    language: gh.language,
+    archived: gh.archived,
+  }
 }
 
 async function inferScore(repo: RawRepo, options?: { chronicleContext?: string }): Promise<Repo | null> {
@@ -102,7 +120,7 @@ async function inferScore(repo: RawRepo, options?: { chronicleContext?: string }
     ? `Chronicle context (condensed):\n${options.chronicleContext.trim()}\n\n`
     : ''
 
-  const prompt = `You are scoring a GitHub repository for the clawdbotatg CLAWD ecosystem.
+  const prompt = `You are scoring a GitHub repository for the clawdbotatg CLAWD ecosystem (scoring v2).
 
 ${chronicleBlock}${ecosystemCtx}
 
@@ -114,26 +132,27 @@ Created: ${repo.createdAt}
 Last pushed: ${repo.pushedAt}
 Status (computed from push date): ${derivedStatus}
 
-Based on the repo name, description, and ecosystem context, infer:
+Infer:
 1. tag: one of direct | supply-lock | indirect | infrastructure | theoretical
-2. tokenMechanic rubric (3 rows — ALWAYS include, use adapted criteria for infrastructure/theoretical)
-3. builderIntegrity rubric (3 rows)
+2. tokenMechanic rubric (3 rows — ALWAYS include; pick consumer OR infra row labels based on tag)
+3. builderIntegrity rubric (5 rows — ALWAYS include all five)
 4. verdict: 2-3 sentence plain English assessment
-5. adminNote: one sentence flagging this is auto-inferred live AI, not a launch baseline score
+5. adminNote: one sentence — live AI score, not a launch baseline
 
-When writing verdict and adminNote, frame low scores constructively and acknowledge the repo's role even when it scores low. Still be accurate — do not invent positive framing that is not warranted. Examples:
-- Infrastructure repos scoring low on token mechanic: say "foundational layer — value shows up in downstream consumer apps" rather than only "no burn mechanic."
-- Dormant repos that are stable: note "stable; foundational work complete" rather than only "low activity."
-- A low token mechanic score during an infrastructure-heavy phase: frame as "infrastructure phase — consumer apps are the expected next unlock" rather than "fails to deliver holder value."
+Framing: low infra token mechanic is normal; low activity is not integrity failure; CV/CONVICTION ≠ CLAWD burns; locks/vesting ≠ burns.
 
-For rubric rows use these exact weights:
-- tokenMechanic consumer apps: "Burn mechanic exists and is live" (50%), "Revenue or burn path built in" (30%), "Mechanic is operational" (20%)
-- tokenMechanic infrastructure/theoretical (adapted): "Enables consumer apps that burn CLAWD" (50%), "Downstream path to holder value" (30%), "Mechanic is operational" (20%)
-- builderIntegrity: "Serves stated vision at time of build" (40%), "Genuine autonomous build" (35%), "Passes walkaway test" (25%)
+${TM_CONSUMER_PROMPT}
+${TM_INFRA_PROMPT}
+${TM_EDGE_RULES}
+
+builderIntegrity (5 rows, exact labels and weights):
+${BI_PROMPT_ROWS}
+Score each BI row high/mid/low from repo type (infra, landing, money-moving, governance, etc.). Do not skip rows.
+
 - level: "high" | "mid" | "low"
-- source: brief inference note like "inferred from repo name" or "inferred from ecosystem context"
+- source: brief inference note
 
-Respond ONLY with a valid JSON object in this exact shape, no markdown:
+Respond ONLY with valid JSON, no markdown:
 {
   "tag": "infrastructure",
   "tokenMechanic": [
@@ -142,18 +161,20 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
     { "label": "...", "weight": "20%", "level": "mid", "source": "..." }
   ],
   "builderIntegrity": [
-    { "label": "...", "weight": "40%", "level": "high", "source": "..." },
-    { "label": "...", "weight": "35%", "level": "high", "source": "..." },
-    { "label": "...", "weight": "25%", "level": "mid", "source": "..." }
+    { "label": "On-chain commitments and constraints", "weight": "22%", "level": "mid", "source": "..." },
+    { "label": "User funds, risk, and safety posture", "weight": "20%", "level": "mid", "source": "..." },
+    { "label": "Transparency and verifiability", "weight": "18%", "level": "mid", "source": "..." },
+    { "label": "Governance, token-economics, and ecosystem alignment", "weight": "20%", "level": "mid", "source": "..." },
+    { "label": "Security, testing, and cryptographic rigor", "weight": "20%", "level": "mid", "source": "..." }
   ],
   "verdict": "...",
-  "adminNote": "Live AI score — inferred from repo name and ecosystem context. Not a launch baseline; treat as a starting point."
+  "adminNote": "Live AI score (v2 rubric) — inferred from repo name and ecosystem context."
 }`
 
   try {
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      max_tokens: 1536,
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -166,12 +187,13 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
       return null
     }
 
+    const tag = parsed.tag as Tag
     const tokenMechanicRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
-    if (!validateRubricRows(tokenMechanicRows, TM_WEIGHTS)) {
+    if (!validateTokenMechanicRows(tokenMechanicRows, tag)) {
       console.error(`[autoscore] invalid tokenMechanic rubric for ${repo.name}`)
       return null
     }
-    if (!validateRubricRows(parsed.builderIntegrity, BI_WEIGHTS)) {
+    if (!validateBuilderIntegrityRows(parsed.builderIntegrity)) {
       console.error(`[autoscore] invalid builderIntegrity rubric for ${repo.name}`)
       return null
     }
@@ -180,7 +202,7 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
       id: repo.name,
       name: repo.name,
       githubSlug: repo.name,
-      tag: parsed.tag as Tag,
+      tag,
       status: derivedStatus,
       confidence: 'low',
       scoredAt: new Date().toLocaleDateString('en-US', {
@@ -188,20 +210,53 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
         day: 'numeric',
         year: 'numeric',
       }),
-      tokenMechanic: tokenMechanicRows?.length ? makeScore(tokenMechanicRows) : null,
-      builderIntegrity: makeScore(parsed.builderIntegrity),
+      tokenMechanic: tokenMechanicRows?.length ? makeTmScore(tokenMechanicRows) : null,
+      builderIntegrity: makeBiScore(parsed.builderIntegrity),
       verdict: parsed.verdict,
       adminNote: parsed.adminNote,
     }
 
     console.log(
-      `[autoscore] done: ${repo.name} tag:${repoOut.tag} TM:${repoOut.tokenMechanic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`
+      `[autoscore] done: ${repo.name} tag:${repoOut.tag} TM:${repoOut.tokenMechanic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`,
     )
     return repoOut
   } catch (err) {
     console.error(`[autoscore] FAILED for ${repo.name}:`, err)
     return null
   }
+}
+
+async function cacheScoredRepo(repo: Repo): Promise<void> {
+  try {
+    const r = getRedis()
+    await r.set(`${CACHE_KEY_PREFIX}${repo.githubSlug}`, repo, {
+      ex: 60 * 60 * 24 * 7,
+    })
+  } catch {
+    // non-fatal
+  }
+}
+
+/** Infer (optional cache bypass) and write to Redis. Used by bulk regen and singles. */
+export async function inferAndCacheRepo(
+  raw: RawRepo,
+  options?: { chronicleContext?: string; skipCache?: boolean },
+): Promise<Repo | null> {
+  const r = getRedis()
+
+  if (!options?.skipCache) {
+    const cached = await readCachedScore(r, raw.name)
+    if (cached) return cached
+  }
+
+  const chronicleContext =
+    options?.chronicleContext ?? (await getChronicleContext().catch(() => null)) ?? undefined
+
+  const scored = await inferScore(raw, { chronicleContext })
+  if (!scored) return null
+
+  await cacheScoredRepo(scored)
+  return scored
 }
 
 // HOMEPAGE-SAFE: cache only, no Anthropic calls
@@ -245,7 +300,7 @@ export interface AutoScoreRunResult {
 // CALL THIS FROM AN API ROUTE OR ADMIN ACTION, NOT app/page.tsx
 export async function runAutoScores(
   newRepos: RawRepo[],
-  options?: { githubOrder?: string[] },
+  options?: { githubOrder?: string[]; chronicleContext?: string },
 ): Promise<AutoScoreRunResult> {
   if (!newRepos.length) {
     console.log('[autoscore] no new repos to score')
@@ -294,17 +349,14 @@ export async function runAutoScores(
 
   const inferred: string[] = []
 
+  const chronicleContext =
+    options?.chronicleContext ?? (await getChronicleContext().catch(() => null)) ?? undefined
+
   for (const repo of batch) {
     if (excludedSlugs.has(repo.name)) continue
-    const scored = await inferScore(repo)
+    const scored = await inferScore(repo, { chronicleContext })
     if (scored) {
-      try {
-        await r.set(`${CACHE_KEY_PREFIX}${repo.name}`, scored, {
-          ex: 60 * 60 * 24 * 7,
-        })
-      } catch {
-        // non-fatal
-      }
+      await cacheScoredRepo(scored)
       results.push(scored)
       inferred.push(repo.name)
     }
@@ -343,20 +395,10 @@ export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null>
   const chronicleContext = await getChronicleContext().catch(() => null)
 
   await flushAutoScore(repoSlug)
-  const scored = await inferScore(raw, { chronicleContext: chronicleContext ?? undefined })
-  if (!scored) return null
-
-  try {
-    const r = getRedis()
-    await r.set(`${CACHE_KEY_PREFIX}${repoSlug}`, scored, {
-      ex: 60 * 60 * 24 * 7,
-    })
-  } catch {
-    // non-fatal — still return scored repo to client
-  }
-
-  console.log(`[autoscore] single done: ${repoSlug}`)
-  return scored
+  return inferAndCacheRepo(raw, {
+    chronicleContext: chronicleContext ?? undefined,
+    skipCache: true,
+  })
 }
 
 export async function flushAutoScore(repoName: string): Promise<void> {

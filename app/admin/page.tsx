@@ -25,6 +25,11 @@ export default function AdminPage() {
   const [ecosystemContext, setEcosystemContextText] = useState('')
   const [savingEcosystem, setSavingEcosystem] = useState(false)
   const [ecosystemSaved, setEcosystemSaved] = useState(false)
+  const [bulkStatus, setBulkStatus] = useState<{ trackableCount: number; cachedCount: number; handScoredBaselineCount: number } | null>(null)
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const [bulkResult, setBulkResult] = useState<string | null>(null)
+  const [bulkFlushAck, setBulkFlushAck] = useState(false)
+  const [backupDownloaded, setBackupDownloaded] = useState(false)
 
   async function refreshGitHubData() {
     setRefreshRunning(true)
@@ -97,6 +102,7 @@ export default function AdminPage() {
       setAutoScored(data.autoScored ?? [])
       setChronicleContextText(data.chronicleContext ?? '')
       setEcosystemContextText(data.ecosystemContext ?? '')
+      void loadBulkStatus()
     } else {
       setAuthError('Wrong password.')
     }
@@ -144,6 +150,103 @@ export default function AdminPage() {
     setSavingEcosystem(false)
     setEcosystemSaved(true)
     setTimeout(() => setEcosystemSaved(false), 2200)
+  }
+
+  async function loadBulkStatus() {
+    try {
+      const res = await fetch('/api/admin/bulk-regen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status', password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setBulkStatus({
+          trackableCount: data.trackableCount,
+          cachedCount: data.cachedCount,
+          handScoredBaselineCount: data.handScoredBaselineCount,
+        })
+      }
+    } catch {
+      // non-fatal
+    }
+  }
+
+  async function downloadBaselineBackup() {
+    setBulkResult(null)
+    try {
+      const res = await fetch('/api/admin/bulk-regen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'exportBaseline', password }),
+      })
+      const data = await res.json()
+      if (!data.ok) {
+        setBulkResult(data.error ?? 'Export failed')
+        return
+      }
+      const blob = new Blob([JSON.stringify(data.backup, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `build-report-baseline-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      setBackupDownloaded(true)
+      setBulkResult('Baseline backup downloaded.')
+    } catch {
+      setBulkResult('Baseline export request failed')
+    }
+  }
+
+  async function runBulkRegenBatch(flushFirst: boolean) {
+    setBulkRunning(true)
+    setBulkResult(null)
+    let offset = 0
+    let totalScored = 0
+    let totalFailed = 0
+    const failedNames: string[] = []
+
+    try {
+      while (true) {
+        const res = await fetch('/api/admin/bulk-regen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'regenerateBatch',
+            password,
+            confirmFlush: flushFirst,
+            acknowledgeFlush: flushFirst && backupDownloaded,
+            offset,
+            limit: 15,
+          }),
+        })
+        const data = await res.json()
+        if (!data.ok) {
+          setBulkResult(data.error ?? 'Bulk regen failed')
+          break
+        }
+
+        totalScored += (data.scored as string[]).length
+        totalFailed += (data.failed as string[]).length
+        failedNames.push(...(data.failed as string[]))
+
+        if (data.nextOffset == null) {
+          setBulkResult(
+            flushFirst
+              ? `Bulk regen complete — scored ${totalScored} repo(s)${totalFailed ? `, ${totalFailed} failed (${failedNames.slice(0, 5).join(', ')})` : ''}.`
+              : `Batch complete — scored ${totalScored} uncached repo(s) this run.`,
+          )
+          void loadBulkStatus()
+          break
+        }
+        offset = data.nextOffset as number
+        setBulkResult(`In progress… ${totalScored} scored so far (${offset}/${data.totalEligible}).`)
+      }
+    } catch {
+      setBulkResult('Bulk regen request failed')
+    }
+    setBulkRunning(false)
   }
 
   async function saveNote(repoId: string) {
@@ -424,6 +527,87 @@ export default function AdminPage() {
             )
           })}
         </div>
+      </div>
+
+      {/* Scoring v2 — bulk regenerate */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Scoring v2 — bulk regenerate</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
+            Download a baseline backup before flushing. Spot-test individual repos via paid rescore first.
+            Bulk flush replaces all cached Live AI scores with v2 rubrics (BI 5-row, TM v2, activity math is automatic on homepage).
+          </p>
+          {bulkStatus && (
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+              {bulkStatus.trackableCount} trackable repos · {bulkStatus.cachedCount} cached Live AI · {bulkStatus.handScoredBaselineCount} hand-scored baselines in code
+            </p>
+          )}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+          <button
+            onClick={() => void downloadBaselineBackup()}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+            }}
+          >
+            Download baseline backup
+          </button>
+          <button
+            onClick={() => void runBulkRegenBatch(false)}
+            disabled={bulkRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            {bulkRunning ? 'Running…' : 'Score uncached only (no flush)'}
+          </button>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', maxWidth: '520px' }}>
+          <input
+            type="checkbox"
+            checked={bulkFlushAck}
+            onChange={e => setBulkFlushAck(e.target.checked)}
+            style={{ marginTop: '3px' }}
+          />
+          <span>I downloaded the baseline backup and approve flushing all cached scores before bulk regen.</span>
+        </label>
+        <button
+          onClick={() => void runBulkRegenBatch(true)}
+          disabled={bulkRunning || !bulkFlushAck || !backupDownloaded}
+          style={{
+            fontSize: '12px',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius)',
+            background: bulkFlushAck && backupDownloaded ? 'var(--accent-dim)' : 'var(--surface-3)',
+            color: bulkFlushAck && backupDownloaded ? 'var(--accent)' : 'var(--text-muted)',
+            border: `1px solid ${bulkFlushAck && backupDownloaded ? 'var(--accent-border)' : 'var(--border)'}`,
+          }}
+        >
+          {bulkRunning ? 'Bulk regenerating…' : 'Flush all & bulk regenerate (v2)'}
+        </button>
+        {bulkResult && (
+          <div style={{
+            marginTop: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {bulkResult}
+          </div>
+        )}
       </div>
 
       {/* Auto-scored repos */}
