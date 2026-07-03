@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { getAdminNotes, setAdminNote, verifyAdminPassword } from '@/lib/admin'
 import { flushAutoScore, listCachedAutoScores } from '@/lib/autoscore'
+import { getExcludedSlugs, setRepoExcluded } from '@/lib/repoExclude'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -12,10 +14,12 @@ export async function POST(req: NextRequest) {
   if (action === 'auth') {
     const notes = await getAdminNotes()
     const autoScored = await listCachedAutoScores()
+    const excluded = await getExcludedSlugs()
     return NextResponse.json({
       ok: true,
       notes,
       autoScored,
+      excluded,
     })
   }
 
@@ -27,6 +31,14 @@ export async function POST(req: NextRequest) {
   if (action === 'flush') {
     // Clear a cached auto-score so it gets re-inferred on next page load
     await flushAutoScore(repoId)
+    return NextResponse.json({ ok: true })
+  }
+
+  if (action === 'exclude' || action === 'include') {
+    const slug = typeof repoId === 'string' ? repoId.trim() : ''
+    if (!slug) return NextResponse.json({ ok: false, error: 'Missing repoId' }, { status: 400 })
+    await setRepoExcluded(slug, action === 'exclude')
+    revalidatePath('/')
     return NextResponse.json({ ok: true })
   }
 

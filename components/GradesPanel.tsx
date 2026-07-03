@@ -6,19 +6,25 @@ import { gradeColor } from '@/lib/gradeLetters'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
 import OverallGrade from './OverallGrade'
 import { OverallGradeWithTrend } from '@/lib/overallGrade'
+import { Period } from '@/lib/grades'
 
 interface Props {
   overall30: OverallGradeWithTrend | null
   overall7: OverallGradeWithTrend | null
+  overall60: OverallGradeWithTrend | null
   overallSummary: string | null
   builderGrade30: BuilderGrade | null
   builderGrade7: BuilderGrade | null
+  builderGrade60: BuilderGrade | null
   tokenMechanicGrade30: TokenMechanicGrade | null
   tokenMechanicGrade7: TokenMechanicGrade | null
+  tokenMechanicGrade60: TokenMechanicGrade | null
   integrityGrade30: IntegrityGrade | null
   integrityGrade7: IntegrityGrade | null
+  integrityGrade60: IntegrityGrade | null
   stats30d: { commits: number; activeDays: number; newRepos: number } | null
   stats7d: { commits: number; activeDays: number; newRepos: number } | null
+  stats60d: { commits: number; activeDays: number; newRepos: number } | null
 }
 
 function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
@@ -45,7 +51,7 @@ function GradeCard({
   label: string
   mini: string
   summary: string
-  period: '30d' | '7d'
+  period: Period
   footer?: React.ReactNode
   trendExplanation?: TrendExplanation
 }) {
@@ -119,7 +125,7 @@ function GradeCard({
               </span>
             )}
 
-            {grade && (
+            {grade && period !== '60d' && (
               <span
                 style={{
                   display: 'flex',
@@ -223,22 +229,27 @@ function GradeCard({
 export default function GradesPanel({
   overall30,
   overall7,
+  overall60,
   overallSummary,
   builderGrade30,
   builderGrade7,
+  builderGrade60,
   tokenMechanicGrade30,
   tokenMechanicGrade7,
+  tokenMechanicGrade60,
   integrityGrade30,
   integrityGrade7,
+  integrityGrade60,
   stats30d,
   stats7d,
+  stats60d,
 }: Props) {
   const { period } = useGradePeriod()
 
-  const bg = period === '30d' ? builderGrade30 : builderGrade7
-  const tg = period === '30d' ? tokenMechanicGrade30 : tokenMechanicGrade7
-  const ig = period === '30d' ? integrityGrade30 : integrityGrade7
-  const stats = period === '30d' ? stats30d : stats7d
+  const bg = period === '30d' ? builderGrade30 : period === '7d' ? builderGrade7 : builderGrade60
+  const tg = period === '30d' ? tokenMechanicGrade30 : period === '7d' ? tokenMechanicGrade7 : tokenMechanicGrade60
+  const ig = period === '30d' ? integrityGrade30 : period === '7d' ? integrityGrade7 : integrityGrade60
+  const stats = period === '30d' ? stats30d : period === '7d' ? stats7d : stats60d
 
   return (
     <div style={{ marginBottom: '40px' }}>
@@ -264,10 +275,11 @@ export default function GradesPanel({
         <PeriodToggle />
       </div>
 
-      {overall30 && overall7 && (
+      {overall30 && overall7 && overall60 && (
         <OverallGrade
           overall30={overall30}
           overall7={overall7}
+          overall60={overall60}
           summary={overallSummary}
         />
       )}
@@ -302,26 +314,46 @@ export default function GradesPanel({
           grade={tg}
           label="token mechanic"
           period={period}
-          mini="Share of commit volume pointed at CLAWD holder value (weighted by commits per repo)."
+          mini={
+            period === '60d'
+              ? 'Commit-weighted token mechanic rubric scores over the last 60 days.'
+              : 'Share of commit volume pointed at CLAWD holder value (weighted by commits per repo).'
+          }
           summary={tg?.summary ?? 'Token mechanic score unavailable'}
           trendExplanation={tg?.trendExplanation}
           footer={
             tg?.counts && (
               <>
                 {tg.counts.repos > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.repos} active repos</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.repos} repos in sample</span>
                 )}
-                {tg.counts.direct > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.direct} direct commits</span>
-                )}
-                {tg.counts.lock > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.lock} supply-lock commits</span>
-                )}
-                {tg.counts.indirect > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.indirect} indirect commits</span>
-                )}
-                {tg.counts.infra > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.infra} infra/R&D commits</span>
+                {period === '60d' ? (
+                  <>
+                    {tg.counts.direct > 0 && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.direct} high-TM commits</span>
+                    )}
+                    {tg.counts.lock > 0 && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.lock} mid-TM commits</span>
+                    )}
+                    {tg.counts.indirect > 0 && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.indirect} low-TM commits</span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {tg.counts.direct > 0 && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.direct} direct commits</span>
+                    )}
+                    {tg.counts.lock > 0 && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.lock} supply-lock commits</span>
+                    )}
+                    {tg.counts.indirect > 0 && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.indirect} indirect commits</span>
+                    )}
+                    {tg.counts.infra > 0 && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.infra} infra/R&D commits</span>
+                    )}
+                  </>
                 )}
               </>
             )

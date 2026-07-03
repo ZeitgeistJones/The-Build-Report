@@ -8,9 +8,11 @@ export default function AdminPage() {
   const [authed, setAuthed] = useState(false)
   const [authError, setAuthError] = useState('')
   const [notes, setNotes] = useState<Record<string, string>>({})
+  const [excluded, setExcluded] = useState<Record<string, boolean>>({})
   const [autoScored, setAutoScored] = useState<string[]>([])
   const [saving, setSaving] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
+  const [togglingExclude, setTogglingExclude] = useState<string | null>(null)
   const [flushing, setFlushing] = useState<string | null>(null)
   const [flushed, setFlushed] = useState<string | null>(null)
   const [autoscoreRunning, setAutoscoreRunning] = useState(false)
@@ -85,10 +87,31 @@ export default function AdminPage() {
     if (data.ok) {
       setAuthed(true)
       setNotes(data.notes ?? {})
+      setExcluded(data.excluded ?? {})
       setAutoScored(data.autoScored ?? [])
     } else {
       setAuthError('Wrong password.')
     }
+  }
+
+  async function toggleExclude(slug: string, currentlyExcluded: boolean) {
+    setTogglingExclude(slug)
+    await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: currentlyExcluded ? 'include' : 'exclude',
+        password,
+        repoId: slug,
+      }),
+    })
+    setExcluded(prev => {
+      const next = { ...prev }
+      if (currentlyExcluded) delete next[slug]
+      else next[slug] = true
+      return next
+    })
+    setTogglingExclude(null)
   }
 
   async function saveNote(repoId: string) {
@@ -208,15 +231,36 @@ export default function AdminPage() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {REPOS.map(repo => (
+          {REPOS.map(repo => {
+            const isExcluded = excluded[repo.githubSlug] === true
+            return (
             <div key={repo.id} style={{
               background: 'var(--surface-1)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-lg)',
               padding: '14px 16px',
+              opacity: isExcluded ? 0.55 : 1,
             }}>
-              <div style={{ fontSize: '13px', fontWeight: 500, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', marginBottom: '8px' }}>
-                {repo.name}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 500, fontFamily: 'var(--font-mono)', color: isExcluded ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                  {repo.name}
+                  {isExcluded && <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>excluded</span>}
+                </div>
+                <button
+                  onClick={() => toggleExclude(repo.githubSlug, isExcluded)}
+                  disabled={togglingExclude === repo.githubSlug}
+                  style={{
+                    fontSize: '12px',
+                    padding: '5px 14px',
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--surface-3)',
+                    color: isExcluded ? 'var(--accent)' : 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    flexShrink: 0,
+                  }}
+                >
+                  {togglingExclude === repo.githubSlug ? '…' : isExcluded ? 'Include' : 'Exclude'}
+                </button>
               </div>
               <textarea
                 value={notes[repo.id] ?? ''}
@@ -251,7 +295,8 @@ export default function AdminPage() {
                 {saving === repo.id ? 'Saving...' : saved === repo.id ? 'Saved ✓' : 'Save note'}
               </button>
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -302,7 +347,9 @@ export default function AdminPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {autoScored.map(name => (
+            {autoScored.map(name => {
+              const isExcluded = excluded[name] === true
+              return (
               <div key={name} style={{
                 background: 'var(--surface-1)',
                 border: '1px solid var(--border)',
@@ -311,31 +358,50 @@ export default function AdminPage() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                opacity: isExcluded ? 0.55 : 1,
               }}>
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: 500, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 500, fontFamily: 'var(--font-mono)', color: isExcluded ? 'var(--text-muted)' : 'var(--text-primary)' }}>
                     {name}
+                    {isExcluded && <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>excluded</span>}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                     auto-inferred · cached in Redis
                   </div>
                 </div>
-                <button
-                  onClick={() => flushScore(name)}
-                  disabled={flushing === name}
-                  style={{
-                    fontSize: '12px',
-                    padding: '5px 14px',
-                    borderRadius: 'var(--radius)',
-                    background: flushed === name ? 'var(--accent-dim)' : 'var(--surface-3)',
-                    color: flushed === name ? 'var(--accent)' : 'var(--red)',
-                    border: `1px solid ${flushed === name ? 'var(--accent-border)' : 'var(--border)'}`,
-                  }}
-                >
-                  {flushing === name ? 'Flushing...' : flushed === name ? 'Flushed ✓' : 'Flush & re-infer'}
-                </button>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                  <button
+                    onClick={() => toggleExclude(name, isExcluded)}
+                    disabled={togglingExclude === name}
+                    style={{
+                      fontSize: '12px',
+                      padding: '5px 14px',
+                      borderRadius: 'var(--radius)',
+                      background: 'var(--surface-3)',
+                      color: isExcluded ? 'var(--accent)' : 'var(--text-secondary)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    {togglingExclude === name ? '…' : isExcluded ? 'Include' : 'Exclude'}
+                  </button>
+                  <button
+                    onClick={() => flushScore(name)}
+                    disabled={flushing === name}
+                    style={{
+                      fontSize: '12px',
+                      padding: '5px 14px',
+                      borderRadius: 'var(--radius)',
+                      background: flushed === name ? 'var(--accent-dim)' : 'var(--surface-3)',
+                      color: flushed === name ? 'var(--accent)' : 'var(--red)',
+                      border: `1px solid ${flushed === name ? 'var(--accent-border)' : 'var(--border)'}`,
+                    }}
+                  >
+                    {flushing === name ? 'Flushing...' : flushed === name ? 'Flushed ✓' : 'Flush & re-infer'}
+                  </button>
+                </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

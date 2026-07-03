@@ -27,11 +27,7 @@ This is not a real-time data feed. Scores are updated manually. GitHub activity 
         },
         {
           heading: 'How scores are assigned',
-          body: `Every repo receives up to two scores: token mechanic and builder integrity. Each score is built from three weighted rubric components, each contributing to a numeric score from 0–100. That percentage maps to a letter grade from A+ down through F (F is below 60%), with a cited source for each component.
-
-Infrastructure and theoretical repos use adapted token mechanic criteria — enables consumer apps that burn CLAWD, downstream path to holder value, active and maintained — rather than the direct burn mechanic criteria used for consumer apps. Every repo gets scored because every repo has some relationship to holder value, direct or indirect.
-
-Scores are assigned against the goals clawdbotatg stated at the time a repo was built, not against where the project ended up. Goals change and a repo should not be penalised retroactively for a direction shift that came later.`,
+          body: '',
         },
         {
           heading: 'Score & Rescore',
@@ -86,7 +82,12 @@ If you hold $CLAWD and have opinions on what should change, that conversation sh
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
             {section.heading}
           </h2>
-          {section.body.split('\n\n').map((para, i) => (
+          {section.heading === 'How scores are assigned' ? (
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '10px' }}>
+              For the full scoring methodology including rubric weights, grade calculations, and period definitions, see{' '}
+              <a href="/#how-we-score" style={{ color: 'var(--accent)' }}>How we score ↗</a>.
+            </p>
+          ) : section.body.split('\n\n').map((para, i) => (
             <p key={i} style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '10px' }}>
               {para}
             </p>

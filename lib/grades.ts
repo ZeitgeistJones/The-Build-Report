@@ -2,7 +2,7 @@ import { Repo } from './scores'
 import { GitHubStats } from './github'
 import { pctToLetter } from './gradeLetters'
 
-export type Period = '30d' | '7d'
+export type Period = '30d' | '7d' | '60d'
 
 export interface TrendExplanation {
   headline: string
@@ -74,8 +74,23 @@ interface BuilderInputs {
 }
 
 function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'current' | 'prior'): BuilderInputs {
-  const periodDays = period === '30d' ? 30 : 7
   const activityCount = Object.keys(stats.repoActivity).length
+
+  if (period === '60d') {
+    const activeRepos = Object.values(stats.repoActivity).filter(
+      r => r.commits30d + r.commits30_60 > 0,
+    ).length
+    return {
+      commits: stats.totalCommits30d + stats.totalCommits30_60,
+      activeDays: stats.activeDays30d + stats.activeDays30_60,
+      newRepos: stats.newRepos30d + stats.newRepos30_60,
+      activeRepos,
+      scannedRepos: activityCount,
+      periodDays: 60,
+    }
+  }
+
+  const periodDays = period === '30d' ? 30 : 7
 
   if (period === '30d') {
     const activeRepos = Object.values(stats.repoActivity).filter(r =>
@@ -106,9 +121,11 @@ function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'cur
 
 function calcBuilderPct(inputs: BuilderInputs, period: Period): number {
   const { commits, activeDays, newRepos, activeRepos, scannedRepos, periodDays } = inputs
-  const commitPct = Math.min(commits / (period === '30d' ? 60 : 14), 1)
+  const commitTarget = period === '60d' ? 120 : period === '30d' ? 60 : 14
+  const newRepoTarget = period === '60d' ? 8 : period === '30d' ? 4 : 2
+  const commitPct = Math.min(commits / commitTarget, 1)
   const activeDaysPct = Math.min(activeDays / periodDays, 1)
-  const newReposPct = Math.min(newRepos / (period === '30d' ? 4 : 2), 1)
+  const newReposPct = Math.min(newRepos / newRepoTarget, 1)
   const activeReposPct = Math.min(activeRepos / Math.max(scannedRepos * 0.5, 1), 1)
   const consistencyPct = Math.min(activeDays / Math.max(periodDays * 0.7, 1), 1)
   const signalPcts = [commitPct, activeDaysPct, newReposPct, activeReposPct, consistencyPct]
@@ -117,9 +134,11 @@ function calcBuilderPct(inputs: BuilderInputs, period: Period): number {
 
 function builderSignals(inputs: BuilderInputs, period: Period) {
   const { commits, activeDays, newRepos, activeRepos, scannedRepos, periodDays } = inputs
-  const commitPct = Math.min(commits / (period === '30d' ? 60 : 14), 1)
+  const commitTarget = period === '60d' ? 120 : period === '30d' ? 60 : 14
+  const newRepoTarget = period === '60d' ? 8 : period === '30d' ? 4 : 2
+  const commitPct = Math.min(commits / commitTarget, 1)
   const activeDaysPct = Math.min(activeDays / periodDays, 1)
-  const newReposPct = Math.min(newRepos / (period === '30d' ? 4 : 2), 1)
+  const newReposPct = Math.min(newRepos / newRepoTarget, 1)
   const activeReposPct = Math.min(activeRepos / Math.max(scannedRepos * 0.5, 1), 1)
   const consistencyPct = Math.min(activeDays / Math.max(periodDays * 0.7, 1), 1)
   return [
@@ -133,11 +152,30 @@ function builderSignals(inputs: BuilderInputs, period: Period) {
 
 export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGrade {
   const current = builderInputsFromStats(stats, period, 'current')
-  const prior = builderInputsFromStats(stats, period, 'prior')
   const pct = calcBuilderPct(current, period)
+  const letter = pctToLetter(pct)
+
+  if (period === '60d') {
+    return {
+      letter,
+      pct,
+      trendPct: null,
+      trend: 'flat',
+      summary:
+        pct >= 80
+          ? 'Strong build activity across the last 60 days — commits, active days, and repo movement.'
+          : pct >= 60
+            ? 'Solid 60-day shipping pace with some unevenness across activity signals.'
+            : pct >= 40
+              ? 'Some activity over 60 days, but the build cadence is mixed.'
+              : 'Build activity over the last 60 days is light relative to the tracked repo set.',
+      signals: builderSignals(current, period),
+    }
+  }
+
+  const prior = builderInputsFromStats(stats, period, 'prior')
   const priorPct = calcBuilderPct(prior, period)
   const trendPct = pctChange(pct, priorPct)
-  const letter = pctToLetter(pct)
 
   return {
     letter,
@@ -164,6 +202,9 @@ function commitsForRepo(
 ): number {
   const live = stats.repoActivity[slug]
   if (!live) return 0
+  if (period === '60d') {
+    return window === 'current' ? live.commits30d + live.commits30_60 : 0
+  }
   if (period === '30d') {
     return window === 'current' ? live.commits30d : live.commits30_60
   }
@@ -261,6 +302,9 @@ function reposActiveInWindow(stats: GitHubStats, repoSet: Repo[], period: Period
   return repoSet.filter(repo => {
     const live = stats.repoActivity[repo.githubSlug]
     if (!live) return false
+    if (period === '60d') {
+      return window === 'current' ? live.commits30d + live.commits30_60 > 0 : false
+    }
     if (period === '30d') {
       return window === 'current' ? live.commits30d > 0 : live.commits30_60 > 0
     }
@@ -268,7 +312,75 @@ function reposActiveInWindow(stats: GitHubStats, repoSet: Repo[], period: Period
   })
 }
 
+function reposWithScoredTokenMechanic(repos: Repo[]): Repo[] {
+  return repos.filter(r => r.tokenMechanic != null && r.tokenMechanic.letter !== '—')
+}
+
+function tokenMechanicRubricCommitCounts(
+  stats: GitHubStats,
+  repos: Repo[],
+  period: Period,
+) {
+  let high = 0
+  let mid = 0
+  let low = 0
+  let total = 0
+  for (const repo of repos) {
+    if (!repo.tokenMechanic || repo.tokenMechanic.letter === '—') continue
+    const w = commitsForRepo(stats, repo.githubSlug, period, 'current')
+    if (w <= 0) continue
+    total += w
+    if (repo.tokenMechanic.pct >= 80) high += w
+    else if (repo.tokenMechanic.pct >= 60) mid += w
+    else low += w
+  }
+  return { high, mid, low, commitWeight: total, repos: repos.length }
+}
+
+function calcTokenMechanicGrade60d(stats: GitHubStats, repoSet: Repo[]): TokenMechanicGrade {
+  const scored = reposWithScoredTokenMechanic(repoSet)
+  const activeRepos = reposActiveInWindow(stats, scored, '60d', 'current')
+  const sample = activeRepos.length ? activeRepos : scored
+
+  const pct = weightedAvgByCommits(stats, sample, '60d', 'current', r => r.tokenMechanic!.pct)
+  const counts = tokenMechanicRubricCommitCounts(stats, sample, '60d')
+  const weightBase = counts.commitWeight || 1
+
+  const tmRubricScore = (repo: Repo, label: string) => {
+    const row = repo.tokenMechanic?.rubric.find(x => x.label === label)
+    return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
+  }
+
+  const burnAvg = weightedAvgByCommits(stats, sample, '60d', 'current', r => tmRubricScore(r, 'Burn mechanic exists and is live'))
+  const revenueAvg = weightedAvgByCommits(stats, sample, '60d', 'current', r => tmRubricScore(r, 'Revenue or burn path built in'))
+  const operationalAvg = weightedAvgByCommits(stats, sample, '60d', 'current', r => tmRubricScore(r, 'Mechanic is operational'))
+
+  return {
+    counts: { direct: counts.high, lock: counts.mid, indirect: counts.low, infra: 0, repos: sample.length },
+    letter: pctToLetter(pct),
+    pct,
+    trendPct: null,
+    trend: 'flat',
+    summary:
+      pct >= 80
+        ? 'Repos with the most commits over 60 days score strongly on token mechanic rubrics.'
+        : pct >= 60
+          ? 'Heavy 60-day commit repos mostly show solid token mechanic scores.'
+          : pct >= 40
+            ? 'Token mechanic scores are mixed where commit volume landed over 60 days.'
+            : 'Most 60-day commits landed on repos with weaker token mechanic scores.',
+    signals: [
+      { label: 'Burn mechanic', level: toLevel(burnAvg / 100), pct: burnAvg },
+      { label: 'Revenue path', level: toLevel(revenueAvg / 100), pct: revenueAvg },
+      { label: 'Operational', level: toLevel(operationalAvg / 100), pct: operationalAvg },
+      { label: 'High-TM share', level: toLevel(counts.high / weightBase), pct: Math.round((counts.high / weightBase) * 100) },
+    ],
+  }
+}
+
 export function calcTokenMechanicGrade(stats: GitHubStats, period: Period, repoSet: Repo[]): TokenMechanicGrade {
+  if (period === '60d') return calcTokenMechanicGrade60d(stats, repoSet)
+
   const activeRepos = reposActiveInWindow(stats, repoSet, period, 'current')
   const priorActiveRepos = reposActiveInWindow(stats, repoSet, period, 'prior')
 
@@ -318,11 +430,11 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
     ? avg(sample.map(repo => repo.builderIntegrity.pct))
     : weightedAvgByCommits(stats, sample, period, 'current', r => r.builderIntegrity.pct)
 
-  const priorPct = !stats || !priorSample.length
+  const priorPct = !stats || !priorSample.length || period === '60d'
     ? 0
     : weightedAvgByCommits(stats, priorSample, period, 'prior', r => r.builderIntegrity.pct)
 
-  const trendPct = pctChange(pct, priorPct)
+  const trendPct = period === '60d' ? null : pctChange(pct, priorPct)
 
   const commitCounts = stats
     ? integrityCommitCounts(stats, sample, period, 'current')
@@ -359,9 +471,17 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
     letter: pctToLetter(pct),
     pct,
     trendPct,
-    trend: trendFromPct(trendPct),
+    trend: period === '60d' ? 'flat' : trendFromPct(trendPct),
     summary:
-      pct >= 80
+      period === '60d'
+        ? pct >= 80
+          ? 'Repos seeing the most commits over 60 days score strongly on the builder-values rubric.'
+          : pct >= 60
+            ? 'Heavy 60-day commit repos mostly fit the stated builder-values frame.'
+            : pct >= 40
+              ? 'Integrity is mixed across where commit volume landed over 60 days.'
+              : 'Most 60-day commits landed on repos with weaker builder-values scores.'
+        : pct >= 80
         ? 'Repos seeing the most commits score strongly on the builder-values rubric.'
         : pct >= 60
           ? 'Heavy commit repos mostly fit the stated builder-values frame, with some weaker alignment.'
@@ -378,6 +498,7 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
 }
 
 export function formatTrendPct(trendPct: number | null, period: Period): string {
+  if (period === '60d') return ''
   const windowLabel = period === '30d' ? 'prior 30d' : 'prior 7d'
   if (trendPct === null) return `new vs ${windowLabel}`
   if (trendPct > 0) return `+${trendPct}% vs ${windowLabel}`

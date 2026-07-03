@@ -6,6 +6,7 @@ import { getAdminNotes } from '@/lib/admin'
 import { getAutoScores } from '@/lib/autoscore'
 import { makeUnscoredRecentRepo } from '@/lib/recentRepos'
 import { shouldSkipRepo } from '@/lib/repoFilters'
+import { getExcludedSlugs, applyExcludedToRepos, filterPublicRepos } from '@/lib/repoExclude'
 import { mergeRepoSources, buildReposInGithubOrder, githubSlugOrder } from '@/lib/repoOrder'
 import { calcBuilderGrade, calcTokenMechanicGrade, calcIntegrityGrade } from '@/lib/grades'
 import {
@@ -13,7 +14,7 @@ import {
   buildTokenMechanicTrendExplanation,
   buildIntegrityTrendExplanation,
 } from '@/lib/gradeNarratives'
-import { calcOverallGradeWithTrend, countReposScored, buildOverallGradeContext } from '@/lib/overallGrade'
+import { calcOverallGradeWithTrend, calcOverallGrade, countReposScored, buildOverallGradeContext } from '@/lib/overallGrade'
 import { getOverallSummary } from '@/lib/overallSummary'
 import RepoList from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
@@ -36,32 +37,41 @@ export default async function Home() {
   }
 
   const adminNotes = await getAdminNotes()
+  const excludedMap = await getExcludedSlugs()
+  const excludedSlugs = new Set(Object.keys(excludedMap).filter(k => excludedMap[k]))
 
   const existingSlugs = new Set(REPOS.map(r => r.githubSlug))
   const trackableGithub = stats?.trackableRepos ?? []
-  const unscoredRepos = trackableGithub.filter(repo => !existingSlugs.has(repo.name))
+  const unscoredRepos = trackableGithub.filter(
+    repo => !existingSlugs.has(repo.name) && !excludedSlugs.has(repo.name),
+  )
   const autoScoredRaw = unscoredRepos.length > 0 ? await getAutoScores(unscoredRepos) : []
   const autoScored = autoScoredRaw.filter(r => !shouldSkipRepo(r.githubSlug))
 
-  const allRepos = mergeRepoSources(REPOS, autoScored)
+  const allRepos = filterPublicRepos(applyExcludedToRepos(mergeRepoSources(REPOS, autoScored), excludedMap))
 
   const reposBase = stats
     ? buildReposInGithubOrder(trackableGithub, REPOS, autoScored, makeUnscoredRecentRepo)
     : allRepos
 
-  const repos = reposBase.map(r => {
-    const activity = stats?.repoActivity[r.githubSlug]
-    const githubRepo = trackableGithub.find(gr => gr.name === r.githubSlug)
-      ?? stats?.repos.find(gr => gr.name === r.githubSlug)
-    return {
-      ...r,
-      adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
-      description: githubRepo?.description?.trim() || null,
-      lastCommitAt: activity?.lastCommitAt ?? null,
-      pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
-      commits30d: activity?.commits30d ?? null,
-    }
-  })
+  const repos = filterPublicRepos(
+    applyExcludedToRepos(
+      reposBase.map(r => {
+        const activity = stats?.repoActivity[r.githubSlug]
+        const githubRepo = trackableGithub.find(gr => gr.name === r.githubSlug)
+          ?? stats?.repos.find(gr => gr.name === r.githubSlug)
+        return {
+          ...r,
+          adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
+          description: githubRepo?.description?.trim() || null,
+          lastCommitAt: activity?.lastCommitAt ?? null,
+          pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
+          commits30d: activity?.commits30d ?? null,
+        }
+      }),
+      excludedMap,
+    ),
+  )
 
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
 
@@ -71,6 +81,10 @@ export default async function Home() {
   const tokenMechanicGrade7Raw = stats ? calcTokenMechanicGrade(stats, '7d', allRepos) : null
   const integrityGrade30Raw = stats ? calcIntegrityGrade(stats, '30d', allRepos) : calcIntegrityGrade(null, '30d', allRepos)
   const integrityGrade7Raw = stats ? calcIntegrityGrade(stats, '7d', allRepos) : calcIntegrityGrade(null, '7d', allRepos)
+
+  const builderGrade60Raw = stats ? calcBuilderGrade(stats, '60d') : null
+  const tokenMechanicGrade60Raw = stats ? calcTokenMechanicGrade(stats, '60d', allRepos) : null
+  const integrityGrade60Raw = stats ? calcIntegrityGrade(stats, '60d', allRepos) : calcIntegrityGrade(null, '60d', allRepos)
 
   const builderGrade30 = builderGrade30Raw && stats
     ? { ...builderGrade30Raw, trendExplanation: buildBuilderTrendExplanation(stats, '30d', builderGrade30Raw.trendPct, builderGrade30Raw.trend) }
@@ -90,6 +104,9 @@ export default async function Home() {
   const integrityGrade7 = integrityGrade7Raw && stats
     ? { ...integrityGrade7Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '7d', allRepos, integrityGrade7Raw.trendPct, integrityGrade7Raw.trend) }
     : integrityGrade7Raw
+  const builderGrade60 = builderGrade60Raw
+  const tokenMechanicGrade60 = tokenMechanicGrade60Raw
+  const integrityGrade60 = integrityGrade60Raw
 
   const reposScored = countReposScored(allRepos)
   const overallGrade30 = calcOverallGradeWithTrend(
@@ -104,6 +121,15 @@ export default async function Home() {
     integrityGrade7!,
     reposScored,
   )
+  const overallGrade60Base = calcOverallGrade(
+    tokenMechanicGrade60,
+    builderGrade60,
+    integrityGrade60!,
+    reposScored,
+  )
+  const overallGrade60 = overallGrade60Base
+    ? { ...overallGrade60Base, trendPct: null, trend: 'flat' as const }
+    : null
   const overallSummary = overallGrade30
     ? await getOverallSummary(
         buildOverallGradeContext(
@@ -189,13 +215,17 @@ export default async function Home() {
       <GradesPanel
         overall30={overallGrade30}
         overall7={overallGrade7}
+        overall60={overallGrade60}
         overallSummary={overallSummary}
         builderGrade30={builderGrade30}
         builderGrade7={builderGrade7}
+        builderGrade60={builderGrade60}
         tokenMechanicGrade30={tokenMechanicGrade30}
         tokenMechanicGrade7={tokenMechanicGrade7}
+        tokenMechanicGrade60={tokenMechanicGrade60}
         integrityGrade30={integrityGrade30}
         integrityGrade7={integrityGrade7}
+        integrityGrade60={integrityGrade60}
         stats30d={
           stats
             ? {
@@ -211,6 +241,15 @@ export default async function Home() {
                 commits: stats.totalCommits7d,
                 activeDays: stats.activeDays7d,
                 newRepos: stats.newRepos7d,
+              }
+            : null
+        }
+        stats60d={
+          stats
+            ? {
+                commits: stats.totalCommits30d + stats.totalCommits30_60,
+                activeDays: stats.activeDays30d + stats.activeDays30_60,
+                newRepos: stats.newRepos30d + stats.newRepos30_60,
               }
             : null
         }
@@ -288,6 +327,32 @@ export default async function Home() {
           <div>Builder integrity — 30%: trust and alignment with stated builder vision.</div>
           <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
             When GitHub data is unavailable, the 30% activity weight redistributes proportionally between token mechanic and builder integrity.
+          </div>
+        </div>
+
+        <div
+          style={{
+            marginBottom: '24px',
+            padding: '14px 16px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.6,
+          }}
+        >
+          <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            Grade periods
+          </div>
+          <div style={{ marginBottom: '6px' }}>
+            <strong>30d</strong> — weighted by commits in the last 30 days. Best for: what&apos;s being built right now.
+          </div>
+          <div style={{ marginBottom: '6px' }}>
+            <strong>7d</strong> — weighted by commits in the last 7 days. Best for: very recent momentum.
+          </div>
+          <div>
+            <strong>60d</strong> — weighted by commits in the last 60 days. Best for: broader recent picture, less affected by short-term bursts. Repos being actively built carry more influence than dormant ones.
           </div>
         </div>
 

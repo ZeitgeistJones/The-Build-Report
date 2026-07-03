@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
 import { runAutoscoreSingle } from '@/lib/autoscore'
 import { shouldSkipRepo } from '@/lib/repoFilters'
+import { isRepoExcluded } from '@/lib/repoExclude'
 import { PAID_TX_KEY_PREFIX } from '@/lib/web3/constants'
 import { verifyPaymentTx } from '@/lib/web3/verifyPayment'
 
@@ -27,6 +28,10 @@ export async function POST(req: NextRequest) {
 
     if (shouldSkipRepo(repoSlug)) {
       return NextResponse.json({ ok: false, error: 'Repo not eligible for scoring' }, { status: 400 })
+    }
+
+    if (await isRepoExcluded(repoSlug)) {
+      return NextResponse.json({ ok: false, error: 'Repo is excluded from scoring' }, { status: 400 })
     }
 
     const redis = getRedis()

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { pctChange } from '@/lib/grades'
 import GateBlur from '@/components/wallet/GateBlur'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
+import { useGradePeriod } from '@/components/GradePeriodContext'
 
 interface Props {
   totalRepos: number
@@ -139,6 +140,7 @@ export default function AllTimeStats({
   lastCommitRepo,
 }: Props) {
   const { unlocked } = useClawdAccess()
+  const { period } = useGradePeriod()
   const gated = !unlocked
 
   return (
@@ -152,6 +154,17 @@ export default function AllTimeStats({
       }}>
         Activity snapshot
       </div>
+      {period === '60d' && (
+        <p style={{
+          fontSize: '12px',
+          color: 'var(--text-muted)',
+          lineHeight: 1.5,
+          marginBottom: '10px',
+          fontStyle: 'italic',
+        }}>
+          Activity snapshot shows 30d data — switch to 30d or 7d to align windows.
+        </p>
+      )}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(3, 1fr)',

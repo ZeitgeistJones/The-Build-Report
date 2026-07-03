@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { Repo, Tag, Status, Level, RubricRow, Score, calcRubricPct, normalizeRepoScores } from './scores'
 import { pctToLetter } from './gradeLetters'
 import { shouldSkipRepo } from './repoFilters'
+import { getExcludedSlugs } from './repoExclude'
 import { fetchRepoBySlug } from './github'
 
 let redis: Redis | null = null
@@ -234,6 +235,9 @@ export async function runAutoScores(
 
   console.log(`[autoscore] ${newRepos.length} unscored repos found`)
 
+  const excludedMap = await getExcludedSlugs()
+  const excludedSlugs = new Set(Object.keys(excludedMap).filter(k => excludedMap[k]))
+
   const r = getRedis()
   const results: Repo[] = []
   const toInfer: RawRepo[] = []
@@ -269,6 +273,7 @@ export async function runAutoScores(
   const inferred: string[] = []
 
   for (const repo of batch) {
+    if (excludedSlugs.has(repo.name)) continue
     const scored = await inferScore(repo)
     if (scored) {
       try {

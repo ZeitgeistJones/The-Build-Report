@@ -30,6 +30,7 @@ export interface Repo {
   verdict: string
   scoredAt: string
   adminNote?: string
+  excluded?: boolean
 }
 
 function calcScore(rows: RubricRow[]): number {
@@ -55,22 +56,6 @@ export function normalizeScore(score: Score): Score {
   if (!score.rubric.length || score.letter === '—') return score
   const pct = calcRubricPct(score.rubric)
   const letter = pctToLetter(pct)
-  // #region agent log
-  if (score.letter !== letter || score.pct !== pct) {
-    fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
-      body: JSON.stringify({
-        sessionId: 'a33a7a',
-        location: 'lib/scores.ts:normalizeScore',
-        message: 'resynced letter from rubric pct',
-        data: { storedLetter: score.letter, storedPct: score.pct, letter, pct },
-        timestamp: Date.now(),
-        hypothesisId: 'H1-stale-letter',
-      }),
-    }).catch(() => {})
-  }
-  // #endregion
   return { ...score, pct, letter }
 }
 

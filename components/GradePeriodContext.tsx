@@ -40,7 +40,7 @@ export function PeriodToggle() {
         padding: '3px',
       }}
     >
-      {(['30d', '7d'] as const).map(p => (
+      {(['30d', '7d', '60d'] as const).map(p => (
         <button
           key={p}
           type="button"

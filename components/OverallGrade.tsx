@@ -14,12 +14,13 @@ function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
 interface Props {
   overall30: OverallGradeWithTrend
   overall7: OverallGradeWithTrend
+  overall60: OverallGradeWithTrend
   summary: string | null
 }
 
-export default function OverallGrade({ overall30, overall7, summary }: Props) {
+export default function OverallGrade({ overall30, overall7, overall60, summary }: Props) {
   const { period } = useGradePeriod()
-  const overall = period === '30d' ? overall30 : overall7
+  const overall = period === '30d' ? overall30 : period === '7d' ? overall7 : overall60
 
   return (
     <div
@@ -66,6 +67,7 @@ export default function OverallGrade({ overall30, overall7, summary }: Props) {
         >
           {overall.pct}%
         </span>
+        {period !== '60d' && (
         <span
           style={{
             display: 'flex',
@@ -79,9 +81,10 @@ export default function OverallGrade({ overall30, overall7, summary }: Props) {
           <TrendArrow trend={overall.trend} />
           {formatTrendPct(overall.trendPct, period)}
         </span>
+        )}
       </div>
 
-      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: period === '30d' && summary ? '10px' : period === '7d' ? '10px' : 0 }}>
+      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: period === '30d' && summary ? '10px' : period === '7d' || period === '60d' ? '10px' : 0 }}>
         Based on {overall.reposScored} repos scored
       </div>
 
@@ -94,6 +97,12 @@ export default function OverallGrade({ overall30, overall7, summary }: Props) {
       {period === '7d' && (
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0, fontStyle: 'italic' }}>
           Summary is available for the 30d window only.
+        </p>
+      )}
+
+      {period === '60d' && (
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0, fontStyle: 'italic' }}>
+          Grades are commit-weighted over the last 60 days. Summary is available for the 30d window only.
         </p>
       )}
     </div>
