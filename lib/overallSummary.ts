@@ -114,26 +114,7 @@ ${SUMMARY_RULES}`
 
 export async function getOverallSummary(ctx: OverallGradeContext): Promise<string | null> {
   // Skip Claude/Redis during next build static collection — summaries run at request time.
-  if (process.env.NEXT_PHASE === 'phase-production-build') {
-    // #region agent log
-    const skipPayload = {
-      sessionId: 'a33a7a',
-      location: 'lib/overallSummary.ts:getOverallSummary',
-      message: 'Skipped summary during production build',
-      data: { period: ctx.period, nextPhase: process.env.NEXT_PHASE },
-      timestamp: Date.now(),
-      hypothesisId: 'H2',
-      runId: 'build-verify',
-    }
-    console.log('[debug-a33a7a]', JSON.stringify(skipPayload))
-    fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
-      body: JSON.stringify(skipPayload),
-    }).catch(() => {})
-    // #endregion
-    return null
-  }
+  if (process.env.NEXT_PHASE === 'phase-production-build') return null
 
   const key = SUMMARY_KEYS[ctx.period]
 
@@ -146,23 +127,6 @@ export async function getOverallSummary(ctx: OverallGradeContext): Promise<strin
   }
 
   const summary = await generateOverallSummary(ctx)
-  // #region agent log
-  const claudePayload = {
-    sessionId: 'a33a7a',
-    location: 'lib/overallSummary.ts:getOverallSummary',
-    message: 'Claude summary generation finished',
-    data: { period: ctx.period, hasSummary: Boolean(summary), nextPhase: process.env.NEXT_PHASE ?? null },
-    timestamp: Date.now(),
-    hypothesisId: 'H2',
-    runId: 'build-verify',
-  }
-  console.log('[debug-a33a7a]', JSON.stringify(claudePayload))
-  fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
-    body: JSON.stringify(claudePayload),
-  }).catch(() => {})
-  // #endregion
   if (!summary) return null
 
   try {

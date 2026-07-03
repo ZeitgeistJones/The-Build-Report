@@ -23,36 +23,7 @@ import { GradePeriodProvider } from '@/components/GradePeriodContext'
 
 export const dynamic = 'force-dynamic'
 
-function debugBuildLog(
-  location: string,
-  message: string,
-  data: Record<string, unknown>,
-  hypothesisId: string,
-) {
-  const payload = {
-    sessionId: 'a33a7a',
-    location,
-    message,
-    data,
-    timestamp: Date.now(),
-    hypothesisId,
-    runId: 'build-verify',
-  }
-  console.log('[debug-a33a7a]', JSON.stringify(payload))
-  // #region agent log
-  fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
-    body: JSON.stringify(payload),
-  }).catch(() => {})
-  // #endregion
-}
-
 export default async function Home() {
-  debugBuildLog('app/page.tsx:Home', 'Home render started', {
-    nextPhase: process.env.NEXT_PHASE ?? null,
-    nodeEnv: process.env.NODE_ENV ?? null,
-  }, 'H1')
   let stats
   let error = false
   const lastGithubScanAt = await getLastGithubScanAt()
