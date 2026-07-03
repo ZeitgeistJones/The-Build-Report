@@ -96,6 +96,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
         throw new Error(data.error || 'Scoring failed')
       }
       const summary = typeof data.changeSummary === 'string' ? data.changeSummary : null
+      // #region agent log
+      fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoScoreButton.tsx:handleClick',message:'autoscore API success',data:{repoSlug,returnedId:(data.repo as Repo)?.id,summaryLen:summary?.length??0},timestamp:Date.now(),hypothesisId:'A,G'})}).catch(()=>{});
+      // #endregion
       setChangeSummary(summary)
       onScored(data.repo as Repo, summary)
     } catch (err) {
