@@ -242,7 +242,7 @@ export default function AdminPage() {
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Chronicle context</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px' }}>
-            Paste a condensed Chronicle summary here. It is prepended to paid rescore prompts so new scores can reference the same grounding as original hand-scored repos.
+            Paste a condensed Chronicle summary here. It is prepended to paid rescore prompts so new scores can reference the same grounding as launch baseline repos.
           </p>
         </div>
         <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>

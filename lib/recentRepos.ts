@@ -21,7 +21,7 @@ export function makeUnscoredRecentRepo(gh: GitHubRepo): Repo {
       pct: 0,
       rubric: [],
     },
-    verdict: 'This repo was recently pushed on GitHub but has not been hand-scored or auto-inferred yet.',
+    verdict: 'This repo was recently pushed on GitHub but has not received a launch baseline or live AI score yet.',
     scoredAt,
     adminNote: 'Unscored — visible because it was recently pushed on GitHub.',
   }

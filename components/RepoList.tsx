@@ -16,6 +16,15 @@ import { Period } from '@/lib/grades'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
+import InfoTooltip from '@/components/InfoTooltip'
+import {
+  CONFIDENCE_LABEL,
+  formatBaselineDate,
+  getConfidenceTooltip,
+  isLaunchBaseline,
+  looksLikeBaselineDate,
+  RESCORE_SUMMARY_NOTE,
+} from '@/lib/scoringCopy'
 
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
@@ -48,7 +57,7 @@ const GITHUB_COMMITS_CAP = 100
 
 type ScoreAgeDisplay =
   | { kind: 'hidden' }
-  | { kind: 'hand_scored'; label: string }
+  | { kind: 'baseline'; label: string }
   | { kind: 'auto_count'; count: number; capped: boolean }
   | { kind: 'auto_age'; days: number }
 
@@ -127,72 +136,17 @@ const LEVEL_STYLES: Record<Level, { color: string; bg: string }> = {
   low: { color: '#e05c5c', bg: 'rgba(224,92,92,0.1)' },
 }
 
-const CONFIDENCE_LABEL: Record<Confidence, string> = {
-  high: 'High confidence',
-  mid: 'Medium confidence',
-  low: 'Low confidence',
-}
-
-const CONFIDENCE_TOOLTIP: Record<Confidence, string> = {
-  high: 'Score based on a detailed repo description and clear ecosystem context. Claude had strong signal to work with.',
-  mid: 'Score based on partial repo metadata. Some inference required — treat as a reasonable estimate.',
-  low: 'Score based on repo name and ecosystem context only — no description available. Treat as a starting point; a Rescore with more repo context may improve accuracy.',
-}
-
-function ConfidenceLabel({ confidence }: { confidence: Confidence }) {
-  const [showTooltip, setShowTooltip] = useState(false)
-  const isMobile = useIsMobile()
+function ConfidenceLabel({ confidence, isBaseline }: { confidence: Confidence; isBaseline: boolean }) {
   const label = CONFIDENCE_LABEL[confidence]
-  const tooltip = CONFIDENCE_TOOLTIP[confidence]
+  const tooltip = getConfidenceTooltip(isBaseline)
 
   return (
-    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
       <span>{label}</span>
-      <button
-        type="button"
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        onClick={() => setShowTooltip(s => !s)}
-        aria-label={`About ${label.toLowerCase()}`}
-        style={{
-          width: isMobile ? MIN_TAP : 14,
-          height: isMobile ? MIN_TAP : 14,
-          borderRadius: '50%',
-          background: 'transparent',
-          color: 'var(--text-muted)',
-          fontSize: '11px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          cursor: 'default',
-          padding: 0,
-        }}
-      >
-        ⓘ
-      </button>
-      {showTooltip && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            right: 0,
-            background: 'var(--surface-3)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: 'var(--radius)',
-            padding: '8px 10px',
-            fontSize: '12px',
-            color: 'var(--text-secondary)',
-            lineHeight: 1.5,
-            width: isMobile ? 'min(280px, calc(100vw - 32px))' : '260px',
-            zIndex: 10,
-            pointerEvents: 'none',
-            textAlign: 'left',
-          }}
-        >
-          {tooltip}
-        </div>
-      )}
+      <InfoTooltip
+        content={tooltip}
+        ariaLabel={`About ${label.toLowerCase()}`}
+      />
     </div>
   )
 }
@@ -209,6 +163,7 @@ function formatScoredDateLabel(scoredAt: string | null | undefined): string {
 function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
   const rescoreDate = formatScoredDateLabel(meta.rescoreAt)
   const oldDate = formatScoredDateLabel(meta.oldScoredAt)
+  const fromBaseline = looksLikeBaselineDate(meta.oldScoredAt)
 
   return (
     <div style={{
@@ -227,10 +182,15 @@ function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
         color: 'var(--accent)',
         textTransform: 'uppercase',
         letterSpacing: '0.04em',
-        marginBottom: '8px',
+        marginBottom: fromBaseline ? '4px' : '8px',
       }}>
         Last rescore · {rescoreDate}
       </div>
+      {fromBaseline && (
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+          {RESCORE_SUMMARY_NOTE}
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: meta.summary ? '8px' : 0, fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
         <div>
           <span style={{ color: 'var(--text-muted)' }}>Token mechanic: </span>
@@ -282,22 +242,15 @@ function daysSinceScored(scoredAt: string | null | undefined): number | null {
   return (Date.now() - scored.getTime()) / MS_PER_DAY
 }
 
-function isHandScored(repo: RepoWithLive): boolean {
-  return !isAutoInferredNote(repo.adminNote)
-}
-
-function formatHandScoredDate(scoredAt: string): string {
-  const scored = parseScoredAt(scoredAt)
-  if (!scored) return 'Scored'
-  const dateLabel = scored.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return `Scored ${dateLabel}`
+function isLaunchBaselineRepo(repo: RepoWithLive): boolean {
+  return isLaunchBaseline(repo.adminNote)
 }
 
 function getScoreAgeDisplay(repo: RepoWithLive, pending: boolean): ScoreAgeDisplay {
   if (pending || !repo.scoredAt) return { kind: 'hidden' }
 
-  if (isHandScored(repo)) {
-    return { kind: 'hand_scored', label: formatHandScoredDate(repo.scoredAt) }
+  if (isLaunchBaselineRepo(repo)) {
+    return { kind: 'baseline', label: formatBaselineDate(repo.scoredAt) }
   }
 
   const days = daysSinceScored(repo.scoredAt)
@@ -550,7 +503,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 ...(isMobile ? { lineHeight: 1.45 } : {}),
               }}>
                 Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}{commitSuffix}
-                {sinceScored.kind === 'hand_scored' && (
+                {sinceScored.kind === 'baseline' && (
                   <>
                     {' · '}
                     <span style={{ color: META_MUTED }}>{sinceScored.label}</span>
@@ -641,7 +594,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 color: 'var(--text-muted)',
                 lineHeight: 1.5,
               }}>
-                This repo was recently pushed on GitHub and appears here for recency tracking. Run autoscore or hand-score to add rubric grades.
+                This repo was recently pushed on GitHub and appears here for recency tracking. Run autoscore or Score to add rubric grades.
               </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '14px' }}>
@@ -769,7 +722,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
             )}
 
             <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
-              <ConfidenceLabel confidence={repo.confidence} />
+              <ConfidenceLabel confidence={repo.confidence} isBaseline={isLaunchBaselineRepo(repo)} />
             </div>
           </div>
         )}

@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useRef, useLayoutEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { useState } from 'react'
 import { useSendTransaction } from 'wagmi'
 import { waitForTransactionReceipt } from '@wagmi/core'
 import { base } from 'wagmi/chains'
@@ -11,9 +10,8 @@ import { RECEIVER_BUY_AND_BURN, SCORE_PAYMENT_WEI } from '@/lib/web3/constants'
 import { ScoringStatus } from '@/lib/scoringStatus'
 import { useClawdAccess } from './wallet/ClawdAccessContext'
 import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
-
-const TOOLTIP =
-  'Score this repo using Claude AI. Cost: 0.000008 ETH (~$0.02 at time of writing — ETH price fluctuates so actual USD cost may vary). Payment is burned as $CLAWD via the receiver-buy-and-burn contract, supporting the ecosystem. Result is cached — community benefits from your score.'
+import InfoTooltip from '@/components/InfoTooltip'
+import { RESCORE_BUTTON_TOOLTIP } from '@/lib/scoringCopy'
 
 interface Props {
   repoSlug: string
@@ -21,28 +19,24 @@ interface Props {
   onScored: (repo: Repo, rescoreMeta?: RescoreSummaryRecord | null) => void
 }
 
+function RescoreTooltipContent() {
+  return (
+    <>
+      {RESCORE_BUTTON_TOOLTIP}{' '}
+      <a href="/about#score-types" style={{ color: 'var(--accent)' }} onClick={e => e.stopPropagation()}>
+        About score types ↗
+      </a>
+    </>
+  )
+}
+
 export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: Props) {
   const { isConnected, hasAccess, connectWallet, address, isWrongChain, switchToBase } = useClawdAccess()
-  const [showTooltip, setShowTooltip] = useState(false)
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null)
   const [inlineMsg, setInlineMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<'idle' | 'paying' | 'scoring'>('idle')
-  const tooltipAnchorRef = useRef<HTMLButtonElement>(null)
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction()
-
-  useLayoutEffect(() => {
-    if (!showTooltip || !tooltipAnchorRef.current) {
-      setTooltipPos(null)
-      return
-    }
-    const rect = tooltipAnchorRef.current.getBoundingClientRect()
-    setTooltipPos({
-      top: rect.top - 6,
-      left: Math.max(8, rect.right - 240),
-    })
-  }, [showTooltip])
 
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
   const busy = phase !== 'idle' || isSending
@@ -95,9 +89,6 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
         throw new Error(data.error || 'Scoring failed')
       }
       const rescoreMeta = data.rescoreMeta as RescoreSummaryRecord | undefined
-      // #region agent log
-      fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoScoreButton.tsx:handleClick',message:'autoscore API success',data:{repoSlug,returnedId:(data.repo as Repo)?.id,summaryLen:rescoreMeta?.summary?.length??0},timestamp:Date.now(),hypothesisId:'A,G'})}).catch(()=>{});
-      // #endregion
       onScored(data.repo as Repo, rescoreMeta ?? null)
       setInlineMsg('Rescore saved — expand card to see what changed.')
     } catch (err) {
@@ -130,31 +121,14 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
         >
           {busy ? (phase === 'paying' || isSending ? 'Paying…' : 'Scoring…') : label}
         </button>
-        <button
-          ref={tooltipAnchorRef}
-          type="button"
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
-          onClick={e => {
-            e.stopPropagation()
-            setShowTooltip(s => !s)
-          }}
-          style={{
-            width: '14px',
-            height: '14px',
-            borderRadius: '50%',
-            background: 'var(--surface-3)',
-            color: 'var(--text-muted)',
-            fontSize: '9px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            cursor: 'default',
-          }}
-        >
-          ?
-        </button>
+        <InfoTooltip
+          content={<RescoreTooltipContent />}
+          ariaLabel="About Score and Rescore"
+          icon="question"
+          placement="above"
+          width={240}
+          interactive
+        />
       </div>
       {inlineMsg && (
         <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '4px', lineHeight: 1.3, maxWidth: '140px' }}>
@@ -165,30 +139,6 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
         <div style={{ fontSize: '10px', color: 'var(--red)', marginTop: '4px', lineHeight: 1.3 }}>
           {error}
         </div>
-      )}
-      {showTooltip && tooltipPos && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            top: tooltipPos.top,
-            left: tooltipPos.left,
-            transform: 'translateY(-100%)',
-            background: 'var(--surface-3)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: 'var(--radius)',
-            padding: '8px 10px',
-            fontSize: '11px',
-            color: 'var(--text-secondary)',
-            lineHeight: 1.5,
-            width: '240px',
-            zIndex: 9999,
-            pointerEvents: 'none',
-            textAlign: 'left',
-          }}
-        >
-          {TOOLTIP}
-        </div>,
-        document.body,
       )}
     </div>
   )

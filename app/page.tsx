@@ -344,6 +344,26 @@ export default async function Home() {
             lineHeight: 1.6,
           }}
         >
+          Three ways a grade gets on a card:{' '}
+          <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>launch baseline</strong>{' '}
+          (fixed Jun 15 snapshot),{' '}
+          <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>live AI</strong>{' '}
+          (auto-inferred or paid Rescore). They use different methods — see{' '}
+          <a href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</a>.
+        </div>
+
+        <div
+          style={{
+            marginBottom: '24px',
+            padding: '14px 16px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.6,
+          }}
+        >
           <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
             Overall grade weights
           </div>
@@ -547,7 +567,7 @@ export default async function Home() {
           <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">
             github.com/clawdbotatg
           </a>{' '}
-          and the clawdbotatg Chronicle. Scores are interpretive and updated manually. If you think a score is wrong, that conversation should happen in the open.
+          and the clawdbotatg Chronicle. Scores are interpretive — launch baseline grades are a fixed snapshot; live AI scores update via Rescore. If you think a score is wrong, that conversation should happen in the open.
         </div>
       </div>
     </>

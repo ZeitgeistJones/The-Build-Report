@@ -120,7 +120,7 @@ Based on the repo name, description, and ecosystem context, infer:
 3. tokenMechanic rubric (3 rows — ALWAYS include, use adapted criteria for infrastructure/theoretical)
 4. builderIntegrity rubric (3 rows)
 5. verdict: 2-3 sentence plain English assessment
-6. adminNote: one sentence flagging this is auto-inferred, not hand-scored
+6. adminNote: one sentence flagging this is auto-inferred live AI, not a launch baseline score
 
 When writing verdict and adminNote, frame low scores constructively and acknowledge the repo's role even when it scores low. Still be accurate — do not invent positive framing that is not warranted. Examples:
 - Infrastructure repos scoring low on token mechanic: say "foundational layer — value shows up in downstream consumer apps" rather than only "no burn mechanic."
@@ -149,7 +149,7 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
     { "label": "...", "weight": "25%", "level": "mid", "source": "..." }
   ],
   "verdict": "...",
-  "adminNote": "Scores auto-inferred from repo name and ecosystem context. Not hand-scored — treat as a starting point."
+  "adminNote": "Live AI score — inferred from repo name and ecosystem context. Not a launch baseline; treat as a starting point."
 }`
 
   try {

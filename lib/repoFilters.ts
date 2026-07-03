@@ -8,5 +8,6 @@ export function shouldSkipRepo(name: string): boolean {
 }
 
 export function isAutoInferredNote(note: string | undefined): boolean {
-  return (note ?? '').startsWith('Scores auto-inferred')
+  if (!note) return false
+  return note.startsWith('Scores auto-inferred') || note.startsWith('Live AI score')
 }

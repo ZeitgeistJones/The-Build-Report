@@ -1,0 +1,174 @@
+'use client'
+
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { MIN_TAP } from '@/lib/responsive'
+
+const HOVER_DELAY_MS = 400
+
+type Placement = 'above' | 'below'
+
+interface Props {
+  content: ReactNode
+  ariaLabel: string
+  icon?: 'info' | 'question'
+  placement?: Placement
+  width?: number
+  /** When true, tooltip panel accepts clicks (e.g. links inside). */
+  interactive?: boolean
+}
+
+export default function InfoTooltip({
+  content,
+  ariaLabel,
+  icon = 'info',
+  placement = 'below',
+  width = 260,
+  interactive = false,
+}: Props) {
+  const isMobile = useIsMobile()
+  const [show, setShow] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const anchorRef = useRef<HTMLButtonElement>(null)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function clearHoverTimer() {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = null
+    }
+  }
+
+  function scheduleShow() {
+    clearHoverTimer()
+    hoverTimerRef.current = setTimeout(() => setShow(true), HOVER_DELAY_MS)
+  }
+
+  function handleMouseEnter() {
+    if (isMobile) return
+    scheduleShow()
+  }
+
+  function handleMouseLeave() {
+    if (isMobile) return
+    clearHoverTimer()
+    setShow(false)
+  }
+
+  function handleClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    clearHoverTimer()
+    setShow(s => !s)
+  }
+
+  useEffect(() => {
+    if (!show || !interactive) return
+    function onDocClick() {
+      setShow(false)
+    }
+    const timer = setTimeout(() => {
+      document.addEventListener('click', onDocClick)
+    }, 0)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('click', onDocClick)
+    }
+  }, [show, interactive])
+
+  useLayoutEffect(() => {
+    if (!show || !anchorRef.current) {
+      setPos(null)
+      return
+    }
+    if (placement === 'below' && !interactive) return
+
+    const rect = anchorRef.current.getBoundingClientRect()
+    const panelWidth = isMobile ? Math.min(width, window.innerWidth - 32) : width
+    const left = Math.max(8, Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8))
+
+    if (placement === 'above') {
+      setPos({ top: rect.top - 6, left })
+    } else {
+      setPos({ top: rect.bottom + 6, left })
+    }
+  }, [show, isMobile, width, placement, interactive])
+
+  const size = isMobile ? MIN_TAP : 14
+  const iconChar = icon === 'question' ? '?' : 'ⓘ'
+  const usePortal = placement === 'above' || interactive
+
+  const panelStyle = {
+    background: 'var(--surface-3)',
+    border: '1px solid var(--border-strong)',
+    borderRadius: 'var(--radius)',
+    padding: '8px 10px',
+    fontSize: icon === 'question' ? '11px' : '12px',
+    color: 'var(--text-secondary)',
+    lineHeight: 1.5,
+    width: isMobile ? `min(${width}px, calc(100vw - 32px))` : `${width}px`,
+    textAlign: 'left' as const,
+  }
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      <button
+        ref={anchorRef}
+        type="button"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
+        aria-label={ariaLabel}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          background: icon === 'question' ? 'var(--surface-3)' : 'transparent',
+          color: 'var(--text-muted)',
+          fontSize: icon === 'question' ? '9px' : '11px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          cursor: 'default',
+          padding: 0,
+          border: 'none',
+        }}
+      >
+        {iconChar}
+      </button>
+      {show && !usePortal && (
+        <div
+          style={{
+            ...panelStyle,
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            right: 0,
+            zIndex: 10,
+            pointerEvents: 'none',
+          }}
+        >
+          {content}
+        </div>
+      )}
+      {show && usePortal && pos && createPortal(
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            ...panelStyle,
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            transform: placement === 'above' ? 'translateY(-100%)' : undefined,
+            zIndex: 9999,
+            pointerEvents: interactive ? 'auto' : 'none',
+            width: isMobile ? Math.min(width, window.innerWidth - 32) : width,
+          }}
+        >
+          {content}
+        </div>,
+        document.body,
+      )}
+    </div>
+  )
+}
