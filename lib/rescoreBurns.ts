@@ -33,7 +33,7 @@ export async function recordRescoreBurn(redisClient: Redis): Promise<void> {
 export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
   try {
     const r = getRedis()
-    const [countRaw, ethRaw] = await r.mget<number>(RESCORE_COUNT_KEY, ETH_TOTAL_KEY)
+    const [countRaw, ethRaw] = await r.mget<[number, number]>(RESCORE_COUNT_KEY, ETH_TOTAL_KEY)
     const count = typeof countRaw === 'number' ? countRaw : 0
     const ethTotal = typeof ethRaw === 'number' ? ethRaw : 0
     return { count, ethTotal }
