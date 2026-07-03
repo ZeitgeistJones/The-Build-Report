@@ -3,10 +3,11 @@ import { Redis } from '@upstash/redis'
 import { resolveRepoBeforeRescore, runAutoscoreSingle } from '@/lib/autoscore'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { isRepoExcluded } from '@/lib/repoExclude'
-import { fetchRecentCommitMessages } from '@/lib/github'
+import { fetchRecentCommitMessages, fetchCommits30dCount } from '@/lib/github'
 import { bustOverallSummaryCache } from '@/lib/overallSummary'
 import { recordRescoreBurn } from '@/lib/rescoreBurns'
 import { generateRescoreChangeSummary } from '@/lib/rescoreChangeSummary'
+import { buildRescoreSummaryRecord, saveRescoreSummary } from '@/lib/rescoreSummaries'
 import { PAID_TX_KEY_PREFIX } from '@/lib/web3/constants'
 import { verifyPaymentTx } from '@/lib/web3/verifyPayment'
 
@@ -48,7 +49,10 @@ export async function POST(req: NextRequest) {
     await verifyPaymentTx(txHash, walletAddress)
 
     const oldRepo = await resolveRepoBeforeRescore(repoSlug)
-    const commitMessages = await fetchRecentCommitMessages(repoSlug)
+    const [commitMessages, commits30dAtRescore] = await Promise.all([
+      fetchRecentCommitMessages(repoSlug),
+      fetchCommits30dCount(repoSlug),
+    ])
 
     const repo = await runAutoscoreSingle(repoSlug)
     if (!repo) {
@@ -61,11 +65,19 @@ export async function POST(req: NextRequest) {
       commitMessages,
     })
 
+    const rescoreMeta = buildRescoreSummaryRecord({
+      oldRepo,
+      newRepo: repo,
+      summary: changeSummary,
+      commits30dAtRescore,
+    })
+    await saveRescoreSummary(repoSlug, rescoreMeta, redis)
+
     await redis.set(paidKey, repoSlug, { ex: 60 * 60 * 24 * 7 })
     await bustOverallSummaryCache(redis)
     await recordRescoreBurn(redis)
 
-    return NextResponse.json({ ok: true, repo, changeSummary })
+    return NextResponse.json({ ok: true, repo, changeSummary, rescoreMeta })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Request failed'
     return NextResponse.json({ ok: false, error: message }, { status: 400 })

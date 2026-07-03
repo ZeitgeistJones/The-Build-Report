@@ -310,6 +310,19 @@ export async function fetchRepoBySlug(slug: string): Promise<GitHubRepo | null> 
   }
 }
 
+export async function fetchCommits30dCount(slug: string): Promise<number> {
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const commits = await ghFetch(
+      `/repos/${GITHUB_ORG}/${slug}/commits?since=${since}&per_page=100`,
+      { fresh: true },
+    )
+    return Array.isArray(commits) ? commits.length : 0
+  } catch {
+    return 0
+  }
+}
+
 export async function fetchRecentCommitMessages(slug: string, limit = 10): Promise<string[]> {
   try {
     const commits = await ghFetch(

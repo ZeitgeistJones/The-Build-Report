@@ -22,6 +22,7 @@ import AllTimeStats from '@/components/AllTimeStats'
 import HomeHeader from '@/components/HomeHeader'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
+import { getRescoreSummaries } from '@/lib/rescoreSummaries'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,6 +77,8 @@ export default async function Home() {
   const repos: RepoWithLive[] = filterPublicRepos(
     applyExcludedToRepos(reposWithLive, excludedMap),
   )
+
+  const rescoreSummaries = await getRescoreSummaries(repos.map(r => r.githubSlug)).catch(() => ({}))
 
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
 
@@ -297,7 +300,7 @@ export default async function Home() {
       )}
 
       <div style={{ marginBottom: '40px' }}>
-      <RepoList repos={repos} githubSlugOrder={githubOrder} />
+      <RepoList repos={repos} githubSlugOrder={githubOrder} initialRescoreSummaries={rescoreSummaries} />
       </div>
 
       {(chronicle?.lastUpdated || chronicle?.summary) && (

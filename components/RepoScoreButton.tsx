@@ -10,6 +10,7 @@ import { wagmiConfig } from '@/lib/wagmi/config'
 import { RECEIVER_BUY_AND_BURN, SCORE_PAYMENT_WEI } from '@/lib/web3/constants'
 import { ScoringStatus } from '@/lib/scoringStatus'
 import { useClawdAccess } from './wallet/ClawdAccessContext'
+import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
 
 const TOOLTIP =
   'Score this repo using Claude AI. Cost: 0.000008 ETH (~$0.02 at time of writing — ETH price fluctuates so actual USD cost may vary). Payment is burned as $CLAWD via the receiver-buy-and-burn contract, supporting the ecosystem. Result is cached — community benefits from your score.'
@@ -17,7 +18,7 @@ const TOOLTIP =
 interface Props {
   repoSlug: string
   scoringStatus: ScoringStatus
-  onScored: (repo: Repo, changeSummary?: string | null) => void
+  onScored: (repo: Repo, rescoreMeta?: RescoreSummaryRecord | null) => void
 }
 
 export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: Props) {
@@ -27,7 +28,6 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
   const [inlineMsg, setInlineMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<'idle' | 'paying' | 'scoring'>('idle')
-  const [changeSummary, setChangeSummary] = useState<string | null>(null)
   const tooltipAnchorRef = useRef<HTMLButtonElement>(null)
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction()
@@ -52,7 +52,6 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
     e.preventDefault()
     setError(null)
     setInlineMsg(null)
-    setChangeSummary(null)
 
     if (!isConnected) {
       connectWallet()
@@ -95,12 +94,12 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
       if (!data.ok) {
         throw new Error(data.error || 'Scoring failed')
       }
-      const summary = typeof data.changeSummary === 'string' ? data.changeSummary : null
+      const rescoreMeta = data.rescoreMeta as RescoreSummaryRecord | undefined
       // #region agent log
-      fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoScoreButton.tsx:handleClick',message:'autoscore API success',data:{repoSlug,returnedId:(data.repo as Repo)?.id,summaryLen:summary?.length??0},timestamp:Date.now(),hypothesisId:'A,G'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoScoreButton.tsx:handleClick',message:'autoscore API success',data:{repoSlug,returnedId:(data.repo as Repo)?.id,summaryLen:rescoreMeta?.summary?.length??0},timestamp:Date.now(),hypothesisId:'A,G'})}).catch(()=>{});
       // #endregion
-      setChangeSummary(summary)
-      onScored(data.repo as Repo, summary)
+      onScored(data.repo as Repo, rescoreMeta ?? null)
+      setInlineMsg('Rescore saved — expand card to see what changed.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -158,26 +157,13 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, onScored }: P
         </button>
       </div>
       {inlineMsg && (
-        <div style={{ fontSize: '10px', color: 'var(--amber)', marginTop: '4px', lineHeight: 1.3 }}>
+        <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '4px', lineHeight: 1.3, maxWidth: '140px' }}>
           {inlineMsg}
         </div>
       )}
       {error && (
         <div style={{ fontSize: '10px', color: 'var(--red)', marginTop: '4px', lineHeight: 1.3 }}>
           {error}
-        </div>
-      )}
-      {changeSummary && (
-        <div style={{
-          marginTop: '6px',
-          fontSize: '10px',
-          color: 'var(--text-muted)',
-          lineHeight: 1.4,
-          textAlign: 'left',
-          maxWidth: '180px',
-        }}>
-          <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>What changed: </span>
-          {changeSummary}
         </div>
       )}
       {showTooltip && tooltipPos && createPortal(

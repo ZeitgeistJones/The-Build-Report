@@ -15,6 +15,7 @@ import { useGradePeriod } from '@/components/GradePeriodContext'
 import { Period } from '@/lib/grades'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
+import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
 
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
@@ -196,6 +197,68 @@ function ConfidenceLabel({ confidence }: { confidence: Confidence }) {
   )
 }
 
+function formatScoredDateLabel(scoredAt: string | null | undefined): string {
+  if (!scoredAt) return 'unknown'
+  const d = new Date(scoredAt)
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+  return scoredAt
+}
+
+function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
+  const rescoreDate = formatScoredDateLabel(meta.rescoreAt)
+  const oldDate = formatScoredDateLabel(meta.oldScoredAt)
+
+  return (
+    <div style={{
+      marginBottom: '14px',
+      padding: '10px 12px',
+      background: 'var(--surface-2)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      fontSize: '12px',
+      color: 'var(--text-secondary)',
+      lineHeight: 1.55,
+    }}>
+      <div style={{
+        fontSize: '11px',
+        fontWeight: 500,
+        color: 'var(--accent)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        marginBottom: '8px',
+      }}>
+        Last rescore · {rescoreDate}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: meta.summary ? '8px' : 0, fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+        <div>
+          <span style={{ color: 'var(--text-muted)' }}>Token mechanic: </span>
+          {meta.oldTokenMechanic ?? 'N/A'} → {meta.newTokenMechanic ?? 'N/A'}
+        </div>
+        <div>
+          <span style={{ color: 'var(--text-muted)' }}>Builder integrity: </span>
+          {meta.oldBuilderIntegrity} → {meta.newBuilderIntegrity}
+        </div>
+        <div>
+          <span style={{ color: 'var(--text-muted)' }}>Scored: </span>
+          {oldDate} → {formatScoredDateLabel(meta.newScoredAt)}
+        </div>
+        <div>
+          <span style={{ color: 'var(--text-muted)' }}>Commits (30d at rescore): </span>
+          {meta.commits30dAtRescore.toLocaleString()}
+        </div>
+      </div>
+      {meta.summary && (
+        <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+          <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>What changed: </span>
+          {meta.summary}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function githubOrderIndex(slug: string, order: string[]): number {
   const idx = order.indexOf(slug)
   return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
@@ -276,13 +339,15 @@ export type { RepoWithLive }
 interface Props {
   repos: RepoWithLive[]
   githubSlugOrder?: string[]
+  initialRescoreSummaries?: Record<string, RescoreSummaryRecord>
 }
 
-export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
+export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSummaries = {} }: Props) {
   const [activeFilter, setActiveFilter] = useState<Tag | 'all'>('all')
   const [density, setDensity] = useState<Density>('compact')
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
+  const [rescoreSummaries, setRescoreSummaries] = useState(initialRescoreSummaries)
   const { unlocked } = useClawdAccess()
   const { period } = useGradePeriod()
   const isMobile = useIsMobile()
@@ -296,16 +361,21 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     setRepoItems(repos)
   }, [repos])
 
-  function handleScored(updated: Repo, changeSummary?: string | null) {
+  function handleScored(updated: Repo, rescoreMeta?: RescoreSummaryRecord | null) {
     // #region agent log
-    fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoList.tsx:handleScored',message:'rescore completed',data:{updatedId:updated.id,updatedSlug:updated.githubSlug,summaryLen:changeSummary?.length??0,expandedIds:Array.from(expandedIds)},timestamp:Date.now(),hypothesisId:'A,G'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoList.tsx:handleScored',message:'rescore completed',data:{updatedId:updated.id,updatedSlug:updated.githubSlug,summaryLen:rescoreMeta?.summary?.length??0,expandedSlugs:Array.from(expandedSlugs)},timestamp:Date.now(),hypothesisId:'A,G'})}).catch(()=>{});
     // #endregion
+    if (rescoreMeta) {
+      setRescoreSummaries(prev => ({ ...prev, [updated.githubSlug]: rescoreMeta }))
+    }
     setRepoItems(prev =>
       prev.map(r =>
         r.githubSlug === updated.githubSlug
           ? {
               ...r,
               ...updated,
+              id: r.id,
+              githubSlug: r.githubSlug,
               scoredAt: updated.scoredAt,
               adminNote: updated.adminNote,
               description: r.description,
@@ -349,14 +419,14 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     return isAutoInferredNote(repo.adminNote)
   }
 
-  function toggleExpand(id: string) {
-    setExpandedIds(prev => {
+  function toggleExpand(slug: string) {
+    setExpandedSlugs(prev => {
       const next = new Set(prev)
-      const wasExpanded = next.has(id)
-      if (wasExpanded) next.delete(id)
-      else next.add(id)
+      const wasExpanded = next.has(slug)
+      if (wasExpanded) next.delete(slug)
+      else next.add(slug)
       // #region agent log
-      fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoList.tsx:toggleExpand',message:'toggle expand',data:{id,wasExpanded,nowExpanded:!wasExpanded,nextSize:next.size},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoList.tsx:toggleExpand',message:'toggle expand',data:{slug,wasExpanded,nowExpanded:!wasExpanded,nextSize:next.size},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
       // #endregion
       return next
     })
@@ -366,7 +436,8 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
   const gatedRepos = unlocked ? [] : filtered.slice(3)
 
   function renderRepoCard(repo: RepoWithLive) {
-    const isExpanded = expandedIds.has(repo.id)
+    const isExpanded = expandedSlugs.has(repo.githubSlug)
+    const rescoreMeta = rescoreSummaries[repo.githubSlug]
     const ts = TAG_STYLES[repo.tag]
     const borderColor = TAG_BORDER_COLORS[repo.tag]
     const auto = isAutoInferred(repo)
@@ -378,7 +449,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
 
     return (
       <div
-        key={repo.id}
+        key={repo.githubSlug}
         style={{
           background: 'var(--surface-1)',
           border: '1px solid var(--border)',
@@ -403,7 +474,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
               // #region agent log
               fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoList.tsx:expand-btn-click',message:'expand button clicked',data:{repoId:repo.id,repoSlug:repo.githubSlug,isExpandedBefore:isExpanded,targetTag:(e.target as HTMLElement)?.tagName},timestamp:Date.now(),hypothesisId:'B,E'})}).catch(()=>{});
               // #endregion
-              toggleExpand(repo.id)
+              toggleExpand(repo.githubSlug)
             }}
             aria-expanded={isExpanded}
             style={{
@@ -669,6 +740,8 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
               </div>
               )}
             </div>
+
+            {rescoreMeta && <RescoreSummaryBlock meta={rescoreMeta} />}
 
             <div style={{
               borderTop: '1px solid var(--border)',
