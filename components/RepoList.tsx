@@ -166,7 +166,11 @@ function getScoreAgeDisplay(repo: RepoWithLive, pending: boolean): ScoreAgeDispl
   }
 
   const days = daysSinceScored(repo.scoredAt)
-  if (days === null || days < 1) return { kind: 'hidden' }
+  if (days === null) return { kind: 'hidden' }
+
+  if (days < 1) {
+    return { kind: 'auto_count', count: 0, capped: false }
+  }
 
   if (days <= 30) {
     const commits30d = repo.commits30d ?? 0
@@ -222,6 +226,8 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
           ? {
               ...r,
               ...updated,
+              scoredAt: updated.scoredAt,
+              adminNote: updated.adminNote,
               description: r.description,
               lastCommitAt: r.lastCommitAt,
               pushedAt: r.pushedAt,

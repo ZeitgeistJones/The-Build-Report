@@ -138,3 +138,9 @@ export async function getOverallSummary(ctx: OverallGradeContext): Promise<strin
 
   return summary
 }
+
+export const OVERALL_SUMMARY_CACHE_KEYS = Object.values(SUMMARY_KEYS)
+
+export async function bustOverallSummaryCache(redis: Redis): Promise<void> {
+  await Promise.all(OVERALL_SUMMARY_CACHE_KEYS.map(key => redis.del(key)))
+}
