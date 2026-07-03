@@ -27,7 +27,7 @@ This is not a real-time data feed. Scores are updated manually. GitHub activity 
         },
         {
           heading: 'How scores are assigned',
-          body: `Every repo receives up to two scores: token mechanic and builder integrity. Each score is built from three weighted components, each rated low / mid / high, with a cited source.
+          body: `Every repo receives up to two scores: token mechanic and builder integrity. Each score is built from three weighted rubric components, each contributing to a numeric score from 0–100. That percentage maps to a letter grade from A+ down through F (F is below 60%), with a cited source for each component.
 
 Infrastructure and theoretical repos use adapted token mechanic criteria — enables consumer apps that burn CLAWD, downstream path to holder value, active and maintained — rather than the direct burn mechanic criteria used for consumer apps. Every repo gets scored because every repo has some relationship to holder value, direct or indirect.
 
@@ -63,7 +63,19 @@ The Chronicle is the primary grounding document. Where a score references a twee
           heading: 'Corrections and disagreements',
           body: `If you think a score is wrong, that conversation should happen in the open. The scoring methodology is fully documented on the main page. Admin notes can be added to any card for context — scores themselves are not changed quietly.
 
+One known v1 limitation: the 'Agent-authored build' criterion under Builder Integrity infers autonomous coding patterns from repo metadata alone. The human collaborator's role is infrastructure and multisig signing, not code authorship — low scores here reflect inference uncertainty from limited metadata, not evidence of human coding involvement.
+
 This is a speculative, experimental community project. It will have errors. The goal is to be honest about the limits of what it knows.`,
+        },
+        {
+          heading: 'What could come next',
+          body: `This is a v1. The scoring categories, rubric weights, and criterion labels were developed quickly using AI-assisted research — not through formal academic validation or extended community scrutiny. They represent a reasonable first attempt, not a final methodology.
+
+With community interest and input, future versions could explore: community-driven formula recalculation — holders burning $CLAWD to propose and vote on rubric changes; commit meaning analysis — Claude-powered breakdowns of what recent commits actually built, funded by small burns so the community shares the cost; holder score verification — burning to formally dispute a score, triggering review and public logging; more scrutinized criteria developed with proper attention to validity, reliability, and labeling; signal bars derived from actual rubric scores rather than tag aggregates; and the ability for project teams to submit context that feeds into how their repos are scored.
+
+There are also directions not yet fully formed — ways the community could participate in scoring that go beyond just reading results, governance mechanisms that don't overlap with existing ecosystem tools, and signals that are genuinely hard to measure but matter to holders. None of this is planned. All of it is possible.
+
+If you hold $CLAWD and have opinions on what should change, that conversation should happen in the open.`,
         },
         {
           heading: 'Do your own research',
