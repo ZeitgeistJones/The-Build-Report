@@ -51,13 +51,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    await verifyPaymentTx(txHash, walletAddress)
+
     const { success } = await ratelimit.limit(walletAddress.toLowerCase())
     if (!success) {
       await redis.del(paidKey)
-      return NextResponse.json({ ok: false, error: 'Rate limit exceeded — try again later' }, { status: 429 })
+      return NextResponse.json({ ok: false, error: 'Rate limit exceeded — max 3 rescores per hour per wallet' }, { status: 429 })
     }
-
-    await verifyPaymentTx(txHash, walletAddress)
 
     const oldRepo = await resolveRepoBeforeRescore(repoSlug)
     const [commitMessages, commits30dAtRescore] = await Promise.all([

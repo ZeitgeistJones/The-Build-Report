@@ -1,4 +1,4 @@
-import { createPublicClient, defineChain, getAddress, http, isAddressEqual } from 'viem'
+import { createPublicClient, defineChain, fallback, getAddress, http, isAddressEqual } from 'viem'
 import {
   BASE_CHAIN_ID,
   CLAWD_GATE_ABI,
@@ -17,20 +17,81 @@ const base = defineChain({
   },
 })
 
+const BASE_HTTP_RPCS = [
+  process.env.BASE_RPC_URL,
+  process.env.NEXT_PUBLIC_BASE_RPC_URL,
+  'https://mainnet.base.org',
+  'https://base.llamarpc.com',
+  'https://base-rpc.publicnode.com',
+  'https://1rpc.io/base',
+].filter((url): url is string => Boolean(url?.trim()))
+
+function baseTransport() {
+  const urls = BASE_HTTP_RPCS
+  const httpOpts = { timeout: 15_000 }
+  if (urls.length <= 1) return http(urls[0] ?? 'https://mainnet.base.org', httpOpts)
+  return fallback(urls.map(url => http(url, httpOpts)))
+}
+
+function createBaseClient() {
+  return createPublicClient({
+    chain: base,
+    transport: baseTransport(),
+  })
+}
+
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function getBlockTimestamp(
+  blockNumber: bigint,
+  blockHash?: `0x${string}`,
+): Promise<number> {
+  let lastErr: unknown
+
+  for (const rpcUrl of BASE_HTTP_RPCS) {
+    const client = createPublicClient({
+      chain: base,
+      transport: http(rpcUrl, { timeout: 15_000 }),
+    })
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (blockHash) {
+          try {
+            const byHash = await client.getBlock({ blockHash })
+            return Number(byHash.timestamp)
+          } catch {
+            // fall through to block number on this RPC
+          }
+        }
+        const byNumber = await client.getBlock({ blockNumber })
+        return Number(byNumber.timestamp)
+      } catch (err) {
+        lastErr = err
+        await sleep(600 * (attempt + 1))
+      }
+    }
+  }
+
+  const detail = lastErr instanceof Error ? lastErr.message : 'unknown RPC error'
+  throw new Error(
+    `Could not verify payment timing (Base RPC unavailable). Try again in a few seconds. (${detail})`,
+  )
+}
+
 export async function verifyPaymentTx(txHash: string, walletAddress: string): Promise<void> {
   const hash = txHash as `0x${string}`
-  const client = createPublicClient({
-    chain: base,
-    transport: http(),
-  })
+  const client = createBaseClient()
 
   const receipt = await client.getTransactionReceipt({ hash })
   if (receipt.status !== 'success') {
     throw new Error('Transaction was not successful')
   }
 
-  const block = await client.getBlock({ blockNumber: receipt.blockNumber })
-  const txAgeSeconds = Number(BigInt(Math.floor(Date.now() / 1000)) - block.timestamp)
+  const blockTimestamp = await getBlockTimestamp(receipt.blockNumber, receipt.blockHash)
+  const txAgeSeconds = Math.floor(Date.now() / 1000) - blockTimestamp
   if (txAgeSeconds > 3600) {
     throw new Error('Transaction is too old — must be used within 1 hour')
   }
