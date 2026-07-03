@@ -1,6 +1,6 @@
 import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
-import { Repo, Tag, Status, Level, RubricRow, Score } from './scores'
+import { Repo, Tag, Status, Level, RubricRow, Score, calcRubricPct, normalizeRepoScores } from './scores'
 import { pctToLetter } from './gradeLetters'
 import { shouldSkipRepo } from './repoFilters'
 import { fetchRepoBySlug } from './github'
@@ -28,12 +28,16 @@ function maxNewPerRun(): number {
 
 function normalizeCachedRepo(raw: Record<string, unknown> | null): Repo | null {
   if (!raw || typeof raw.githubSlug !== 'string' || shouldSkipRepo(raw.githubSlug)) return null
-  if (raw.tokenMechanic !== undefined) return raw as unknown as Repo
-  if (raw.holderRelevance !== undefined) {
+  let repo: Repo
+  if (raw.tokenMechanic !== undefined) {
+    repo = raw as unknown as Repo
+  } else if (raw.holderRelevance !== undefined) {
     const { holderRelevance, ...rest } = raw
-    return { ...rest, tokenMechanic: holderRelevance } as unknown as Repo
+    repo = { ...rest, tokenMechanic: holderRelevance } as unknown as Repo
+  } else {
+    repo = raw as unknown as Repo
   }
-  return raw as unknown as Repo
+  return normalizeRepoScores(repo)
 }
 
 async function readCachedScore(r: Redis, repoName: string): Promise<Repo | null> {
@@ -61,21 +65,8 @@ export interface RawRepo {
   language: string | null
 }
 
-function calcScore(rows: RubricRow[]): number {
-  const weightMap: Record<string, number> = {
-    '50%': 0.5, '30%': 0.3, '20%': 0.2,
-    '40%': 0.4, '35%': 0.35, '25%': 0.25,
-  }
-  const levelMap: Record<Level, number> = { high: 3, mid: 2, low: 1 }
-  let total = 0
-  for (const row of rows) {
-    total += (weightMap[row.weight] ?? 0.33) * levelMap[row.level]
-  }
-  return Math.round((total / 3) * 100)
-}
-
 function makeScore(rows: RubricRow[]): Score {
-  const pct = calcScore(rows)
+  const pct = calcRubricPct(rows)
   return { letter: pctToLetter(pct), pct, rubric: rows }
 }
 

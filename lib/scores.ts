@@ -36,7 +36,7 @@ function calcScore(rows: RubricRow[]): number {
   const weightMap: Record<string, number> = {
     '50%': 0.5, '30%': 0.3, '20%': 0.2,
     '40%': 0.4, '35%': 0.35, '25%': 0.25,
-    'equal': 0.2
+    'equal': 0.2,
   }
   const levelMap: Record<Level, number> = { high: 3, mid: 2, low: 1 }
   let total = 0
@@ -44,6 +44,45 @@ function calcScore(rows: RubricRow[]): number {
     total += (weightMap[row.weight] ?? 0) * levelMap[row.level]
   }
   return Math.round((total / 3) * 100)
+}
+
+/** Rubric rows → numeric score (0–100). Letter grades use {@link pctToLetter}. */
+export function calcRubricPct(rows: RubricRow[]): number {
+  return calcScore(rows)
+}
+
+export function normalizeScore(score: Score): Score {
+  if (!score.rubric.length || score.letter === '—') return score
+  const pct = calcRubricPct(score.rubric)
+  const letter = pctToLetter(pct)
+  // #region agent log
+  if (score.letter !== letter || score.pct !== pct) {
+    fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
+      body: JSON.stringify({
+        sessionId: 'a33a7a',
+        location: 'lib/scores.ts:normalizeScore',
+        message: 'resynced letter from rubric pct',
+        data: { storedLetter: score.letter, storedPct: score.pct, letter, pct },
+        timestamp: Date.now(),
+        hypothesisId: 'H1-stale-letter',
+      }),
+    }).catch(() => {})
+  }
+  // #endregion
+  return { ...score, pct, letter }
+}
+
+export function normalizeRepoScores(repo: Repo): Repo {
+  if (repo.builderIntegrity.letter === '—' && !repo.builderIntegrity.rubric.length) {
+    return repo
+  }
+  return {
+    ...repo,
+    tokenMechanic: repo.tokenMechanic ? normalizeScore(repo.tokenMechanic) : null,
+    builderIntegrity: normalizeScore(repo.builderIntegrity),
+  }
 }
 
 function tm(rows: RubricRow[]): Score {

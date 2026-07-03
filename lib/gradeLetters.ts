@@ -1,16 +1,18 @@
+/** Map numeric score (0–100) to letter grade. F is below 60%. */
 export function pctToLetter(pct: number): string {
-  if (pct >= 97) return 'A+'
-  if (pct >= 93) return 'A'
-  if (pct >= 90) return 'A-'
-  if (pct >= 87) return 'B+'
-  if (pct >= 83) return 'B'
-  if (pct >= 80) return 'B-'
-  if (pct >= 77) return 'C+'
-  if (pct >= 73) return 'C'
-  if (pct >= 70) return 'C-'
-  if (pct >= 67) return 'D+'
-  if (pct >= 63) return 'D'
-  if (pct >= 60) return 'D-'
+  const n = Math.round(Math.max(0, Math.min(100, pct)))
+  if (n >= 97) return 'A+'
+  if (n >= 93) return 'A'
+  if (n >= 90) return 'A-'
+  if (n >= 87) return 'B+'
+  if (n >= 83) return 'B'
+  if (n >= 80) return 'B-'
+  if (n >= 77) return 'C+'
+  if (n >= 73) return 'C'
+  if (n >= 70) return 'C-'
+  if (n >= 67) return 'D+'
+  if (n >= 63) return 'D'
+  if (n >= 60) return 'D-'
   return 'F'
 }
 

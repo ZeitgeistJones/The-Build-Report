@@ -1,6 +1,7 @@
-import { Repo } from './scores'
+import { Repo, normalizeRepoScores } from './scores'
 import { GitHubRepo } from './github'
 import { shouldSkipRepo } from './repoFilters'
+import { isUnscoredRecent } from './recentRepos'
 
 /** Merge repo sources; hand-scored REPOS entries win over auto-scored duplicates. */
 export function mergeRepoSources(handScored: Repo[], autoScored: Repo[], recentUnscored: Repo[] = []): Repo[] {
@@ -9,10 +10,10 @@ export function mergeRepoSources(handScored: Repo[], autoScored: Repo[], recentU
     if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, repo)
   }
   for (const repo of autoScored) {
-    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, repo)
+    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, normalizeRepoScores(repo))
   }
   for (const repo of handScored) {
-    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, repo)
+    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, normalizeRepoScores(repo))
   }
   return Array.from(bySlug.values())
 }
@@ -20,10 +21,10 @@ export function mergeRepoSources(handScored: Repo[], autoScored: Repo[], recentU
 function scoredBySlug(handScored: Repo[], autoScored: Repo[]): Map<string, Repo> {
   const bySlug = new Map<string, Repo>()
   for (const repo of autoScored) {
-    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, repo)
+    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, normalizeRepoScores(repo))
   }
   for (const repo of handScored) {
-    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, repo)
+    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, normalizeRepoScores(repo))
   }
   return bySlug
 }
@@ -55,7 +56,7 @@ export function buildReposInGithubOrder(
   for (const repo of handScored) {
     if (shouldSkipRepo(repo.githubSlug)) continue
     if (includedIds.has(repo.id)) continue
-    ordered.push(repo)
+    ordered.push(isUnscoredRecent(repo) ? repo : normalizeRepoScores(repo))
     includedIds.add(repo.id)
   }
 
