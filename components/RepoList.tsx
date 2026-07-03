@@ -2,6 +2,19 @@
 
 import { useState, useEffect, type ReactNode } from 'react'
 import { Repo, Tag, Level, Confidence } from '@/lib/scores'
+import {
+  getEffectiveTag,
+  getShippingLeverage,
+  getTokenMechanicForDisplay,
+  showsEconomicNa,
+} from '@/lib/economicGrade'
+import { getCriticalPathRole } from '@/lib/criticalPath'
+import {
+  computeRepoLifecycle,
+  LIFECYCLE_LABELS,
+  LIFECYCLE_STYLES,
+  lifecycleHint,
+} from '@/lib/repoLifecycle'
 import { timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { isUnscoredRecent } from '@/lib/recentRepos'
@@ -194,7 +207,7 @@ function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: meta.summary ? '8px' : 0, fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
         <div>
-          <span style={{ color: 'var(--text-muted)' }}>Token mechanic: </span>
+          <span style={{ color: 'var(--text-muted)' }}>Economic: </span>
           {meta.oldTokenMechanic ?? 'N/A'} → {meta.newTokenMechanic ?? 'N/A'}
         </div>
         <div>
@@ -383,14 +396,20 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
   function renderRepoCard(repo: RepoWithLive) {
     const isExpanded = expandedSlugs.has(repo.githubSlug)
     const rescoreMeta = rescoreSummaries[repo.githubSlug]
-    const ts = TAG_STYLES[repo.tag]
-    const borderColor = TAG_BORDER_COLORS[repo.tag]
+    const ts = TAG_STYLES[getEffectiveTag(repo)]
+    const borderColor = TAG_BORDER_COLORS[getEffectiveTag(repo)]
     const auto = isAutoInferred(repo)
     const pending = isUnscoredRecent(repo)
     const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
     const periodCommits = repoCommitsForPeriod(repo, period)
+    const lifecycle = computeRepoLifecycle(repo, periodCommits)
     const commitSuffix = periodCommits > 0 ? ` · ${periodCommits} commits (${period})` : ''
     const sinceScored = getScoreAgeDisplay(repo, pending)
+    const criticalPath = getCriticalPathRole(repo.githubSlug)
+    const lcStyle = LIFECYCLE_STYLES[lifecycle]
+    const economicNa = showsEconomicNa(repo)
+    const shippingLeverage = getShippingLeverage(repo)
+    const tokenMechanic = getTokenMechanicForDisplay(repo)
 
     return (
       <div
@@ -455,6 +474,32 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                     letterSpacing: '0.03em',
                   }}>
                     awaiting score
+                  </span>
+                )}
+                {criticalPath && (
+                  <span style={{
+                    fontSize: '10px',
+                    padding: '2px 7px',
+                    borderRadius: '99px',
+                    color: 'var(--accent)',
+                    background: 'var(--accent-dim)',
+                    border: '1px solid var(--accent-border)',
+                    letterSpacing: '0.02em',
+                  }}>
+                    {criticalPath.roleBadge}
+                  </span>
+                )}
+                {!pending && (
+                  <span style={{
+                    fontSize: '10px',
+                    padding: '2px 7px',
+                    borderRadius: '99px',
+                    fontWeight: 500,
+                    color: lcStyle.color,
+                    background: lcStyle.bg,
+                    letterSpacing: '0.02em',
+                  }}>
+                    {lifecycle === 'done' ? `${LIFECYCLE_LABELS.done} ✅` : LIFECYCLE_LABELS[lifecycle]}
                   </span>
                 )}
                 {!pending && repo.scoredAt && (
@@ -534,18 +579,48 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 </div>
               ) : (
               <>
-              <div style={{ textAlign: 'center', minWidth: '40px' }}>
-                {repo.tokenMechanic ? (
+              <div style={{ textAlign: 'center', minWidth: economicNa ? '52px' : '40px' }}>
+                {economicNa ? (
                   <>
-                    <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.tokenMechanic.letter) }}>
-                      {repo.tokenMechanic.letter}
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
+                    {shippingLeverage && (
+                      <>
+                        <div style={{
+                          fontSize: `${Math.max(d.gradeLetter - 4, 16)}px`,
+                          fontWeight: 600,
+                          fontFamily: 'var(--font-mono)',
+                          color: gradeColor(shippingLeverage.letter),
+                          marginTop: '6px',
+                        }}>
+                          {shippingLeverage.letter}
+                        </div>
+                        <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{shippingLeverage.pct}%</div>
+                      </>
+                    )}
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>
+                      economic<br />indirect
+                      {shippingLeverage && (
+                        <>
+                          <br />
+                          <span style={{ fontSize: '9px' }}>ship leverage</span>
+                        </>
+                      )}
                     </div>
-                    <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{repo.tokenMechanic.pct}%</div>
+                  </>
+                ) : tokenMechanic ? (
+                  <>
+                    <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(tokenMechanic.letter) }}>
+                      {tokenMechanic.letter}
+                    </div>
+                    <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{tokenMechanic.pct}%</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
                   </>
                 ) : (
-                  <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
+                  <>
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
+                  </>
                 )}
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
               </div>
 
               <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
@@ -590,12 +665,57 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
               </div>
             )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '14px' }}>
-              {!pending && repo.tokenMechanic && (
+              {!pending && shippingLeverage && (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                    Shipping leverage
+                  </div>
+                  {shippingLeverage.rubric.map((row, i) => (
+                    <div key={i} style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px',
+                      marginBottom: '6px',
+                      flexWrap: isMobile ? 'wrap' : 'nowrap',
+                    }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        padding: '2px 8px',
+                        borderRadius: '99px',
+                        color: LEVEL_STYLES[row.level].color,
+                        background: LEVEL_STYLES[row.level].bg,
+                        flexShrink: 0,
+                      }}>
+                        {row.level}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        color: 'var(--text-muted)',
+                        maxWidth: isMobile ? undefined : '220px',
+                        width: isMobile ? '100%' : undefined,
+                        textAlign: isMobile ? 'left' : 'right',
+                        lineHeight: 1.3,
+                        flexShrink: isMobile ? 1 : 0,
+                      }}>
+                        {row.source}
+                      </span>
+                    </div>
+                  ))}
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: 0, lineHeight: 1.45 }}>
+                    Indirect holder value — how much this repo multiplies the builder&apos;s ability to ship consumer apps that burn or lock CLAWD. No in-repo burn is expected.
+                  </p>
+                </div>
+              )}
+
+              {!pending && tokenMechanic && (
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
                     Token mechanic
                   </div>
-                  {repo.tokenMechanic.rubric.map((row, i) => (
+                  {tokenMechanic.rubric.map((row, i) => (
                     <div key={i} style={{
                       display: 'flex',
                       alignItems: 'flex-start',
@@ -632,15 +752,21 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 </div>
               )}
 
-              {!pending && !repo.tokenMechanic && (
+              {!pending && !shippingLeverage && !tokenMechanic && (
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-                    Token mechanic
+                    Economic score
                   </div>
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    Not scored — infrastructure repos are not expected to have a direct token mechanic. Value shows up in downstream consumer apps.
+                    Not yet scored on token mechanic or shipping leverage.
                   </p>
                 </div>
+              )}
+
+              {!pending && lifecycleHint(lifecycle, repo.status) && (
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.45, fontStyle: 'italic' }}>
+                  {lifecycleHint(lifecycle, repo.status)}
+                </p>
               )}
 
               {!pending && (

@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { Repo, RubricRow, Score } from './scores'
+import { getEconomicScore, getShippingLeverage, getTokenMechanicForDisplay } from './economicGrade'
 import { stripMarkdown } from './textCleanup'
 
 function formatScoreBlock(label: string, score: Score | null): string {
@@ -10,10 +11,16 @@ function formatScoreBlock(label: string, score: Score | null): string {
   return `${label}: ${score.letter} (${score.pct}%)\n${rows}`
 }
 
+function formatEconomicBlock(repo: Repo): string {
+  const shipping = getShippingLeverage(repo)
+  if (shipping) return formatScoreBlock('Shipping leverage', shipping)
+  return formatScoreBlock('Token mechanic', getTokenMechanicForDisplay(repo))
+}
+
 function formatRepoScores(repo: Repo): string {
   return [
     `Tag: ${repo.tag} · Status: ${repo.status}`,
-    formatScoreBlock('Token mechanic', repo.tokenMechanic),
+    formatEconomicBlock(repo),
     formatScoreBlock('Builder integrity', repo.builderIntegrity),
     `Verdict: ${repo.verdict}`,
   ].join('\n')
@@ -22,6 +29,7 @@ function formatRepoScores(repo: Repo): string {
 export function wasChronicleSourced(repo: Repo | null): boolean {
   if (!repo) return false
   const rows: RubricRow[] = [
+    ...(repo.shippingLeverage?.rubric ?? []),
     ...(repo.tokenMechanic?.rubric ?? []),
     ...repo.builderIntegrity.rubric,
   ]

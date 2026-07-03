@@ -17,8 +17,12 @@ import {
 import {
   LEGACY_TM_LABELS,
   TM_CONSUMER_LABELS,
-  tmRubricLevelScore,
 } from './rubrics/tokenMechanic'
+import {
+  SL_LABELS,
+  slRubricLevelScore,
+} from './rubrics/shippingLeverage'
+import { getConsumerEconomicScorePct, isConsumerEconomicScored } from './economicGrade'
 
 export { pctToLetter }
 
@@ -299,7 +303,7 @@ function reposActiveInWindow(stats: GitHubStats, repoSet: Repo[], period: Period
 }
 
 function reposWithScoredTokenMechanic(repos: Repo[]): Repo[] {
-  return repos.filter(r => r.tokenMechanic != null && r.tokenMechanic.letter !== '—')
+  return repos.filter(r => isConsumerEconomicScored(r))
 }
 
 function tokenMechanicRubricCommitCounts(
@@ -312,12 +316,13 @@ function tokenMechanicRubricCommitCounts(
   let low = 0
   let total = 0
   for (const repo of repos) {
-    if (!repo.tokenMechanic || repo.tokenMechanic.letter === '—') continue
+    const pct = getConsumerEconomicScorePct(repo)
+    if (pct == null) continue
     const w = commitsForRepo(stats, repo.githubSlug, period, 'current')
     if (w <= 0) continue
     total += w
-    if (repo.tokenMechanic.pct >= 80) high += w
-    else if (repo.tokenMechanic.pct >= 60) mid += w
+    if (pct >= 80) high += w
+    else if (pct >= 60) mid += w
     else low += w
   }
   return { high, mid, low, commitWeight: total, repos: repos.length }
@@ -342,22 +347,22 @@ function tokenMechanicSummary(pct: number, period: Period): string {
         : 'this week'
   if (pct >= 80) {
     return period === '60d'
-      ? 'Repos with the most commits over 60 days score strongly on token mechanic rubrics.'
-      : `Repos with the most commits ${window} score strongly on token mechanic rubrics.`
+      ? 'Burn-app repos with the most commits over 60 days score strongly on token mechanic rubrics.'
+      : `Burn-app repos with the most commits ${window} score strongly on token mechanic rubrics.`
   }
   if (pct >= 60) {
     return period === '60d'
-      ? 'Heavy 60-day commit repos mostly show solid token mechanic scores.'
-      : `Heavy commit repos mostly show solid token mechanic scores ${window}.`
+      ? 'Heavy 60-day commit repos mostly show solid burn-app economic scores.'
+      : `Heavy commit burn apps mostly show solid token mechanic scores ${window}.`
   }
   if (pct >= 40) {
     return period === '60d'
-      ? 'Token mechanic scores are mixed where commit volume landed over 60 days.'
-      : `Token mechanic scores are mixed where commit volume landed ${window}.`
+      ? 'Burn-app economic scores are mixed where commit volume landed over 60 days.'
+      : `Burn-app economic scores are mixed where commit volume landed ${window}.`
   }
   return period === '60d'
-    ? 'Most 60-day commits landed on repos with weaker token mechanic scores.'
-    : `Most commits ${window} landed on repos with weaker token mechanic scores.`
+    ? 'Most 60-day commits on burn apps landed on weaker token mechanic scores.'
+    : `Most burn-app commits ${window} landed on weaker token mechanic scores.`
 }
 
 function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], period: Period): TokenMechanicGrade {
@@ -367,24 +372,24 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
   const sample = activeRepos.length ? activeRepos : scored
   const priorSample = priorActiveRepos
 
-  const pct = weightedAvgByCommits(stats, sample, period, 'current', r => r.tokenMechanic!.pct)
+  const pct = weightedAvgByCommits(stats, sample, period, 'current', r => getConsumerEconomicScorePct(r) ?? 0)
   const priorPct =
     period === '60d' || !priorSample.length
       ? null
-      : weightedAvgByCommits(stats, priorSample, period, 'prior', r => r.tokenMechanic!.pct)
+      : weightedAvgByCommits(stats, priorSample, period, 'prior', r => getConsumerEconomicScorePct(r) ?? 0)
   const trendPct = period === '60d' ? null : pctChange(pct, priorPct ?? 0)
 
   const rubricCounts = tokenMechanicRubricCommitCounts(stats, sample, period)
   const weightBase = rubricCounts.commitWeight || 1
 
   const impactAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
-    tmRubricLevelScore(r, [...TM_CONSUMER_LABELS, ...LEGACY_TM_LABELS.slice(0, 1)]),
+    slRubricLevelScore(r, [SL_LABELS[0], TM_CONSUMER_LABELS[0], LEGACY_TM_LABELS[0]]),
   )
   const clarityAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
-    tmRubricLevelScore(r, [TM_CONSUMER_LABELS[1], LEGACY_TM_LABELS[1]]),
+    slRubricLevelScore(r, [SL_LABELS[1], TM_CONSUMER_LABELS[1], LEGACY_TM_LABELS[1]]),
   )
   const alignmentAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
-    tmRubricLevelScore(r, [TM_CONSUMER_LABELS[2], LEGACY_TM_LABELS[2]]),
+    slRubricLevelScore(r, [SL_LABELS[2], TM_CONSUMER_LABELS[2], LEGACY_TM_LABELS[2]]),
   )
 
   const tagCommits =

@@ -1,5 +1,6 @@
 import { pctToLetter } from './gradeLetters'
 import { calcBuilderIntegrityPct } from './rubrics/builderIntegrity'
+import { calcShippingLeveragePct } from './rubrics/shippingLeverage'
 
 export type Tag = 'direct' | 'supply-lock' | 'indirect' | 'infrastructure' | 'theoretical'
 export type Status = 'active' | 'dormant' | 'archived'
@@ -26,7 +27,10 @@ export interface Repo {
   tag: Tag
   status: Status
   confidence: Confidence
+  /** Direct CLAWD economic path — consumer and supply-lock repos. */
   tokenMechanic: Score | null
+  /** Indirect multiplier value — indirect, infrastructure, and theoretical repos. */
+  shippingLeverage?: Score | null
   builderIntegrity: Score
   verdict: string
   scoredAt: string
@@ -77,6 +81,12 @@ export function normalizeScore(score: Score): Score {
   return { ...score, pct, letter }
 }
 
+export function normalizeShippingLeverageScore(score: Score): Score {
+  if (!score.rubric.length || score.letter === '—') return score
+  const pct = calcShippingLeveragePct(score.rubric)
+  return { ...score, pct, letter: pctToLetter(pct) }
+}
+
 export function normalizeRepoScores(repo: Repo): Repo {
   if (repo.builderIntegrity.letter === '—' && !repo.builderIntegrity.rubric.length) {
     return repo
@@ -84,6 +94,9 @@ export function normalizeRepoScores(repo: Repo): Repo {
   return {
     ...repo,
     tokenMechanic: repo.tokenMechanic ? normalizeTokenMechanicScore(repo.tokenMechanic) : null,
+    shippingLeverage: repo.shippingLeverage
+      ? normalizeShippingLeverageScore(repo.shippingLeverage)
+      : repo.shippingLeverage ?? null,
     builderIntegrity: normalizeBuilderIntegrityScore(repo.builderIntegrity),
   }
 }

@@ -1,6 +1,16 @@
 import { Redis } from '@upstash/redis'
 import { getRedis } from '@/lib/redis'
 import { Repo, Score } from './scores'
+import { getConsumerEconomicScore, getShippingLeverage } from './economicGrade'
+
+function formatEconomicLabel(repo: Repo | null | undefined): string | null {
+  if (!repo) return null
+  const sl = getShippingLeverage(repo)
+  if (sl) return `${sl.letter} (${sl.pct}%) SL`
+  const tm = getConsumerEconomicScore(repo)
+  if (tm) return `${tm.letter} (${tm.pct}%)`
+  return null
+}
 
 const KEY_PREFIX = 'build-report:rescore-summary:'
 
@@ -34,8 +44,8 @@ export function buildRescoreSummaryRecord(params: {
   const { oldRepo, newRepo, summary, commits30dAtRescore } = params
   return {
     summary: summary?.trim() ?? '',
-    oldTokenMechanic: formatScoreLabel(oldRepo?.tokenMechanic),
-    newTokenMechanic: formatScoreLabel(newRepo.tokenMechanic),
+    oldTokenMechanic: formatEconomicLabel(oldRepo),
+    newTokenMechanic: formatEconomicLabel(newRepo),
     oldBuilderIntegrity: formatScoreLabel(oldRepo?.builderIntegrity) ?? '—',
     newBuilderIntegrity: formatScoreLabel(newRepo.builderIntegrity) ?? '—',
     oldScoredAt: oldRepo?.scoredAt ?? null,

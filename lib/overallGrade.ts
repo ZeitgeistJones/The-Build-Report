@@ -1,4 +1,5 @@
 import { Repo, Tag } from './scores'
+import { getEconomicScore } from './economicGrade'
 import { GitHubStats, RepoActivity } from './github'
 import { pctToLetter } from './gradeLetters'
 import { isUnscoredRecent } from './recentRepos'
@@ -131,9 +132,10 @@ export function buildOverallGradeContext(
   let reposWithTokenMechanicGrade = 0
 
   for (const repo of scored) {
-    if (repo.tokenMechanic) {
+    const economic = getEconomicScore(repo)
+    if (economic) {
       reposWithTokenMechanicGrade++
-      tokenMechanicDistribution[letterBucket(repo.tokenMechanic.letter)]++
+      tokenMechanicDistribution[letterBucket(economic.letter)]++
     }
     builderIntegrityDistribution[letterBucket(repo.builderIntegrity.letter)]++
   }

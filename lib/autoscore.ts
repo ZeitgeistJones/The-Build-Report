@@ -1,6 +1,7 @@
 import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
-import { Repo, Tag, Status, RubricRow, Score, calcTokenMechanicPct, normalizeRepoScores, REPOS } from './scores'
+import { Repo, Tag, Status, RubricRow, Score, calcTokenMechanicPct, REPOS } from './scores'
+import { normalizeAndApplyV3 } from './repoV3'
 import { pctToLetter } from './gradeLetters'
 import { shouldSkipRepo } from './repoFilters'
 import { getExcludedSlugs } from './repoExclude'
@@ -16,9 +17,15 @@ import {
 import {
   TM_CONSUMER_PROMPT,
   TM_EDGE_RULES,
-  TM_INFRA_PROMPT,
   validateTokenMechanicRows,
 } from './rubrics/tokenMechanic'
+import {
+  SL_PROMPT,
+  calcShippingLeveragePct,
+  hasShippingLeverageTag,
+  validateShippingLeverageRows,
+} from './rubrics/shippingLeverage'
+import { getLockedTag } from './criticalPath'
 import { ECOSYSTEM_DECODER_RING } from './rubrics/decoderRing'
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
@@ -42,7 +49,7 @@ function normalizeCachedRepo(raw: Record<string, unknown> | null): Repo | null {
   } else {
     repo = raw as unknown as Repo
   }
-  return normalizeRepoScores(repo)
+  return normalizeAndApplyV3(repo)
 }
 
 async function readCachedScore(r: Redis, repoName: string): Promise<Repo | null> {
@@ -86,6 +93,11 @@ function makeTmScore(rows: RubricRow[]): Score {
 
 function makeBiScore(rows: RubricRow[]): Score {
   const pct = calcBuilderIntegrityPct(rows)
+  return { letter: pctToLetter(pct), pct, rubric: rows }
+}
+
+function makeSlScore(rows: RubricRow[]): Score {
+  const pct = calcShippingLeveragePct(rows)
   return { letter: pctToLetter(pct), pct, rubric: rows }
 }
 
@@ -135,17 +147,19 @@ Status (computed from push date): ${derivedStatus}
 
 Infer:
 1. tag: one of direct | supply-lock | indirect | infrastructure | theoretical
-2. tokenMechanic rubric (3 rows — ALWAYS include; pick consumer OR infra row labels based on tag)
+2. Economic axis (pick ONE based on tag):
+   - direct or supply-lock → tokenMechanic rubric (consumer labels), shippingLeverage: null
+   - indirect, infrastructure, or theoretical → shippingLeverage rubric, tokenMechanic: null
 3. builderIntegrity rubric (5 rows — ALWAYS include all five)
 4. verdict: 2-3 sentence plain English assessment
 5. adminNote: one sentence — live AI score, not a launch baseline
 
-Framing: low infra token mechanic is normal; low activity is not integrity failure; CV/CONVICTION ≠ CLAWD burns; locks/vesting ≠ burns.
+Framing: infra/indirect repos score shipping leverage (indirect holder value), not direct CLAWD burn; low activity is not integrity failure; CV/CONVICTION ≠ CLAWD burns; locks/vesting ≠ burns.
 
 ${ECOSYSTEM_DECODER_RING}
 
 ${TM_CONSUMER_PROMPT}
-${TM_INFRA_PROMPT}
+${SL_PROMPT}
 ${TM_EDGE_RULES}
 
 builderIntegrity (5 rows, exact labels and weights):
@@ -159,10 +173,11 @@ Apply the decoder ring: completed vesting/locks and waiting burn mechanisms shou
 Respond ONLY with valid JSON, no markdown:
 {
   "tag": "infrastructure",
-  "tokenMechanic": [
-    { "label": "...", "weight": "50%", "level": "low", "source": "..." },
-    { "label": "...", "weight": "30%", "level": "low", "source": "..." },
-    { "label": "...", "weight": "20%", "level": "mid", "source": "..." }
+  "tokenMechanic": null,
+  "shippingLeverage": [
+    { "label": "Multiplies builder shipping capacity", "weight": "40%", "level": "mid", "source": "..." },
+    { "label": "Downstream path to holder value", "weight": "35%", "level": "mid", "source": "..." },
+    { "label": "Role in ecosystem workflow", "weight": "25%", "level": "mid", "source": "..." }
   ],
   "builderIntegrity": [
     { "label": "On-chain commitments and constraints", "weight": "22%", "level": "mid", "source": "..." },
@@ -191,12 +206,31 @@ Respond ONLY with valid JSON, no markdown:
       return null
     }
 
-    const tag = parsed.tag as Tag
-    const tokenMechanicRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
-    if (!validateTokenMechanicRows(tokenMechanicRows, tag)) {
-      console.error(`[autoscore] invalid tokenMechanic rubric for ${repo.name}`)
-      return null
+    const tag = (getLockedTag(repo.name) ?? parsed.tag) as Tag
+    let tokenMechanic: Score | null = null
+    let shippingLeverage: Score | null = null
+
+    if (hasShippingLeverageTag(tag)) {
+      if (validateShippingLeverageRows(parsed.shippingLeverage)) {
+        shippingLeverage = makeSlScore(parsed.shippingLeverage)
+      } else {
+        const legacyRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
+        if (legacyRows?.length && validateTokenMechanicRows(legacyRows, tag)) {
+          shippingLeverage = makeSlScore(legacyRows)
+        } else {
+          console.error(`[autoscore] invalid shippingLeverage rubric for ${repo.name}`)
+          return null
+        }
+      }
+    } else {
+      const tokenMechanicRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
+      if (!validateTokenMechanicRows(tokenMechanicRows, tag)) {
+        console.error(`[autoscore] invalid tokenMechanic rubric for ${repo.name}`)
+        return null
+      }
+      tokenMechanic = tokenMechanicRows?.length ? makeTmScore(tokenMechanicRows) : null
     }
+
     if (!validateBuilderIntegrityRows(parsed.builderIntegrity)) {
       console.error(`[autoscore] invalid builderIntegrity rubric for ${repo.name}`)
       return null
@@ -214,16 +248,18 @@ Respond ONLY with valid JSON, no markdown:
         day: 'numeric',
         year: 'numeric',
       }),
-      tokenMechanic: tokenMechanicRows?.length ? makeTmScore(tokenMechanicRows) : null,
+      tokenMechanic,
+      shippingLeverage,
       builderIntegrity: makeBiScore(parsed.builderIntegrity),
       verdict: parsed.verdict,
       adminNote: parsed.adminNote,
     }
 
+    const economic = shippingLeverage ?? tokenMechanic
     console.log(
-      `[autoscore] done: ${repo.name} tag:${repoOut.tag} TM:${repoOut.tokenMechanic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`,
+      `[autoscore] done: ${repo.name} tag:${repoOut.tag} Econ:${economic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`,
     )
-    return repoOut
+    return normalizeAndApplyV3(repoOut)
   } catch (err) {
     console.error(`[autoscore] FAILED for ${repo.name}:`, err)
     return null
@@ -378,7 +414,7 @@ export async function resolveRepoBeforeRescore(repoSlug: string): Promise<Repo |
   if (cached) return cached
 
   const handScored = REPOS.find(repo => repo.githubSlug === repoSlug)
-  return handScored ? normalizeRepoScores(handScored) : null
+  return handScored ? normalizeAndApplyV3(handScored) : null
 }
 
 export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null> {

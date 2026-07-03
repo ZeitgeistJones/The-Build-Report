@@ -19,8 +19,7 @@ import {
   buildTokenMechanicTrendExplanation,
   buildIntegrityTrendExplanation,
 } from '@/lib/gradeNarratives'
-import { calcOverallGradeWithTrend, calcOverallGrade, countReposScored, buildOverallGradeContext } from '@/lib/overallGrade'
-import { getOverallSummary } from '@/lib/overallSummary'
+import { calcEcosystemPulse } from '@/lib/ecosystemPulse'
 import RepoList, { type RepoWithLive } from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
@@ -117,69 +116,9 @@ export default async function Home() {
   const tokenMechanicGrade60 = tokenMechanicGrade60Raw
   const integrityGrade60 = integrityGrade60Raw
 
-  const reposScored = countReposScored(allRepos)
-  const overallGrade30 = calcOverallGradeWithTrend(
-    tokenMechanicGrade30,
-    builderGrade30,
-    integrityGrade30!,
-    reposScored,
-  )
-  const overallGrade7 = calcOverallGradeWithTrend(
-    tokenMechanicGrade7,
-    builderGrade7,
-    integrityGrade7!,
-    reposScored,
-  )
-  const overallGrade60Base = calcOverallGrade(
-    tokenMechanicGrade60,
-    builderGrade60,
-    integrityGrade60!,
-    reposScored,
-  )
-  const overallGrade60 = overallGrade60Base
-    ? { ...overallGrade60Base, trendPct: null, trend: 'flat' as const }
-    : null
-  const [overallSummary30, overallSummary7, overallSummary60] = await Promise.all([
-    overallGrade30
-      ? getOverallSummary(
-          buildOverallGradeContext(
-            overallGrade30,
-            tokenMechanicGrade30,
-            builderGrade30,
-            integrityGrade30!,
-            allRepos,
-            stats,
-            '30d',
-          ),
-        ).catch(() => null)
-      : Promise.resolve(null),
-    overallGrade7
-      ? getOverallSummary(
-          buildOverallGradeContext(
-            overallGrade7,
-            tokenMechanicGrade7,
-            builderGrade7,
-            integrityGrade7!,
-            allRepos,
-            stats,
-            '7d',
-          ),
-        ).catch(() => null)
-      : Promise.resolve(null),
-    overallGrade60
-      ? getOverallSummary(
-          buildOverallGradeContext(
-            overallGrade60,
-            tokenMechanicGrade60,
-            builderGrade60,
-            integrityGrade60!,
-            allRepos,
-            stats,
-            '60d',
-          ),
-        ).catch(() => null)
-      : Promise.resolve(null),
-  ])
+  const pulse30 = stats ? calcEcosystemPulse(allRepos, stats, '30d') : null
+  const pulse7 = stats ? calcEcosystemPulse(allRepos, stats, '7d') : null
+  const pulse60 = stats ? calcEcosystemPulse(allRepos, stats, '60d') : null
 
   return (
     <GradePeriodProvider>
@@ -238,12 +177,9 @@ export default async function Home() {
 
       <div style={{ marginBottom: '40px' }}>
       <GradesPanel
-        overall30={overallGrade30}
-        overall7={overallGrade7}
-        overall60={overallGrade60}
-        overallSummary30={overallSummary30}
-        overallSummary7={overallSummary7}
-        overallSummary60={overallSummary60}
+        pulse30={pulse30}
+        pulse7={pulse7}
+        pulse60={pulse60}
         builderGrade30={builderGrade30}
         builderGrade7={builderGrade7}
         builderGrade60={builderGrade60}
@@ -331,7 +267,7 @@ export default async function Home() {
         </h2>
 
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '20px' }}>
-          All three axes measure holder value from different angles. Builder activity tells you if the project is alive and shipping. Token mechanic tells you if value flows back to holders economically through burns, staking, or fee distribution. Builder integrity tells you if the builder can be trusted to keep delivering on their stated vision. Together they answer: is this worth holding?
+          All three axes measure holder value from different angles. Builder activity tells you if the project is alive and shipping. Token mechanic (consumer apps) or shipping leverage (infra/indirect repos) tells you if value flows back to holders — directly through burns and locks, or indirectly by multiplying how fast consumer apps ship. Builder integrity tells you if the builder can be trusted to keep delivering on their stated vision. Together they answer: is this worth holding?
         </p>
 
         <div
@@ -367,13 +303,14 @@ export default async function Home() {
           }}
         >
           <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
-            Overall grade weights
+            Ecosystem grades (v3)
           </div>
-          <div>Token mechanic — 40%: economic return path to holders (burns, locks, fee distribution).</div>
-          <div>Builder activity — 30%: shipping velocity and consistency on GitHub.</div>
-          <div>Builder integrity — 30%: trust and alignment with stated builder vision.</div>
+          <div><strong>Ecosystem pulse</strong> — repos shipping, supporting, done, and dormant in the selected window. No blended overall letter grade.</div>
+          <div><strong>Burn apps (economic)</strong> — commit-weighted token mechanic for direct and supply-lock repos only. Infra and tools are excluded.</div>
+          <div><strong>Builder activity</strong> — GitHub shipping velocity across the ecosystem.</div>
+          <div><strong>Builder integrity</strong> — commit-weighted trust and alignment scores.</div>
           <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-            When GitHub data is unavailable, the 30% activity weight redistributes proportionally between token mechanic and builder integrity.
+            Infra cards show economic N/A (indirect) plus a display-only shipping leverage score. Critical-path repos have locked tags and floor at C when functioning as designed.
           </div>
         </div>
 
@@ -419,7 +356,7 @@ export default async function Home() {
             Token mechanic grade (period tabs)
           </div>
           <p style={{ margin: 0 }}>
-            Token mechanic grade is the commit-weighted average of each scored repo&apos;s rubric score for that axis.
+            Token mechanic grade is the commit-weighted average of each repo&apos;s economic score — token mechanic for consumer apps, shipping leverage for infra/indirect/theoretical repos.
             Repos with more commits in the window carry more weight. The tag (direct, supply-lock, indirect…) is a
             displayed classification, not a direct grade input.
           </p>
@@ -448,14 +385,24 @@ export default async function Home() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
           {[
             {
-              title: 'Token mechanic — consumer apps (infra uses adapted rows)',
+              title: 'Token mechanic — consumer apps (direct, supply-lock)',
               rows: [
                 { label: 'Direct CLAWD economic impact', weight: '50%' },
                 { label: 'Mechanism clarity and holder relevance', weight: '30%' },
                 { label: 'Alignment with CLAWD economic story', weight: '20%' },
               ],
               note:
-                'Measures CLAWD-facing economic impact from repo evidence and Chronicle context. Each row rated low / mid / high; score = (weighted sum ÷ 3) × 100. Infrastructure repos use adapted row labels (enablement, economic role, alignment). Low TM on infra or landing repos is expected — not a quality failure.',
+                'Measures CLAWD-facing economic impact from repo evidence and Chronicle context. Each row rated low / mid / high; score = (weighted sum ÷ 3) × 100.',
+            },
+            {
+              title: 'Shipping leverage — infra, indirect, theoretical',
+              rows: [
+                { label: 'Multiplies builder shipping capacity', weight: '40%' },
+                { label: 'Downstream path to holder value', weight: '35%' },
+                { label: 'Role in ecosystem workflow', weight: '25%' },
+              ],
+              note:
+                'Replaces token mechanic for repos that enable shipping rather than burn CLAWD directly (e.g. clawd-harness, clawd-containers, dead-simple-agent). Low direct burn is expected — score the multiplier effect on the autonomous-builder thesis.',
             },
             {
               title: 'Builder integrity — all repos (5 rows)',

@@ -10,6 +10,7 @@ Key facts:
 - clawd-fomo3d-v2: onchain game, 20% of every pot burned
 - clawdviction / larv.ai: governance staking, locks 8% of CLAWD supply
 - dead-simple-agent: agent framework powering the Leftclaw worker fleet
+- clawd-harness: multi-session web harness for interactive Claude Code — builder shipping engine
 - clawd-containers: Docker infrastructure running the worker bots
 - zkllmapi-v2: ZK-proof private AI API, accepts CLAWD as payment
 - ethskills: onchain knowledge graph for agents
@@ -18,8 +19,8 @@ Key facts:
 Tag definitions:
 - direct: burn mechanic on every interaction (burns CLAWD permanently)
 - supply-lock: removes CLAWD from circulation temporarily (staking/vesting)
-- indirect: enables other repos that burn CLAWD (infrastructure with clear burn downstream)
-- infrastructure: no token mechanic expected, foundational tooling
+- indirect: enables other repos that burn CLAWD — score shipping leverage, not direct burn
+- infrastructure: foundational tooling — score shipping leverage, not direct CLAWD mechanic
 - theoretical: R&D, no live mechanic yet
 
 The project's stated goals: every consumer app burns CLAWD, autonomous operation, walkaway test (runs without clawdbotatg intervention).

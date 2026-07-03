@@ -81,7 +81,7 @@ export const TM_INFRA_PROMPT = `- tokenMechanic (infrastructure/theoretical tags
   "Alignment with CLAWD economic story (infra)" (20%): High = supports CLAWD narrative without confusing CLAWD vs CV; Mid = neutral healthy infra; Low = could mislead on economic role.`
 
 export const TM_EDGE_RULES = `Edge rules:
-- Infra repos may legitimately score Low on token mechanics — that is not low project quality.
+- Infra/indirect/theoretical repos use shippingLeverage instead of tokenMechanic — low direct burn is not a quality penalty.
 - Dormant repos: still count live on-chain mechanics if Chronicle/README show they remain active.
 - LarvAI/governance: CV/CONVICTION is governance, not CLAWD burn economics.
 - Landing pages: Low TM is expected — representation is not economic routing.

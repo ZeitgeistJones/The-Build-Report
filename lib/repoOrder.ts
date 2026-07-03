@@ -2,9 +2,10 @@ import { Repo, normalizeRepoScores } from './scores'
 import { GitHubRepo } from './github'
 import { shouldSkipRepo } from './repoFilters'
 import { isUnscoredRecent } from './recentRepos'
+import { normalizeAndApplyV3 } from './repoV3'
 
 function overlayCachedOnBaseline(baseline: Repo | undefined, cached: Repo): Repo {
-  const normalized = normalizeRepoScores(cached)
+  const normalized = normalizeAndApplyV3(cached)
   if (!baseline) return normalized
   return { ...normalized, id: baseline.id }
 }
@@ -16,7 +17,7 @@ export function mergeRepoSources(handScored: Repo[], autoScored: Repo[], recentU
 
   for (const repo of handScored) {
     if (!shouldSkipRepo(repo.githubSlug)) {
-      baselineBySlug.set(repo.githubSlug, normalizeRepoScores(repo))
+      baselineBySlug.set(repo.githubSlug, normalizeAndApplyV3(repo))
     }
   }
 
@@ -24,7 +25,7 @@ export function mergeRepoSources(handScored: Repo[], autoScored: Repo[], recentU
     if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, repo)
   }
   for (const repo of handScored) {
-    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, normalizeRepoScores(repo))
+    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, normalizeAndApplyV3(repo))
   }
   for (const repo of autoScored) {
     if (!shouldSkipRepo(repo.githubSlug)) {
@@ -40,12 +41,12 @@ function scoredBySlug(handScored: Repo[], autoScored: Repo[]): Map<string, Repo>
 
   for (const repo of handScored) {
     if (!shouldSkipRepo(repo.githubSlug)) {
-      baselineBySlug.set(repo.githubSlug, normalizeRepoScores(repo))
+      baselineBySlug.set(repo.githubSlug, normalizeAndApplyV3(repo))
     }
   }
 
   for (const repo of handScored) {
-    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, normalizeRepoScores(repo))
+    if (!shouldSkipRepo(repo.githubSlug)) bySlug.set(repo.githubSlug, normalizeAndApplyV3(repo))
   }
   for (const repo of autoScored) {
     if (!shouldSkipRepo(repo.githubSlug)) {
@@ -82,7 +83,7 @@ export function buildReposInGithubOrder(
   for (const repo of handScored) {
     if (shouldSkipRepo(repo.githubSlug)) continue
     if (includedIds.has(repo.id)) continue
-    ordered.push(isUnscoredRecent(repo) ? repo : normalizeRepoScores(repo))
+    ordered.push(isUnscoredRecent(repo) ? repo : normalizeAndApplyV3(repo))
     includedIds.add(repo.id)
   }
 

@@ -14,9 +14,9 @@ Governance / Larv.ai:
 - Misread: CV staking = CLAWD payout; or "just a forum."
 - Fair: conviction is signaling on what gets built; value is downstream builds, not staking yield. CLAWD lock/supply impact can score mid on direct TM; do not treat CV as CLAWD burn economics.
 
-Infra / tools (e.g. dead-simple-agent, containers, scaffolds):
-- Misread: no holder-facing UI = no value; judge like a trading app.
-- Fair: infra multiplies downstream products. Low TM is normal. For BI "On-chain commitments" score architectural restraint, permission boundaries, and secrets handling — not absence of contracts.
+Infra / tools (e.g. dead-simple-agent, containers, scaffolds, clawd-harness):
+- Misread: no holder-facing UI = no value; judge like a trading app; F token mechanic = failed project.
+- Fair: score Shipping leverage, not direct CLAWD burn. Infra multiplies downstream products. Active builder harnesses on the shipping critical path (clawd-harness, clawd-containers, dead-simple-agent, ethskills, nerve-cord) should score mid–high on capacity multiplication and downstream holder path even with zero in-repo burns. For BI "On-chain commitments" score architectural restraint, permission boundaries, and secrets handling — not absence of contracts.
 
 Landing pages / marketing repos:
 - Misread: polished page = finished economic product.

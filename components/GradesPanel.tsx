@@ -4,18 +4,15 @@ import { useState } from 'react'
 import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation } from '@/lib/grades'
 import { gradeColor } from '@/lib/gradeLetters'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
-import OverallGrade from './OverallGrade'
-import { OverallGradeWithTrend } from '@/lib/overallGrade'
+import EcosystemPulsePanel from './EcosystemPulse'
+import { EcosystemPulse } from '@/lib/ecosystemPulse'
 import { Period } from '@/lib/grades'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface Props {
-  overall30: OverallGradeWithTrend | null
-  overall7: OverallGradeWithTrend | null
-  overall60: OverallGradeWithTrend | null
-  overallSummary30: string | null
-  overallSummary7: string | null
-  overallSummary60: string | null
+  pulse30: EcosystemPulse | null
+  pulse7: EcosystemPulse | null
+  pulse60: EcosystemPulse | null
   builderGrade30: BuilderGrade | null
   builderGrade7: BuilderGrade | null
   builderGrade60: BuilderGrade | null
@@ -248,12 +245,9 @@ function GradeCard({
 }
 
 export default function GradesPanel({
-  overall30,
-  overall7,
-  overall60,
-  overallSummary30,
-  overallSummary7,
-  overallSummary60,
+  pulse30,
+  pulse7,
+  pulse60,
   builderGrade30,
   builderGrade7,
   builderGrade60,
@@ -302,15 +296,8 @@ export default function GradesPanel({
         <PeriodToggle />
       </div>
 
-      {overall30 && overall7 && overall60 && (
-        <OverallGrade
-          overall30={overall30}
-          overall7={overall7}
-          overall60={overall60}
-          summary30={overallSummary30}
-          summary7={overallSummary7}
-          summary60={overallSummary60}
-        />
+      {pulse30 && pulse7 && pulse60 && (
+        <EcosystemPulsePanel pulse30={pulse30} pulse7={pulse7} pulse60={pulse60} />
       )}
 
       <div
@@ -343,12 +330,12 @@ export default function GradesPanel({
         <GradeCard
           isMobile={isMobile}
           grade={tg}
-          label="token mechanic"
+          label="burn apps (economic)"
           period={period}
           mini={
             period === '60d'
-              ? 'Commit-weighted token mechanic rubric scores over the last 60 days.'
-              : 'Commit-weighted average of each repo\'s token mechanic rubric score.'
+              ? 'Commit-weighted token mechanic scores for direct/supply-lock repos only — infra excluded.'
+              : 'Burn-app economic scores only — infra and tools excluded from this average.'
           }
           summary={tg?.summary ?? 'Token mechanic score unavailable'}
           trendExplanation={tg?.trendExplanation}
