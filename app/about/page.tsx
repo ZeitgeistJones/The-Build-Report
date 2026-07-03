@@ -39,7 +39,9 @@ When you pay, the ETH is sent to the receiver-buy-and-burn contract (0x0C1a3DB07
 
 Who can use it: any wallet that passes CLAWDGate tier 1 on Base (10M+ $CLAWD). The full report blur gate uses the same check.
 
-Result is shared: once a repo is scored, the result is cached in Redis and everyone sees it for free — including visitors who have not connected a wallet.`,
+Result is shared: once a repo is scored, the result is cached in Redis and everyone sees it for free — including visitors who have not connected a wallet.
+
+Commit counts shown on repo cards reflect GitHub scan windows (7d, 30d, 60d) — not precise counts from the exact score date. Hand-scored repos show their original score date; commit tracking since scoring is available for recently autoscored repos only.`,
         },
         {
           heading: 'Important distinctions',

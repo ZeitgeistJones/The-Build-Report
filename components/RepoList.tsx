@@ -43,10 +43,11 @@ const STALE_RED = '#ef4444'
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const GITHUB_COMMITS_CAP = 100
 
-type CommitsSinceScoredDisplay =
+type ScoreAgeDisplay =
   | { kind: 'hidden' }
-  | { kind: 'recently_scored' }
-  | { kind: 'count'; count: number; capped: boolean }
+  | { kind: 'hand_scored'; label: string }
+  | { kind: 'auto_count'; count: number; capped: boolean }
+  | { kind: 'auto_age'; days: number }
 
 function truncate120(text: string): string {
   return text.length > 120 ? `${text.slice(0, 119)}…` : text
@@ -146,35 +147,37 @@ function daysSinceScored(scoredAt: string | null | undefined): number | null {
   return (Date.now() - scored.getTime()) / MS_PER_DAY
 }
 
-/** Estimate commits since score using available GitHub windows. */
-function estimateCommitsSinceScored(
-  daysSince: number,
-  commits30d: number,
-  commits7d: number,
-): number {
-  if (daysSince > 30) return commits30d
-  const tail = Math.max(0, commits30d - commits7d)
-  const factor = Math.min(1, Math.max(0, (daysSince - 7) / 23))
-  return Math.round(commits7d + tail * factor)
+function isHandScored(repo: RepoWithLive): boolean {
+  return !isAutoInferredNote(repo.adminNote)
 }
 
-function getCommitsSinceScoredDisplay(
-  repo: RepoWithLive,
-  pending: boolean,
-): CommitsSinceScoredDisplay {
+function formatHandScoredDate(scoredAt: string): string {
+  const scored = parseScoredAt(scoredAt)
+  if (!scored) return 'Scored'
+  const dateLabel = scored.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `Scored ${dateLabel}`
+}
+
+function getScoreAgeDisplay(repo: RepoWithLive, pending: boolean): ScoreAgeDisplay {
   if (pending || !repo.scoredAt) return { kind: 'hidden' }
+
+  if (isHandScored(repo)) {
+    return { kind: 'hand_scored', label: formatHandScoredDate(repo.scoredAt) }
+  }
 
   const days = daysSinceScored(repo.scoredAt)
   if (days === null || days < 1) return { kind: 'hidden' }
 
-  if (days <= 7) return { kind: 'recently_scored' }
+  if (days <= 30) {
+    const commits30d = repo.commits30d ?? 0
+    return {
+      kind: 'auto_count',
+      count: commits30d,
+      capped: commits30d >= GITHUB_COMMITS_CAP,
+    }
+  }
 
-  const commits30d = repo.commits30d ?? 0
-  const commits7d = repo.commits7d ?? 0
-  const count = estimateCommitsSinceScored(days, commits30d, commits7d)
-  const capped = commits30d >= GITHUB_COMMITS_CAP && days > 30
-
-  return { kind: 'count', count, capped }
+  return { kind: 'auto_age', days: Math.floor(days) }
 }
 
 function commitsSinceScoredColor(count: number): string {
@@ -281,7 +284,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
     const periodCommits = repoCommitsForPeriod(repo, period)
     const commitSuffix = periodCommits > 0 ? ` · ${periodCommits} commits (${period})` : ''
-    const sinceScored = getCommitsSinceScoredDisplay(repo, pending)
+    const sinceScored = getScoreAgeDisplay(repo, pending)
 
     return (
       <div
@@ -364,18 +367,24 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
 
               <div style={{ fontSize: `${d.lastPushed}px`, color: META_MUTED, marginTop: '2px' }}>
                 Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}{commitSuffix}
-                {sinceScored.kind === 'recently_scored' && (
+                {sinceScored.kind === 'hand_scored' && (
                   <>
                     {' · '}
-                    <span style={{ color: META_MUTED }}>recently scored</span>
+                    <span style={{ color: META_MUTED }}>{sinceScored.label}</span>
                   </>
                 )}
-                {sinceScored.kind === 'count' && (
+                {sinceScored.kind === 'auto_count' && (
                   <>
                     {' · '}
                     <span style={{ color: commitsSinceScoredColor(sinceScored.capped ? GITHUB_COMMITS_CAP : sinceScored.count) }}>
                       {sinceScored.capped ? '100+' : sinceScored.count} commits since scored
                     </span>
+                  </>
+                )}
+                {sinceScored.kind === 'auto_age' && (
+                  <>
+                    {' · '}
+                    <span style={{ color: META_MUTED }}>Scored {sinceScored.days} days ago</span>
                   </>
                 )}
               </div>
