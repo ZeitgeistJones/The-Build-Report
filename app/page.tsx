@@ -19,7 +19,9 @@ import { getOverallSummary } from '@/lib/overallSummary'
 import RepoList, { type RepoWithLive } from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
+import RescoreBurnTracker from '@/components/RescoreBurnTracker'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
+import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +30,7 @@ export default async function Home() {
   let error = false
   const lastGithubScanAt = await getLastGithubScanAt()
   const chronicle = await getChronicleBannerData().catch(() => null)
+  const rescoreBurns = await getRescoreBurnStats().catch(() => null)
 
   try {
     stats = await getGitHubStats()
@@ -307,6 +310,9 @@ export default async function Home() {
       )}
 
       <div style={{ marginBottom: '40px' }}>
+      {rescoreBurns && rescoreBurns.count > 0 && (
+        <RescoreBurnTracker count={rescoreBurns.count} ethTotal={rescoreBurns.ethTotal} />
+      )}
       <RepoList repos={repos} githubSlugOrder={githubOrder} />
       </div>
 

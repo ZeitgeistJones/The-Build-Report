@@ -4,6 +4,7 @@ import { runAutoscoreSingle } from '@/lib/autoscore'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { isRepoExcluded } from '@/lib/repoExclude'
 import { bustOverallSummaryCache } from '@/lib/overallSummary'
+import { recordRescoreBurn } from '@/lib/rescoreBurns'
 import { PAID_TX_KEY_PREFIX } from '@/lib/web3/constants'
 import { verifyPaymentTx } from '@/lib/web3/verifyPayment'
 
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
 
     await redis.set(paidKey, repoSlug, { ex: 60 * 60 * 24 * 7 })
     await bustOverallSummaryCache(redis)
+    await recordRescoreBurn(redis)
 
     return NextResponse.json({ ok: true, repo })
   } catch (err: unknown) {
