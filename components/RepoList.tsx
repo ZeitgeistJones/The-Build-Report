@@ -33,11 +33,13 @@ const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
 type Density = 'compact' | 'comfortable'
 
 const DENSITY_STYLES = {
-  compact: { cardPadding: '14px 16px', name: 14, preview: 12, lastPushed: 12, gradeLetter: 20 },
-  comfortable: { cardPadding: '18px 16px', name: 15, preview: 13, lastPushed: 13, gradeLetter: 22 },
+  compact: { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20 },
+  comfortable: { cardPadding: '18px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 22 },
 } as const
 
-const CARD_META_COLOR = '#9a9590'
+const META_MUTED = '#5e5a55'
+const STALE_AMBER = '#f59e0b'
+const STALE_RED = '#ef4444'
 
 function truncate120(text: string): string {
   return text.length > 120 ? `${text.slice(0, 119)}…` : text
@@ -123,6 +125,25 @@ function repoCommitsForPeriod(repo: RepoWithLive, period: Period): number {
   if (period === '7d') return repo.commits7d ?? 0
   if (period === '30d') return repo.commits30d ?? 0
   return (repo.commits30d ?? 0) + (repo.commits30_60 ?? 0)
+}
+
+function isScoredWithinOneDay(scoredAt: string | null | undefined): boolean {
+  if (!scoredAt) return true
+  const scored = new Date(scoredAt)
+  if (Number.isNaN(scored.getTime())) return true
+  return Date.now() - scored.getTime() < 24 * 60 * 60 * 1000
+}
+
+function commitsSinceScoredColor(count: number): string {
+  if (count > 50) return STALE_RED
+  if (count > 20) return STALE_AMBER
+  return META_MUTED
+}
+
+function shouldShowCommitsSinceScored(repo: RepoWithLive, pending: boolean): boolean {
+  if (pending) return false
+  if (!repo.scoredAt) return false
+  return !isScoredWithinOneDay(repo.scoredAt)
 }
 
 interface RepoWithLive extends Repo {
@@ -223,6 +244,8 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
     const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
     const periodCommits = repoCommitsForPeriod(repo, period)
     const commitSuffix = periodCommits > 0 ? ` · ${periodCommits} commits (${period})` : ''
+    const commitsSinceScored = repo.commits30d ?? 0
+    const showSinceScored = shouldShowCommitsSinceScored(repo, pending)
 
     return (
       <div
@@ -286,14 +309,14 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                 )}
               </div>
 
-              <div style={{ fontSize: `${d.name}px`, fontWeight: 500, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
+              <div style={{ fontSize: `${d.name}px`, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
                 {repo.name}
               </div>
 
               {previewLine && (
                 <div style={{
                   fontSize: `${d.preview}px`,
-                  color: CARD_META_COLOR,
+                  color: 'var(--text-muted)',
                   marginTop: '2px',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -303,8 +326,16 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                 </div>
               )}
 
-              <div style={{ fontSize: `${d.lastPushed}px`, color: CARD_META_COLOR, marginTop: '2px' }}>
+              <div style={{ fontSize: `${d.lastPushed}px`, color: META_MUTED, marginTop: '2px' }}>
                 Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}{commitSuffix}
+                {showSinceScored && (
+                  <>
+                    {' · '}
+                    <span style={{ color: commitsSinceScoredColor(commitsSinceScored) }}>
+                      {commitsSinceScored} commits since scored
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
@@ -324,7 +355,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.tokenMechanic.letter) }}>
                       {repo.tokenMechanic.letter}
                     </div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.tokenMechanic.pct}%</div>
+                    <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{repo.tokenMechanic.pct}%</div>
                   </>
                 ) : (
                   <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
@@ -338,7 +369,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                 <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.builderIntegrity.letter) }}>
                   {repo.builderIntegrity.letter}
                 </div>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
+                <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>builder<br />integrity</div>
               </div>
 
