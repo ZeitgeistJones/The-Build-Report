@@ -124,6 +124,8 @@ interface RepoWithLive extends Repo {
   commits30d: number | null
 }
 
+export type { RepoWithLive }
+
 interface Props {
   repos: RepoWithLive[]
   githubSlugOrder?: string[]

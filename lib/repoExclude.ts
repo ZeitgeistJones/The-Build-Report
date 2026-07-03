@@ -60,13 +60,13 @@ export async function setRepoExcluded(slug: string, excluded: boolean): Promise<
   await patchAutoscoreCacheExcluded(slug, excluded)
 }
 
-export function applyExcludedToRepos(repos: Repo[], excludedMap: Record<string, boolean>): Repo[] {
+export function applyExcludedToRepos<T extends Repo>(repos: T[], excludedMap: Record<string, boolean>): T[] {
   return repos.map(repo => ({
     ...repo,
     excluded: excludedMap[repo.githubSlug] === true || repo.excluded === true,
   }))
 }
 
-export function filterPublicRepos(repos: Repo[]): Repo[] {
+export function filterPublicRepos<T extends Repo>(repos: T[]): T[] {
   return repos.filter(r => !r.excluded)
 }

@@ -16,7 +16,7 @@ import {
 } from '@/lib/gradeNarratives'
 import { calcOverallGradeWithTrend, calcOverallGrade, countReposScored, buildOverallGradeContext } from '@/lib/overallGrade'
 import { getOverallSummary } from '@/lib/overallSummary'
-import RepoList from '@/components/RepoList'
+import RepoList, { type RepoWithLive } from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
@@ -54,23 +54,22 @@ export default async function Home() {
     ? buildReposInGithubOrder(trackableGithub, REPOS, autoScored, makeUnscoredRecentRepo)
     : allRepos
 
-  const repos = filterPublicRepos(
-    applyExcludedToRepos(
-      reposBase.map(r => {
-        const activity = stats?.repoActivity[r.githubSlug]
-        const githubRepo = trackableGithub.find(gr => gr.name === r.githubSlug)
-          ?? stats?.repos.find(gr => gr.name === r.githubSlug)
-        return {
-          ...r,
-          adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
-          description: githubRepo?.description?.trim() || null,
-          lastCommitAt: activity?.lastCommitAt ?? null,
-          pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
-          commits30d: activity?.commits30d ?? null,
-        }
-      }),
-      excludedMap,
-    ),
+  const reposWithLive: RepoWithLive[] = reposBase.map(r => {
+    const activity = stats?.repoActivity[r.githubSlug]
+    const githubRepo = trackableGithub.find(gr => gr.name === r.githubSlug)
+      ?? stats?.repos.find(gr => gr.name === r.githubSlug)
+    return {
+      ...r,
+      adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
+      description: githubRepo?.description?.trim() || null,
+      lastCommitAt: activity?.lastCommitAt ?? null,
+      pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
+      commits30d: activity?.commits30d ?? null,
+    }
+  })
+
+  const repos: RepoWithLive[] = filterPublicRepos(
+    applyExcludedToRepos(reposWithLive, excludedMap),
   )
 
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []

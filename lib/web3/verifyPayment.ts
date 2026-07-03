@@ -1,6 +1,14 @@
-import { createPublicClient, getAddress, http, isAddressEqual } from 'viem'
-import { base } from 'viem/chains'
-import { RECEIVER_BUY_AND_BURN, SCORE_PAYMENT_WEI } from './constants'
+import { createPublicClient, defineChain, getAddress, http, isAddressEqual } from 'viem'
+import { BASE_CHAIN_ID, RECEIVER_BUY_AND_BURN, SCORE_PAYMENT_WEI } from './constants'
+
+const base = defineChain({
+  id: BASE_CHAIN_ID,
+  name: 'Base',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://mainnet.base.org'] },
+  },
+})
 
 export async function verifyPaymentTx(txHash: string, walletAddress: string): Promise<void> {
   const hash = txHash as `0x${string}`
