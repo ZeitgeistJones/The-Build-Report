@@ -1,11 +1,26 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import './mobile.css'
 import Web3Provider from '@/components/wallet/Web3Provider'
 import NavBar from '@/components/NavBar'
 
 export const metadata: Metadata = {
   title: 'The Build Report',
   description: 'A plain English look at the repos, scored and sourced.',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
+}
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#0e0e0e',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -14,10 +29,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Web3Provider>
           <NavBar />
-          <main style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', padding: '32px var(--content-padding-x) 80px' }}>
+          <main className="site-main" style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', padding: '32px var(--content-padding-x) 80px' }}>
             {children}
           </main>
-          <footer style={{
+          <footer className="site-footer" style={{
             borderTop: '1px solid var(--border)',
             padding: '20px 24px',
             textAlign: 'center',

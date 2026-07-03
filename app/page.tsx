@@ -19,7 +19,7 @@ import { getOverallSummary } from '@/lib/overallSummary'
 import RepoList, { type RepoWithLive } from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
-import RescoreBurnTracker from '@/components/RescoreBurnTracker'
+import HomeHeader from '@/components/HomeHeader'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 
@@ -180,27 +180,7 @@ export default async function Home() {
     <GradePeriodProvider>
     <>
       <div style={{ marginBottom: '40px', paddingBottom: '24px', borderBottom: '1px solid var(--border-strong)' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h1
-              style={{
-                fontSize: '26px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                letterSpacing: '-0.02em',
-                marginBottom: '6px',
-              }}
-            >
-              The Build Report
-            </h1>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-              A plain English look at the repos, scored and sourced.
-            </p>
-          </div>
-          {rescoreBurns && (rescoreBurns.count > 0 || rescoreBurns.clawdDisplay > 0) && (
-            <RescoreBurnTracker count={rescoreBurns.count} clawdDisplay={rescoreBurns.clawdDisplay} />
-          )}
-        </div>
+        <HomeHeader rescoreBurns={rescoreBurns} />
         <div
           style={{
             marginTop: '12px',
@@ -413,7 +393,7 @@ export default async function Home() {
           <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
             Letter grade scale
           </div>
-          <div>
+          <div className="letter-grade-scale">
             A+ 97–100 · A 93–96 · A- 90–92 · B+ 87–89 · B 83–86 · B- 80–82 · C+ 77–79 · C 73–76 · C- 70–72 · D+ 67–69 · D 63–66 · D- 60–62 · F+ 50–59 · F 40–49 · F- below 40
           </div>
         </div>
@@ -468,6 +448,7 @@ export default async function Home() {
               {block.rows.map(row => (
                 <div
                   key={row.label}
+                  className="rubric-weight-row"
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -540,7 +521,7 @@ export default async function Home() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {CHANGELOG.map((entry, i) => (
-              <div key={i} style={{ display: 'flex', gap: '12px', fontSize: '13px' }}>
+              <div key={i} className="changelog-row" style={{ display: 'flex', gap: '12px', fontSize: '13px' }}>
                 <span
                   style={{
                     color: 'var(--text-muted)',

@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import { Period } from '@/lib/grades'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { MIN_TAP } from '@/lib/responsive'
 
 interface GradePeriodContextValue {
   period: Period
@@ -29,6 +31,7 @@ export function useGradePeriod(): GradePeriodContextValue {
 
 export function PeriodToggle() {
   const { period, setPeriod } = useGradePeriod()
+  const isMobile = useIsMobile()
 
   return (
     <div
@@ -47,13 +50,17 @@ export function PeriodToggle() {
           onClick={() => setPeriod(p)}
           style={{
             fontSize: '12px',
-            padding: '4px 12px',
+            padding: isMobile ? '8px 14px' : '4px 12px',
+            minHeight: isMobile ? MIN_TAP : undefined,
             borderRadius: '4px',
             background: period === p ? 'var(--accent-dim)' : 'transparent',
             color: period === p ? 'var(--accent)' : 'var(--text-muted)',
             fontWeight: period === p ? 500 : 400,
             border: period === p ? '1px solid var(--accent-border)' : '1px solid transparent',
             transition: 'all 0.15s',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           {p}

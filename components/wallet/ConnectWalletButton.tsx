@@ -1,9 +1,24 @@
 'use client'
 
 import { useClawdAccess } from './ClawdAccessContext'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { MIN_TAP } from '@/lib/responsive'
 
 function truncateAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
+}
+
+function walletButtonStyle(isMobile: boolean): React.CSSProperties {
+  return {
+    fontSize: '12px',
+    padding: isMobile ? '8px 14px' : '4px 11px',
+    minHeight: isMobile ? MIN_TAP : undefined,
+    borderRadius: '99px',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
 }
 
 export default function ConnectWalletButton() {
@@ -16,6 +31,8 @@ export default function ConnectWalletButton() {
     switchToBase,
     isLoading,
   } = useClawdAccess()
+  const isMobile = useIsMobile()
+  const base = walletButtonStyle(isMobile)
 
   if (isWrongChain) {
     return (
@@ -24,13 +41,10 @@ export default function ConnectWalletButton() {
         onClick={switchToBase}
         disabled={isLoading}
         style={{
-          fontSize: '12px',
-          padding: '4px 11px',
-          borderRadius: '99px',
+          ...base,
           border: '1px solid var(--accent-border)',
           background: 'var(--accent-dim)',
           color: 'var(--accent)',
-          cursor: 'pointer',
         }}
       >
         Switch to Base
@@ -45,14 +59,11 @@ export default function ConnectWalletButton() {
         onClick={disconnectWallet}
         title={address}
         style={{
-          fontSize: '12px',
-          padding: '4px 11px',
-          borderRadius: '99px',
+          ...base,
           border: '1px solid var(--accent-border)',
           background: 'var(--accent-dim)',
           color: 'var(--accent)',
           fontFamily: 'var(--font-mono)',
-          cursor: 'pointer',
         }}
       >
         {truncateAddress(address)}
@@ -66,13 +77,10 @@ export default function ConnectWalletButton() {
       onClick={connectWallet}
       disabled={isLoading}
       style={{
-        fontSize: '12px',
-        padding: '4px 11px',
-        borderRadius: '99px',
+        ...base,
         border: '1px solid var(--border)',
         background: 'transparent',
         color: 'var(--text-secondary)',
-        cursor: 'pointer',
       }}
     >
       Connect wallet

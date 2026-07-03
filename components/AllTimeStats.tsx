@@ -5,6 +5,8 @@ import { pctChange } from '@/lib/grades'
 import GateBlur from '@/components/wallet/GateBlur'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import { useGradePeriod } from '@/components/GradePeriodContext'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { MIN_TAP } from '@/lib/responsive'
 
 interface Props {
   totalRepos: number
@@ -45,10 +47,12 @@ interface StatCardProps {
   trend?: string
   tooltip?: string
   gated?: boolean
+  isMobile: boolean
 }
 
-function StatCard({ label, value, sub, trend, tooltip, gated }: StatCardProps) {
+function StatCard({ label, value, sub, trend, tooltip, gated, isMobile }: StatCardProps) {
   const [show, setShow] = useState(false)
+  const trendSize = isMobile ? '11px' : '10px'
 
   const valueContent = (
     <>
@@ -59,7 +63,7 @@ function StatCard({ label, value, sub, trend, tooltip, gated }: StatCardProps) {
         {sub}
       </div>
       {trend && (
-        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+        <div style={{ fontSize: trendSize, color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
           {trend}
         </div>
       )}
@@ -85,10 +89,10 @@ function StatCard({ label, value, sub, trend, tooltip, gated }: StatCardProps) {
             onMouseLeave={() => setShow(false)}
             onClick={() => setShow(s => !s)}
             style={{
-              width: '14px',
-              height: '14px',
+              width: isMobile ? MIN_TAP : 14,
+              height: isMobile ? MIN_TAP : 14,
               borderRadius: '50%',
-              background: 'var(--surface-3)',
+              background: isMobile ? 'transparent' : 'var(--surface-3)',
               color: 'var(--text-muted)',
               fontSize: '9px',
               display: 'flex',
@@ -96,6 +100,7 @@ function StatCard({ label, value, sub, trend, tooltip, gated }: StatCardProps) {
               justifyContent: 'center',
               flexShrink: 0,
               cursor: 'default',
+              padding: 0,
             }}
           >
             ?
@@ -115,7 +120,7 @@ function StatCard({ label, value, sub, trend, tooltip, gated }: StatCardProps) {
           fontSize: '12px',
           color: 'var(--text-secondary)',
           lineHeight: 1.5,
-          width: '220px',
+          width: isMobile ? 'min(280px, calc(100vw - 32px))' : '220px',
           zIndex: 10,
           pointerEvents: 'none',
         }}>
@@ -141,6 +146,7 @@ export default function AllTimeStats({
 }: Props) {
   const { unlocked } = useClawdAccess()
   const { period } = useGradePeriod()
+  const isMobile = useIsMobile()
   const gated = !unlocked
 
   return (
@@ -167,16 +173,18 @@ export default function AllTimeStats({
       )}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
         gap: '10px',
       }}>
         <StatCard
+          isMobile={isMobile}
           label="Total repos"
           value={totalRepos.toString()}
           sub="all public on GitHub"
           tooltip="Total number of public repositories on the clawdbotatg GitHub account."
         />
         <StatCard
+          isMobile={isMobile}
           label="Commits (30d)"
           value={totalCommits30d.toLocaleString()}
           sub="last 30 days"
@@ -184,6 +192,7 @@ export default function AllTimeStats({
           tooltip="Commits across up to 40 repos pushed in the last 30 days (scored repos prioritized). Compared to days 31–60."
         />
         <StatCard
+          isMobile={isMobile}
           label="Commits (7d)"
           value={totalCommits7d.toLocaleString()}
           sub="last 7 days"
@@ -192,6 +201,7 @@ export default function AllTimeStats({
           gated={gated}
         />
         <StatCard
+          isMobile={isMobile}
           label="Active days (30d)"
           value={activeDays30d.toString()}
           sub="last 30 days"
@@ -200,6 +210,7 @@ export default function AllTimeStats({
           gated={gated}
         />
         <StatCard
+          isMobile={isMobile}
           label="Active days (7d)"
           value={activeDays7d.toString()}
           sub="last 7 days"
@@ -208,6 +219,7 @@ export default function AllTimeStats({
           gated={gated}
         />
         <StatCard
+          isMobile={isMobile}
           label="Last commit"
           value={lastCommitAt ? formatLastCommit(lastCommitAt) : '—'}
           sub={lastCommitRepo ?? ''}

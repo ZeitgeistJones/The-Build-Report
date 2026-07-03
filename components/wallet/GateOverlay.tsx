@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { useClawdAccess } from './ClawdAccessContext'
 import { CLAWD_BUY_URL } from '@/lib/web3/constants'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 const panelStyle = {
   fontSize: '14px',
@@ -20,6 +21,7 @@ const panelStyle = {
 
 export default function GateOverlay() {
   const { isConnected, hasAccess, isWrongChain, connectWallet, switchToBase } = useClawdAccess()
+  const isMobile = useIsMobile()
 
   let content: ReactNode
 
@@ -69,7 +71,7 @@ export default function GateOverlay() {
         display: 'flex',
         alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '12px 24px 24px',
+        padding: isMobile ? '12px 16px 24px' : '12px 24px 24px',
         background:
           'linear-gradient(to bottom, transparent 0px, rgba(14, 14, 14, 0.45) 80px, rgba(14, 14, 14, 0.55) 100%)',
         borderRadius: 'var(--radius-lg)',

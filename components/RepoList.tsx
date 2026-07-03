@@ -13,6 +13,8 @@ import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import RepoScoreButton from '@/components/RepoScoreButton'
 import { useGradePeriod } from '@/components/GradePeriodContext'
 import { Period } from '@/lib/grades'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { MIN_TAP } from '@/lib/responsive'
 
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
@@ -89,22 +91,28 @@ function PillButton({
   active,
   onClick,
   children,
+  isMobile,
 }: {
   active: boolean
   onClick: () => void
   children: ReactNode
+  isMobile: boolean
 }) {
   return (
     <button
       onClick={onClick}
       style={{
         fontSize: '12px',
-        padding: '4px 11px',
+        padding: isMobile ? '8px 14px' : '4px 11px',
+        minHeight: isMobile ? MIN_TAP : undefined,
         borderRadius: '99px',
         border: `1px solid ${active ? 'var(--accent-border)' : 'var(--border)'}`,
         background: active ? 'var(--accent-dim)' : 'transparent',
         color: active ? 'var(--accent)' : 'var(--text-muted)',
         transition: 'all 0.15s',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       {children}
@@ -132,6 +140,7 @@ const CONFIDENCE_TOOLTIP: Record<Confidence, string> = {
 
 function ConfidenceLabel({ confidence }: { confidence: Confidence }) {
   const [showTooltip, setShowTooltip] = useState(false)
+  const isMobile = useIsMobile()
   const label = CONFIDENCE_LABEL[confidence]
   const tooltip = CONFIDENCE_TOOLTIP[confidence]
 
@@ -145,8 +154,8 @@ function ConfidenceLabel({ confidence }: { confidence: Confidence }) {
         onClick={() => setShowTooltip(s => !s)}
         aria-label={`About ${label.toLowerCase()}`}
         style={{
-          width: '14px',
-          height: '14px',
+          width: isMobile ? MIN_TAP : 14,
+          height: isMobile ? MIN_TAP : 14,
           borderRadius: '50%',
           background: 'transparent',
           color: 'var(--text-muted)',
@@ -174,7 +183,7 @@ function ConfidenceLabel({ confidence }: { confidence: Confidence }) {
             fontSize: '12px',
             color: 'var(--text-secondary)',
             lineHeight: 1.5,
-            width: '260px',
+            width: isMobile ? 'min(280px, calc(100vw - 32px))' : '260px',
             zIndex: 10,
             pointerEvents: 'none',
             textAlign: 'left',
@@ -276,7 +285,9 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
   const [repoItems, setRepoItems] = useState(repos)
   const { unlocked } = useClawdAccess()
   const { period } = useGradePeriod()
-  const d = DENSITY_STYLES[density]
+  const isMobile = useIsMobile()
+  const effectiveDensity = isMobile ? 'compact' : density
+  const d = DENSITY_STYLES[effectiveDensity]
 
   useEffect(() => {
     setRepoItems(repos)
@@ -373,6 +384,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
             alignItems: 'flex-start',
             gap: '12px',
             padding: d.cardPadding,
+            flexDirection: isMobile ? 'column' : 'row',
           }}
         >
           <button
@@ -382,9 +394,11 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
             style={{
               flex: 1,
               minWidth: 0,
+              width: isMobile ? '100%' : undefined,
               display: 'flex',
               alignItems: 'flex-start',
               gap: '12px',
+              flexDirection: isMobile ? 'column' : 'row',
               textAlign: 'left',
               background: 'transparent',
               cursor: 'pointer',
@@ -427,14 +441,28 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                   color: 'var(--text-muted)',
                   marginTop: '2px',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  ...(isMobile
+                    ? {
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical' as const,
+                        whiteSpace: 'normal',
+                      }
+                    : {
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }),
                 }}>
                   {previewLine}
                 </div>
               )}
 
-              <div style={{ fontSize: `${d.lastPushed}px`, color: META_MUTED, marginTop: '2px' }}>
+              <div style={{
+                fontSize: `${d.lastPushed}px`,
+                color: META_MUTED,
+                marginTop: '2px',
+                ...(isMobile ? { lineHeight: 1.45 } : {}),
+              }}>
                 Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}{commitSuffix}
                 {sinceScored.kind === 'hand_scored' && (
                   <>
@@ -459,7 +487,13 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexShrink: 0 }}>
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'flex-start',
+              flexShrink: 0,
+              ...(isMobile ? { width: '100%', justifyContent: 'space-between' } : {}),
+            }}>
               {pending ? (
                 <div style={{ textAlign: 'center', minWidth: '88px', paddingTop: '3px' }}>
                   <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>Pending</div>
@@ -531,7 +565,13 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     Token mechanic
                   </div>
                   {repo.tokenMechanic.rubric.map((row, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '6px', flexWrap: 'nowrap' }}>
+                    <div key={i} style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px',
+                      marginBottom: '6px',
+                      flexWrap: isMobile ? 'wrap' : 'nowrap',
+                    }}>
                       <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
                       <span style={{
@@ -545,7 +585,15 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                       }}>
                         {row.level}
                       </span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
+                      <span style={{
+                        fontSize: '11px',
+                        color: 'var(--text-muted)',
+                        maxWidth: isMobile ? undefined : '220px',
+                        width: isMobile ? '100%' : undefined,
+                        textAlign: isMobile ? 'left' : 'right',
+                        lineHeight: 1.3,
+                        flexShrink: isMobile ? 1 : 0,
+                      }}>
                         {row.source}
                       </span>
                     </div>
@@ -570,7 +618,13 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                   Builder integrity
                 </div>
                 {repo.builderIntegrity.rubric.map((row, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '6px', flexWrap: 'nowrap' }}>
+                  <div key={i} style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    marginBottom: '6px',
+                    flexWrap: isMobile ? 'wrap' : 'nowrap',
+                  }}>
                     <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
                     <span style={{
@@ -584,7 +638,15 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
                     }}>
                       {row.level}
                     </span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '220px', textAlign: 'right', lineHeight: 1.3, flexShrink: 0 }}>
+                    <span style={{
+                      fontSize: '11px',
+                      color: 'var(--text-muted)',
+                      maxWidth: isMobile ? undefined : '220px',
+                      width: isMobile ? '100%' : undefined,
+                      textAlign: isMobile ? 'left' : 'right',
+                      lineHeight: 1.3,
+                      flexShrink: isMobile ? 1 : 0,
+                    }}>
                       {row.source}
                     </span>
                   </div>
@@ -629,7 +691,14 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+      <div style={{
+        display: 'flex',
+        alignItems: isMobile ? 'stretch' : 'center',
+        justifyContent: 'space-between',
+        marginBottom: '12px',
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? '10px' : 0,
+      }}>
         <div style={{ fontSize: '11px', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Repos
           {activeFilter === 'all'
@@ -642,17 +711,22 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
               key={f.key}
               active={activeFilter === f.key}
               onClick={() => setActiveFilter(f.key)}
+              isMobile={isMobile}
             >
               {f.label}
             </PillButton>
           ))}
-          <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 4px' }} />
-          <PillButton active={density === 'compact'} onClick={() => setDensity('compact')}>
-            Compact
-          </PillButton>
-          <PillButton active={density === 'comfortable'} onClick={() => setDensity('comfortable')}>
-            Comfortable
-          </PillButton>
+          {!isMobile && (
+            <>
+              <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 4px' }} />
+              <PillButton active={density === 'compact'} onClick={() => setDensity('compact')} isMobile={false}>
+                Compact
+              </PillButton>
+              <PillButton active={density === 'comfortable'} onClick={() => setDensity('comfortable')} isMobile={false}>
+                Comfortable
+              </PillButton>
+            </>
+          )}
         </div>
       </div>
 

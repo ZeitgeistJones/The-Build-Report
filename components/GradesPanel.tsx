@@ -7,6 +7,7 @@ import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
 import OverallGrade from './OverallGrade'
 import { OverallGradeWithTrend } from '@/lib/overallGrade'
 import { Period } from '@/lib/grades'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface Props {
   overall30: OverallGradeWithTrend | null
@@ -45,6 +46,7 @@ function GradeCard({
   period,
   footer,
   trendExplanation,
+  isMobile,
 }: {
   grade: {
     letter: string
@@ -58,6 +60,7 @@ function GradeCard({
   period: Period
   footer?: React.ReactNode
   trendExplanation?: TrendExplanation
+  isMobile: boolean
 }) {
   const [showTrend, setShowTrend] = useState(false)
 
@@ -102,6 +105,7 @@ function GradeCard({
               alignItems: 'baseline',
               gap: '8px',
               marginBottom: '4px',
+              flexWrap: isMobile ? 'wrap' : 'nowrap',
             }}
           >
             <span
@@ -151,7 +155,7 @@ function GradeCard({
                   fontSize: '11px',
                   color: 'var(--text-muted)',
                   lineHeight: 1.3,
-                  maxWidth: 140,
+                  maxWidth: isMobile ? undefined : 140,
                 }}
               >
                 {TREND_UNAVAILABLE_60D}
@@ -264,6 +268,8 @@ export default function GradesPanel({
   stats60d,
 }: Props) {
   const { period } = useGradePeriod()
+  const isMobile = useIsMobile()
+  const footerSize = isMobile ? '11px' : '10px'
 
   const bg = period === '30d' ? builderGrade30 : period === '7d' ? builderGrade7 : builderGrade60
   const tg = period === '30d' ? tokenMechanicGrade30 : period === '7d' ? tokenMechanicGrade7 : tokenMechanicGrade60
@@ -278,6 +284,8 @@ export default function GradesPanel({
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '12px',
+          flexWrap: isMobile ? 'wrap' : 'nowrap',
+          gap: isMobile ? '8px' : 0,
         }}
       >
         <div
@@ -308,12 +316,13 @@ export default function GradesPanel({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gap: '12px',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+          gap: isMobile ? '10px' : '12px',
           alignItems: 'stretch',
         }}
       >
         <GradeCard
+          isMobile={isMobile}
           grade={bg}
           label="builder activity"
           period={period}
@@ -323,15 +332,16 @@ export default function GradesPanel({
           footer={
             stats && (
               <>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.commits} commits</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.activeDays} active days</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{stats.newRepos} new repos</span>
+                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{stats.commits} commits</span>
+                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{stats.activeDays} active days</span>
+                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{stats.newRepos} new repos</span>
               </>
             )
           }
         />
 
         <GradeCard
+          isMobile={isMobile}
           grade={tg}
           label="token mechanic"
           period={period}
@@ -346,33 +356,33 @@ export default function GradesPanel({
             tg?.counts && (
               <>
                 {tg.counts.repos > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.repos} repos in sample</span>
+                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.repos} repos in sample</span>
                 )}
                 {period === '60d' ? (
                   <>
                     {tg.counts.direct > 0 && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.direct} high-TM commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.direct} high-TM commits</span>
                     )}
                     {tg.counts.lock > 0 && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.lock} mid-TM commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.lock} mid-TM commits</span>
                     )}
                     {tg.counts.indirect > 0 && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.indirect} low-TM commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.indirect} low-TM commits</span>
                     )}
                   </>
                 ) : (
                   <>
                     {tg.counts.direct > 0 && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.direct} direct commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.direct} direct commits</span>
                     )}
                     {tg.counts.lock > 0 && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.lock} supply-lock commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.lock} supply-lock commits</span>
                     )}
                     {tg.counts.indirect > 0 && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.indirect} indirect commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.indirect} indirect commits</span>
                     )}
                     {tg.counts.infra > 0 && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tg.counts.infra} infra/R&D commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.infra} infra/R&D commits</span>
                     )}
                   </>
                 )}
@@ -382,6 +392,7 @@ export default function GradesPanel({
         />
 
         <GradeCard
+          isMobile={isMobile}
           grade={ig}
           label="Builder Integrity"
           period={period}
@@ -391,18 +402,18 @@ export default function GradesPanel({
           footer={
             ig && (
               <>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.active} repos in sample</span>
+                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.active} repos in sample</span>
                 {ig.counts.commitWeight > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.commitWeight} commits weighted</span>
+                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.commitWeight} commits weighted</span>
                 )}
                 {ig.counts.high > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.high} high-integrity commits</span>
+                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.high} high-integrity commits</span>
                 )}
                 {ig.counts.mid > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.mid} mid commits</span>
+                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.mid} mid commits</span>
                 )}
                 {ig.counts.low > 0 && (
-                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{ig.counts.low} low-integrity commits</span>
+                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.low} low-integrity commits</span>
                 )}
               </>
             )

@@ -1,6 +1,6 @@
 export default function AboutPage() {
   return (
-    <div style={{ maxWidth: '640px' }}>
+    <div className="about-prose" style={{ maxWidth: '640px' }}>
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 600, letterSpacing: '-0.02em', marginBottom: '8px' }}>
           About The Build Report
@@ -80,7 +80,7 @@ If you hold $CLAWD and have opinions on what should change, that conversation sh
           body: `The Build Report is a starting point, not a conclusion. Verify anything that matters to you against primary sources. Hold $CLAWD because you've done your own research, not because a score on this site told you to.`,
         },
       ].map(section => (
-        <div key={section.heading} style={{ marginBottom: '28px' }}>
+        <div key={section.heading} className="about-prose-section" style={{ marginBottom: '28px' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
             {section.heading}
           </h2>
