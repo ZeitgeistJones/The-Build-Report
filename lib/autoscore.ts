@@ -205,24 +205,30 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
 }
 
 // HOMEPAGE-SAFE: cache only, no Anthropic calls
+export async function getCachedAutoScoresForSlugs(slugs: string[]): Promise<Repo[]> {
+  if (!slugs.length) return []
+
+  const r = getRedis()
+  const results: Repo[] = []
+
+  await Promise.all(
+    slugs.map(async slug => {
+      const cached = await readCachedScore(r, slug)
+      if (cached) results.push(cached)
+    }),
+  )
+
+  return results
+}
+
+/** @deprecated Prefer getCachedAutoScoresForSlugs when slugs are already known. */
 export async function getAutoScores(newRepos: RawRepo[]): Promise<Repo[]> {
   if (!newRepos.length) {
     console.log('[autoscore] no new repos to read from cache')
     return []
   }
 
-  const r = getRedis()
-  const results: Repo[] = []
-
-  await Promise.all(
-    newRepos.map(async (repo) => {
-      const cached = await readCachedScore(r, repo.name)
-      if (cached) results.push(cached)
-    }),
-  )
-
-  console.log(`[autoscore] cache-only returning ${results.length} scored repos`)
-  return results
+  return getCachedAutoScoresForSlugs(newRepos.map(r => r.name))
 }
 
 function rankForInference(name: string, githubOrder: string[]): number {

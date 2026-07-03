@@ -3,11 +3,16 @@ import { getChronicleBannerData } from '@/lib/chronicle'
 import { getLastGithubScanAt, formatScanAt } from '@/lib/githubScan'
 import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
-import { getAutoScores } from '@/lib/autoscore'
+import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
 import { makeUnscoredRecentRepo } from '@/lib/recentRepos'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { getExcludedSlugs, applyExcludedToRepos, filterPublicRepos } from '@/lib/repoExclude'
-import { mergeRepoSources, buildReposInGithubOrder, githubSlugOrder } from '@/lib/repoOrder'
+import {
+  mergeRepoSources,
+  buildReposInGithubOrder,
+  githubSlugOrder,
+  cacheLookupSlugs,
+} from '@/lib/repoOrder'
 import { calcBuilderGrade, calcTokenMechanicGrade, calcIntegrityGrade } from '@/lib/grades'
 import {
   buildBuilderTrendExplanation,
@@ -44,12 +49,9 @@ export default async function Home() {
   const excludedMap = await getExcludedSlugs()
   const excludedSlugs = new Set(Object.keys(excludedMap).filter(k => excludedMap[k]))
 
-  const existingSlugs = new Set(REPOS.map(r => r.githubSlug))
   const trackableGithub = stats?.trackableRepos ?? []
-  const unscoredRepos = trackableGithub.filter(
-    repo => !existingSlugs.has(repo.name) && !excludedSlugs.has(repo.name),
-  )
-  const autoScoredRaw = unscoredRepos.length > 0 ? await getAutoScores(unscoredRepos) : []
+  const cacheSlugs = cacheLookupSlugs(REPOS, trackableGithub, excludedSlugs)
+  const autoScoredRaw = cacheSlugs.length > 0 ? await getCachedAutoScoresForSlugs(cacheSlugs) : []
   const autoScored = autoScoredRaw.filter(r => !shouldSkipRepo(r.githubSlug))
 
   const allRepos = filterPublicRepos(applyExcludedToRepos(mergeRepoSources(REPOS, autoScored), excludedMap))
