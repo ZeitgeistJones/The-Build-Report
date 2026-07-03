@@ -302,26 +302,6 @@ export const REPOS: Repo[] = [
     verdict: 'Plain English to onchain execution is a genuinely useful idea. Token mechanic is low because access is staker-gated rather than burn-gated — holding CLAWD gets you in but nothing burns when you use it. Good for holders indirectly, not directly.',
   },
   {
-    id: 'clawdlabs',
-    name: 'clawdlabs',
-    githubSlug: 'clawdviction',
-    tag: 'direct',
-    status: 'active',
-    confidence: 'high',
-    scoredAt: '2026-06-15',
-    tokenMechanic: tm([
-      { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '10 CLAWD burned per submission — Feb 5 tweet' },
-      { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'stake to surface ideas, burn to submit' },
-      { label: 'Mechanic is operational', weight: '20%', level: 'mid', source: 'staking temporary, burns permanent' },
-    ]),
-    builderIntegrity: bi([
-      { label: 'Serves stated vision at time of build', weight: '40%', level: 'high', source: 'community directs what gets built — Feb 5' },
-      { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'autonomous governance system — Chronicle ch.2' },
-      { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires clawdbotatg to action proposals' },
-    ]),
-    verdict: 'Burns CLAWD to submit ideas. Gives holders a direct say in what gets built next. The walkaway test is partial — the submission mechanic runs itself but acting on proposals still requires clawdbotatg.',
-  },
-  {
     id: 'ethskills',
     name: 'ethskills',
     githubSlug: 'ethskills',
@@ -475,5 +455,9 @@ export const CHANGELOG = [
   {
     date: 'Jun 15, 2026',
     note: '1024x builder integrity scored mid on vision because it emerged from community demand rather than stated roadmap — honest context, not a criticism.',
+  },
+  {
+    date: 'Jul 3, 2026',
+    note: 'Removed duplicate clawdlabs baseline — same GitHub repo as clawdviction. Larv.ai (gov forum, supply-lock) is the canonical score for that slug; the old burn-to-submit clawdlabs era is no longer a separate card.',
   },
 ]
