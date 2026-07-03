@@ -70,9 +70,6 @@ export const CRITICAL_PATH_REPOS: Record<string, CriticalPathEntry> = {
   },
 }
 
-/** Completed contracts — quiet = success, not dormant. */
-export const DONE_REPOS = new Set<string>(['clawd-vesting'])
-
 export function getLockedTag(slug: string): Tag | null {
   return CRITICAL_PATH_REPOS[slug]?.tag ?? null
 }
@@ -91,8 +88,4 @@ export function shouldFloorAtC(slug: string): boolean {
 
 export function getCriticalPathRole(slug: string): CriticalPathEntry | null {
   return CRITICAL_PATH_REPOS[slug] ?? null
-}
-
-export function isDoneRepo(slug: string): boolean {
-  return DONE_REPOS.has(slug)
 }

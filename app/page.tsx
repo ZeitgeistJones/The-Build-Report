@@ -305,12 +305,13 @@ export default async function Home() {
           <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
             Ecosystem grades (v3)
           </div>
-          <div><strong>Ecosystem pulse</strong> — repos shipping, supporting, done, and dormant in the selected window. No blended overall letter grade.</div>
+          <div><strong>Ecosystem pulse</strong> — repos shipping, stable, or done in the selected window. Quiet repos are stable, not failures.</div>
           <div><strong>Burn apps (economic)</strong> — commit-weighted token mechanic for direct and supply-lock repos only. Infra and tools are excluded.</div>
           <div><strong>Builder activity</strong> — GitHub shipping velocity across the ecosystem.</div>
           <div><strong>Builder integrity</strong> — commit-weighted trust and alignment scores.</div>
           <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
             Infra cards show economic N/A (indirect) plus a display-only shipping leverage score. Critical-path repos have locked tags and floor at C when functioning as designed.
+            Card badges: <strong>Shipping</strong> (commits in window), <strong>Stable</strong> (quiet — normal for infra, waiting burns, locks), <strong>Done ✅</strong> (completed supply-lock with strong integrity).
           </div>
         </div>
 

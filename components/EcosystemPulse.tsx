@@ -69,9 +69,8 @@ export default function EcosystemPulsePanel({ pulse30, pulse7, pulse60 }: Props)
       >
         <PulseStat label="scored" value={pulse.reposScored} />
         <PulseStat label="shipping" value={pulse.shipping} />
-        <PulseStat label="supporting" value={pulse.supporting} />
-        <PulseStat label="done" value={pulse.done} />
-        {pulse.dormant > 0 && <PulseStat label="dormant" value={pulse.dormant} />}
+        <PulseStat label="stable" value={pulse.stable} />
+        {pulse.done > 0 && <PulseStat label="done" value={pulse.done} />}
         <PulseStat label="burn apps" value={pulse.consumerApps} />
         <PulseStat label="infra/tools" value={pulse.infraTools} />
       </div>

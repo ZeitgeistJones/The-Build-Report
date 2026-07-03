@@ -579,49 +579,48 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 </div>
               ) : (
               <>
-              <div style={{ textAlign: 'center', minWidth: economicNa ? '52px' : '40px' }}>
-                {economicNa ? (
+              ) : economicNa ? (
+              <>
+              <div style={{ textAlign: 'center', minWidth: '36px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                  economic<br />indirect
+                </div>
+              </div>
+
+              <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
+
+              <div style={{ textAlign: 'center', minWidth: '36px' }}>
+                {shippingLeverage ? (
                   <>
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
-                    {shippingLeverage && (
-                      <>
-                        <div style={{
-                          fontSize: `${Math.max(d.gradeLetter - 4, 16)}px`,
-                          fontWeight: 600,
-                          fontFamily: 'var(--font-mono)',
-                          color: gradeColor(shippingLeverage.letter),
-                          marginTop: '6px',
-                        }}>
-                          {shippingLeverage.letter}
-                        </div>
-                        <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{shippingLeverage.pct}%</div>
-                      </>
-                    )}
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>
-                      economic<br />indirect
-                      {shippingLeverage && (
-                        <>
-                          <br />
-                          <span style={{ fontSize: '9px' }}>ship leverage</span>
-                        </>
-                      )}
+                    <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(shippingLeverage.letter) }}>
+                      {shippingLeverage.letter}
                     </div>
+                    <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{shippingLeverage.pct}%</div>
                   </>
-                ) : tokenMechanic ? (
+                ) : (
+                  <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>—</div>
+                )}
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                  shipping<br />leverage
+                </div>
+              </div>
+              </>
+              ) : (
+              <div style={{ textAlign: 'center', minWidth: '40px' }}>
+                {tokenMechanic ? (
                   <>
                     <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(tokenMechanic.letter) }}>
                       {tokenMechanic.letter}
                     </div>
                     <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{tokenMechanic.pct}%</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
                   </>
                 ) : (
-                  <>
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
-                  </>
+                  <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
                 )}
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
               </div>
+              )}
 
               <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
 
@@ -763,9 +762,9 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 </div>
               )}
 
-              {!pending && lifecycleHint(lifecycle, repo.status) && (
+              {!pending && lifecycleHint(lifecycle) && (
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.45, fontStyle: 'italic' }}>
-                  {lifecycleHint(lifecycle, repo.status)}
+                  {lifecycleHint(lifecycle)}
                 </p>
               )}
 
