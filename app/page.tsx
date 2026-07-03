@@ -21,7 +21,7 @@ import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   let stats
@@ -131,45 +131,47 @@ export default async function Home() {
   const overallGrade60 = overallGrade60Base
     ? { ...overallGrade60Base, trendPct: null, trend: 'flat' as const }
     : null
-  const overallSummary30 = overallGrade30
-    ? await getOverallSummary(
-        buildOverallGradeContext(
-          overallGrade30,
-          tokenMechanicGrade30,
-          builderGrade30,
-          integrityGrade30!,
-          allRepos,
-          stats,
-          '30d',
-        ),
-      ).catch(() => null)
-    : null
-  const overallSummary7 = overallGrade7
-    ? await getOverallSummary(
-        buildOverallGradeContext(
-          overallGrade7,
-          tokenMechanicGrade7,
-          builderGrade7,
-          integrityGrade7!,
-          allRepos,
-          stats,
-          '7d',
-        ),
-      ).catch(() => null)
-    : null
-  const overallSummary60 = overallGrade60
-    ? await getOverallSummary(
-        buildOverallGradeContext(
-          overallGrade60,
-          tokenMechanicGrade60,
-          builderGrade60,
-          integrityGrade60!,
-          allRepos,
-          stats,
-          '60d',
-        ),
-      ).catch(() => null)
-    : null
+  const [overallSummary30, overallSummary7, overallSummary60] = await Promise.all([
+    overallGrade30
+      ? getOverallSummary(
+          buildOverallGradeContext(
+            overallGrade30,
+            tokenMechanicGrade30,
+            builderGrade30,
+            integrityGrade30!,
+            allRepos,
+            stats,
+            '30d',
+          ),
+        ).catch(() => null)
+      : Promise.resolve(null),
+    overallGrade7
+      ? getOverallSummary(
+          buildOverallGradeContext(
+            overallGrade7,
+            tokenMechanicGrade7,
+            builderGrade7,
+            integrityGrade7!,
+            allRepos,
+            stats,
+            '7d',
+          ),
+        ).catch(() => null)
+      : Promise.resolve(null),
+    overallGrade60
+      ? getOverallSummary(
+          buildOverallGradeContext(
+            overallGrade60,
+            tokenMechanicGrade60,
+            builderGrade60,
+            integrityGrade60!,
+            allRepos,
+            stats,
+            '60d',
+          ),
+        ).catch(() => null)
+      : Promise.resolve(null),
+  ])
 
   return (
     <GradePeriodProvider>

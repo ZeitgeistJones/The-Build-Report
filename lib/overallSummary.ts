@@ -113,6 +113,9 @@ ${SUMMARY_RULES}`
 }
 
 export async function getOverallSummary(ctx: OverallGradeContext): Promise<string | null> {
+  // Skip Claude/Redis during next build static collection — summaries run at request time.
+  if (process.env.NEXT_PHASE === 'phase-production-build') return null
+
   const key = SUMMARY_KEYS[ctx.period]
 
   try {
