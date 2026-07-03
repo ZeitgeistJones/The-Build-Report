@@ -88,7 +88,7 @@ export const REPOS: Repo[] = [
     tag: 'direct',
     status: 'active',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: 'Chronicle ch.7, Mar 7 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'high', source: 'buy-and-burn on USDC payments' },
@@ -108,7 +108,7 @@ export const REPOS: Repo[] = [
     tag: 'direct',
     status: 'dormant',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '10M per call — Chronicle ch.3' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'high', source: 'caller incentive keeps it running' },
@@ -128,7 +128,7 @@ export const REPOS: Repo[] = [
     tag: 'direct',
     status: 'active',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '20% of every pot burned — Chronicle ch.5' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'high', source: '25% dividends to key holders' },
@@ -148,7 +148,7 @@ export const REPOS: Repo[] = [
     tag: 'direct',
     status: 'dormant',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '25% of stakes burned — Jan 29 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: '65% to winners, one-off mechanic' },
@@ -168,7 +168,7 @@ export const REPOS: Repo[] = [
     tag: 'direct',
     status: 'active',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '1% on every bet and win — Feb 21 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'high', source: 'dual burn on both sides of every play' },
@@ -188,7 +188,7 @@ export const REPOS: Repo[] = [
     tag: 'supply-lock',
     status: 'active',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'low', source: 'CV burns are not CLAWD burns' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'governance unlocks Leftclaw access' },
@@ -208,7 +208,7 @@ export const REPOS: Repo[] = [
     tag: 'supply-lock',
     status: 'dormant',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'low', source: 'vesting not burning — no destruction' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'low', source: 'pure lock mechanic, no revenue path' },
@@ -228,7 +228,7 @@ export const REPOS: Repo[] = [
     tag: 'supply-lock',
     status: 'active',
     confidence: 'mid',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'low', source: 'liquidity lock, not a burn' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'earns swap fees during vest period' },
@@ -248,7 +248,7 @@ export const REPOS: Repo[] = [
     tag: 'direct',
     status: 'dormant',
     confidence: 'mid',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '10% of all stakes burned — Feb 18 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'community-judged payouts' },
@@ -268,7 +268,7 @@ export const REPOS: Repo[] = [
     tag: 'direct',
     status: 'active',
     confidence: 'mid',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'mid', source: 'accepts CLAWD as payment — Mar 23 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'payment path exists, burn path less clear' },
@@ -288,7 +288,7 @@ export const REPOS: Repo[] = [
     tag: 'indirect',
     status: 'active',
     confidence: 'mid',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'low', source: 'no direct burn mechanic' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'limited to CLAWD stakers — Mar 17 tweet' },
@@ -308,7 +308,7 @@ export const REPOS: Repo[] = [
     tag: 'direct',
     status: 'active',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Burn mechanic exists and is live', weight: '50%', level: 'high', source: '10 CLAWD burned per submission — Feb 5 tweet' },
       { label: 'Revenue or burn path built in', weight: '30%', level: 'mid', source: 'stake to surface ideas, burn to submit' },
@@ -328,7 +328,7 @@ export const REPOS: Repo[] = [
     tag: 'infrastructure',
     status: 'active',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'high', source: 'directly improves quality of shipped apps' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'mid', source: 'indirect — better tools, better burns' },
@@ -348,7 +348,7 @@ export const REPOS: Repo[] = [
     tag: 'infrastructure',
     status: 'active',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'high', source: 'powers Leftclaw worker fleet directly' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'high', source: 'Leftclaw burns CLAWD on every job — Mar 28' },
@@ -368,7 +368,7 @@ export const REPOS: Repo[] = [
     tag: 'infrastructure',
     status: 'active',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'high', source: 'keeps the worker bot fleet running' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'high', source: 'if this breaks, Leftclaw stops, burns stop' },
@@ -388,7 +388,7 @@ export const REPOS: Repo[] = [
     tag: 'infrastructure',
     status: 'active',
     confidence: 'high',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'low', source: 'read-only, no downstream burn path' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'low', source: 'informs holders but does not move CLAWD' },
@@ -408,7 +408,7 @@ export const REPOS: Repo[] = [
     tag: 'infrastructure',
     status: 'active',
     confidence: 'mid',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'mid', source: 'expands agent ecosystem that uses CLAWD' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'low', source: 'theoretical — more agents could mean more burns' },
@@ -428,7 +428,7 @@ export const REPOS: Repo[] = [
     tag: 'theoretical',
     status: 'active',
     confidence: 'low',
-    scoredAt: 'Jun 15, 2026',
+    scoredAt: '2026-06-15',
     tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'mid', source: 'if mature, multiplies shipping capacity significantly' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'low', source: 'potential only — no live mechanic yet' },
@@ -448,7 +448,7 @@ export const REPOS: Repo[] = [
     tag: 'infrastructure',
     status: 'active',
     confidence: 'mid',
-    scoredAt: 'Jul 1, 2026',
+    scoredAt: '2026-07-01',
     tokenMechanic: tm([
       { label: 'Enables consumer apps that burn CLAWD', weight: '50%', level: 'mid', source: 'multi-session dev harness for shipping clawdbotatg apps faster' },
       { label: 'Downstream path to holder value', weight: '30%', level: 'mid', source: 'fork of clawd-console — speeds interactive Claude Code builds' },
