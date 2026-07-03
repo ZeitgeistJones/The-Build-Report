@@ -180,20 +180,27 @@ export default async function Home() {
     <GradePeriodProvider>
     <>
       <div style={{ marginBottom: '40px', paddingBottom: '24px', borderBottom: '1px solid var(--border-strong)' }}>
-        <h1
-          style={{
-            fontSize: '26px',
-            fontWeight: 600,
-            color: 'var(--text-primary)',
-            letterSpacing: '-0.02em',
-            marginBottom: '6px',
-          }}
-        >
-          The Build Report
-        </h1>
-        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          A plain English look at the repos, scored and sourced.
-        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1
+              style={{
+                fontSize: '26px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                letterSpacing: '-0.02em',
+                marginBottom: '6px',
+              }}
+            >
+              The Build Report
+            </h1>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+              A plain English look at the repos, scored and sourced.
+            </p>
+          </div>
+          {rescoreBurns && (rescoreBurns.count > 0 || rescoreBurns.clawdDisplay > 0) && (
+            <RescoreBurnTracker count={rescoreBurns.count} clawdDisplay={rescoreBurns.clawdDisplay} />
+          )}
+        </div>
         <div
           style={{
             marginTop: '12px',
@@ -208,18 +215,13 @@ export default async function Home() {
             color: 'var(--text-muted)',
           }}
         >
-          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-            <span style={{ flex: '1 1 200px' }}>
-              Scores are interpretive — based on the{' '}
-              <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">
-                Chronicle
-              </a>{' '}
-              and public GitHub data. Not financial advice. <a href="/about">Full disclaimer →</a>
-            </span>
-            {rescoreBurns && (rescoreBurns.count > 0 || rescoreBurns.clawdDisplay > 0) && (
-              <RescoreBurnTracker count={rescoreBurns.count} clawdDisplay={rescoreBurns.clawdDisplay} />
-            )}
-          </div>
+          <span>
+            Scores are interpretive — based on the{' '}
+            <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">
+              Chronicle
+            </a>{' '}
+            and public GitHub data. Not financial advice. <a href="/about">Full disclaimer →</a>
+          </span>
           <span>
             GitHub data updates when a scan is run from the admin panel.
             {lastGithubScanAt && ` Last scan: ${formatScanAt(lastGithubScanAt)}.`}
