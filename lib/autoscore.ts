@@ -19,6 +19,7 @@ import {
   TM_INFRA_PROMPT,
   validateTokenMechanicRows,
 } from './rubrics/tokenMechanic'
+import { ECOSYSTEM_DECODER_RING } from './rubrics/decoderRing'
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
 const CACHE_KEY_PREFIX_V2 = 'build-report:autoscore:v2:'
@@ -141,13 +142,16 @@ Infer:
 
 Framing: low infra token mechanic is normal; low activity is not integrity failure; CV/CONVICTION ≠ CLAWD burns; locks/vesting ≠ burns.
 
+${ECOSYSTEM_DECODER_RING}
+
 ${TM_CONSUMER_PROMPT}
 ${TM_INFRA_PROMPT}
 ${TM_EDGE_RULES}
 
 builderIntegrity (5 rows, exact labels and weights):
 ${BI_PROMPT_ROWS}
-Score each BI row high/mid/low from repo type (infra, landing, money-moving, governance, etc.). Do not skip rows.
+Score each BI row high/mid/low from repo type (infra, landing, money-moving, governance, completed lock, etc.). Do not skip rows.
+Apply the decoder ring: completed vesting/locks and waiting burn mechanisms should not be penalized for quiet dormancy or lack of ongoing test suites if launch commitments held.
 
 - level: "high" | "mid" | "low"
 - source: brief inference note
