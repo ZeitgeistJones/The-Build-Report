@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, type ReactNode } from 'react'
-import { Repo, Tag, Level } from '@/lib/scores'
+import { Repo, Tag, Level, Confidence } from '@/lib/scores'
 import { timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { isUnscoredRecent } from '@/lib/recentRepos'
@@ -118,10 +118,73 @@ const LEVEL_STYLES: Record<Level, { color: string; bg: string }> = {
   low: { color: '#e05c5c', bg: 'rgba(224,92,92,0.1)' },
 }
 
-const CONFIDENCE_LABEL: Record<string, string> = {
+const CONFIDENCE_LABEL: Record<Confidence, string> = {
   high: 'High confidence',
   mid: 'Medium confidence',
   low: 'Low confidence',
+}
+
+const CONFIDENCE_TOOLTIP: Record<Confidence, string> = {
+  high: 'Score based on a detailed repo description and clear ecosystem context. Claude had strong signal to work with.',
+  mid: 'Score based on partial repo metadata. Some inference required — treat as a reasonable estimate.',
+  low: 'Score based on repo name and ecosystem context only — no description available. Treat as a starting point; a Rescore with more repo context may improve accuracy.',
+}
+
+function ConfidenceLabel({ confidence }: { confidence: Confidence }) {
+  const [showTooltip, setShowTooltip] = useState(false)
+  const label = CONFIDENCE_LABEL[confidence]
+  const tooltip = CONFIDENCE_TOOLTIP[confidence]
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+      <span>{label}</span>
+      <button
+        type="button"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        onClick={() => setShowTooltip(s => !s)}
+        aria-label={`About ${label.toLowerCase()}`}
+        style={{
+          width: '14px',
+          height: '14px',
+          borderRadius: '50%',
+          background: 'transparent',
+          color: 'var(--text-muted)',
+          fontSize: '11px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          cursor: 'default',
+          padding: 0,
+        }}
+      >
+        ⓘ
+      </button>
+      {showTooltip && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            right: 0,
+            background: 'var(--surface-3)',
+            border: '1px solid var(--border-strong)',
+            borderRadius: 'var(--radius)',
+            padding: '8px 10px',
+            fontSize: '12px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.5,
+            width: '260px',
+            zIndex: 10,
+            pointerEvents: 'none',
+            textAlign: 'left',
+          }}
+        >
+          {tooltip}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function githubOrderIndex(slug: string, order: string[]): number {
@@ -556,7 +619,7 @@ export default function RepoList({ repos, githubSlugOrder = [] }: Props) {
             )}
 
             <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
-              {CONFIDENCE_LABEL[repo.confidence]}
+              <ConfidenceLabel confidence={repo.confidence} />
             </div>
           </div>
         )}
