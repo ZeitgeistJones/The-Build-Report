@@ -38,6 +38,28 @@ export const LIVE_AI_CONFIDENCE_TOOLTIP =
 export const RESCORE_BUTTON_TOOLTIP =
   'Score this repo using Claude AI. Cost: 0.000008 ETH (~$0.02 at time of writing — ETH price fluctuates so actual USD cost may vary). Payment is burned as $CLAWD via the receiver-buy-and-burn contract, supporting the ecosystem. Result is cached — community benefits from your score. First rescore on a baseline grade often shifts the letter — different scoring pass, not always a repo change.'
 
+export const SCORE_TYPE_BASELINE_LABEL = 'Baseline'
+export const SCORE_TYPE_LIVE_AI_LABEL = 'Live AI'
+
+export const SCORE_TYPE_BASELINE_TOOLTIP =
+  'Launch baseline — fixed Jun 15 grade with cited Chronicle and tweet sources. Editorial snapshot, not re-run automatically.'
+
+export const SCORE_TYPE_LIVE_AI_TOOLTIP =
+  'Live AI score — Claude inferred this from repo metadata and GitHub activity. A starting-point estimate; Rescore can refresh it.'
+
+export const SCORE_TYPE_STYLES = {
+  baseline: {
+    color: '#6b9eb8',
+    bg: 'rgba(107, 158, 184, 0.14)',
+    border: 'rgba(107, 158, 184, 0.35)',
+  },
+  liveAi: {
+    color: '#a78bc9',
+    bg: 'rgba(167, 139, 201, 0.14)',
+    border: 'rgba(167, 139, 201, 0.35)',
+  },
+} as const
+
 export function isLaunchBaseline(adminNote: string | undefined): boolean {
   return !isAutoInferredNote(adminNote)
 }
@@ -53,9 +75,9 @@ function parseScoredAt(scoredAt: string): Date | null {
 
 export function formatBaselineDate(scoredAt: string): string {
   const scored = parseScoredAt(scoredAt)
-  if (!scored) return 'Baseline'
+  if (!scored) return 'Jun 15 snapshot'
   const dateLabel = scored.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return `Baseline · ${dateLabel}`
+  return `${dateLabel} snapshot`
 }
 
 /** Launch baseline dates use ISO (2026-06-15); live AI uses locale strings (Jun 30, 2026). */

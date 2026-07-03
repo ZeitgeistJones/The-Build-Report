@@ -17,6 +17,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
 import InfoTooltip from '@/components/InfoTooltip'
+import ScoreTypeBadge from '@/components/ScoreTypeBadge'
 import {
   CONFIDENCE_LABEL,
   formatBaselineDate,
@@ -467,6 +468,9 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                   }}>
                     awaiting score
                   </span>
+                )}
+                {!pending && repo.scoredAt && (
+                  <ScoreTypeBadge adminNote={repo.adminNote} />
                 )}
               </div>
 

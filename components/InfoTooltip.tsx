@@ -17,6 +17,8 @@ interface Props {
   width?: number
   /** When true, tooltip panel accepts clicks (e.g. links inside). */
   interactive?: boolean
+  /** Smaller trigger for nested badges; keeps 14px on mobile. */
+  compact?: boolean
 }
 
 export default function InfoTooltip({
@@ -26,6 +28,7 @@ export default function InfoTooltip({
   placement = 'below',
   width = 260,
   interactive = false,
+  compact = false,
 }: Props) {
   const isMobile = useIsMobile()
   const [show, setShow] = useState(false)
@@ -94,7 +97,7 @@ export default function InfoTooltip({
     }
   }, [show, isMobile, width, placement, interactive])
 
-  const size = isMobile ? MIN_TAP : 14
+  const size = compact ? 14 : (isMobile ? MIN_TAP : 14)
   const iconChar = icon === 'question' ? '?' : 'ⓘ'
   const usePortal = placement === 'above' || interactive
 
