@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
+import { getRedis } from '@/lib/redis'
 import { stripMarkdown } from './textCleanup'
 import { LetterBucketDistribution, OverallGradeContext } from './overallGrade'
 import { Period } from './grades'
@@ -20,18 +21,6 @@ const PERIOD_FOCUS: Record<Period, string> = {
   '7d': 'Focus on what happened this week: recent momentum, where commits landed, and the short-term signal for holders.',
   '30d': 'Focus on the current month: what is being built right now and what the grades mean for holders today.',
   '60d': 'Focus on the broader two-month picture: sustained patterns, whether activity is consistent or bursty, and how this week\'s work fits the longer arc.',
-}
-
-let redis: Redis | null = null
-
-function getRedis() {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-  }
-  return redis
 }
 
 function formatDistribution(dist: LetterBucketDistribution): string {

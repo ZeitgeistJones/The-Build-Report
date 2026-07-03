@@ -73,25 +73,19 @@ export function calcOverallGrade(
   }
 }
 
-function priorPctFromTrend(curr: number, trendPct: number | null): number {
-  if (trendPct === null) return 0
-  if (trendPct === 0) return curr
-  return Math.round(curr / (1 + trendPct / 100))
-}
-
 export function calcOverallGradeWithTrend(
-  tokenMechanic: { pct: number; trendPct: number | null } | null,
-  builder: { pct: number; trendPct: number | null } | null,
-  integrity: { pct: number; trendPct: number | null },
+  tokenMechanic: { pct: number; priorPct: number | null } | null,
+  builder: { pct: number; priorPct: number | null } | null,
+  integrity: { pct: number; priorPct: number | null },
   reposScored: number,
 ): OverallGradeWithTrend | null {
   const overall = calcOverallGrade(tokenMechanic, builder, integrity, reposScored)
   if (!overall) return null
 
   const priorOverall = calcOverallGrade(
-    tokenMechanic ? { pct: priorPctFromTrend(tokenMechanic.pct, tokenMechanic.trendPct) } : null,
-    builder ? { pct: priorPctFromTrend(builder.pct, builder.trendPct) } : null,
-    { pct: priorPctFromTrend(integrity.pct, integrity.trendPct) },
+    tokenMechanic ? { pct: tokenMechanic.priorPct ?? 0 } : null,
+    builder ? { pct: builder.priorPct ?? 0 } : null,
+    { pct: integrity.priorPct ?? 0 },
     reposScored,
   )
 

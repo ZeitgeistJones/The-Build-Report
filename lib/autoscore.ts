@@ -1,22 +1,13 @@
 import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
-import { Repo, Tag, Status, Level, RubricRow, Score, calcRubricPct, normalizeRepoScores, REPOS } from './scores'
+import { Repo, Tag, Status, RubricRow, Score, calcRubricPct, normalizeRepoScores, REPOS } from './scores'
 import { pctToLetter } from './gradeLetters'
 import { shouldSkipRepo } from './repoFilters'
 import { getExcludedSlugs } from './repoExclude'
 import { getChronicleContext } from './chronicleContext'
+import { DEFAULT_ECOSYSTEM_CONTEXT, getEcosystemContext } from './ecosystemContext'
+import { getRedis } from './redis'
 import { fetchRepoBySlug } from './github'
-
-let redis: Redis | null = null
-function getRedis() {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-  }
-  return redis
-}
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
 const CACHE_KEY_PREFIX_V2 = 'build-report:autoscore:v2:'
@@ -65,6 +56,15 @@ export interface RawRepo {
   pushedAt: string
   createdAt: string
   language: string | null
+  archived?: boolean
+}
+
+function deriveStatus(repo: RawRepo): Status {
+  if (repo.archived) return 'archived'
+  const days = (Date.now() - new Date(repo.pushedAt).getTime()) / 86_400_000
+  if (days > 180) return 'archived'
+  if (days > 60) return 'dormant'
+  return 'active'
 }
 
 function makeScore(rows: RubricRow[]): Score {
@@ -72,32 +72,31 @@ function makeScore(rows: RubricRow[]): Score {
   return { letter: pctToLetter(pct), pct, rubric: rows }
 }
 
-const ECOSYSTEM_CONTEXT = `
-clawdbotatg is an autonomous AI builder agent on Base blockchain. It builds tools for $CLAWD token holders.
-Key facts:
-- leftclaw-services: AI job marketplace — users pay USDC, buys and burns CLAWD automatically
-- clawd-incinerator: direct burn contract, 10M CLAWD per call
-- clawd-fomo3d-v2: onchain game, 20% of every pot burned
-- clawdviction / larv.ai: governance staking, locks 8% of CLAWD supply
-- dead-simple-agent: agent framework powering the Leftclaw worker fleet
-- clawd-containers: Docker infrastructure running the worker bots
-- zkllmapi-v2: ZK-proof private AI API, accepts CLAWD as payment
-- ethskills: onchain knowledge graph for agents
-- yet-another-builder-agent: meta-agent that builds other agents
+const VALID_TAGS = new Set(['direct', 'supply-lock', 'indirect', 'infrastructure', 'theoretical'])
+const VALID_LEVELS = new Set(['high', 'mid', 'low'])
+const TM_WEIGHTS = new Set(['50%', '30%', '20%'])
+const BI_WEIGHTS = new Set(['40%', '35%', '25%'])
 
-Tag definitions:
-- direct: burn mechanic on every interaction (burns CLAWD permanently)
-- supply-lock: removes CLAWD from circulation temporarily (staking/vesting)
-- indirect: enables other repos that burn CLAWD (infrastructure with clear burn downstream)
-- infrastructure: no token mechanic expected, foundational tooling
-- theoretical: R&D, no live mechanic yet
-
-The project's stated goals: every consumer app burns CLAWD, autonomous operation, walkaway test (runs without clawdbotatg intervention).
-`.trim()
+function validateRubricRows(rows: unknown[], weights: Set<string>): rows is RubricRow[] {
+  if (!Array.isArray(rows) || rows.length !== 3) return false
+  return rows.every(
+    r =>
+      typeof r === 'object' &&
+      r !== null &&
+      typeof (r as RubricRow).label === 'string' &&
+      weights.has((r as RubricRow).weight) &&
+      VALID_LEVELS.has((r as RubricRow).level) &&
+      typeof (r as RubricRow).source === 'string',
+  )
+}
 
 async function inferScore(repo: RawRepo, options?: { chronicleContext?: string }): Promise<Repo | null> {
   console.log(`[autoscore] inferring: ${repo.name}`)
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+  const derivedStatus = deriveStatus(repo)
+  const ecosystemCtx =
+    (await getEcosystemContext().catch(() => null)) ?? DEFAULT_ECOSYSTEM_CONTEXT
 
   const chronicleBlock = options?.chronicleContext?.trim()
     ? `Chronicle context (condensed):\n${options.chronicleContext.trim()}\n\n`
@@ -105,7 +104,7 @@ async function inferScore(repo: RawRepo, options?: { chronicleContext?: string }
 
   const prompt = `You are scoring a GitHub repository for the clawdbotatg CLAWD ecosystem.
 
-${chronicleBlock}${ECOSYSTEM_CONTEXT}
+${chronicleBlock}${ecosystemCtx}
 
 Repo to score:
 Name: ${repo.name}
@@ -113,14 +112,14 @@ Description: ${repo.description ?? 'none'}
 Language: ${repo.language ?? 'unknown'}
 Created: ${repo.createdAt}
 Last pushed: ${repo.pushedAt}
+Status (computed from push date): ${derivedStatus}
 
 Based on the repo name, description, and ecosystem context, infer:
 1. tag: one of direct | supply-lock | indirect | infrastructure | theoretical
-2. status: one of active | dormant | archived
-3. tokenMechanic rubric (3 rows — ALWAYS include, use adapted criteria for infrastructure/theoretical)
-4. builderIntegrity rubric (3 rows)
-5. verdict: 2-3 sentence plain English assessment
-6. adminNote: one sentence flagging this is auto-inferred live AI, not a launch baseline score
+2. tokenMechanic rubric (3 rows — ALWAYS include, use adapted criteria for infrastructure/theoretical)
+3. builderIntegrity rubric (3 rows)
+4. verdict: 2-3 sentence plain English assessment
+5. adminNote: one sentence flagging this is auto-inferred live AI, not a launch baseline score
 
 When writing verdict and adminNote, frame low scores constructively and acknowledge the repo's role even when it scores low. Still be accurate — do not invent positive framing that is not warranted. Examples:
 - Infrastructure repos scoring low on token mechanic: say "foundational layer — value shows up in downstream consumer apps" rather than only "no burn mechanic."
@@ -137,7 +136,6 @@ For rubric rows use these exact weights:
 Respond ONLY with a valid JSON object in this exact shape, no markdown:
 {
   "tag": "infrastructure",
-  "status": "active",
   "tokenMechanic": [
     { "label": "...", "weight": "50%", "level": "low", "source": "..." },
     { "label": "...", "weight": "30%", "level": "low", "source": "..." },
@@ -163,14 +161,27 @@ Respond ONLY with a valid JSON object in this exact shape, no markdown:
     const clean = text.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
 
+    if (!VALID_TAGS.has(parsed.tag)) {
+      console.error(`[autoscore] invalid tag for ${repo.name}:`, parsed.tag)
+      return null
+    }
+
     const tokenMechanicRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
+    if (!validateRubricRows(tokenMechanicRows, TM_WEIGHTS)) {
+      console.error(`[autoscore] invalid tokenMechanic rubric for ${repo.name}`)
+      return null
+    }
+    if (!validateRubricRows(parsed.builderIntegrity, BI_WEIGHTS)) {
+      console.error(`[autoscore] invalid builderIntegrity rubric for ${repo.name}`)
+      return null
+    }
 
     const repoOut: Repo = {
       id: repo.name,
       name: repo.name,
       githubSlug: repo.name,
       tag: parsed.tag as Tag,
-      status: parsed.status as Status,
+      status: derivedStatus,
       confidence: 'low',
       scoredAt: new Date().toLocaleDateString('en-US', {
         month: 'short',
@@ -320,6 +331,7 @@ export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null>
     pushedAt: gh.pushedAt,
     createdAt: gh.createdAt,
     language: gh.language,
+    archived: gh.archived,
   }
 
   const chronicleContext = await getChronicleContext().catch(() => null)

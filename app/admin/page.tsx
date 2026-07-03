@@ -22,6 +22,9 @@ export default function AdminPage() {
   const [chronicleContext, setChronicleContextText] = useState('')
   const [savingChronicle, setSavingChronicle] = useState(false)
   const [chronicleSaved, setChronicleSaved] = useState(false)
+  const [ecosystemContext, setEcosystemContextText] = useState('')
+  const [savingEcosystem, setSavingEcosystem] = useState(false)
+  const [ecosystemSaved, setEcosystemSaved] = useState(false)
 
   async function refreshGitHubData() {
     setRefreshRunning(true)
@@ -93,6 +96,7 @@ export default function AdminPage() {
       setExcluded(data.excluded ?? {})
       setAutoScored(data.autoScored ?? [])
       setChronicleContextText(data.chronicleContext ?? '')
+      setEcosystemContextText(data.ecosystemContext ?? '')
     } else {
       setAuthError('Wrong password.')
     }
@@ -128,6 +132,18 @@ export default function AdminPage() {
     setSavingChronicle(false)
     setChronicleSaved(true)
     setTimeout(() => setChronicleSaved(false), 2200)
+  }
+
+  async function saveEcosystemContext() {
+    setSavingEcosystem(true)
+    await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'saveEcosystemContext', password, ecosystemContext }),
+    })
+    setSavingEcosystem(false)
+    setEcosystemSaved(true)
+    setTimeout(() => setEcosystemSaved(false), 2200)
   }
 
   async function saveNote(repoId: string) {
@@ -280,6 +296,53 @@ export default function AdminPage() {
             }}
           >
             {savingChronicle ? 'Saving…' : chronicleSaved ? 'Saved ✓' : 'Save Chronicle context'}
+          </button>
+        </div>
+      </div>
+
+      {/* Ecosystem context for autoscore */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Ecosystem context</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px' }}>
+            Background knowledge prepended to all autoscore prompts (batch and paid rescore). Leave empty to use the built-in default.
+          </p>
+        </div>
+        <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+          <textarea
+            value={ecosystemContext}
+            onChange={e => setEcosystemContextText(e.target.value)}
+            placeholder="Ecosystem facts, repo relationships, tag definitions..."
+            rows={8}
+            style={{
+              display: 'block',
+              width: '100%',
+              boxSizing: 'border-box',
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              padding: '10px 14px',
+              color: 'var(--text-primary)',
+              fontSize: '13px',
+              fontFamily: 'var(--font-sans)',
+              resize: 'vertical',
+              marginBottom: '8px',
+            }}
+          />
+          <button
+            onClick={saveEcosystemContext}
+            disabled={savingEcosystem}
+            style={{
+              display: 'block',
+              fontSize: '12px',
+              padding: '5px 14px',
+              borderRadius: 'var(--radius)',
+              background: ecosystemSaved ? 'var(--accent-dim)' : 'var(--surface-3)',
+              color: ecosystemSaved ? 'var(--accent)' : 'var(--text-secondary)',
+              border: `1px solid ${ecosystemSaved ? 'var(--accent-border)' : 'var(--border)'}`,
+            }}
+          >
+            {savingEcosystem ? 'Saving…' : ecosystemSaved ? 'Saved ✓' : 'Save ecosystem context'}
           </button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Redis } from '@upstash/redis'
+import { Ratelimit } from '@upstash/ratelimit'
 import { resolveRepoBeforeRescore, runAutoscoreSingle } from '@/lib/autoscore'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { isRepoExcluded } from '@/lib/repoExclude'
@@ -8,19 +8,22 @@ import { bustOverallSummaryCache } from '@/lib/overallSummary'
 import { recordRescoreBurn } from '@/lib/rescoreBurns'
 import { generateRescoreChangeSummary } from '@/lib/rescoreChangeSummary'
 import { buildRescoreSummaryRecord, saveRescoreSummary } from '@/lib/rescoreSummaries'
+import { getRedis } from '@/lib/redis'
 import { PAID_TX_KEY_PREFIX } from '@/lib/web3/constants'
 import { verifyPaymentTx } from '@/lib/web3/verifyPayment'
 
 export const maxDuration = 60
 
-function getRedis() {
-  return new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-  })
-}
+const ratelimit = new Ratelimit({
+  redis: getRedis(),
+  limiter: Ratelimit.slidingWindow(3, '1 h'),
+  prefix: 'build-report:rl:rescore',
+})
 
 export async function POST(req: NextRequest) {
+  const redis = getRedis()
+  let paidKey: string | null = null
+
   try {
     const body = await req.json().catch(() => ({}))
     const repoSlug = typeof body.repoSlug === 'string' ? body.repoSlug.trim() : ''
@@ -39,11 +42,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Repo is excluded from scoring' }, { status: 400 })
     }
 
-    const redis = getRedis()
-    const paidKey = `${PAID_TX_KEY_PREFIX}${txHash}`
-    const alreadyUsed = await redis.get(paidKey)
-    if (alreadyUsed) {
-      return NextResponse.json({ ok: false, error: 'Transaction already used' }, { status: 400 })
+    paidKey = `${PAID_TX_KEY_PREFIX}${txHash}`
+    const claimed = await redis.set(paidKey, 'pending', { nx: true })
+    if (!claimed) {
+      return NextResponse.json(
+        { ok: false, error: 'Transaction already used or in progress' },
+        { status: 400 },
+      )
+    }
+
+    const { success } = await ratelimit.limit(walletAddress.toLowerCase())
+    if (!success) {
+      await redis.del(paidKey)
+      return NextResponse.json({ ok: false, error: 'Rate limit exceeded — try again later' }, { status: 429 })
     }
 
     await verifyPaymentTx(txHash, walletAddress)
@@ -56,6 +67,7 @@ export async function POST(req: NextRequest) {
 
     const repo = await runAutoscoreSingle(repoSlug)
     if (!repo) {
+      await redis.del(paidKey)
       return NextResponse.json({ ok: false, error: 'Could not score repo' }, { status: 500 })
     }
 
@@ -73,12 +85,15 @@ export async function POST(req: NextRequest) {
     })
     await saveRescoreSummary(repoSlug, rescoreMeta, redis)
 
-    await redis.set(paidKey, repoSlug, { ex: 60 * 60 * 24 * 7 })
+    await redis.set(paidKey, `complete:${repoSlug}`)
     await bustOverallSummaryCache(redis)
     await recordRescoreBurn(redis)
 
     return NextResponse.json({ ok: true, repo, changeSummary, rescoreMeta })
   } catch (err: unknown) {
+    if (paidKey) {
+      await redis.del(paidKey).catch(() => {})
+    }
     const message = err instanceof Error ? err.message : 'Request failed'
     return NextResponse.json({ ok: false, error: message }, { status: 400 })
   }

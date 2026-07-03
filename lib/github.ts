@@ -44,6 +44,7 @@ export interface GitHubRepo {
   createdAt: string
   pushedAt: string
   language: string | null
+  archived?: boolean
 }
 
 export interface GitHubStats {
@@ -304,6 +305,7 @@ export async function fetchRepoBySlug(slug: string): Promise<GitHubRepo | null> 
       createdAt: data.created_at,
       pushedAt: data.pushed_at,
       language: data.language ?? null,
+      archived: data.archived === true,
     }
   } catch {
     return null

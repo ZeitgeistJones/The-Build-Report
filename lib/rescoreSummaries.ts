@@ -1,4 +1,5 @@
 import { Redis } from '@upstash/redis'
+import { getRedis } from '@/lib/redis'
 import { Repo, Score } from './scores'
 
 const KEY_PREFIX = 'build-report:rescore-summary:'
@@ -13,18 +14,6 @@ export type RescoreSummaryRecord = {
   newScoredAt: string
   commits30dAtRescore: number
   rescoreAt: string
-}
-
-let redis: Redis | null = null
-
-function getRedis() {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-  }
-  return redis
 }
 
 function summaryKey(slug: string) {

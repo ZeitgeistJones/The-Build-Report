@@ -19,6 +19,7 @@ export interface TrendExplanation {
 export interface BuilderGrade {
   letter: string
   pct: number
+  priorPct: number | null
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   trendPct: number | null
@@ -28,8 +29,10 @@ export interface BuilderGrade {
 
 export interface TokenMechanicGrade {
   counts: { direct: number; lock: number; indirect: number; infra: number; repos: number }
+  tagCommits?: { direct: number; lock: number; indirect: number; infra: number }
   letter: string
   pct: number
+  priorPct: number | null
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   trendPct: number | null
@@ -41,6 +44,7 @@ export interface IntegrityGrade {
   counts: { active: number; high: number; mid: number; low: number; commitWeight: number }
   letter: string
   pct: number
+  priorPct: number | null
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   trendPct: number | null
@@ -166,6 +170,7 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
     return {
       letter,
       pct,
+      priorPct: null,
       trendPct: null,
       trend: 'flat',
       summary:
@@ -187,6 +192,7 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
   return {
     letter,
     pct,
+    priorPct,
     trendPct,
     trend: trendFromPct(trendPct),
     summary:
@@ -218,51 +224,22 @@ function commitsForRepo(
   return window === 'current' ? live.commits7d : live.commits7_14
 }
 
-const HOLDER_TAG_VALUE: Record<Repo['tag'], number> = {
-  direct: 1,
-  'supply-lock': 0.75,
-  indirect: 0.55,
-  infrastructure: 0.2,
-  theoretical: 0.2,
-}
-
-function tokenMechanicPctWeighted(
-  stats: GitHubStats,
-  activeRepos: Repo[],
-  period: Period,
-  window: 'current' | 'prior',
-): number {
-  let weightedSum = 0
-  let totalCommits = 0
-  for (const repo of activeRepos) {
-    const w = commitsForRepo(stats, repo.githubSlug, period, window)
-    if (w <= 0) continue
-    weightedSum += HOLDER_TAG_VALUE[repo.tag] * w
-    totalCommits += w
-  }
-  if (totalCommits === 0) return 0
-  return Math.round((weightedSum / totalCommits) * 100)
-}
-
-function tokenMechanicCommitCounts(
+function tokenMechanicTagCommitCounts(
   stats: GitHubStats,
   activeRepos: Repo[],
   period: Period,
   window: 'current' | 'prior',
 ) {
-  const counts = { direct: 0, lock: 0, indirect: 0, infra: 0, repos: activeRepos.length }
+  const counts = { direct: 0, lock: 0, indirect: 0, infra: 0 }
   for (const repo of activeRepos) {
     const w = commitsForRepo(stats, repo.githubSlug, period, window)
+    if (w <= 0) continue
     if (repo.tag === 'direct') counts.direct += w
     else if (repo.tag === 'supply-lock') counts.lock += w
     else if (repo.tag === 'indirect') counts.indirect += w
     else counts.infra += w
   }
   return counts
-}
-
-function tokenMechanicTotalCommits(counts: { direct: number; lock: number; indirect: number; infra: number }): number {
-  return counts.direct + counts.lock + counts.indirect + counts.infra
 }
 
 function weightedAvgByCommits(
@@ -344,81 +321,100 @@ function tokenMechanicRubricCommitCounts(
   return { high, mid, low, commitWeight: total, repos: repos.length }
 }
 
-function calcTokenMechanicGrade60d(stats: GitHubStats, repoSet: Repo[]): TokenMechanicGrade {
-  const scored = reposWithScoredTokenMechanic(repoSet)
-  const activeRepos = reposActiveInWindow(stats, scored, '60d', 'current')
-  const sample = activeRepos.length ? activeRepos : scored
+function tmRubricScore(repo: Repo, label: string): number {
+  const row = repo.tokenMechanic?.rubric.find(x => x.label === label)
+  return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
+}
 
-  const pct = weightedAvgByCommits(stats, sample, '60d', 'current', r => r.tokenMechanic!.pct)
-  const counts = tokenMechanicRubricCommitCounts(stats, sample, '60d')
-  const weightBase = counts.commitWeight || 1
-
-  const tmRubricScore = (repo: Repo, label: string) => {
-    const row = repo.tokenMechanic?.rubric.find(x => x.label === label)
-    return row?.level === 'high' ? 100 : row?.level === 'mid' ? 67 : 33
+function tokenMechanicSummary(pct: number, period: Period): string {
+  const window =
+    period === '60d'
+      ? 'over 60 days'
+      : period === '30d'
+        ? 'in this window'
+        : 'this week'
+  if (pct >= 80) {
+    return period === '60d'
+      ? 'Repos with the most commits over 60 days score strongly on token mechanic rubrics.'
+      : `Repos with the most commits ${window} score strongly on token mechanic rubrics.`
   }
+  if (pct >= 60) {
+    return period === '60d'
+      ? 'Heavy 60-day commit repos mostly show solid token mechanic scores.'
+      : `Heavy commit repos mostly show solid token mechanic scores ${window}.`
+  }
+  if (pct >= 40) {
+    return period === '60d'
+      ? 'Token mechanic scores are mixed where commit volume landed over 60 days.'
+      : `Token mechanic scores are mixed where commit volume landed ${window}.`
+  }
+  return period === '60d'
+    ? 'Most 60-day commits landed on repos with weaker token mechanic scores.'
+    : `Most commits ${window} landed on repos with weaker token mechanic scores.`
+}
 
-  const burnAvg = weightedAvgByCommits(stats, sample, '60d', 'current', r => tmRubricScore(r, 'Burn mechanic exists and is live'))
-  const revenueAvg = weightedAvgByCommits(stats, sample, '60d', 'current', r => tmRubricScore(r, 'Revenue or burn path built in'))
-  const operationalAvg = weightedAvgByCommits(stats, sample, '60d', 'current', r => tmRubricScore(r, 'Mechanic is operational'))
+function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], period: Period): TokenMechanicGrade {
+  const scored = reposWithScoredTokenMechanic(repoSet)
+  const activeRepos = reposActiveInWindow(stats, scored, period, 'current')
+  const priorActiveRepos = reposActiveInWindow(stats, scored, period, 'prior')
+  const sample = activeRepos.length ? activeRepos : scored
+  const priorSample = priorActiveRepos
+
+  const pct = weightedAvgByCommits(stats, sample, period, 'current', r => r.tokenMechanic!.pct)
+  const priorPct =
+    period === '60d' || !priorSample.length
+      ? null
+      : weightedAvgByCommits(stats, priorSample, period, 'prior', r => r.tokenMechanic!.pct)
+  const trendPct = period === '60d' ? null : pctChange(pct, priorPct ?? 0)
+
+  const rubricCounts = tokenMechanicRubricCommitCounts(stats, sample, period)
+  const weightBase = rubricCounts.commitWeight || 1
+
+  const burnAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
+    tmRubricScore(r, 'Burn mechanic exists and is live'),
+  )
+  const revenueAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
+    tmRubricScore(r, 'Revenue or burn path built in'),
+  )
+  const operationalAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
+    tmRubricScore(r, 'Mechanic is operational'),
+  )
+
+  const tagCommits =
+    period === '60d'
+      ? undefined
+      : tokenMechanicTagCommitCounts(stats, sample, period, 'current')
 
   return {
-    counts: { direct: counts.high, lock: counts.mid, indirect: counts.low, infra: 0, repos: sample.length },
+    counts: {
+      direct: rubricCounts.high,
+      lock: rubricCounts.mid,
+      indirect: rubricCounts.low,
+      infra: 0,
+      repos: sample.length,
+    },
+    tagCommits,
     letter: pctToLetter(pct),
     pct,
-    trendPct: null,
-    trend: 'flat',
-    summary:
-      pct >= 80
-        ? 'Repos with the most commits over 60 days score strongly on token mechanic rubrics.'
-        : pct >= 60
-          ? 'Heavy 60-day commit repos mostly show solid token mechanic scores.'
-          : pct >= 40
-            ? 'Token mechanic scores are mixed where commit volume landed over 60 days.'
-            : 'Most 60-day commits landed on repos with weaker token mechanic scores.',
+    priorPct,
+    trendPct,
+    trend: period === '60d' ? 'flat' : trendFromPct(trendPct),
+    summary: tokenMechanicSummary(pct, period),
     signals: [
       { label: 'Burn mechanic', level: toLevel(burnAvg / 100), pct: burnAvg },
       { label: 'Revenue path', level: toLevel(revenueAvg / 100), pct: revenueAvg },
       { label: 'Operational', level: toLevel(operationalAvg / 100), pct: operationalAvg },
-      { label: 'High-TM share', level: toLevel(counts.high / weightBase), pct: Math.round((counts.high / weightBase) * 100) },
+      {
+        label: 'High-TM share',
+        level: toLevel(rubricCounts.high / weightBase),
+        pct: Math.round((rubricCounts.high / weightBase) * 100),
+      },
     ],
   }
 }
 
 export function calcTokenMechanicGrade(stats: GitHubStats, period: Period, repoSet: Repo[]): TokenMechanicGrade {
-  if (period === '60d') return calcTokenMechanicGrade60d(stats, repoSet)
-
-  const activeRepos = reposActiveInWindow(stats, repoSet, period, 'current')
-  const priorActiveRepos = reposActiveInWindow(stats, repoSet, period, 'prior')
-
-  const counts = tokenMechanicCommitCounts(stats, activeRepos, period, 'current')
-  const totalCommits = tokenMechanicTotalCommits(counts) || 1
-  const pct = tokenMechanicPctWeighted(stats, activeRepos, period, 'current')
-  const priorPct = tokenMechanicPctWeighted(stats, priorActiveRepos, period, 'prior')
-  const trendPct = pctChange(pct, priorPct)
-  const letter = pctToLetter(pct)
-
-  return {
-    counts,
-    letter,
-    pct,
-    trendPct,
-    trend: trendFromPct(trendPct),
-    summary:
-      pct >= 80
-        ? 'Most commit volume in this window is on directly holder-aligned repos.'
-        : pct >= 60
-          ? 'A healthy share of commits points toward holder value, with some infra mixed in.'
-          : pct >= 40
-            ? 'Commit volume is split between holder-facing work and infrastructure.'
-            : 'Recent commits lean more toward infrastructure and R&D than direct holder value.',
-    signals: [
-      { label: 'Direct burn', level: toLevel(counts.direct / totalCommits), pct: Math.round((counts.direct / totalCommits) * 100) },
-      { label: 'Supply lock', level: toLevel(counts.lock / totalCommits), pct: Math.round((counts.lock / totalCommits) * 100) },
-      { label: 'Indirect value', level: toLevel(counts.indirect / totalCommits), pct: Math.round((counts.indirect / totalCommits) * 100) },
-      { label: 'Non-infra share', level: toLevel(1 - counts.infra / totalCommits), pct: Math.round((1 - counts.infra / totalCommits) * 100) },
-    ],
-  }
+  return calcTokenMechanicGradeUnified(stats, repoSet, period)
 }
 
 export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, repoSet: Repo[]): IntegrityGrade {
@@ -441,6 +437,7 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
     ? 0
     : weightedAvgByCommits(stats, priorSample, period, 'prior', r => r.builderIntegrity.pct)
 
+  const priorPctValue = period === '60d' ? null : priorPct
   const trendPct = period === '60d' ? null : pctChange(pct, priorPct)
 
   const commitCounts = stats
@@ -477,6 +474,7 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
     counts: { active: sample.length, high, mid, low, commitWeight },
     letter: pctToLetter(pct),
     pct,
+    priorPct: priorPctValue,
     trendPct,
     trend: period === '60d' ? 'flat' : trendFromPct(trendPct),
     summary:

@@ -1,21 +1,9 @@
-import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
+import { getRedis } from '@/lib/redis'
 
 const CHRONICLE_REPO = 'clawdbotatg/clawd-chronicle'
 const SUMMARY_KEY_PREFIX = 'build-report:chronicle-summary:'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
-
-let redis: Redis | null = null
-
-function getRedis() {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-  }
-  return redis
-}
 
 export interface ChronicleCommit {
   date: string

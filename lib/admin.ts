@@ -1,16 +1,4 @@
-import { Redis } from '@upstash/redis'
-
-let redis: Redis | null = null
-
-function getRedis() {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-  }
-  return redis
-}
+import { getRedis } from '@/lib/redis'
 
 export async function getAdminNotes(): Promise<Record<string, string>> {
   try {
@@ -34,5 +22,6 @@ export async function setAdminNote(repoId: string, note: string): Promise<void> 
 }
 
 export async function verifyAdminPassword(password: string): Promise<boolean> {
+  if (!process.env.ADMIN_PASSWORD) return false
   return password === process.env.ADMIN_PASSWORD
 }

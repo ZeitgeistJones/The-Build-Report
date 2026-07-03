@@ -186,6 +186,29 @@ export function buildTokenMechanicTrendExplanation(
     return live ? commitCount(live, period, window) : 0
   }
 
+  const rubricWeightedAvg = (repos: Repo[], window: 'current' | 'prior') => {
+    let sum = 0
+    let weight = 0
+    for (const repo of repos) {
+      if (!repo.tokenMechanic || repo.tokenMechanic.letter === '—') continue
+      const w = repoCommits(repo, window)
+      if (w <= 0) continue
+      sum += repo.tokenMechanic.pct * w
+      weight += w
+    }
+    return weight ? Math.round(sum / weight) : null
+  }
+
+  const rubricNow = rubricWeightedAvg(activeNow, 'current')
+  const rubricPrior = rubricWeightedAvg(activePrior, 'prior')
+
+  if (rubricNow != null && rubricPrior != null && rubricNow !== rubricPrior) {
+    const dir = rubricNow > rubricPrior ? 'stronger' : 'weaker'
+    bullets.push(
+      `Repos that drove commits this window carried ${dir} token mechanic rubric scores (${rubricNow}% vs ${rubricPrior}% prior, commit-weighted).`,
+    )
+  }
+
   const directNowCommits = activeNow
     .filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
     .reduce((sum, r) => sum + repoCommits(r, 'current'), 0)
@@ -201,7 +224,7 @@ export function buildTokenMechanicTrendExplanation(
 
   if (directNowCommits !== directPriorCommits || infraNowCommits !== infraPriorCommits) {
     bullets.push(
-      `Commit-weighted: ${directNowCommits} commits on holder-facing repos vs ${directPriorCommits} prior; ${infraNowCommits} on infra/R&D vs ${infraPriorCommits} prior.`,
+      `Tag mix (display only): ${directNowCommits} commits on holder-facing repos vs ${directPriorCommits} prior; ${infraNowCommits} on infra/R&D vs ${infraPriorCommits} prior.`,
     )
   }
 
@@ -228,10 +251,10 @@ export function buildTokenMechanicTrendExplanation(
   const trendLabel = formatTrendPct(trendPct, period)
   const headline =
     trend === 'up'
-      ? `Token mechanic alignment improved (${trendLabel}) — more commit volume on direct, lock, or indirect repos.`
+      ? `Token mechanic grade improved (${trendLabel}) — repos with the most commits score stronger on the rubric this window.`
       : trend === 'down'
-        ? `Token mechanic alignment dipped (${trendLabel}) — commit volume skews toward infra/R&D vs the prior window.`
-        : `Token mechanic alignment stable (${trendLabel}) — similar commit-weighted tag mix.`
+        ? `Token mechanic grade dipped (${trendLabel}) — commit volume landed on repos with weaker rubric scores vs the prior window.`
+        : `Token mechanic grade stable (${trendLabel}) — similar commit-weighted rubric average.`
 
   return { headline, bullets: bullets.slice(0, 5) }
 }

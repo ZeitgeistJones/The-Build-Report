@@ -414,6 +414,28 @@ export default async function Home() {
           }}
         >
           <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            Token mechanic grade (period tabs)
+          </div>
+          <p style={{ margin: 0 }}>
+            Token mechanic grade is the commit-weighted average of each scored repo&apos;s rubric score for that axis.
+            Repos with more commits in the window carry more weight. The tag (direct, supply-lock, indirect…) is a
+            displayed classification, not a direct grade input.
+          </p>
+        </div>
+
+        <div
+          style={{
+            marginBottom: '24px',
+            padding: '14px 16px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.6,
+          }}
+        >
+          <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>
             Letter grade scale
           </div>
           <div className="letter-grade-scale">

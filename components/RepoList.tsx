@@ -309,16 +309,10 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
   const d = DENSITY_STYLES[effectiveDensity]
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoList.tsx:repos-effect',message:'repos prop sync',data:{reposCount:repos.length},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
     setRepoItems(repos)
   }, [repos])
 
   function handleScored(updated: Repo, rescoreMeta?: RescoreSummaryRecord | null) {
-    // #region agent log
-    fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoList.tsx:handleScored',message:'rescore completed',data:{updatedId:updated.id,updatedSlug:updated.githubSlug,summaryLen:rescoreMeta?.summary?.length??0,expandedSlugs:Array.from(expandedSlugs)},timestamp:Date.now(),hypothesisId:'A,G'})}).catch(()=>{});
-    // #endregion
     if (rescoreMeta) {
       setRescoreSummaries(prev => ({ ...prev, [updated.githubSlug]: rescoreMeta }))
     }
@@ -379,9 +373,6 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
       const wasExpanded = next.has(slug)
       if (wasExpanded) next.delete(slug)
       else next.add(slug)
-      // #region agent log
-      fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoList.tsx:toggleExpand',message:'toggle expand',data:{slug,wasExpanded,nowExpanded:!wasExpanded,nextSize:next.size},timestamp:Date.now(),hypothesisId:'A,D'})}).catch(()=>{});
-      // #endregion
       return next
     })
   }
@@ -424,10 +415,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
         >
           <button
             type="button"
-            onClick={(e) => {
-              // #region agent log
-              fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'RepoList.tsx:expand-btn-click',message:'expand button clicked',data:{repoId:repo.id,repoSlug:repo.githubSlug,isExpandedBefore:isExpanded,targetTag:(e.target as HTMLElement)?.tagName},timestamp:Date.now(),hypothesisId:'B,E'})}).catch(()=>{});
-              // #endregion
+            onClick={() => {
               toggleExpand(repo.githubSlug)
             }}
             aria-expanded={isExpanded}

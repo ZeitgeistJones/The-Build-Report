@@ -1,18 +1,6 @@
-import { Redis } from '@upstash/redis'
+import { getRedis } from '@/lib/redis'
 
 const CHRONICLE_CONTEXT_KEY = 'build-report:chronicle-context'
-
-let redis: Redis | null = null
-
-function getRedis() {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-  }
-  return redis
-}
 
 export async function getChronicleContext(): Promise<string | null> {
   try {

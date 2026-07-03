@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { getAdminNotes, setAdminNote, verifyAdminPassword } from '@/lib/admin'
 import { flushAutoScore, listCachedAutoScores } from '@/lib/autoscore'
 import { getChronicleContext, setChronicleContext } from '@/lib/chronicleContext'
+import { getEcosystemContext, setEcosystemContext } from '@/lib/ecosystemContext'
 import { getExcludedSlugs, setRepoExcluded } from '@/lib/repoExclude'
 
 export async function POST(req: NextRequest) {
@@ -17,18 +18,26 @@ export async function POST(req: NextRequest) {
     const autoScored = await listCachedAutoScores()
     const excluded = await getExcludedSlugs()
     const chronicleContext = await getChronicleContext()
+    const ecosystemContext = await getEcosystemContext()
     return NextResponse.json({
       ok: true,
       notes,
       autoScored,
       excluded,
       chronicleContext: chronicleContext ?? '',
+      ecosystemContext: ecosystemContext ?? '',
     })
   }
 
   if (action === 'saveChronicleContext') {
     const text = typeof body.chronicleContext === 'string' ? body.chronicleContext : ''
     await setChronicleContext(text)
+    return NextResponse.json({ ok: true })
+  }
+
+  if (action === 'saveEcosystemContext') {
+    const text = typeof body.ecosystemContext === 'string' ? body.ecosystemContext : ''
+    await setEcosystemContext(text)
     return NextResponse.json({ ok: true })
   }
 

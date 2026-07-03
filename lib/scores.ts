@@ -34,15 +34,15 @@ export interface Repo {
 }
 
 function calcScore(rows: RubricRow[]): number {
-  const weightMap: Record<string, number> = {
-    '50%': 0.5, '30%': 0.3, '20%': 0.2,
-    '40%': 0.4, '35%': 0.35, '25%': 0.25,
-    'equal': 0.2,
+  function parseWeight(w: string): number {
+    if (w === 'equal') return 0.2
+    const n = parseFloat(w)
+    return Number.isFinite(n) ? n / 100 : 0
   }
   const levelMap: Record<Level, number> = { high: 3, mid: 2, low: 1 }
   let total = 0
   for (const row of rows) {
-    total += (weightMap[row.weight] ?? 0) * levelMap[row.level]
+    total += parseWeight(row.weight) * levelMap[row.level]
   }
   return Math.round((total / 3) * 100)
 }

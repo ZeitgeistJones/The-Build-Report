@@ -1,4 +1,5 @@
 import { Redis } from '@upstash/redis'
+import { getRedis } from '@/lib/redis'
 import { getClawdUsdPrice, getEthAndClawdUsdPrices, getEthUsdPrice } from '@/lib/coingecko'
 import { SCORE_PAYMENT_WEI } from '@/lib/web3/constants'
 
@@ -12,18 +13,6 @@ const CLAWD_PER_RESCORE_CACHE_KEY = 'build-report:burns:clawd-per-rescore-cache'
 const CLAWD_TOKENS_PER_RESCORE_FALLBACK = 1_000_000
 
 export const SCORE_PAYMENT_ETH = Number(SCORE_PAYMENT_WEI) / 1e18
-
-let redis: Redis | null = null
-
-function getRedis() {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-  }
-  return redis
-}
 
 export type RescoreBurnStats = {
   count: number

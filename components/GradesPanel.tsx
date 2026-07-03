@@ -348,7 +348,7 @@ export default function GradesPanel({
           mini={
             period === '60d'
               ? 'Commit-weighted token mechanic rubric scores over the last 60 days.'
-              : 'Share of commit volume pointed at CLAWD holder value (weighted by commits per repo).'
+              : 'Commit-weighted average of each repo\'s token mechanic rubric score.'
           }
           summary={tg?.summary ?? 'Token mechanic score unavailable'}
           trendExplanation={tg?.trendExplanation}
@@ -358,7 +358,7 @@ export default function GradesPanel({
                 {tg.counts.repos > 0 && (
                   <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.repos} repos in sample</span>
                 )}
-                {period === '60d' ? (
+                {period === '60d' || !tg.tagCommits ? (
                   <>
                     {tg.counts.direct > 0 && (
                       <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.direct} high-TM commits</span>
@@ -373,16 +373,25 @@ export default function GradesPanel({
                 ) : (
                   <>
                     {tg.counts.direct > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.direct} direct commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.direct} high-TM commits</span>
                     )}
                     {tg.counts.lock > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.lock} supply-lock commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.lock} mid-TM commits</span>
                     )}
                     {tg.counts.indirect > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.indirect} indirect commits</span>
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.indirect} low-TM commits</span>
                     )}
-                    {tg.counts.infra > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.infra} infra/R&D commits</span>
+                    {tg.tagCommits.direct > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.tagCommits.direct} direct-tag commits</span>
+                    )}
+                    {tg.tagCommits.lock > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.tagCommits.lock} supply-lock commits</span>
+                    )}
+                    {tg.tagCommits.indirect > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.tagCommits.indirect} indirect commits</span>
+                    )}
+                    {tg.tagCommits.infra > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.tagCommits.infra} infra/R&D commits</span>
                     )}
                   </>
                 )}

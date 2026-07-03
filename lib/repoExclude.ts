@@ -1,20 +1,8 @@
-import { Redis } from '@upstash/redis'
+import { getRedis } from '@/lib/redis'
 import { Repo } from './scores'
 
 const EXCLUDED_KEY = 'build-report:repo-excluded'
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
-
-let redis: Redis | null = null
-
-function getRedis() {
-  if (!redis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-  }
-  return redis
-}
 
 export async function getExcludedSlugs(): Promise<Record<string, boolean>> {
   try {
