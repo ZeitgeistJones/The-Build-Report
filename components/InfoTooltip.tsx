@@ -84,7 +84,6 @@ export default function InfoTooltip({
       setPos(null)
       return
     }
-    if (placement === 'below' && !interactive) return
 
     const rect = anchorRef.current.getBoundingClientRect()
     const panelWidth = isMobile ? Math.min(width, window.innerWidth - 32) : width
@@ -95,11 +94,10 @@ export default function InfoTooltip({
     } else {
       setPos({ top: rect.bottom + 6, left })
     }
-  }, [show, isMobile, width, placement, interactive])
+  }, [show, isMobile, width, placement])
 
   const size = compact ? 14 : (isMobile ? MIN_TAP : 14)
   const iconChar = icon === 'question' ? '?' : 'ⓘ'
-  const usePortal = placement === 'above' || interactive
 
   const panelStyle = {
     background: 'var(--surface-3)',
@@ -109,8 +107,8 @@ export default function InfoTooltip({
     fontSize: icon === 'question' ? '11px' : '12px',
     color: 'var(--text-secondary)',
     lineHeight: 1.5,
-    width: isMobile ? `min(${width}px, calc(100vw - 32px))` : `${width}px`,
     textAlign: 'left' as const,
+    boxShadow: 'var(--card-elevated)',
   }
 
   return (
@@ -140,21 +138,7 @@ export default function InfoTooltip({
       >
         {iconChar}
       </button>
-      {show && !usePortal && (
-        <div
-          style={{
-            ...panelStyle,
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            right: 0,
-            zIndex: 10,
-            pointerEvents: 'none',
-          }}
-        >
-          {content}
-        </div>
-      )}
-      {show && usePortal && pos && createPortal(
+      {show && pos && createPortal(
         <div
           onClick={e => e.stopPropagation()}
           style={{

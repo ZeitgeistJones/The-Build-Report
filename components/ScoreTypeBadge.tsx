@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   isLaunchBaseline,
@@ -12,6 +13,7 @@ import {
 } from '@/lib/scoringCopy'
 
 const HOVER_DELAY_MS = 400
+const TOOLTIP_WIDTH = 240
 
 interface Props {
   adminNote?: string
@@ -20,6 +22,8 @@ interface Props {
 export default function ScoreTypeBadge({ adminNote }: Props) {
   const isMobile = useIsMobile()
   const [show, setShow] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const baseline = isLaunchBaseline(adminNote)
@@ -52,9 +56,21 @@ export default function ScoreTypeBadge({ adminNote }: Props) {
     setShow(s => !s)
   }
 
+  useLayoutEffect(() => {
+    if (!show || !buttonRef.current) {
+      setPos(null)
+      return
+    }
+    const rect = buttonRef.current.getBoundingClientRect()
+    const panelWidth = Math.min(TOOLTIP_WIDTH, window.innerWidth - 32)
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - panelWidth - 8))
+    setPos({ top: rect.bottom + 6, left })
+  }, [show, isMobile])
+
   return (
-    <span style={{ position: 'relative', display: 'inline-flex' }}>
+    <>
       <button
+        ref={buttonRef}
         type="button"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -75,12 +91,12 @@ export default function ScoreTypeBadge({ adminNote }: Props) {
       >
         {label}
       </button>
-      {show && (
+      {show && pos && createPortal(
         <div
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: 0,
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
             background: 'var(--surface-3)',
             border: '1px solid var(--border-strong)',
             borderRadius: 'var(--radius)',
@@ -88,16 +104,17 @@ export default function ScoreTypeBadge({ adminNote }: Props) {
             fontSize: '11px',
             color: 'var(--text-secondary)',
             lineHeight: 1.5,
-            width: 'min(240px, calc(100vw - 32px))',
-            zIndex: 10,
+            width: Math.min(TOOLTIP_WIDTH, window.innerWidth - 32),
+            zIndex: 9999,
             pointerEvents: 'none',
             textAlign: 'left',
             boxShadow: 'var(--card-elevated)',
           }}
         >
           {tooltip}
-        </div>
+        </div>,
+        document.body,
       )}
-    </span>
+    </>
   )
 }
