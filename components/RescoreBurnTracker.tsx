@@ -17,7 +17,16 @@ export default function RescoreBurnTracker({ count, clawdDisplay }: Props) {
   if (count <= 0 && clawdDisplay <= 0) return null
 
   return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
+    <div
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: '6px',
+        flexShrink: 0,
+      }}
+    >
       <span
         style={{
           fontSize: '11px',
@@ -26,15 +35,19 @@ export default function RescoreBurnTracker({ count, clawdDisplay }: Props) {
           letterSpacing: '0.05em',
         }}
       >
-        CLAWD BURNED 🔥
+        CLAWD BURNED
+      </span>
+      <span style={{ fontSize: '11px', lineHeight: 1 }} aria-hidden>
+        🔥
       </span>
       <span
         style={{
-          fontSize: '16px',
+          fontSize: '20px',
           fontWeight: 600,
           color: '#f97316',
           fontFamily: 'var(--font-mono)',
           letterSpacing: '-0.02em',
+          lineHeight: 1,
         }}
       >
         {formatClawdBurned(clawdDisplay)}
@@ -67,7 +80,7 @@ export default function RescoreBurnTracker({ count, clawdDisplay }: Props) {
           style={{
             position: 'absolute',
             top: 'calc(100% + 6px)',
-            left: 0,
+            right: 0,
             background: 'var(--surface-3)',
             border: '1px solid var(--border-strong)',
             borderRadius: 'var(--radius)',
