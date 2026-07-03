@@ -1,8 +1,8 @@
 import { Repo, Tag } from './scores'
-import { GitHubStats } from './github'
+import { GitHubStats, RepoActivity } from './github'
 import { pctToLetter } from './gradeLetters'
 import { isUnscoredRecent } from './recentRepos'
-import { pctChange, trendFromPct } from './grades'
+import { pctChange, trendFromPct, Period } from './grades'
 
 export interface OverallGrade {
   letter: string
@@ -17,6 +17,7 @@ export interface OverallGradeWithTrend extends OverallGrade {
 }
 
 export interface OverallGradeContext {
+  period: Period
   overall: OverallGrade
   tokenMechanic: { letter: string; pct: number } | null
   builder: { letter: string; pct: number } | null
@@ -107,6 +108,12 @@ function letterBucket(letter: string): 'A' | 'B' | 'C' | 'D' | 'F' {
   return 'D'
 }
 
+function commitsForActivity(activity: RepoActivity, period: Period): number {
+  if (period === '7d') return activity.commits7d
+  if (period === '30d') return activity.commits30d
+  return activity.commits30d + activity.commits30_60
+}
+
 export function buildOverallGradeContext(
   overall: OverallGrade,
   tokenMechanic: { letter: string; pct: number } | null,
@@ -114,6 +121,7 @@ export function buildOverallGradeContext(
   integrity: { letter: string; pct: number },
   repos: Repo[],
   stats: GitHubStats | null,
+  period: Period,
 ): OverallGradeContext {
   const scored = repos.filter(r => !isUnscoredRecent(r))
   const gradeDistribution: Record<'A' | 'B' | 'C' | 'D' | 'F', number> = {
@@ -141,13 +149,34 @@ export function buildOverallGradeContext(
 
   const mostActiveRepos = stats
     ? Object.values(stats.repoActivity)
-        .map(a => ({ name: a.slug, commits: a.commits30d }))
+        .map(a => ({ name: a.slug, commits: commitsForActivity(a, period) }))
         .filter(r => r.commits > 0)
         .sort((a, b) => b.commits - a.commits)
         .slice(0, 5)
     : []
 
+  const builderStats = stats
+    ? period === '7d'
+      ? {
+          commits: stats.totalCommits7d,
+          activeDays: stats.activeDays7d,
+          newRepos: stats.newRepos7d,
+        }
+      : period === '30d'
+        ? {
+            commits: stats.totalCommits30d,
+            activeDays: stats.activeDays30d,
+            newRepos: stats.newRepos30d,
+          }
+        : {
+            commits: stats.totalCommits30d + stats.totalCommits30_60,
+            activeDays: stats.activeDays30d + stats.activeDays30_60,
+            newRepos: stats.newRepos30d + stats.newRepos30_60,
+          }
+    : null
+
   return {
+    period,
     overall,
     tokenMechanic,
     builder,

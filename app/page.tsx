@@ -131,7 +131,7 @@ export default async function Home() {
   const overallGrade60 = overallGrade60Base
     ? { ...overallGrade60Base, trendPct: null, trend: 'flat' as const }
     : null
-  const overallSummary = overallGrade30
+  const overallSummary30 = overallGrade30
     ? await getOverallSummary(
         buildOverallGradeContext(
           overallGrade30,
@@ -140,6 +140,33 @@ export default async function Home() {
           integrityGrade30!,
           allRepos,
           stats,
+          '30d',
+        ),
+      ).catch(() => null)
+    : null
+  const overallSummary7 = overallGrade7
+    ? await getOverallSummary(
+        buildOverallGradeContext(
+          overallGrade7,
+          tokenMechanicGrade7,
+          builderGrade7,
+          integrityGrade7!,
+          allRepos,
+          stats,
+          '7d',
+        ),
+      ).catch(() => null)
+    : null
+  const overallSummary60 = overallGrade60
+    ? await getOverallSummary(
+        buildOverallGradeContext(
+          overallGrade60,
+          tokenMechanicGrade60,
+          builderGrade60,
+          integrityGrade60!,
+          allRepos,
+          stats,
+          '60d',
         ),
       ).catch(() => null)
     : null
@@ -217,7 +244,9 @@ export default async function Home() {
         overall30={overallGrade30}
         overall7={overallGrade7}
         overall60={overallGrade60}
-        overallSummary={overallSummary}
+        overallSummary30={overallSummary30}
+        overallSummary7={overallSummary7}
+        overallSummary60={overallSummary60}
         builderGrade30={builderGrade30}
         builderGrade7={builderGrade7}
         builderGrade60={builderGrade60}

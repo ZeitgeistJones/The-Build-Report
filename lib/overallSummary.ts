@@ -2,8 +2,25 @@ import { Redis } from '@upstash/redis'
 import Anthropic from '@anthropic-ai/sdk'
 import { stripMarkdown } from './textCleanup'
 import { OverallGradeContext } from './overallGrade'
+import { Period } from './grades'
 
-const SUMMARY_KEY = 'build-report:overall-summary'
+const SUMMARY_KEYS: Record<Period, string> = {
+  '30d': 'build-report:overall-summary',
+  '7d': 'build-report:overall-summary-7d',
+  '60d': 'build-report:overall-summary-60d',
+}
+
+const PERIOD_LABELS: Record<Period, string> = {
+  '7d': '7-day',
+  '30d': '30-day',
+  '60d': '60-day',
+}
+
+const PERIOD_FOCUS: Record<Period, string> = {
+  '7d': 'Focus on what happened this week: recent momentum, where commits landed, and the short-term signal for holders.',
+  '30d': 'Focus on the current month: what is being built right now and what the grades mean for holders today.',
+  '60d': 'Focus on the broader two-month picture: sustained patterns, whether activity is consistent or bursty, and how this week\'s work fits the longer arc.',
+}
 
 let redis: Redis | null = null
 
@@ -25,7 +42,7 @@ function formatContext(ctx: OverallGradeContext): string {
     ? `Builder activity: ${ctx.builder.letter} (${ctx.builder.pct}%)`
     : 'Builder activity: unavailable (GitHub data missing — weight redistributed)'
   const integrity = `Builder integrity: ${ctx.integrity.letter} (${ctx.integrity.pct}%)`
-  const overall = `Overall: ${ctx.overall.letter} (${ctx.overall.pct}%) — ${ctx.overall.reposScored} repos scored`
+  const overall = `Overall (${PERIOD_LABELS[ctx.period]} window): ${ctx.overall.letter} (${ctx.overall.pct}%) — ${ctx.overall.reposScored} repos scored`
 
   const dist = Object.entries(ctx.gradeDistribution)
     .filter(([, n]) => n > 0)
@@ -42,11 +59,31 @@ function formatContext(ctx: OverallGradeContext): string {
     .join(', ')
 
   const activity = ctx.builderStats
-    ? `30d activity: ${ctx.builderStats.commits} commits, ${ctx.builderStats.activeDays} active days, ${ctx.builderStats.newRepos} new repos`
-    : '30d activity: unavailable'
+    ? `${PERIOD_LABELS[ctx.period]} activity: ${ctx.builderStats.commits} commits, ${ctx.builderStats.activeDays} active days, ${ctx.builderStats.newRepos} new repos`
+    : `${PERIOD_LABELS[ctx.period]} activity: unavailable`
 
-  return [overall, tm, builder, integrity, `Grade distribution (repo scores): ${dist}`, `Dominant tags: ${tags}`, `Most active repos (30d): ${active || 'none'}`, activity].join('\n')
+  return [
+    overall,
+    tm,
+    builder,
+    integrity,
+    `Grade distribution (repo scores): ${dist}`,
+    `Dominant tags: ${tags}`,
+    `Most active repos (${ctx.period}): ${active || 'none'}`,
+    activity,
+  ].join('\n')
 }
+
+const SUMMARY_RULES = `Write exactly 2 sentences of plain English. Sound like a knowledgeable $CLAWD holder talking straight — direct and human, not corporate or hype-y.
+
+Rules:
+- Be accurate about the scores shown. Acknowledge weaknesses honestly.
+- Frame the picture in terms of trajectory and context, not a demoralizing snapshot.
+- Avoid stiff phrasing like "foundational layers are expected to surface holder value through downstream consumer applications." Prefer plain talk: "the infrastructure being laid now should pay off when consumer apps with real burn mechanics ship."
+- Heavy infra phase with low token mechanic: say the build work should matter once consumer apps with burns go live — don't dress it up in jargon.
+- Dormant but stable repos: "stable; core work is done" beats only "low activity."
+- Still be honest — do not invent positive framing that is not warranted by the data.
+- No bullet points, no markdown.`
 
 async function generateOverallSummary(ctx: OverallGradeContext): Promise<string | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null
@@ -57,16 +94,9 @@ async function generateOverallSummary(ctx: OverallGradeContext): Promise<string 
 
 ${formatContext(ctx)}
 
-Write exactly 2 sentences of plain English summarizing the overall grade and what it means for holders.
+${PERIOD_FOCUS[ctx.period]}
 
-Rules:
-- Be accurate about the scores shown. Acknowledge weaknesses honestly.
-- Frame the picture in terms of trajectory and context, not a demoralizing snapshot.
-- Avoid demoralizing language. A low token mechanic score during an infrastructure-heavy phase should be framed like "infrastructure phase — consumer apps are the expected next unlock" rather than "fails to deliver holder value."
-- Infrastructure repos scoring low on token mechanic: frame as "foundational layer — value shows up in downstream consumer apps."
-- Dormant but stable repos: note as "stable; foundational work complete" rather than only "low activity."
-- Still be honest — do not invent positive framing that is not warranted by the data.
-- No bullet points, no markdown.`
+${SUMMARY_RULES}`
 
   try {
     const message = await client.messages.create({
@@ -83,9 +113,11 @@ Rules:
 }
 
 export async function getOverallSummary(ctx: OverallGradeContext): Promise<string | null> {
+  const key = SUMMARY_KEYS[ctx.period]
+
   try {
     const r = getRedis()
-    const cached = await r.get<string>(SUMMARY_KEY)
+    const cached = await r.get<string>(key)
     if (cached) return stripMarkdown(cached)
   } catch {
     // fall through
@@ -96,7 +128,7 @@ export async function getOverallSummary(ctx: OverallGradeContext): Promise<strin
 
   try {
     const r = getRedis()
-    await r.set(SUMMARY_KEY, summary, { ex: 86400 })
+    await r.set(key, summary, { ex: 86400 })
   } catch {
     // non-fatal
   }

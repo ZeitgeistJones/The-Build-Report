@@ -12,7 +12,9 @@ interface Props {
   overall30: OverallGradeWithTrend | null
   overall7: OverallGradeWithTrend | null
   overall60: OverallGradeWithTrend | null
-  overallSummary: string | null
+  overallSummary30: string | null
+  overallSummary7: string | null
+  overallSummary60: string | null
   builderGrade30: BuilderGrade | null
   builderGrade7: BuilderGrade | null
   builderGrade60: BuilderGrade | null
@@ -245,7 +247,9 @@ export default function GradesPanel({
   overall30,
   overall7,
   overall60,
-  overallSummary,
+  overallSummary30,
+  overallSummary7,
+  overallSummary60,
   builderGrade30,
   builderGrade7,
   builderGrade60,
@@ -295,7 +299,9 @@ export default function GradesPanel({
           overall30={overall30}
           overall7={overall7}
           overall60={overall60}
-          summary={overallSummary}
+          summary30={overallSummary30}
+          summary7={overallSummary7}
+          summary60={overallSummary60}
         />
       )}
 

@@ -15,12 +15,22 @@ interface Props {
   overall30: OverallGradeWithTrend
   overall7: OverallGradeWithTrend
   overall60: OverallGradeWithTrend
-  summary: string | null
+  summary30: string | null
+  summary7: string | null
+  summary60: string | null
 }
 
-export default function OverallGrade({ overall30, overall7, overall60, summary }: Props) {
+export default function OverallGrade({
+  overall30,
+  overall7,
+  overall60,
+  summary30,
+  summary7,
+  summary60,
+}: Props) {
   const { period } = useGradePeriod()
   const overall = period === '30d' ? overall30 : period === '7d' ? overall7 : overall60
+  const summary = period === '30d' ? summary30 : period === '7d' ? summary7 : summary60
 
   return (
     <div
@@ -89,25 +99,13 @@ export default function OverallGrade({ overall30, overall7, overall60, summary }
         )}
       </div>
 
-      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: period === '30d' && summary ? '10px' : period === '7d' || period === '60d' ? '10px' : 0 }}>
+      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: summary ? '10px' : 0 }}>
         Based on {overall.reposScored} repos scored
       </div>
 
-      {period === '30d' && summary && (
+      {summary && (
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>
           {summary}
-        </p>
-      )}
-
-      {period === '7d' && (
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0, fontStyle: 'italic' }}>
-          Summary is available for the 30d window only.
-        </p>
-      )}
-
-      {period === '60d' && (
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0, fontStyle: 'italic' }}>
-          Grades are commit-weighted over the last 60 days. Summary is available for the 30d window only.
         </p>
       )}
     </div>
