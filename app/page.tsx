@@ -208,13 +208,18 @@ export default async function Home() {
             color: 'var(--text-muted)',
           }}
         >
-          <span>
-            Scores are interpretive — based on the{' '}
-            <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">
-              Chronicle
-            </a>{' '}
-            and public GitHub data. Not financial advice. <a href="/about">Full disclaimer →</a>
-          </span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+            <span style={{ flex: '1 1 200px' }}>
+              Scores are interpretive — based on the{' '}
+              <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">
+                Chronicle
+              </a>{' '}
+              and public GitHub data. Not financial advice. <a href="/about">Full disclaimer →</a>
+            </span>
+            {rescoreBurns && rescoreBurns.clawdTotal > 0 && (
+              <RescoreBurnTracker clawdTotal={rescoreBurns.clawdTotal} />
+            )}
+          </div>
           <span>
             GitHub data updates when a scan is run from the admin panel.
             {lastGithubScanAt && ` Last scan: ${formatScanAt(lastGithubScanAt)}.`}
@@ -310,9 +315,6 @@ export default async function Home() {
       )}
 
       <div style={{ marginBottom: '40px' }}>
-      {rescoreBurns && rescoreBurns.count > 0 && (
-        <RescoreBurnTracker count={rescoreBurns.count} ethTotal={rescoreBurns.ethTotal} />
-      )}
       <RepoList repos={repos} githubSlugOrder={githubOrder} />
       </div>
 
