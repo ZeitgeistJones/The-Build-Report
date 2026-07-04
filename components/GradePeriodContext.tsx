@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import { PeriodKey, PERIOD_TOGGLE_OPTIONS } from '@/lib/grades'
+import { PeriodKey, PERIOD_TOGGLE_OPTIONS, REPO_WINDOW_OPTIONS } from '@/lib/grades'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
@@ -34,9 +34,10 @@ interface PeriodKeyToggleProps {
   onChange: (period: PeriodKey) => void
   /** When true, buttons stretch on mobile. Default false for inline repo controls. */
   stretchMobile?: boolean
+  options?: readonly { key: PeriodKey; label: string; short: string }[]
 }
 
-export function PeriodKeyToggle({ period, onChange, stretchMobile = false }: PeriodKeyToggleProps) {
+export function PeriodKeyToggle({ period, onChange, stretchMobile = false, options = PERIOD_TOGGLE_OPTIONS }: PeriodKeyToggleProps) {
   const isMobile = useIsMobile()
 
   return (
@@ -51,7 +52,7 @@ export function PeriodKeyToggle({ period, onChange, stretchMobile = false }: Per
         justifyContent: stretchMobile && isMobile ? 'stretch' : 'flex-start',
       }}
     >
-      {PERIOD_TOGGLE_OPTIONS.map(({ key, label, short }) => (
+      {options.map(({ key, label, short }) => (
         <button
           key={key}
           type="button"
@@ -80,6 +81,8 @@ export function PeriodKeyToggle({ period, onChange, stretchMobile = false }: Per
     </div>
   )
 }
+
+export { REPO_WINDOW_OPTIONS }
 
 export function PeriodToggle() {
   const { period, setPeriod } = useGradePeriod()

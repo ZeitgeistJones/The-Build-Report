@@ -25,8 +25,8 @@ import GateBlur from '@/components/wallet/GateBlur'
 import GateOverlay from '@/components/wallet/GateOverlay'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import RepoScoreButton from '@/components/RepoScoreButton'
-import { PeriodKeyToggle } from '@/components/GradePeriodContext'
-import { periodKeyLabel, periodKeyWindowHint, repoCommitsForPeriodKey, type PeriodKey } from '@/lib/grades'
+import { PeriodKeyToggle, REPO_WINDOW_OPTIONS } from '@/components/GradePeriodContext'
+import { periodKeyLabel, repoCommitsForPeriodKey, type Period } from '@/lib/grades'
 import RubricCriterionRow from '@/components/RubricCriterionRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
@@ -36,6 +36,7 @@ import ScoreTypeBadge from '@/components/ScoreTypeBadge'
 import {
   CONFIDENCE_LABEL,
   formatBaselineDate,
+  formatScoredDateLabel,
   getConfidenceTooltip,
   isLaunchBaseline,
   looksLikeBaselineDate,
@@ -165,15 +166,6 @@ function ConfidenceLabel({ confidence, isBaseline }: { confidence: Confidence; i
   )
 }
 
-function formatScoredDateLabel(scoredAt: string | null | undefined): string {
-  if (!scoredAt) return 'unknown'
-  const d = new Date(scoredAt)
-  if (!Number.isNaN(d.getTime())) {
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-  return scoredAt
-}
-
 function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
   const rescoreDate = formatScoredDateLabel(meta.rescoreAt)
   const oldDate = formatScoredDateLabel(meta.oldScoredAt)
@@ -256,7 +248,7 @@ function repoGradeSortKey(repo: RepoWithLive): number {
   return tm != null ? (bi + tm) / 2 : bi
 }
 
-function repoCommitsForPeriod(repo: RepoWithLive, period: PeriodKey): number {
+function repoCommitsForPeriod(repo: RepoWithLive, period: Period): number {
   return repoCommitsForPeriodKey(repo, period)
 }
 
@@ -330,7 +322,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
   const [activeFilter, setActiveFilter] = useState<Tag | 'all'>('all')
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
   const [sortBy, setSortBy] = useState<RepoSort>('recent')
-  const [repoPeriod, setRepoPeriod] = useState<PeriodKey>('30d')
+  const [repoPeriod, setRepoPeriod] = useState<Period>('30d')
   const [density, setDensity] = useState<Density>('compact')
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
@@ -409,10 +401,9 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
       return a.name.localeCompare(b.name)
     })
 
-  const periodHint = periodKeyWindowHint(repoPeriod)
   const repoCountLabel = activityScope === 'active'
     ? activeFilter === 'all'
-      ? ` · ${filtered.length} active (${periodKeyLabel(repoPeriod)}${periodHint ? `, ${periodHint}` : ''})`
+      ? ` · ${filtered.length} active (${periodKeyLabel(repoPeriod)})`
       : ` · ${filtered.length} of ${activeInPeriod.length} active (${periodKeyLabel(repoPeriod)})`
     : activeFilter === 'all'
       ? ` · ${filtered.length} total`
@@ -703,6 +694,15 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
           <RepoScoreButton
             repoSlug={repo.githubSlug}
             scoringStatus={getScoringStatus(repo)}
+            activity={{
+              scoredAt: repo.scoredAt,
+              lastCommitAt: repo.lastCommitAt,
+              pushedAt: repo.pushedAt,
+              commits7d: repo.commits7d,
+              commits30d: repo.commits30d,
+              adminNote: repo.adminNote,
+              scoringContextVersion: repo.scoringContextVersion,
+            }}
             onScored={handleScored}
           />
         </div>
@@ -911,7 +911,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
         <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           Window
         </span>
-        <PeriodKeyToggle period={repoPeriod} onChange={setRepoPeriod} />
+        <PeriodKeyToggle period={repoPeriod} onChange={setRepoPeriod} options={REPO_WINDOW_OPTIONS} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

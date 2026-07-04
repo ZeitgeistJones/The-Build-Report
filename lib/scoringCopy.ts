@@ -90,3 +90,12 @@ export function looksLikeBaselineDate(scoredAt: string | null | undefined): bool
   if (!scoredAt) return false
   return /^\d{4}-\d{2}-\d{2}$/.test(scoredAt.trim())
 }
+
+export function formatScoredDateLabel(scoredAt: string | null | undefined): string {
+  if (!scoredAt) return 'unknown'
+  const d = new Date(scoredAt)
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+  return scoredAt
+}

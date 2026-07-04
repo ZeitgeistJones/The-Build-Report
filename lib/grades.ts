@@ -44,6 +44,11 @@ export const PERIOD_TOGGLE_OPTIONS: { key: PeriodKey; label: string; short: stri
   { key: '60d', label: 'Last 60 days', short: '60d' },
 ]
 
+/** Repo list window — current periods only (prior windows live on Grades toggle). */
+export const REPO_WINDOW_OPTIONS = PERIOD_TOGGLE_OPTIONS.filter(
+  (o): o is { key: Period; label: string; short: string } => !o.key.endsWith('-prior'),
+)
+
 export function periodKeyToBase(pk: PeriodKey): Period {
   if (pk === '7d-prior') return '7d'
   if (pk === '30d-prior') return '30d'
