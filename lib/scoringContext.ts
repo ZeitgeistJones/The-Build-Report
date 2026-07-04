@@ -7,8 +7,6 @@ export function formatScoringContextLabel(version: number | null | undefined): s
 }
 
 export function scoringContextTooltip(version: number | null | undefined): string {
-  if (version == null || version < 1) {
-    return 'Scored before context versioning — may not match today’s public scoring context.'
-  }
-  return `Scored against ${formatScoringContextLabel(version)}. See /context for the background the AI read.`
+  const label = formatScoringContextLabel(version)
+  return `Scored against ${label}. See /context for the background the AI read.`
 }

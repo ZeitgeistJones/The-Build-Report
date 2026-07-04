@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { Repo, RubricRow, Score } from './scores'
+import { Repo, Score } from './scores'
 import { getEconomicScore, getShippingLeverage, getTokenMechanicForDisplay } from './economicGrade'
 import { stripMarkdown } from './textCleanup'
 
@@ -26,16 +26,6 @@ function formatRepoScores(repo: Repo): string {
   ].join('\n')
 }
 
-export function wasChronicleSourced(repo: Repo | null): boolean {
-  if (!repo) return false
-  const rows: RubricRow[] = [
-    ...(repo.shippingLeverage?.rubric ?? []),
-    ...(repo.tokenMechanic?.rubric ?? []),
-    ...repo.builderIntegrity.rubric,
-  ]
-  return rows.some(r => /chronicle/i.test(r.source))
-}
-
 export async function generateRescoreChangeSummary(params: {
   oldRepo: Repo | null
   newRepo: Repo
@@ -44,11 +34,6 @@ export async function generateRescoreChangeSummary(params: {
   if (!process.env.ANTHROPIC_API_KEY) return null
 
   const { oldRepo, newRepo, commitMessages } = params
-  const chronicleNote = wasChronicleSourced(oldRepo) && !wasChronicleSourced(newRepo)
-    ? 'Note: the previous score cited the Chronicle; this rescore does not — methodology changed.'
-    : wasChronicleSourced(oldRepo)
-      ? 'Note: the previous score was Chronicle-sourced.'
-      : ''
 
   const commitsBlock = commitMessages.length
     ? commitMessages.map(m => `- ${m}`).join('\n')
@@ -65,9 +50,7 @@ ${formatRepoScores(newRepo)}
 RECENT COMMITS:
 ${commitsBlock}
 
-${chronicleNote}
-
-In 1-2 sentences, explain what changed and why — be specific about which scores moved and what the commits suggest. If the previous score cited the Chronicle and this rescore does not, note that the methodology changed. Plain English, no markdown.`
+In 1-2 sentences, explain what changed and why — be specific about which scores moved and what the commits suggest. Plain English, no markdown.`
 
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })

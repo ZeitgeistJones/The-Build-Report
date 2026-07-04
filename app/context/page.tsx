@@ -27,9 +27,9 @@ export default async function ContextPage() {
         Scoring context v{SCORING_CONTEXT_VERSION}
       </h1>
       <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0 0 24px' }}>
-        Live AI scores read this background plus each repo&apos;s GitHub metadata. When context changes, version
-        bumps and a flush/rescore applies the new lens. Future versions will show diffs here — community updates
-        will route through paid rescore burns, not admin-only edits.
+        Live AI scores read this background plus each repo&apos;s GitHub metadata. Repo cards link here from the{' '}
+        <code style={{ fontSize: '12px' }}>context v{SCORING_CONTEXT_VERSION}</code> badge on Live AI grades.
+        Launch baseline (Jun 15) grades used a separate editorial pass with row-by-row Chronicle citations.
       </p>
 
       {usingOverride && (
@@ -44,7 +44,7 @@ export default async function ContextPage() {
             border: '1px solid var(--border)',
           }}
         >
-          Admin override is active in Redis — this is what autoscore uses today.
+          Admin override is active — this is what autoscore uses today.
         </p>
       )}
 
@@ -66,8 +66,15 @@ export default async function ContextPage() {
       </pre>
 
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '20px', lineHeight: 1.5 }}>
-        Repo cards link here from Live AI scores. Baseline (Jun 15) grades used a fixed editorial pass, not this
-        context version.
+        For the living project narrative, see the{' '}
+        <Link href="/#chronicle" style={{ color: 'var(--accent)' }}>
+          Chronicle
+        </Link>{' '}
+        section on the homepage or{' '}
+        <a href="https://github.com/clawdbotatg/clawd-chronicle" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+          clawd-chronicle on GitHub
+        </a>
+        .
       </p>
     </main>
   )

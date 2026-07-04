@@ -11,6 +11,12 @@ function DesktopNavLinks() {
       <a href="/" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Repos
       </a>
+      <a href="/context" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        Context
+      </a>
+      <a href="/#chronicle" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        Chronicle
+      </a>
       <a href="/about" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         About
       </a>
@@ -57,6 +63,12 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
       <div id="mobile-nav-menu" className="mobile-nav-panel">
         <a href="/" className="mobile-nav-link" onClick={onClose}>
           Repos
+        </a>
+        <a href="/context" className="mobile-nav-link" onClick={onClose}>
+          Context
+        </a>
+        <a href="/#chronicle" className="mobile-nav-link" onClick={onClose}>
+          Chronicle
         </a>
         <a href="/about" className="mobile-nav-link" onClick={onClose}>
           About

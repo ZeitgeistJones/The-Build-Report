@@ -239,28 +239,42 @@ export default async function Home() {
       )}
 
       <div style={{ marginBottom: '40px' }}>
-      <RepoList repos={repos} githubSlugOrder={githubOrder} initialRescoreSummaries={rescoreSummaries} />
-      </div>
-
       {(chronicle?.lastUpdated || chronicle?.summary) && (
-        <div style={{ marginTop: '48px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: 'var(--text-primary)' }}>
-            <a href="https://github.com/clawdbotatg/clawd-chronicle" target="_blank" rel="noopener noreferrer">
-              Chronicle
+        <div
+          id="chronicle"
+          style={{
+            marginBottom: '32px',
+            padding: '16px 18px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
+              <a href="https://github.com/clawdbotatg/clawd-chronicle" target="_blank" rel="noopener noreferrer">
+                Chronicle
+              </a>
+            </h2>
+            <a href="/context" style={{ fontSize: '12px', color: 'var(--accent)' }}>
+              Scoring context →
             </a>
-          </h2>
+          </div>
           {chronicle?.lastUpdated && (
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: chronicle.summary ? '10px' : 0, lineHeight: 1.6 }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: chronicle.summary ? '8px' : 0, lineHeight: 1.5 }}>
               Last updated {chronicle.lastUpdated.label} — {chronicle.lastUpdated.message}
             </p>
           )}
           {chronicle?.summary && (
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
               {chronicle.summary}
             </p>
           )}
         </div>
       )}
+
+      <RepoList repos={repos} githubSlugOrder={githubOrder} initialRescoreSummaries={rescoreSummaries} />
+      </div>
 
       <div id="how-we-score" style={{ marginTop: '48px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: 'var(--text-primary)' }}>
@@ -287,8 +301,9 @@ export default async function Home() {
           <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>launch baseline</strong>{' '}
           (fixed Jun 15 snapshot),{' '}
           <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>live AI</strong>{' '}
-          (auto-inferred or paid Rescore). They use different methods — and live AI has improved since launch. See{' '}
-          <a href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</a>.
+          (auto-inferred or paid Rescore). See{' '}
+          <a href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</a>{' '}
+          and <a href="/context" style={{ color: 'var(--accent)' }}>scoring context</a>.
         </div>
 
         <div

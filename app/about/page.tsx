@@ -1,5 +1,4 @@
 import {
-  ABOUT_LIVE_AI_EVOLUTION_CALLOUT,
   ABOUT_SCORE_TYPES_CALLOUT,
   ABOUT_SCORE_TYPES_SECTIONS,
 } from '@/lib/scoringCopy'
@@ -8,7 +7,7 @@ export default function AboutPage() {
   const sections = [
     {
       heading: 'What this is',
-      body: `The Build Report is an independent community project tracking what clawdbotatg is building on GitHub and scoring each repo against two criteria: how relevant it is to $CLAWD holders, and how well it reflects clawdbotatg's own stated builder values.
+      body: `The Build Report is an independent community project tracking what clawdbotatg is building on GitHub and scoring each repo on three axes: token mechanic or shipping leverage (holder economic impact), builder integrity (trust and alignment), and ecosystem-wide builder activity from GitHub signals.
 
 It is not affiliated with clawdbotatg, Austin Griffith, or any core team. It was built by a community member who holds $CLAWD and wanted a clearer picture of what was being built and why.`,
     },
@@ -30,17 +29,15 @@ This is not a real-time data feed. Launch baseline grades are a fixed Jun 15 sna
     },
     {
       heading: 'Score & Rescore',
-      body: `Every repo card has a Score or Rescore button. It runs Claude AI inference for that single repo — useful for repos that have not been scored yet, or to refresh a live AI score with a new pass. Rescore runs the current live AI method — which may include optional Chronicle context — not a re-review of the baseline.
+      body: `Every repo card has a Score or Rescore button. It runs Claude AI inference for that single repo — useful for repos that have not been scored yet, or to refresh a live AI score.
 
-Cost: 0.000008 ETH per score. That is a fixed onchain amount; at the time this was built (July 2026) it was approximately $0.02, but ETH price fluctuates so the USD equivalent may be closer to $0.01 or $0.04 depending on when you use it.
-
-When you pay, the ETH is sent to the receiver-buy-and-burn contract (0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad). CLAWD is destroyed when someone calls execute() on that contract (batch swap to dead via Uniswap V3). The homepage shows rescore count, on-chain CLAWD burned, and a button to trigger the batch burn.
+Cost: 0.000008 ETH per score. When you pay, ETH goes to the receiver-buy-and-burn contract (0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad). CLAWD is destroyed when someone calls execute() on that contract. The homepage shows on-chain CLAWD burned, pending ETH, and a button to trigger the batch burn.
 
 Who can use it: any wallet that passes CLAWDGate tier 1 on Base (10M+ $CLAWD). The full report blur gate uses the same check.
 
 Result is shared: once a repo is scored, the result is cached in Redis and everyone sees it for free — including visitors who have not connected a wallet.
 
-Commit counts shown on repo cards reflect GitHub scan windows (7d, 30d, 60d) — not precise counts from the exact score date. Launch baseline repos show a Baseline badge and snapshot date; commit tracking since scoring is available for live AI scores only.`,
+Live AI scores read public scoring context at /context. Optional Chronicle grounding can be configured in admin for richer rescore prompts.`,
     },
     {
       heading: 'Important distinctions',
@@ -129,18 +126,6 @@ If you hold $CLAWD and have opinions on what should change, that conversation sh
                 lineHeight: 1.6,
               }}>
                 {ABOUT_SCORE_TYPES_CALLOUT}
-              </div>
-              <div style={{
-                marginTop: '10px',
-                padding: '12px 14px',
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                fontSize: '13px',
-                color: 'var(--text-muted)',
-                lineHeight: 1.6,
-              }}>
-                {ABOUT_LIVE_AI_EVOLUTION_CALLOUT}
               </div>
             </>
           ) : (
