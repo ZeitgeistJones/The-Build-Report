@@ -50,6 +50,7 @@ import { integritySectionFraming } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
+import { BI_WEIGHTS_TOOLTIP_SHORT } from '@/lib/rubrics/builderIntegrity'
 import {
   AWAITING_SCORE_TOOLTIP,
   criticalPathTooltip,
@@ -201,10 +202,21 @@ function rubricSectionGridStyle(
   return undefined
 }
 
-function RubricSectionTitle({ children }: { children: ReactNode }) {
+function RubricSectionTitle({ children, hint }: { children: ReactNode; hint?: string }) {
   return (
-    <div style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-      {children}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '6px' }}>
+      <div style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {children}
+      </div>
+      {hint && (
+        <InfoTooltip
+          content={hint}
+          ariaLabel="Builder integrity weight explanation"
+          icon="question"
+          width={240}
+          compact
+        />
+      )}
     </div>
   )
 }
@@ -921,7 +933,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                   )}
 
                   <div style={rubricSectionGridStyle('bi', hasSL, hasTM, isMobile)}>
-                    <RubricSectionTitle>Builder integrity</RubricSectionTitle>
+                    <RubricSectionTitle hint={BI_WEIGHTS_TOOLTIP_SHORT}>Builder integrity</RubricSectionTitle>
                     {integritySectionFraming(repo) && (
                       <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.35 }}>
                         {integritySectionFraming(repo)}

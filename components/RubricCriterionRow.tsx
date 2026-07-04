@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import type { Level } from '@/lib/scores'
 import { LEVEL_BAR_COLORS, rubricRowPoints } from '@/lib/rubricDisplay'
 
@@ -10,6 +13,8 @@ interface Props {
   deltaEarned?: number | null
   levelChangeLabel?: string | null
   isNewRow?: boolean
+  /** When true, long source text starts collapsed. Default true. */
+  collapsibleSource?: boolean
 }
 
 function formatDeltaBadge(delta: number, isNewRow: boolean): { text: string; color: string } | null {
@@ -28,19 +33,20 @@ export default function RubricCriterionRow({
   deltaEarned = null,
   levelChangeLabel = null,
   isNewRow = false,
+  collapsibleSource = true,
 }: Props) {
+  const [sourceOpen, setSourceOpen] = useState(false)
   const { earned, max } = rubricRowPoints(weight, level)
   const fillPct = max > 0 ? (earned / max) * 100 : 0
   const barColor = LEVEL_BAR_COLORS[level]
-  const showSource = source.trim().length > 0
+  const trimmedSource = source.trim()
+  const showSource = trimmedSource.length > 0
   const showDelta = deltaEarned != null
   const deltaBadge = showDelta ? formatDeltaBadge(deltaEarned, isNewRow) : null
+  const useCollapse = collapsibleSource && showSource && trimmedSource.length > 72
 
   return (
-    <div
-      style={{ marginBottom: '5px' }}
-      title={showSource ? source : undefined}
-    >
+    <div style={{ marginBottom: '5px' }}>
       <div
         style={{
           display: 'flex',
@@ -67,11 +73,7 @@ export default function RubricCriterionRow({
             gap: '5px',
             flexShrink: 0,
           }}
-          title={
-            showDelta && deltaEarned !== 0
-              ? `${levelChangeLabel ?? level}${deltaEarned != null ? ` (${deltaEarned > 0 ? '+' : ''}${deltaEarned} pts)` : ''}`
-              : `${earned} of ${max} points (${level})`
-          }
+          title={`${earned} of ${max} points (${level})`}
         >
           <div
             style={{
@@ -130,10 +132,51 @@ export default function RubricCriterionRow({
           )}
         </p>
       )}
-      {showSource && (
-        <p className="rubric-source-clamp" style={{ margin: '2px 0 0', fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1.35 }}>
-          {source}
-        </p>
+      {showSource && useCollapse && !sourceOpen && (
+        <button
+          type="button"
+          onClick={() => setSourceOpen(true)}
+          style={{
+            margin: '2px 0 0',
+            padding: 0,
+            fontSize: '10px',
+            color: 'var(--accent)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            lineHeight: 1.35,
+          }}
+        >
+          Why this score ▾
+        </button>
+      )}
+      {showSource && (!useCollapse || sourceOpen) && (
+        <>
+          {useCollapse && sourceOpen && (
+            <button
+              type="button"
+              onClick={() => setSourceOpen(false)}
+              style={{
+                margin: '2px 0 0',
+                padding: 0,
+                fontSize: '10px',
+                color: 'var(--accent)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                lineHeight: 1.35,
+              }}
+            >
+              Hide ▴
+            </button>
+          )}
+          <p
+            className={!useCollapse ? 'rubric-source-clamp' : undefined}
+            style={{ margin: '2px 0 0', fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1.35 }}
+          >
+            {trimmedSource}
+          </p>
+        </>
       )}
     </div>
   )

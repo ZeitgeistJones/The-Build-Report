@@ -20,6 +20,13 @@ export const BI_WEIGHT_BY_LABEL: Record<BiRowLabel, string> = {
   'Security, testing, and cryptographic rigor': '20%',
 }
 
+/** Easter egg — why 22% / 18% instead of flat 20% each. */
+export const BI_WEIGHTS_TOOLTIP =
+  'Independent AI rubric review proposed 22/20/18/20/20 — not equal 20s. On-chain commitments weighted up, transparency down. We kept their split instead of rounding for symmetry.'
+
+export const BI_WEIGHTS_TOOLTIP_SHORT =
+  'Asked AI researchers for weights. Got 22/20/18/20/20. We didn\u2019t flatten it.'
+
 /** Legacy 3-row labels — used for ecosystem-grade signals on older cached scores. */
 export const LEGACY_BI_LABELS = [
   'Serves stated vision at time of build',
