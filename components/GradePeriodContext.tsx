@@ -29,15 +29,26 @@ export function useGradePeriod(): GradePeriodContextValue {
   return ctx
 }
 
-interface PeriodKeyToggleProps {
-  period: PeriodKey
-  onChange: (period: PeriodKey) => void
-  /** When true, buttons stretch on mobile. Default false for inline repo controls. */
-  stretchMobile?: boolean
-  options?: readonly { key: PeriodKey; label: string; short: string }[]
+interface PeriodOption<K extends PeriodKey = PeriodKey> {
+  key: K
+  label: string
+  short: string
 }
 
-export function PeriodKeyToggle({ period, onChange, stretchMobile = false, options = PERIOD_TOGGLE_OPTIONS }: PeriodKeyToggleProps) {
+interface PeriodKeyToggleProps<K extends PeriodKey = PeriodKey> {
+  period: K
+  onChange: (period: K) => void
+  /** When true, buttons stretch on mobile. Default false for inline repo controls. */
+  stretchMobile?: boolean
+  options?: readonly PeriodOption<K>[]
+}
+
+export function PeriodKeyToggle<K extends PeriodKey = PeriodKey>({
+  period,
+  onChange,
+  stretchMobile = false,
+  options = PERIOD_TOGGLE_OPTIONS as readonly PeriodOption<K>[],
+}: PeriodKeyToggleProps<K>) {
   const isMobile = useIsMobile()
 
   return (
