@@ -105,16 +105,23 @@ function normalizeWeight(weight: unknown): string | null {
   return null
 }
 
-function sanitizeRubricRow(raw: unknown): RubricRow | null {
+/** Accept any N% weight — used when coercing mis-tagged SL/legacy rows onto consumer TM. */
+function normalizeWeightLoose(weight: unknown): string | null {
+  if (typeof weight !== 'string') return null
+  const w = weight.trim()
+  if (/^\d+(\.\d+)?%$/.test(w)) return w
+  if (/^\d+$/.test(w)) return `${w}%`
+  return null
+}
+
+function sanitizeRubricRow(raw: unknown, looseWeight = false): RubricRow | null {
   if (typeof raw !== 'object' || raw === null) return null
   const row = raw as RubricRow
   const level = normalizeLevel(row.level)
-  const weight = normalizeWeight(row.weight)
+  const weight = looseWeight ? normalizeWeightLoose(row.weight) : normalizeWeight(row.weight)
   if (!level || !weight || typeof row.label !== 'string' || typeof row.source !== 'string') return null
-  return { ...row, level, weight: weight as RubricRow['weight'] }
+  return { ...row, level, weight }
 }
-
-const TM_WEIGHT_ORDER = ['50%', '30%', '20%'] as const
 
 /**
  * Accept v3, legacy, or mis-tagged rows (e.g. shipping-leverage labels on a direct repo).
@@ -122,7 +129,7 @@ const TM_WEIGHT_ORDER = ['50%', '30%', '20%'] as const
  */
 export function coerceTokenMechanicRows(rows: unknown, tag: Tag): RubricRow[] | null {
   if (!Array.isArray(rows) || rows.length !== 3) return null
-  const sanitized = rows.map(sanitizeRubricRow).filter((r): r is RubricRow => r !== null)
+  const sanitized = rows.map(r => sanitizeRubricRow(r, true)).filter((r): r is RubricRow => r !== null)
   if (sanitized.length !== 3) return null
 
   const tmValid = validateTokenMechanicRows([...sanitized], tag)
@@ -132,15 +139,8 @@ export function coerceTokenMechanicRows(rows: unknown, tag: Tag): RubricRow[] | 
 
   if (isInfraTag(tag)) return null
 
-  const weightRank = (w: string) => {
-    const i = TM_WEIGHT_ORDER.indexOf(w as (typeof TM_WEIGHT_ORDER)[number])
-    return i === -1 ? 99 : i
-  }
-
-  const byWeight = [...sanitized].sort((a, b) => weightRank(a.weight) - weightRank(b.weight))
-
-  // Claude often returns SL weights (40/35/25) or wrong labels — coerce by row order.
-  const ordered = byWeight.every(r => TM_WEIGHTS.has(r.weight)) ? byWeight : sanitized
+  // Preserve row order when weights are SL-style (40/35/25) — not TM order.
+  const ordered = sanitized
 
   return TM_CONSUMER_LABELS.map((label, i) => ({
     label,
