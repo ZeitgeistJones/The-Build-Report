@@ -154,9 +154,10 @@ export default function AllTimeStats({
     <div style={{ marginBottom: '40px' }}>
       <div style={{
         fontSize: '11px',
-        color: 'var(--accent)',
+        fontWeight: 600,
+        color: 'var(--text-muted)',
         textTransform: 'uppercase',
-        letterSpacing: '0.06em',
+        letterSpacing: '0.1em',
         marginBottom: '10px',
       }}>
         Activity snapshot

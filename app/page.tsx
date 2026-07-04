@@ -124,34 +124,54 @@ export default async function Home() {
   return (
     <GradePeriodProvider>
     <>
-      <div style={{ marginBottom: '40px', paddingBottom: '24px', borderBottom: '1px solid var(--border-strong)' }}>
+      <div style={{ marginBottom: '32px' }}>
         <HomeHeader rescoreBurns={rescoreBurns} />
         <div
           style={{
-            marginTop: '12px',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            padding: '8px 14px',
-            fontSize: '12px',
-            color: 'var(--text-muted)',
+            flexWrap: 'wrap',
+            gap: '8px',
+            padding: '14px 0',
+            borderTop: '1px solid var(--border)',
+            borderBottom: '1px solid var(--border)',
+            marginTop: '20px',
+            alignItems: 'center',
           }}
         >
-          <span>
-            Scores are interpretive — based on the{' '}
-            <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">
-              Chronicle
-            </a>{' '}
-            and public GitHub data. Not financial advice. <a href="/about">Full disclaimer →</a>
-          </span>
-          <span>
-            GitHub data updates when a scan is run from the admin panel.
-            {lastGithubScanAt && ` Last scan: ${formatScanAt(lastGithubScanAt)}.`}
-            {stats?.lastCommitAt && ` Latest commit ${timeAgo(stats.lastCommitAt)}.`}
-          </span>
+          {[
+            'Interpretive scores — not financial advice',
+            'Independent community project',
+            'Public GitHub repos only',
+            ...(lastGithubScanAt ? [`Last scan: ${formatScanAt(lastGithubScanAt)}`] : []),
+            ...(stats?.lastCommitAt ? [`Latest commit ${timeAgo(stats.lastCommitAt)}`] : []),
+          ].map(label => (
+            <span
+              key={label}
+              style={{
+                fontSize: '11px',
+                color: 'var(--text-muted)',
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-pill)',
+                padding: '4px 10px',
+                letterSpacing: '0.03em',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {label}
+            </span>
+          ))}
+          <a
+            href="/about"
+            style={{
+              fontSize: '11px',
+              color: 'var(--accent)',
+              padding: '4px 2px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Full disclaimer →
+          </a>
         </div>
       </div>
 
@@ -176,7 +196,7 @@ export default async function Home() {
         </div>
       )}
 
-      <div style={{ marginBottom: '40px' }}>
+      <div style={{ marginBottom: '32px' }}>
       <GradesPanel
         pulse30={pulse30}
         pulse7={pulse7}
@@ -221,7 +241,7 @@ export default async function Home() {
       </div>
 
       {stats && (
-      <div style={{ marginBottom: '40px' }}>
+      <div style={{ marginBottom: '32px' }}>
         <AllTimeStats
           totalRepos={stats.totalRepos}
           totalCommits30d={stats.totalCommits30d}
@@ -238,38 +258,75 @@ export default async function Home() {
       </div>
       )}
 
-      <div style={{ marginBottom: '40px' }}>
+      <div style={{ marginTop: '40px' }}>
       {(chronicle?.lastUpdated || chronicle?.summary) && (
         <div
           id="chronicle"
           style={{
             marginBottom: '32px',
-            padding: '16px 18px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '24px',
             background: 'var(--surface-1)',
             border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '14px 20px',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
-              <a href="https://github.com/clawdbotatg/clawd-chronicle" target="_blank" rel="noopener noreferrer">
-                Chronicle
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                color: 'var(--text-muted)',
+                display: 'block',
+                marginBottom: '4px',
+              }}
+            >
+              <a
+                href="https://github.com/clawdbotatg/clawd-chronicle"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'var(--text-muted)', textDecoration: 'none' }}
+              >
+                Latest Chronicle
               </a>
-            </h2>
-            <a href="/context" style={{ fontSize: '12px', color: 'var(--accent)' }}>
-              Scoring context →
-            </a>
+              {chronicle?.lastUpdated && (
+                <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: '8px' }}>
+                  · {chronicle.lastUpdated.label}
+                </span>
+              )}
+            </span>
+            <span
+              className="rubric-source-clamp"
+              style={{
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.55,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {chronicle?.summary ?? chronicle?.lastUpdated?.message ?? 'Scoring context sourced from the clawdbotatg Chronicle.'}
+            </span>
           </div>
-          {chronicle?.lastUpdated && (
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: chronicle.summary ? '8px' : 0, lineHeight: 1.5 }}>
-              Last updated {chronicle.lastUpdated.label} — {chronicle.lastUpdated.message}
-            </p>
-          )}
-          {chronicle?.summary && (
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
-              {chronicle.summary}
-            </p>
-          )}
+          <a
+            href="/context"
+            style={{
+              fontSize: '12px',
+              color: 'var(--accent)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              textDecoration: 'none',
+            }}
+          >
+            Scoring context →
+          </a>
         </div>
       )}
 

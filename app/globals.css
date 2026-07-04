@@ -7,34 +7,39 @@
 }
 
 :root {
-  --bg: #0e0e0e;
-  --surface-1: #161616;
-  --surface-2: #1c1c1c;
-  --surface-3: #242424;
-  --border: rgba(255,255,255,0.07);
-  --border-strong: rgba(255,255,255,0.14);
-  --text-primary: #f0ede8;
-  --text-secondary: #a8a39c;
-  --text-muted: #5e5a55;
-  --accent: #c8f060;
-  --accent-dim: rgba(200,240,96,0.12);
-  --accent-border: rgba(200,240,96,0.25);
+  --bg: #0B0E10;
+  --surface-1: #12171B;
+  --surface-2: #171D22;
+  --surface-3: #1E252C;
+  --border: #263038;
+  --border-strong: rgba(255,255,255,0.12);
+  --text-primary: #E8EEF2;
+  --text-secondary: #A7B3BC;
+  --text-muted: #73808A;
+  --accent: #5FB3A1;
+  --accent-dim: rgba(95,179,161,0.12);
+  --accent-border: rgba(95,179,161,0.25);
   --red: #e05c5c;
   --amber: #d4943a;
   --green: #5cb87a;
   --radius: 8px;
-  --radius-lg: 12px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
   --card-elevated: 0 1px 0 rgba(255,255,255,0.05), 0 8px 32px rgba(0,0,0,0.4);
   --content-max-width: 1200px;
   --content-padding-x: 24px;
-  /* Letter grade colors — harmonized; F bumped from #991b1b to pass 4.5:1 on #1c1c1c */
-  --grade-a: rgba(200, 240, 96, 0.9);
-  --grade-b: #4ade80;
-  --grade-c: #fb923c;
-  --grade-d: #f87171;
-  --grade-f: #c44444;
+  --grade-a: #78C26D;
+  --grade-b: #A7C96B;
+  --grade-c: #D2B85F;
+  --grade-d: #D98A5B;
+  --grade-f: #E06666;
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+}
+
+@keyframes fadeTray {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 html {

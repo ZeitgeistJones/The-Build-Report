@@ -32,25 +32,25 @@ export default function RescoreBurnTracker({
 
   if (count <= 0 && clawdBurnedOnChain <= 0 && ethPendingInReceiver <= 0) return null
 
+  const metaParts: string[] = []
+  if (lastBurnLabel) metaParts.push(`last burn ${lastBurnLabel}`)
+  if (ethPendingInReceiver > 0) metaParts.push(`${formatEthAmount(ethPendingInReceiver)} ETH pending`)
+  const metaLine = metaParts.join(' · ')
+
   return (
     <div
       style={{
         position: 'relative',
-        flexShrink: 0,
-        textAlign: isMobile ? 'left' : 'right',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: isMobile ? 'flex-start' : 'flex-end',
-        gap: '6px',
+        width: '100%',
       }}
     >
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: isMobile ? 'flex-start' : 'flex-end',
-          gap: '5px',
-          marginBottom: '2px',
+          justifyContent: 'space-between',
+          gap: '8px',
+          marginBottom: '6px',
         }}
       >
         <div
@@ -61,7 +61,7 @@ export default function RescoreBurnTracker({
             letterSpacing: '0.05em',
           }}
         >
-          CLAWD BURNED 🔥
+          CLAWD burned
         </div>
         <button
           type="button"
@@ -92,7 +92,7 @@ export default function RescoreBurnTracker({
         style={{
           fontSize: '28px',
           fontWeight: 600,
-          color: 'var(--accent)',
+          color: 'var(--text-primary)',
           fontFamily: 'var(--font-mono)',
           letterSpacing: '-0.02em',
           lineHeight: 1.1,
@@ -101,19 +101,15 @@ export default function RescoreBurnTracker({
         {formatClawdAmount(clawdBurnedOnChain)}
       </div>
 
-      {ethPendingInReceiver > 0 && (
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-          {formatEthAmount(ethPendingInReceiver)} ETH pending swap
+      {metaLine && (
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.45 }}>
+          {metaLine}
         </div>
       )}
 
-      <TriggerExecuteBurnButton ethPending={ethPendingInReceiver} compact />
-
-      {lastBurnLabel && (
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          last burn {lastBurnLabel}
-        </div>
-      )}
+      <div style={{ marginTop: '10px' }}>
+        <TriggerExecuteBurnButton ethPending={ethPendingInReceiver} compact />
+      </div>
 
       {showTooltip && (
         <div
