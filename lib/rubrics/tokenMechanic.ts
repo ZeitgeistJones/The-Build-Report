@@ -28,6 +28,16 @@ export const TM_WEIGHT_BY_LABEL: Record<string, string> = {
   'CLAWD mechanic enablement': '50%',
   'Clarity of economic role in ecosystem': '30%',
   'Alignment with CLAWD economic story (infra)': '20%',
+  'Burn mechanic exists and is live': '50%',
+  'Revenue or burn path built in': '30%',
+  'Mechanic is operational': '20%',
+}
+
+/** Claude often returns launch-baseline row names on direct/supply-lock repos — map to v3 labels. */
+export const LEGACY_TM_TO_V3_LABEL: Record<string, string> = {
+  'Burn mechanic exists and is live': 'Direct CLAWD economic impact',
+  'Revenue or burn path built in': 'Mechanism clarity and holder relevance',
+  'Mechanic is operational': 'Alignment with CLAWD economic story',
 }
 
 export function isInfraTag(tag: Tag): boolean {
@@ -38,15 +48,19 @@ export function expectedTmLabels(tag: Tag): readonly string[] {
   return isInfraTag(tag) ? TM_INFRA_LABELS : TM_CONSUMER_LABELS
 }
 
-export function validateTokenMechanicRows(rows: unknown[], tag: Tag): rows is RubricRow[] {
-  if (!Array.isArray(rows) || rows.length !== 3) return false
-  const expected = expectedTmLabels(tag)
-  const labels = rows.map(r => (r as RubricRow).label)
-  if (!expected.every(l => labels.includes(l))) return false
+export function isLegacyTokenMechanicRubric(rows: RubricRow[]): boolean {
+  if (rows.length !== 3) return false
+  const labels = rows.map(r => r.label)
+  return LEGACY_TM_LABELS.every(l => labels.includes(l))
+}
 
-  return rows.every(r => {
-    if (typeof r !== 'object' || r === null) return false
-    const row = r as RubricRow
+function rowsMatchExpectedLabels(rows: RubricRow[], expected: readonly string[]): boolean {
+  const labels = rows.map(r => r.label)
+  return expected.every(l => labels.includes(l))
+}
+
+function rowsHaveValidTmShape(rows: RubricRow[]): boolean {
+  return rows.every(row => {
     return (
       typeof row.label === 'string' &&
       typeof row.source === 'string' &&
@@ -55,6 +69,26 @@ export function validateTokenMechanicRows(rows: unknown[], tag: Tag): rows is Ru
       row.weight === TM_WEIGHT_BY_LABEL[row.label]
     )
   })
+}
+
+/** Normalize legacy TM row names to v3 consumer labels (same 50/30/20 weights). */
+export function normalizeTokenMechanicRows(rows: RubricRow[], tag: Tag): RubricRow[] {
+  if (isInfraTag(tag) || !isLegacyTokenMechanicRubric(rows)) return rows
+  return rows.map(row => {
+    const label = LEGACY_TM_TO_V3_LABEL[row.label] ?? row.label
+    return { ...row, label, weight: TM_WEIGHT_BY_LABEL[label] ?? row.weight }
+  })
+}
+
+export function validateTokenMechanicRows(rows: unknown[], tag: Tag): rows is RubricRow[] {
+  if (!Array.isArray(rows) || rows.length !== 3) return false
+  const typed = rows as RubricRow[]
+  const expected = expectedTmLabels(tag)
+  const labelsOk =
+    rowsMatchExpectedLabels(typed, expected) ||
+    (!isInfraTag(tag) && isLegacyTokenMechanicRubric(typed))
+  if (!labelsOk) return false
+  return rowsHaveValidTmShape(typed)
 }
 
 export function tmRubricLevelScore(

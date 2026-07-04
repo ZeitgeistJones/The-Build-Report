@@ -17,6 +17,7 @@ import {
 import {
   TM_CONSUMER_PROMPT,
   TM_EDGE_RULES,
+  normalizeTokenMechanicRows,
   validateTokenMechanicRows,
 } from './rubrics/tokenMechanic'
 import {
@@ -223,7 +224,8 @@ Respond ONLY with valid JSON, no markdown:
         console.error(`[autoscore] invalid tokenMechanic rubric for ${repo.name}`)
         return null
       }
-      tokenMechanic = tokenMechanicRows?.length ? makeTmScore(tokenMechanicRows) : null
+      const normalizedTm = normalizeTokenMechanicRows(tokenMechanicRows, tag)
+      tokenMechanic = normalizedTm.length ? makeTmScore(normalizedTm) : null
     }
 
     if (!validateBuilderIntegrityRows(parsed.builderIntegrity)) {
