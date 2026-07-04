@@ -66,6 +66,11 @@ export function isConsumerEconomicScored(repo: Repo): boolean {
   return getConsumerEconomicScorePct(repo) != null
 }
 
+/** Holder-facing integrity sample — consumer apps + supply-lock; excludes infra/indirect/theoretical. */
+export function isEcosystemIntegritySample(repo: Repo): boolean {
+  return !showsEconomicNa(repo)
+}
+
 /** @deprecated Use getConsumerEconomicScorePct for ecosystem blends; getShippingLeverage is display-only for infra. */
 export function getEconomicScore(repo: Repo): Score | null {
   return getShippingLeverage(repo) ?? getTokenMechanicForDisplay(repo)

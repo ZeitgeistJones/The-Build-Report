@@ -6,7 +6,7 @@ import { gradeColor } from '@/lib/gradeLetters'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
 import EcosystemPulsePanel from './EcosystemPulse'
 import { EcosystemPulse } from '@/lib/ecosystemPulse'
-import { Period } from '@/lib/grades'
+import { integrityGradeFootnote } from '@/lib/cardFraming'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface Props {
@@ -392,12 +392,13 @@ export default function GradesPanel({
           grade={ig}
           label="Builder Integrity"
           period={period}
-          mini="Commit-weighted fit to the stated builder-values frame (by rubric scores)."
+          mini="Commit-weighted trust & safety on consumer apps and supply-lock repos (infra excluded)."
           summary={ig?.summary ?? 'Integrity score unavailable'}
           trendExplanation={ig?.trendExplanation}
           footer={
             ig && (
               <>
+                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{integrityGradeFootnote()}</span>
                 <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.active} repos in sample</span>
                 {ig.counts.commitWeight > 0 && (
                   <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.commitWeight} commits weighted</span>

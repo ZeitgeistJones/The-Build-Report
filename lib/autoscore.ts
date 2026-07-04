@@ -10,7 +10,7 @@ import { DEFAULT_ECOSYSTEM_CONTEXT, getEcosystemContext } from './ecosystemConte
 import { getRedis } from './redis'
 import { fetchRepoBySlug } from './github'
 import {
-  BI_PROMPT_ROWS,
+  BI_PROMPT,
   calcBuilderIntegrityPct,
   validateBuilderIntegrityRows,
 } from './rubrics/builderIntegrity'
@@ -27,6 +27,7 @@ import {
 } from './rubrics/shippingLeverage'
 import { getLockedTag } from './criticalPath'
 import { ECOSYSTEM_DECODER_RING } from './rubrics/decoderRing'
+import { SCORING_CONTEXT_VERSION } from './scoringContext'
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
 const CACHE_KEY_PREFIX_V2 = 'build-report:autoscore:v2:'
@@ -133,7 +134,7 @@ async function inferScore(repo: RawRepo, options?: { chronicleContext?: string }
     ? `Chronicle context (condensed):\n${options.chronicleContext.trim()}\n\n`
     : ''
 
-  const prompt = `You are scoring a GitHub repository for the clawdbotatg CLAWD ecosystem (scoring v2).
+  const prompt = `You are scoring a GitHub repository for the clawdbotatg CLAWD ecosystem (scoring v3).
 
 ${chronicleBlock}${ecosystemCtx}
 
@@ -150,11 +151,11 @@ Infer:
 2. Economic axis (pick ONE based on tag):
    - direct or supply-lock → tokenMechanic rubric (consumer labels), shippingLeverage: null
    - indirect, infrastructure, or theoretical → shippingLeverage rubric, tokenMechanic: null
-3. builderIntegrity rubric (5 rows — ALWAYS include all five)
-4. verdict: 2-3 sentence plain English assessment
+3. builderIntegrity rubric (5 rows — ALWAYS include all five; apply tag-specific BI rules below)
+4. verdict: 2-3 sentence plain English — honest, not hype; quick-glance friendly
 5. adminNote: one sentence — live AI score, not a launch baseline
 
-Framing: infra/indirect repos score shipping leverage (indirect holder value), not direct CLAWD burn; low activity is not integrity failure; CV/CONVICTION ≠ CLAWD burns; locks/vesting ≠ burns.
+Framing: score by repo type, not one universal standard. Infra/indirect score shipping leverage, not direct burn. Low GitHub activity is not automatic failure. CV/CONVICTION ≠ CLAWD burns. Locks/vesting ≠ burns. Hold clawdbotatg accountable on consumer apps and money-moving repos; do not penalize dev tools for missing burns.
 
 ${ECOSYSTEM_DECODER_RING}
 
@@ -162,13 +163,7 @@ ${TM_CONSUMER_PROMPT}
 ${SL_PROMPT}
 ${TM_EDGE_RULES}
 
-builderIntegrity (5 rows, exact labels and weights):
-${BI_PROMPT_ROWS}
-Score each BI row high/mid/low from repo type (infra, landing, money-moving, governance, completed lock, etc.). Do not skip rows.
-Apply the decoder ring: completed vesting/locks and waiting burn mechanisms should not be penalized for quiet dormancy or lack of ongoing test suites if launch commitments held.
-
-- level: "high" | "mid" | "low"
-- source: brief inference note
+${BI_PROMPT}
 
 Respond ONLY with valid JSON, no markdown:
 {
@@ -187,7 +182,7 @@ Respond ONLY with valid JSON, no markdown:
     { "label": "Security, testing, and cryptographic rigor", "weight": "20%", "level": "mid", "source": "..." }
   ],
   "verdict": "...",
-  "adminNote": "Live AI score (v2 rubric) — inferred from repo name and ecosystem context."
+  "adminNote": "Live AI score (v3) — inferred from repo metadata and ecosystem context v${SCORING_CONTEXT_VERSION}."
 }`
 
   try {
@@ -253,6 +248,7 @@ Respond ONLY with valid JSON, no markdown:
       builderIntegrity: makeBiScore(parsed.builderIntegrity),
       verdict: parsed.verdict,
       adminNote: parsed.adminNote,
+      scoringContextVersion: SCORING_CONTEXT_VERSION,
     }
 
     const economic = shippingLeverage ?? tokenMechanic

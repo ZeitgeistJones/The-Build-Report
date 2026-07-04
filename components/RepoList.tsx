@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, type ReactNode } from 'react'
+import Link from 'next/link'
 import { Repo, Tag, Level, Confidence } from '@/lib/scores'
 import {
   getEffectiveTag,
@@ -39,6 +40,8 @@ import {
   looksLikeBaselineDate,
   RESCORE_SUMMARY_NOTE,
 } from '@/lib/scoringCopy'
+import { integritySectionFraming } from '@/lib/cardFraming'
+import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
@@ -505,6 +508,24 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 {!pending && repo.scoredAt && (
                   <ScoreTypeBadge adminNote={repo.adminNote} />
                 )}
+                {!pending && isAutoInferredNote(repo.adminNote) && (
+                  <Link
+                    href="/context"
+                    title={scoringContextTooltip(repo.scoringContextVersion)}
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 500,
+                      color: 'var(--text-muted)',
+                      textDecoration: 'none',
+                      padding: '2px 7px',
+                      borderRadius: '99px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface-2)',
+                    }}
+                  >
+                    {formatScoringContextLabel(repo.scoringContextVersion)}
+                  </Link>
+                )}
               </div>
 
               <div style={{ fontSize: `${d.name}px`, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
@@ -773,6 +794,11 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
                   Builder integrity
                 </div>
+                {integritySectionFraming(repo) && (
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 8px', lineHeight: 1.45 }}>
+                    {integritySectionFraming(repo)}
+                  </p>
+                )}
                 {repo.builderIntegrity.rubric.map((row, i) => (
                   <div key={i} style={{
                     display: 'flex',

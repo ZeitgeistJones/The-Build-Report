@@ -35,6 +35,8 @@ export interface Repo {
   verdict: string
   scoredAt: string
   adminNote?: string
+  /** Ecosystem context version the AI read at score time. Omitted on legacy cached scores. */
+  scoringContextVersion?: number
   excluded?: boolean
 }
 

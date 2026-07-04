@@ -22,7 +22,7 @@ import {
   SL_LABELS,
   slRubricLevelScore,
 } from './rubrics/shippingLeverage'
-import { getConsumerEconomicScorePct, isConsumerEconomicScored } from './economicGrade'
+import { getConsumerEconomicScorePct, isConsumerEconomicScored, isEcosystemIntegritySample } from './economicGrade'
 
 export { pctToLetter }
 
@@ -429,16 +429,21 @@ export function calcTokenMechanicGrade(stats: GitHubStats, period: Period, repoS
   return calcTokenMechanicGradeUnified(stats, repoSet, period)
 }
 
+function reposForEcosystemIntegrity(repos: Repo[]): Repo[] {
+  return repos.filter(r => isEcosystemIntegritySample(r))
+}
+
 export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, repoSet: Repo[]): IntegrityGrade {
+  const integrityRepos = reposForEcosystemIntegrity(repoSet)
   const activeRepos = !stats
-    ? repoSet
-    : reposActiveInWindow(stats, repoSet, period, 'current')
+    ? integrityRepos
+    : reposActiveInWindow(stats, integrityRepos, period, 'current')
 
   const priorActiveRepos = !stats
-    ? repoSet
-    : reposActiveInWindow(stats, repoSet, period, 'prior')
+    ? integrityRepos
+    : reposActiveInWindow(stats, integrityRepos, period, 'prior')
 
-  const sample = activeRepos.length ? activeRepos : repoSet
+  const sample = activeRepos.length ? activeRepos : integrityRepos
   const priorSample = priorActiveRepos
 
   const pct = !stats
