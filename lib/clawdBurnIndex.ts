@@ -10,7 +10,14 @@ const base = defineChain({
 
 const BLOCKSCOUT_V2 = 'https://base.blockscout.com/api/v2'
 const CLAWD_DEAD_ADDRESS = '0x000000000000000000000000000000000000dEaD'
-const MAX_TRANSFER_PAGES = 30
+const DEAD_TOPIC =
+  '0x000000000000000000000000000000000000000000000000000000000000dead'
+const TRANSFER_TOPIC =
+  '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+const EXECUTE_METHOD_ID = '61461954'
+const MAX_TX_PAGES = 10
+const FETCH_TIMEOUT_MS = 8_000
+const BURN_INDEX_BUDGET_MS = 12_000
 
 export type OnChainBurnTotals = {
   clawdBurned: number
@@ -18,20 +25,34 @@ export type OnChainBurnTotals = {
   lastBurnAt: string | null
 }
 
-interface TokenTransferItem {
+interface AddressTxItem {
+  hash: string
   timestamp?: string
-  transaction_hash?: string
-  token?: { address_hash?: string }
-  total?: { value?: string }
+  status?: string
+  method?: string | null
+  raw_input?: string
+  result?: string
 }
 
-interface TokenTransferPage {
-  items?: TokenTransferItem[]
+interface AddressTxPage {
+  items?: AddressTxItem[]
   next_page_params?: Record<string, unknown> | null
 }
 
-interface BlockscoutTxDetail {
-  to?: { hash?: string } | null
+interface TxLogItem {
+  timestamp?: string
+  address?: { hash?: string }
+  topics?: string[]
+  data?: string
+  total?: { value?: string }
+  decoded?: {
+    method_call?: string
+    parameters?: { name?: string; value?: string }[]
+  }
+}
+
+interface TxLogsPage {
+  items?: TxLogItem[]
 }
 
 function createBaseClient() {
@@ -41,9 +62,8 @@ function createBaseClient() {
   })
 }
 
-function transfersUrl(cursor?: Record<string, unknown>): string {
-  const url = new URL(`${BLOCKSCOUT_V2}/addresses/${CLAWD_DEAD_ADDRESS}/token-transfers`)
-  url.searchParams.set('type', 'ERC-20')
+function addressTxUrl(contract: string, cursor?: Record<string, unknown>): string {
+  const url = new URL(`${BLOCKSCOUT_V2}/addresses/${contract}/transactions`)
   if (cursor) {
     for (const [key, value] of Object.entries(cursor)) {
       if (value != null) url.searchParams.set(key, String(value))
@@ -54,7 +74,10 @@ function transfersUrl(cursor?: Record<string, unknown>): string {
 
 async function fetchBlockscout<T>(url: string): Promise<T | null> {
   try {
-    const res = await fetch(url, { cache: 'no-store' })
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
     if (!res.ok) return null
     return (await res.json()) as T
   } catch {
@@ -62,63 +85,91 @@ async function fetchBlockscout<T>(url: string): Promise<T | null> {
   }
 }
 
-async function resolveTxTo(
-  hash: string,
-  cache: Map<string, string | null>,
-): Promise<string | null> {
-  const key = hash.toLowerCase()
-  if (cache.has(key)) return cache.get(key)!
+function isExecuteTx(tx: AddressTxItem): boolean {
+  if (tx.result && tx.result !== 'success' && tx.status && tx.status !== 'ok') return false
+  if (tx.method === 'execute') return true
+  const input = tx.raw_input?.toLowerCase().replace(/^0x/, '') ?? ''
+  return input.startsWith(EXECUTE_METHOD_ID)
+}
 
-  const detail = await fetchBlockscout<BlockscoutTxDetail>(`${BLOCKSCOUT_V2}/transactions/${hash}`)
-  const to = detail?.to?.hash?.toLowerCase() ?? null
-  cache.set(key, to)
-  return to
+function clawdToDeadInLogs(logs: TxLogItem[]): bigint {
+  const clawd = CLAWD_TOKEN_ADDRESS.toLowerCase()
+  let total = BigInt(0)
+
+  for (const log of logs) {
+    if (log.address?.hash?.toLowerCase() !== clawd) continue
+    if (log.topics?.[0]?.toLowerCase() !== TRANSFER_TOPIC) continue
+    if (log.topics?.[2]?.toLowerCase() !== DEAD_TOPIC) continue
+
+    const fromDecoded = log.decoded?.parameters?.find(p => p.name === 'value')?.value
+    const raw = fromDecoded ?? log.total?.value ?? log.data
+    if (!raw) continue
+    try {
+      total += BigInt(raw)
+    } catch {
+      // skip malformed values
+    }
+  }
+
+  return total
+}
+
+async function fetchOnChainBurnTotalsInner(
+  attributedContracts: string[],
+): Promise<OnChainBurnTotals> {
+  let total = BigInt(0)
+  let lastBurnAt: string | null = null
+
+  for (const contract of attributedContracts) {
+    let cursor: Record<string, unknown> | null | undefined = undefined
+    let pages = 0
+
+    while (pages < MAX_TX_PAGES) {
+      const page: AddressTxPage | null = await fetchBlockscout<AddressTxPage>(
+        addressTxUrl(contract, cursor ?? undefined),
+      )
+      if (!page?.items?.length) break
+
+      for (const tx of page.items) {
+        if (!isExecuteTx(tx)) continue
+
+        const logsPage = await fetchBlockscout<TxLogsPage>(
+          `${BLOCKSCOUT_V2}/transactions/${tx.hash}/logs`,
+        )
+        if (!logsPage?.items?.length) continue
+
+        total += clawdToDeadInLogs(logsPage.items)
+        const ts = tx.timestamp
+        if (ts && (!lastBurnAt || ts > lastBurnAt)) lastBurnAt = ts
+      }
+
+      pages += 1
+      cursor = page.next_page_params ?? null
+      if (!cursor) break
+    }
+  }
+
+  return { clawdBurned: Number(total) / 1e18, lastBurnAt }
 }
 
 /**
- * Sum all CLAWD Transfer→dead where the tx was sent to one of `attributedContracts`.
- * Matches the community builds hub rule (Blockscout token-transfers, not RPC receipts).
+ * Sum CLAWD→dead in execute() txs to the receiver contract.
+ * Same attribution as the community hub (tx.to == receiver) but indexed via
+ * receiver transactions — O(executes) not O(all dead-address transfers).
  */
 export async function fetchOnChainBurnTotals(
   attributedContracts: string[],
 ): Promise<OnChainBurnTotals> {
-  const attributed = new Set(attributedContracts.map(c => c.toLowerCase()))
-  const clawd = CLAWD_TOKEN_ADDRESS.toLowerCase()
-  const txToCache = new Map<string, string | null>()
-
-  let total = BigInt(0)
-  let lastBurnAt: string | null = null
-  let cursor: Record<string, unknown> | null | undefined = undefined
-  let pages = 0
-
-  while (pages < MAX_TRANSFER_PAGES) {
-    const page: TokenTransferPage | null = await fetchBlockscout<TokenTransferPage>(
-      transfersUrl(cursor ?? undefined),
-    )
-    if (!page?.items?.length) break
-
-    for (const item of page.items) {
-      if (item.token?.address_hash?.toLowerCase() !== clawd) continue
-      const hash = item.transaction_hash
-      if (!hash) continue
-
-      const txTo = await resolveTxTo(hash, txToCache)
-      if (!txTo || !attributed.has(txTo)) continue
-
-      const raw = item.total?.value
-      if (!raw) continue
-
-      total += BigInt(raw)
-      const ts = item.timestamp
-      if (ts && (!lastBurnAt || ts > lastBurnAt)) lastBurnAt = ts
-    }
-
-    pages += 1
-    cursor = page.next_page_params ?? null
-    if (!cursor) break
+  try {
+    return await Promise.race([
+      fetchOnChainBurnTotalsInner(attributedContracts),
+      new Promise<OnChainBurnTotals>((_, reject) => {
+        setTimeout(() => reject(new Error('burn index timeout')), BURN_INDEX_BUDGET_MS)
+      }),
+    ])
+  } catch {
+    return { clawdBurned: 0, lastBurnAt: null }
   }
-
-  return { clawdBurned: Number(total) / 1e18, lastBurnAt }
 }
 
 /** Lifetime CLAWD burned via txs to this receiver contract. */

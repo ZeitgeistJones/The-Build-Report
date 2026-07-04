@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import {
-  formatClawdCompact,
+  formatClawdAmount,
   formatEthAmount,
   formatLastBurnLabel,
 } from '@/lib/clawdBurnIndex'
@@ -11,7 +11,7 @@ import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
 const TOOLTIP =
-  'Cumulative CLAWD sent to dead from execute() on the receiver contract — counted via Blockscout (CLAWD→dead transfers where tx.to is the receiver). Rescore payments only deposit ETH until someone triggers a burn.'
+  'Cumulative CLAWD sent to dead from execute() on the receiver contract — counted on-chain via Blockscout. Rescore payments deposit ETH until someone triggers a burn.'
 
 interface Props {
   count: number
@@ -36,16 +36,24 @@ export default function RescoreBurnTracker({
     <div
       style={{
         position: 'relative',
+        flexShrink: 0,
+        textAlign: isMobile ? 'left' : 'right',
         display: 'flex',
         flexDirection: 'column',
         alignItems: isMobile ? 'flex-start' : 'flex-end',
         gap: '6px',
-        flexShrink: 0,
-        minWidth: isMobile ? undefined : '220px',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isMobile ? 'flex-start' : 'flex-end',
+          gap: '5px',
+          marginBottom: '2px',
+        }}
+      >
+        <div
           style={{
             fontSize: '11px',
             color: 'var(--text-muted)',
@@ -53,21 +61,21 @@ export default function RescoreBurnTracker({
             letterSpacing: '0.05em',
           }}
         >
-          CLAWD burned
-        </span>
+          CLAWD BURNED 🔥
+        </div>
         <button
           type="button"
           onMouseEnter={() => setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
           onClick={() => setShowTooltip(s => !s)}
-          aria-label="About CLAWD burns"
+          aria-label="About CLAWD burned total"
           style={{
             width: isMobile ? MIN_TAP : 14,
             height: isMobile ? MIN_TAP : 14,
             borderRadius: '50%',
-            background: 'transparent',
+            background: 'var(--surface-3)',
             color: 'var(--text-muted)',
-            fontSize: '11px',
+            fontSize: '9px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -82,38 +90,30 @@ export default function RescoreBurnTracker({
 
       <div
         style={{
-          fontSize: '22px',
+          fontSize: '28px',
           fontWeight: 600,
+          color: 'var(--accent)',
           fontFamily: 'var(--font-mono)',
-          color: '#f97316',
+          letterSpacing: '-0.02em',
           lineHeight: 1.1,
-          textAlign: isMobile ? 'left' : 'right',
         }}
       >
-        {formatClawdCompact(clawdBurnedOnChain)} CLAWD
+        {formatClawdAmount(clawdBurnedOnChain)}
       </div>
 
-      {lastBurnLabel && (
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: isMobile ? 'left' : 'right' }}>
-          last burn {lastBurnLabel}
+      {ethPendingInReceiver > 0 && (
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+          {formatEthAmount(ethPendingInReceiver)} ETH pending swap
         </div>
       )}
 
-      <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45, textAlign: isMobile ? 'left' : 'right' }}>
-        {count > 0 && (
-          <div>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{count}</span>
-            {' '}rescore{count === 1 ? '' : 's'}
-          </div>
-        )}
-        {ethPendingInReceiver > 0 && (
-          <div>
-            {formatEthAmount(ethPendingInReceiver)} ETH waiting to burn
-          </div>
-        )}
-      </div>
-
       <TriggerExecuteBurnButton ethPending={ethPendingInReceiver} compact />
+
+      {lastBurnLabel && (
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          last burn {lastBurnLabel}
+        </div>
+      )}
 
       {showTooltip && (
         <div
@@ -128,7 +128,7 @@ export default function RescoreBurnTracker({
             fontSize: '12px',
             color: 'var(--text-secondary)',
             lineHeight: 1.5,
-            width: isMobile ? 'min(280px, calc(100vw - 32px))' : '280px',
+            width: isMobile ? 'min(280px, calc(100vw - 32px))' : '260px',
             zIndex: 10,
             pointerEvents: 'none',
             textAlign: 'left',
