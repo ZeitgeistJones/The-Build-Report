@@ -1,6 +1,5 @@
 import { getGitHubStats, timeAgo } from '@/lib/github'
 import { getChronicleBannerData } from '@/lib/chronicle'
-import { getLastGithubScanAt, formatScanAt } from '@/lib/githubScan'
 import { REPOS, CHANGELOG } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
@@ -33,7 +32,6 @@ export const dynamic = 'force-dynamic'
 export default async function Home() {
   let stats
   let error = false
-  const lastGithubScanAt = await getLastGithubScanAt()
   const chronicle = await getChronicleBannerData().catch(() => null)
   const rescoreBurns = await getRescoreBurnStats().catch(() => null)
 
@@ -124,55 +122,11 @@ export default async function Home() {
   return (
     <GradePeriodProvider>
     <>
-      <div style={{ marginBottom: '32px' }}>
-        <HomeHeader rescoreBurns={rescoreBurns} />
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-            padding: '14px 0',
-            borderTop: '1px solid var(--border)',
-            borderBottom: '1px solid var(--border)',
-            marginTop: '20px',
-            alignItems: 'center',
-          }}
-        >
-          {[
-            'Interpretive scores — not financial advice',
-            'Independent community project',
-            'Public GitHub repos only',
-            ...(lastGithubScanAt ? [`Last scan: ${formatScanAt(lastGithubScanAt)}`] : []),
-            ...(stats?.lastCommitAt ? [`Latest commit ${timeAgo(stats.lastCommitAt)}`] : []),
-          ].map(label => (
-            <span
-              key={label}
-              style={{
-                fontSize: '11px',
-                color: 'var(--text-muted)',
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-pill)',
-                padding: '4px 10px',
-                letterSpacing: '0.03em',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {label}
-            </span>
-          ))}
-          <a
-            href="/about"
-            style={{
-              fontSize: '11px',
-              color: 'var(--accent)',
-              padding: '4px 2px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Full disclaimer →
-          </a>
-        </div>
+      <div style={{ marginBottom: '24px' }}>
+        <HomeHeader
+          rescoreBurns={rescoreBurns}
+          latestCommitLabel={stats?.lastCommitAt ? `Latest commit ${timeAgo(stats.lastCommitAt)}` : null}
+        />
       </div>
 
       {(error || stats?.rateLimited) && (

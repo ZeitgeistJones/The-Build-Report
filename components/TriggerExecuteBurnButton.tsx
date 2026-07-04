@@ -55,11 +55,11 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
     )
   }
 
-  let label = 'Burn accumulated CLAWD'
-  if (!isConnected) label = 'Connect wallet to burn'
+  let label = 'Execute burn'
+  if (!isConnected) label = 'Connect'
   else if (isWrongChain) label = 'Switch to Base'
-  else if (busy) label = 'Confirm in wallet…'
-  else if (isSuccess) label = 'Burn submitted ✓'
+  else if (busy) label = 'Confirm…'
+  else if (isSuccess) label = 'Submitted ✓'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: compact ? 'flex-end' : 'flex-start' }}>
@@ -81,9 +81,9 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
         onClick={handleClick}
         disabled={busy || (isConnected && !isWrongChain && !canBurn && !isSuccess)}
         style={{
-          fontSize: compact ? '11px' : '13px',
+          fontSize: compact ? '10px' : '13px',
           fontWeight: 600,
-          padding: compact ? '6px 12px' : isMobile ? '12px 18px' : '10px 18px',
+          padding: compact ? '4px 10px' : isMobile ? '12px 18px' : '10px 18px',
           minHeight: isMobile && !compact ? MIN_TAP : undefined,
           borderRadius: '99px',
           border: '1px solid var(--accent-border)',

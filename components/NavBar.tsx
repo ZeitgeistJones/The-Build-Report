@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import ConnectWalletButton from './wallet/ConnectWalletButton'
+import ColorThemePicker from './ColorThemePicker'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
@@ -32,6 +33,7 @@ function DesktopNavLinks() {
         ↗ clawdbotatg
       </a>
       <ConnectWalletButton />
+      <ColorThemePicker />
     </div>
   )
 }
@@ -85,6 +87,9 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         >
           ↗ clawdbotatg on GitHub
         </a>
+        <div className="mobile-nav-link" style={{ paddingTop: '8px' }} onClick={e => e.stopPropagation()}>
+          <ColorThemePicker />
+        </div>
       </div>
     </>
   )

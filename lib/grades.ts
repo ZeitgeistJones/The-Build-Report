@@ -36,18 +36,22 @@ export type Period = '30d' | '7d' | '60d'
 /** Extended period for repo list filtering — includes prior comparison windows. */
 export type PeriodKey = Period | '7d-prior' | '30d-prior'
 
-export const PERIOD_TOGGLE_OPTIONS: { key: PeriodKey; label: string; short: string }[] = [
+/** Grades panel — current windows only. */
+export const GRADES_PERIOD_TOGGLE_OPTIONS: { key: Period; label: string; short: string }[] = [
   { key: '7d', label: 'Last 7 days', short: '7d' },
-  { key: '7d-prior', label: 'Prior 7 days (8–14)', short: '7d prev' },
   { key: '30d', label: 'Last 30 days', short: '30d' },
-  { key: '30d-prior', label: 'Prior 30 days (31–60)', short: '30d prev' },
   { key: '60d', label: 'Last 60 days', short: '60d' },
 ]
 
-/** Repo list window — current periods only (prior windows live on Grades toggle). */
-export const REPO_WINDOW_OPTIONS = PERIOD_TOGGLE_OPTIONS.filter(
-  (o): o is { key: Period; label: string; short: string } => !o.key.endsWith('-prior'),
-)
+/** @deprecated Use GRADES_PERIOD_TOGGLE_OPTIONS — prior windows hidden from UI. */
+export const PERIOD_TOGGLE_OPTIONS: { key: PeriodKey; label: string; short: string }[] = [
+  ...GRADES_PERIOD_TOGGLE_OPTIONS,
+  { key: '7d-prior', label: 'Prior 7 days (8–14)', short: '7d prev' },
+  { key: '30d-prior', label: 'Prior 30 days (31–60)', short: '30d prev' },
+]
+
+/** Repo list window — current periods only. */
+export const REPO_WINDOW_OPTIONS = GRADES_PERIOD_TOGGLE_OPTIONS
 
 export function periodKeyToBase(pk: PeriodKey): Period {
   if (pk === '7d-prior') return '7d'

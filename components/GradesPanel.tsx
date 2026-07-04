@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation, Period, periodKeyToBase } from '@/lib/grades'
+import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation, Period } from '@/lib/grades'
 import { gradeColor } from '@/lib/gradeLetters'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
 import { PulseMicrostats } from './EcosystemPulse'
@@ -310,8 +310,7 @@ export default function GradesPanel({
   stats7d,
   stats60d,
 }: Props) {
-  const { period: periodKey } = useGradePeriod()
-  const period = periodKeyToBase(periodKey)
+  const { period } = useGradePeriod()
   const isMobile = useIsMobile()
   const footerSize = isMobile ? '11px' : '10px'
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)

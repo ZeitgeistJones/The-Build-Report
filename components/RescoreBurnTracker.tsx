@@ -7,8 +7,6 @@ import {
   formatLastBurnLabel,
 } from '@/lib/clawdBurnIndex'
 import TriggerExecuteBurnButton from '@/components/TriggerExecuteBurnButton'
-import { useIsMobile } from '@/hooks/useIsMobile'
-import { MIN_TAP } from '@/lib/responsive'
 
 const TOOLTIP =
   'Cumulative CLAWD sent to dead from execute() on the receiver contract — counted on-chain via Blockscout. Rescore payments deposit ETH until someone triggers a burn.'
@@ -27,42 +25,35 @@ export default function RescoreBurnTracker({
   lastBurnAt,
 }: Props) {
   const [showTooltip, setShowTooltip] = useState(false)
-  const isMobile = useIsMobile()
   const lastBurnLabel = formatLastBurnLabel(lastBurnAt)
 
   if (count <= 0 && clawdBurnedOnChain <= 0 && ethPendingInReceiver <= 0) return null
 
   const metaParts: string[] = []
-  if (lastBurnLabel) metaParts.push(`last burn ${lastBurnLabel}`)
+  if (lastBurnLabel) metaParts.push(lastBurnLabel)
   if (ethPendingInReceiver > 0) metaParts.push(`${formatEthAmount(ethPendingInReceiver)} ETH pending`)
-  const metaLine = metaParts.join(' · ')
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        width: '100%',
-      }}
-    >
+    <div style={{ position: 'relative', textAlign: 'right' }}>
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '8px',
-          marginBottom: '6px',
+          display: 'inline-flex',
+          alignItems: 'baseline',
+          gap: '5px',
+          justifyContent: 'flex-end',
         }}
       >
-        <div
+        <span
           style={{
-            fontSize: '11px',
-            color: 'var(--text-muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
+            fontSize: '14px',
+            fontWeight: 600,
+            color: 'var(--text-secondary)',
+            fontFamily: 'var(--font-mono)',
+            fontVariantNumeric: 'tabular-nums',
           }}
         >
-          CLAWD burned
-        </div>
+          {formatClawdAmount(clawdBurnedOnChain)} CLAWD
+        </span>
         <button
           type="button"
           onMouseEnter={() => setShowTooltip(true)}
@@ -70,13 +61,13 @@ export default function RescoreBurnTracker({
           onClick={() => setShowTooltip(s => !s)}
           aria-label="About CLAWD burned total"
           style={{
-            width: isMobile ? MIN_TAP : 14,
-            height: isMobile ? MIN_TAP : 14,
+            width: 14,
+            height: 14,
             borderRadius: '50%',
             background: 'var(--surface-3)',
             color: 'var(--text-muted)',
             fontSize: '9px',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
@@ -88,26 +79,13 @@ export default function RescoreBurnTracker({
         </button>
       </div>
 
-      <div
-        style={{
-          fontSize: '28px',
-          fontWeight: 600,
-          color: 'var(--text-primary)',
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: '-0.02em',
-          lineHeight: 1.1,
-        }}
-      >
-        {formatClawdAmount(clawdBurnedOnChain)}
-      </div>
-
-      {metaLine && (
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.45 }}>
-          {metaLine}
+      {metaParts.length > 0 && (
+        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '3px', lineHeight: 1.4 }}>
+          {metaParts.join(' · ')}
         </div>
       )}
 
-      <div style={{ marginTop: '10px' }}>
+      <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'flex-end' }}>
         <TriggerExecuteBurnButton ethPending={ethPendingInReceiver} compact />
       </div>
 
@@ -116,15 +94,15 @@ export default function RescoreBurnTracker({
           style={{
             position: 'absolute',
             top: 'calc(100% + 6px)',
-            ...(isMobile ? { left: 0 } : { right: 0 }),
+            right: 0,
             background: 'var(--surface-3)',
             border: '1px solid var(--border-strong)',
             borderRadius: 'var(--radius)',
             padding: '8px 10px',
-            fontSize: '12px',
+            fontSize: '11px',
             color: 'var(--text-secondary)',
             lineHeight: 1.5,
-            width: isMobile ? 'min(280px, calc(100vw - 32px))' : '260px',
+            width: '240px',
             zIndex: 10,
             pointerEvents: 'none',
             textAlign: 'left',

@@ -1,19 +1,19 @@
 'use client'
 
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import { Period, PeriodKey, PERIOD_TOGGLE_OPTIONS, REPO_WINDOW_OPTIONS } from '@/lib/grades'
+import { Period, GRADES_PERIOD_TOGGLE_OPTIONS, REPO_WINDOW_OPTIONS } from '@/lib/grades'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
 interface GradePeriodContextValue {
-  period: PeriodKey
-  setPeriod: (period: PeriodKey) => void
+  period: Period
+  setPeriod: (period: Period) => void
 }
 
 const GradePeriodContext = createContext<GradePeriodContextValue | null>(null)
 
 export function GradePeriodProvider({ children }: { children: ReactNode }) {
-  const [period, setPeriod] = useState<PeriodKey>('30d')
+  const [period, setPeriod] = useState<Period>('30d')
   return (
     <GradePeriodContext.Provider value={{ period, setPeriod }}>
       {children}
@@ -29,7 +29,7 @@ export function useGradePeriod(): GradePeriodContextValue {
   return ctx
 }
 
-type PeriodOption = { key: PeriodKey; label: string; short: string }
+type PeriodOption = { key: Period; label: string; short: string }
 
 function PeriodButtonRow({
   period,
@@ -37,8 +37,8 @@ function PeriodButtonRow({
   options,
   stretchMobile,
 }: {
-  period: PeriodKey
-  onChange: (period: PeriodKey) => void
+  period: Period
+  onChange: (period: Period) => void
   options: readonly PeriodOption[]
   stretchMobile?: boolean
 }) {
@@ -90,10 +90,10 @@ export function PeriodKeyToggle({
   period,
   onChange,
   stretchMobile = false,
-  options = PERIOD_TOGGLE_OPTIONS,
+  options = GRADES_PERIOD_TOGGLE_OPTIONS,
 }: {
-  period: PeriodKey
-  onChange: (period: PeriodKey) => void
+  period: Period
+  onChange: (period: Period) => void
   stretchMobile?: boolean
   options?: readonly PeriodOption[]
 }) {

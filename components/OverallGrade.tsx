@@ -1,7 +1,7 @@
 'use client'
 
 import { gradeColor } from '@/lib/gradeLetters'
-import { formatTrendPct, periodKeyToBase } from '@/lib/grades'
+import { formatTrendPct } from '@/lib/grades'
 import { OverallGradeWithTrend } from '@/lib/overallGrade'
 import { useGradePeriod } from './GradePeriodContext'
 
@@ -28,8 +28,7 @@ export default function OverallGrade({
   summary7,
   summary60,
 }: Props) {
-  const { period: periodKey } = useGradePeriod()
-  const period = periodKeyToBase(periodKey)
+  const { period } = useGradePeriod()
   const overall = period === '30d' ? overall30 : period === '7d' ? overall7 : overall60
   const summary = period === '30d' ? summary30 : period === '7d' ? summary7 : summary60
 

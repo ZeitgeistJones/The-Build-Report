@@ -1,7 +1,6 @@
 'use client'
 
 import { useGradePeriod } from './GradePeriodContext'
-import { periodKeyToBase } from '@/lib/grades'
 import { EcosystemPulse } from '@/lib/ecosystemPulse'
 
 interface Props {
@@ -12,8 +11,7 @@ interface Props {
 }
 
 export function PulseMicrostats({ pulse30, pulse7, pulse60, commits }: Props) {
-  const { period: periodKey } = useGradePeriod()
-  const period = periodKeyToBase(periodKey)
+  const { period } = useGradePeriod()
   const pulse = period === '30d' ? pulse30 : period === '7d' ? pulse7 : pulse60
 
   const parts = [
