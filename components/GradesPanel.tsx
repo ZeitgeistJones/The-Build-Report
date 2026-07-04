@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation } from '@/lib/grades'
+import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation, Period } from '@/lib/grades'
 import { gradeColor } from '@/lib/gradeLetters'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
 import EcosystemPulsePanel from './EcosystemPulse'
