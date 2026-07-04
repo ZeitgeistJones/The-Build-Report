@@ -13,75 +13,78 @@ export default function RubricCriterionRow({ label, weight, level, source, isMob
   const { earned, max } = rubricRowPoints(weight, level)
   const fillPct = max > 0 ? (earned / max) * 100 : 0
   const barColor = LEVEL_BAR_COLORS[level]
+  const showSource = source.trim().length > 0
 
   return (
     <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '10px',
-        marginBottom: '6px',
-        flexWrap: isMobile ? 'wrap' : 'nowrap',
-      }}
+      style={{ marginBottom: '5px' }}
+      title={showSource ? source : undefined}
     >
-      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>
-        {label}
-      </span>
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
-          flexShrink: 0,
-          paddingTop: '2px',
+          gap: '8px',
+          minHeight: '20px',
         }}
-        title={`${earned} of ${max} points (${level})`}
       >
-        <div
-          style={{
-            width: isMobile ? 56 : 72,
-            height: 6,
-            borderRadius: 3,
-            background: 'var(--surface-2)',
-            overflow: 'hidden',
-            border: '1px solid var(--border)',
-          }}
-        >
-          <div
-            style={{
-              width: `${fillPct}%`,
-              height: '100%',
-              background: barColor,
-              borderRadius: 2,
-              transition: 'width 0.2s ease',
-            }}
-          />
-        </div>
         <span
           style={{
             fontSize: '11px',
-            color: 'var(--text-muted)',
-            fontFamily: 'var(--font-mono)',
-            minWidth: '38px',
-            textAlign: 'right',
+            color: 'var(--text-secondary)',
+            flex: 1,
+            minWidth: 0,
+            lineHeight: 1.35,
           }}
         >
-          {earned}/{max}
+          {label}
         </span>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            flexShrink: 0,
+          }}
+          title={`${earned} of ${max} points (${level})`}
+        >
+          <div
+            style={{
+              width: isMobile ? 48 : 64,
+              height: 5,
+              borderRadius: 3,
+              background: 'var(--surface-2)',
+              overflow: 'hidden',
+              border: '1px solid var(--border)',
+            }}
+          >
+            <div
+              style={{
+                width: `${fillPct}%`,
+                height: '100%',
+                background: barColor,
+                borderRadius: 2,
+              }}
+            />
+          </div>
+          <span
+            style={{
+              fontSize: '10px',
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-mono)',
+              minWidth: '34px',
+              textAlign: 'right',
+            }}
+          >
+            {earned}/{max}
+          </span>
+        </div>
       </div>
-      <span
-        style={{
-          fontSize: '11px',
-          color: 'var(--text-muted)',
-          maxWidth: isMobile ? undefined : '220px',
-          width: isMobile ? '100%' : undefined,
-          textAlign: isMobile ? 'left' : 'right',
-          lineHeight: 1.3,
-          flexShrink: isMobile ? 1 : 0,
-        }}
-      >
-        {source}
-      </span>
+      {showSource && (
+        <p className="rubric-source-clamp" style={{ margin: '2px 0 0', fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+          {source}
+        </p>
+      )}
     </div>
   )
 }

@@ -4,10 +4,13 @@ import { SCORE_PAYMENT_WEI, RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
 import {
   fetchOnChainBurnTotals,
   getContractEthBalance,
+  type OnChainBurnTotals,
 } from '@/lib/clawdBurnIndex'
 
 const RESCORE_COUNT_KEY = 'build-report:burns:rescore-count'
 const ETH_TOTAL_KEY = 'build-report:burns:eth-total'
+const ONCHAIN_BURN_CACHE_KEY = 'build-report:burns:onchain-cache'
+const ONCHAIN_BURN_CACHE_TTL_SEC = 300
 
 export const SCORE_PAYMENT_ETH = Number(SCORE_PAYMENT_WEI) / 1e18
 
@@ -26,6 +29,15 @@ export async function recordRescoreBurn(redisClient: Redis): Promise<void> {
   ])
 }
 
+async function getCachedOnChainBurns(redis: Redis): Promise<OnChainBurnTotals> {
+  const cached = await redis.get<OnChainBurnTotals>(ONCHAIN_BURN_CACHE_KEY)
+  if (cached && typeof cached.clawdBurned === 'number') return cached
+
+  const fresh = await fetchOnChainBurnTotals([RECEIVER_BUY_AND_BURN])
+  await redis.set(ONCHAIN_BURN_CACHE_KEY, fresh, { ex: ONCHAIN_BURN_CACHE_TTL_SEC })
+  return fresh
+}
+
 export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
   try {
     const r = getRedis()
@@ -33,7 +45,7 @@ export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
       r.get<number>(RESCORE_COUNT_KEY),
       r.get<number>(ETH_TOTAL_KEY),
       getContractEthBalance(RECEIVER_BUY_AND_BURN),
-      fetchOnChainBurnTotals([RECEIVER_BUY_AND_BURN]),
+      getCachedOnChainBurns(r),
     ])
 
     return {
@@ -46,9 +58,4 @@ export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
   } catch {
     return null
   }
-}
-
-/** @deprecated use formatClawdAmount from clawdBurnIndex */
-export function formatClawdBurned(clawdTotal: number): string {
-  return Math.round(clawdTotal).toLocaleString('en-US')
 }

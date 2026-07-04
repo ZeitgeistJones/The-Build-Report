@@ -166,6 +166,55 @@ function ConfidenceLabel({ confidence, isBaseline }: { confidence: Confidence; i
   )
 }
 
+function rubricSectionGridStyle(
+  section: 'sl' | 'tm' | 'bi',
+  hasSL: boolean,
+  hasTM: boolean,
+  isMobile: boolean,
+): React.CSSProperties | undefined {
+  if (isMobile) return undefined
+  if (hasSL && hasTM) {
+    if (section === 'bi') return { gridColumn: '1 / -1' }
+    return undefined
+  }
+  if (section === 'bi' && (hasSL || hasTM)) return { gridColumn: 2 }
+  if ((section === 'sl' || section === 'tm') && (hasSL || hasTM)) return { gridColumn: 1 }
+  return undefined
+}
+
+function RubricSectionTitle({ children }: { children: ReactNode }) {
+  return (
+    <div style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+      {children}
+    </div>
+  )
+}
+
+function VerdictBlock({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const long = text.length > 220
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
+      <p
+        className={!expanded && long ? 'verdict-clamp' : undefined}
+        style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.55 }}
+      >
+        {text}
+      </p>
+      {long && !expanded && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          style={{ marginTop: '6px', fontSize: '11px', color: 'var(--accent)', padding: 0 }}
+        >
+          Read full verdict
+        </button>
+      )}
+    </div>
+  )
+}
+
 function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
   const rescoreDate = formatScoredDateLabel(meta.rescoreAt)
   const oldDate = formatScoredDateLabel(meta.oldScoredAt)
@@ -708,113 +757,120 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
         </div>
 
         {isExpanded && (
-          <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
+          <div style={{ borderTop: '1px solid var(--border)', padding: '12px 14px' }}>
             {pending && (
               <div style={{
-                marginBottom: '12px',
-                padding: '8px 12px',
+                marginBottom: '10px',
+                padding: '8px 10px',
                 background: 'var(--surface-2)',
                 borderRadius: 'var(--radius)',
                 border: '1px solid var(--border)',
-                fontSize: '12px',
+                fontSize: '11px',
                 color: 'var(--text-muted)',
-                lineHeight: 1.5,
+                lineHeight: 1.45,
               }}>
                 This repo was recently pushed on GitHub and appears here for recency tracking. Run autoscore or Score to add rubric grades.
               </div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '14px' }}>
-              {!pending && shippingLeverage && (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                    Shipping leverage
+            {!pending && (() => {
+              const hasSL = !!shippingLeverage
+              const hasTM = !!tokenMechanic
+              const gridColumns = isMobile ? '1fr' : hasSL && hasTM ? '1fr 1fr' : hasSL || hasTM ? '1fr 1fr' : '1fr'
+
+              return (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: gridColumns,
+                    gap: '10px 14px',
+                    marginBottom: '10px',
+                  }}
+                >
+                  {hasSL && shippingLeverage && (
+                    <div style={rubricSectionGridStyle('sl', hasSL, hasTM, isMobile)}>
+                      <RubricSectionTitle>Shipping leverage</RubricSectionTitle>
+                      {shippingLeverage.rubric.map((row, i) => (
+                        <RubricCriterionRow
+                          key={i}
+                          label={row.label}
+                          weight={row.weight}
+                          level={row.level}
+                          source={row.source}
+                          isMobile={isMobile}
+                        />
+                      ))}
+                      <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', marginBottom: 0, lineHeight: 1.35 }}>
+                        Indirect holder value — how much this repo multiplies the builder&apos;s ability to ship consumer apps that burn or lock CLAWD.
+                      </p>
+                    </div>
+                  )}
+
+                  {hasTM && tokenMechanic && (
+                    <div style={rubricSectionGridStyle('tm', hasSL, hasTM, isMobile)}>
+                      <RubricSectionTitle>Token mechanic</RubricSectionTitle>
+                      {tokenMechanic.rubric.map((row, i) => (
+                        <RubricCriterionRow
+                          key={i}
+                          label={row.label}
+                          weight={row.weight}
+                          level={row.level}
+                          source={row.source}
+                          isMobile={isMobile}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {!hasSL && !hasTM && (
+                    <div style={rubricSectionGridStyle('sl', false, false, isMobile)}>
+                      <RubricSectionTitle>Economic score</RubricSectionTitle>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+                        Not yet scored on token mechanic or shipping leverage.
+                      </p>
+                    </div>
+                  )}
+
+                  <div style={rubricSectionGridStyle('bi', hasSL, hasTM, isMobile)}>
+                    <RubricSectionTitle>Builder integrity</RubricSectionTitle>
+                    {integritySectionFraming(repo) && (
+                      <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.35 }}>
+                        {integritySectionFraming(repo)}
+                      </p>
+                    )}
+                    {repo.builderIntegrity.rubric.map((row, i) => (
+                      <RubricCriterionRow
+                        key={i}
+                        label={row.label}
+                        weight={row.weight}
+                        level={row.level}
+                        source={row.source}
+                        isMobile={isMobile}
+                      />
+                    ))}
                   </div>
-                  {shippingLeverage.rubric.map((row, i) => (
-                    <RubricCriterionRow
-                      key={i}
-                      label={row.label}
-                      weight={row.weight}
-                      level={row.level}
-                      source={row.source}
-                      isMobile={isMobile}
-                    />
-                  ))}
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: 0, lineHeight: 1.45 }}>
-                    Indirect holder value — how much this repo multiplies the builder&apos;s ability to ship consumer apps that burn or lock CLAWD. No in-repo burn is expected.
-                  </p>
-                </div>
-              )}
 
-              {!pending && tokenMechanic && (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                    Token mechanic
-                  </div>
-                  {tokenMechanic.rubric.map((row, i) => (
-                    <RubricCriterionRow
-                      key={i}
-                      label={row.label}
-                      weight={row.weight}
-                      level={row.level}
-                      source={row.source}
-                      isMobile={isMobile}
-                    />
-                  ))}
+                  {lifecycleHint(lifecycle) && (
+                    <p
+                      className="rubric-source-clamp"
+                      style={{
+                        gridColumn: isMobile ? undefined : '1 / -1',
+                        fontSize: '10px',
+                        color: 'var(--text-muted)',
+                        margin: 0,
+                        lineHeight: 1.35,
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      {lifecycleHint(lifecycle)}
+                    </p>
+                  )}
                 </div>
-              )}
-
-              {!pending && !shippingLeverage && !tokenMechanic && (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
-                    Economic score
-                  </div>
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    Not yet scored on token mechanic or shipping leverage.
-                  </p>
-                </div>
-              )}
-
-              {!pending && lifecycleHint(lifecycle) && (
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.45, fontStyle: 'italic' }}>
-                  {lifecycleHint(lifecycle)}
-                </p>
-              )}
-
-              {!pending && (
-              <div>
-                <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                  Builder integrity
-                </div>
-                {integritySectionFraming(repo) && (
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 8px', lineHeight: 1.45 }}>
-                    {integritySectionFraming(repo)}
-                  </p>
-                )}
-                {repo.builderIntegrity.rubric.map((row, i) => (
-                  <RubricCriterionRow
-                    key={i}
-                    label={row.label}
-                    weight={row.weight}
-                    level={row.level}
-                    source={row.source}
-                    isMobile={isMobile}
-                  />
-                ))}
-              </div>
-              )}
-            </div>
+              )
+            })()}
 
             {rescoreMeta && <RescoreSummaryBlock meta={rescoreMeta} />}
 
-            <div style={{
-              borderTop: '1px solid var(--border)',
-              paddingTop: '12px',
-              fontSize: '13px',
-              color: 'var(--text-secondary)',
-              lineHeight: 1.6,
-            }}>
-              {repo.verdict}
-            </div>
+            <VerdictBlock text={repo.verdict} />
 
             {repo.adminNote && !auto && (
               <div style={{
