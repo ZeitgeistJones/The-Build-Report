@@ -92,7 +92,9 @@ export async function fetchOnChainBurnTotals(
   let pages = 0
 
   while (pages < MAX_TRANSFER_PAGES) {
-    const page = await fetchBlockscout<TokenTransferPage>(transfersUrl(cursor ?? undefined))
+    const page: TokenTransferPage | null = await fetchBlockscout<TokenTransferPage>(
+      transfersUrl(cursor ?? undefined),
+    )
     if (!page?.items?.length) break
 
     for (const item of page.items) {
