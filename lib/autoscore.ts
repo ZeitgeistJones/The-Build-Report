@@ -255,11 +255,7 @@ Respond ONLY with valid JSON, no markdown:
       tag,
       status: derivedStatus,
       confidence: 'low',
-      scoredAt: new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }),
+      scoredAt: new Date().toISOString(),
       tokenMechanic,
       shippingLeverage,
       builderIntegrity: makeBiScore(parsed.builderIntegrity),

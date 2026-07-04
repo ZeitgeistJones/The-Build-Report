@@ -44,7 +44,14 @@ import {
 } from '@/lib/scoringCopy'
 import { integritySectionFraming } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
-
+import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
+import RepoBadge from '@/components/RepoBadge'
+import {
+  AWAITING_SCORE_TOOLTIP,
+  criticalPathTooltip,
+  LIFECYCLE_TOOLTIPS,
+  TAG_TOOLTIPS,
+} from '@/lib/badgeTooltips'
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
   'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
   'supply-lock': { color: '#5b9bd5', bg: 'rgba(91,155,213,0.12)', label: 'supply lock' },
@@ -61,14 +68,10 @@ const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
   theoretical: '#a78bfa',
 }
 
-type Density = 'compact' | 'comfortable'
 type ActivityScope = 'active' | 'all'
 type RepoSort = 'recent' | 'commits' | 'grade'
 
-const DENSITY_STYLES = {
-  compact: { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20 },
-  comfortable: { cardPadding: '18px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 22 },
-} as const
+const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20 } as const
 
 const META_MUTED = '#5e5a55'
 const STALE_AMBER = '#f59e0b'
@@ -80,6 +83,7 @@ type ScoreAgeDisplay =
   | { kind: 'hidden' }
   | { kind: 'baseline'; label: string }
   | { kind: 'auto_count'; count: number; capped: boolean }
+  | { kind: 'auto_new' }
   | { kind: 'auto_age'; days: number }
 
 function truncate120(text: string): string {
@@ -324,23 +328,26 @@ function getScoreAgeDisplay(repo: RepoWithLive, pending: boolean): ScoreAgeDispl
     return { kind: 'baseline', label: formatBaselineDate(repo.scoredAt) }
   }
 
+  const result = countCommitsSinceScore(
+    repo.scoredAt,
+    repo.commitTimestamps,
+    { lastCommitAt: repo.lastCommitAt, pushedAt: repo.pushedAt },
+  )
+
+  if (result.exact) {
+    return { kind: 'auto_count', count: result.count, capped: result.capped }
+  }
+
+  if (result.hasNew) {
+    return { kind: 'auto_new' }
+  }
+
   const days = daysSinceScored(repo.scoredAt)
-  if (days === null) return { kind: 'hidden' }
-
-  if (days < 1) {
-    return { kind: 'auto_count', count: 0, capped: false }
+  if (days !== null && days > 30) {
+    return { kind: 'auto_age', days: Math.floor(days) }
   }
 
-  if (days <= 30) {
-    const commits30d = repo.commits30d ?? 0
-    return {
-      kind: 'auto_count',
-      count: commits30d,
-      capped: commits30d >= GITHUB_COMMITS_CAP,
-    }
-  }
-
-  return { kind: 'auto_age', days: Math.floor(days) }
+  return { kind: 'auto_count', count: 0, capped: false }
 }
 
 function commitsSinceScoredColor(count: number): string {
@@ -357,6 +364,7 @@ interface RepoWithLive extends Repo {
   commits7d: number | null
   commits7_14: number | null
   commits30_60: number | null
+  commitTimestamps: string[] | null
 }
 
 export type { RepoWithLive }
@@ -372,14 +380,12 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
   const [sortBy, setSortBy] = useState<RepoSort>('recent')
   const [repoPeriod, setRepoPeriod] = useState<Period>('30d')
-  const [density, setDensity] = useState<Density>('compact')
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
   const [rescoreSummaries, setRescoreSummaries] = useState(initialRescoreSummaries)
   const { unlocked } = useClawdAccess()
   const isMobile = useIsMobile()
-  const effectiveDensity = isMobile ? 'compact' : density
-  const d = DENSITY_STYLES[effectiveDensity]
+  const d = CARD
 
   useEffect(() => {
     setRepoItems(repos)
@@ -535,54 +541,70 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
           >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: '5px', marginBottom: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{
-                  fontSize: '11px',
-                  padding: '2px 8px',
-                  borderRadius: '99px',
-                  fontWeight: 500,
-                  color: ts.color,
-                  background: ts.bg,
-                }}>
-                  {ts.label}
-                </span>
-                {pending && (
-                  <span style={{
-                    fontSize: '10px',
-                    padding: '2px 7px',
-                    borderRadius: '99px',
-                    color: 'var(--amber)',
-                    background: 'rgba(212,148,58,0.1)',
-                    border: '1px solid var(--border)',
-                    letterSpacing: '0.03em',
-                  }}>
-                    awaiting score
-                  </span>
-                )}
-                {criticalPath && (
-                  <span style={{
-                    fontSize: '10px',
-                    padding: '2px 7px',
-                    borderRadius: '99px',
-                    color: 'var(--accent)',
-                    background: 'var(--accent-dim)',
-                    border: '1px solid var(--accent-border)',
-                    letterSpacing: '0.02em',
-                  }}>
-                    {criticalPath.roleBadge}
-                  </span>
-                )}
-                {!pending && (
-                  <span style={{
-                    fontSize: '10px',
-                    padding: '2px 7px',
+                <RepoBadge
+                  tooltip={TAG_TOOLTIPS[getEffectiveTag(repo)]}
+                  style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
                     borderRadius: '99px',
                     fontWeight: 500,
-                    color: lcStyle.color,
-                    background: lcStyle.bg,
-                    letterSpacing: '0.02em',
-                  }}>
+                    color: ts.color,
+                    background: ts.bg,
+                    display: 'inline-block',
+                  }}
+                >
+                  {ts.label}
+                </RepoBadge>
+                {pending && (
+                  <RepoBadge
+                    tooltip={AWAITING_SCORE_TOOLTIP}
+                    style={{
+                      fontSize: '10px',
+                      padding: '2px 7px',
+                      borderRadius: '99px',
+                      color: 'var(--amber)',
+                      background: 'rgba(212,148,58,0.1)',
+                      border: '1px solid var(--border)',
+                      letterSpacing: '0.03em',
+                      display: 'inline-block',
+                    }}
+                  >
+                    awaiting score
+                  </RepoBadge>
+                )}
+                {criticalPath && (
+                  <RepoBadge
+                    tooltip={criticalPathTooltip(criticalPath.roleBadge)}
+                    style={{
+                      fontSize: '10px',
+                      padding: '2px 7px',
+                      borderRadius: '99px',
+                      color: 'var(--accent)',
+                      background: 'var(--accent-dim)',
+                      border: '1px solid var(--accent-border)',
+                      letterSpacing: '0.02em',
+                      display: 'inline-block',
+                    }}
+                  >
+                    {criticalPath.roleBadge}
+                  </RepoBadge>
+                )}
+                {!pending && (
+                  <RepoBadge
+                    tooltip={LIFECYCLE_TOOLTIPS[lifecycle]}
+                    style={{
+                      fontSize: '10px',
+                      padding: '2px 7px',
+                      borderRadius: '99px',
+                      fontWeight: 500,
+                      color: lcStyle.color,
+                      background: lcStyle.bg,
+                      letterSpacing: '0.02em',
+                      display: 'inline-block',
+                    }}
+                  >
                     {lifecycle === 'done' ? `${LIFECYCLE_LABELS.done} ✅` : LIFECYCLE_LABELS[lifecycle]}
-                  </span>
+                  </RepoBadge>
                 )}
                 {!pending && repo.scoredAt && (
                   <ScoreTypeBadge adminNote={repo.adminNote} />
@@ -652,6 +674,12 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                     <span style={{ color: commitsSinceScoredColor(sinceScored.capped ? GITHUB_COMMITS_CAP : sinceScored.count) }}>
                       {sinceScored.capped ? '100+' : sinceScored.count} commits since scored
                     </span>
+                  </>
+                )}
+                {sinceScored.kind === 'auto_new' && (
+                  <>
+                    {' · '}
+                    <span style={{ color: STALE_AMBER }}>New commits since scored</span>
                   </>
                 )}
                 {sinceScored.kind === 'auto_age' && (
@@ -749,6 +777,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
               pushedAt: repo.pushedAt,
               commits7d: repo.commits7d,
               commits30d: repo.commits30d,
+              commitTimestamps: repo.commitTimestamps,
               adminNote: repo.adminNote,
               scoringContextVersion: repo.scoringContextVersion,
             }}
@@ -900,16 +929,16 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
     <div>
       <div style={{
         display: 'flex',
-        alignItems: isMobile ? 'stretch' : 'center',
-        justifyContent: 'space-between',
-        marginBottom: '8px',
-        flexDirection: isMobile ? 'column' : 'row',
-        gap: isMobile ? '10px' : 0,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: '4px',
+        marginBottom: '12px',
       }}>
-        <div style={{ fontSize: '11px', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginRight: isMobile ? 0 : '8px' }}>
           Repos{repoCountLabel}
-        </div>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+        </span>
+        {isMobile && <div style={{ width: '100%', height: 0 }} />}
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginLeft: isMobile ? 0 : 'auto' }}>
           {filters.map(f => (
             <PillButton
               key={f.key}
@@ -920,54 +949,26 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
               {f.label}
             </PillButton>
           ))}
-          {!isMobile && (
-            <>
-              <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 4px' }} />
-              <PillButton active={density === 'compact'} onClick={() => setDensity('compact')} isMobile={false}>
-                Compact
-              </PillButton>
-              <PillButton active={density === 'comfortable'} onClick={() => setDensity('comfortable')} isMobile={false}>
-                Comfortable
-              </PillButton>
-            </>
-          )}
+          <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />
+          <PillButton active={sortBy === 'recent'} onClick={() => setSortBy('recent')} isMobile={isMobile}>
+            Recent
+          </PillButton>
+          <PillButton active={sortBy === 'commits'} onClick={() => setSortBy('commits')} isMobile={isMobile}>
+            Commits
+          </PillButton>
+          <PillButton active={sortBy === 'grade'} onClick={() => setSortBy('grade')} isMobile={isMobile}>
+            Grades
+          </PillButton>
+          <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />
+          <RepoWindowToggle period={repoPeriod} onChange={setRepoPeriod} />
+          <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />
+          <PillButton active={activityScope === 'active'} onClick={() => setActivityScope('active')} isMobile={isMobile}>
+            Active
+          </PillButton>
+          <PillButton active={activityScope === 'all'} onClick={() => setActivityScope('all')} isMobile={isMobile}>
+            All
+          </PillButton>
         </div>
-      </div>
-
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        marginBottom: '12px',
-      }}>
-        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Show
-        </span>
-        <PillButton active={activityScope === 'active'} onClick={() => setActivityScope('active')} isMobile={isMobile}>
-          Active in window
-        </PillButton>
-        <PillButton active={activityScope === 'all'} onClick={() => setActivityScope('all')} isMobile={isMobile}>
-          All repos
-        </PillButton>
-        <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 4px' }} />
-        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Sort
-        </span>
-        <PillButton active={sortBy === 'recent'} onClick={() => setSortBy('recent')} isMobile={isMobile}>
-          Recent
-        </PillButton>
-        <PillButton active={sortBy === 'commits'} onClick={() => setSortBy('commits')} isMobile={isMobile}>
-          Commits
-        </PillButton>
-        <PillButton active={sortBy === 'grade'} onClick={() => setSortBy('grade')} isMobile={isMobile}>
-          Grades
-        </PillButton>
-        <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 4px' }} />
-        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Window
-        </span>
-        <RepoWindowToggle period={repoPeriod} onChange={setRepoPeriod} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

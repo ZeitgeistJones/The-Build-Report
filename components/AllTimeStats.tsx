@@ -7,6 +7,7 @@ import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import { useGradePeriod } from '@/components/GradePeriodContext'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
+import { timeAgo } from '@/lib/github'
 
 interface Props {
   totalRepos: number
@@ -20,16 +21,6 @@ interface Props {
   activeDays7_14: number
   lastCommitAt: string | null
   lastCommitRepo: string | null
-}
-
-function formatLastCommit(dateStr: string) {
-  const d = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
 }
 
 function formatStatTrend(curr: number, prev: number, windowLabel: string): string {
@@ -222,7 +213,7 @@ export default function AllTimeStats({
         <StatCard
           isMobile={isMobile}
           label="Last commit"
-          value={lastCommitAt ? formatLastCommit(lastCommitAt) : '—'}
+          value={lastCommitAt ? timeAgo(lastCommitAt) : '—'}
           sub={lastCommitRepo ?? ''}
           tooltip="Most recent commit found while scanning the sampled repo set."
           gated={gated}

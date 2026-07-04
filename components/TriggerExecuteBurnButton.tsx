@@ -60,6 +60,8 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
   else if (isWrongChain) label = 'Switch to Base'
   else if (busy) label = 'Confirm…'
   else if (isSuccess) label = 'Submitted ✓'
+  else if (canBurn && compact) label = `Execute burn · ${formatEthAmount(ethPending)} ETH`
+  else if (!canBurn && compact && isConnected && !isWrongChain) label = 'No ETH pending'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: compact ? 'flex-end' : 'flex-start' }}>
@@ -70,7 +72,7 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
         </p>
       )}
 
-      {ethPending > 0 && (
+      {!compact && ethPending > 0 && (
         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
           {formatEthAmount(ethPending)} ETH ready to swap (~{Math.round(ethPending / 0.000008)} rescores worth)
         </div>

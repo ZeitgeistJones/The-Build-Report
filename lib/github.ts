@@ -33,6 +33,8 @@ export interface RepoActivity {
   commits7d: number
   commits7_14: number
   commits30_60: number
+  /** ISO timestamps from the 60d commit scan (newest first, capped at 100). */
+  commitTimestamps: string[]
   lastCommitAt: string | null
   pushedAt: string
   isActive: boolean
@@ -227,6 +229,7 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
         commits7d: c7.length,
         commits7_14: c7_14.length,
         commits30_60: c30_60.length,
+        commitTimestamps: commits.map((c: { commit: { author: { date: string } } }) => c.commit.author.date),
         lastCommitAt: commits[0]?.commit?.author?.date ?? null,
         pushedAt: repo.pushed_at,
         isActive: c30.length > 0,
@@ -248,6 +251,7 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
       commits7d: 0,
       commits7_14: 0,
       commits30_60: 0,
+      commitTimestamps: [],
       lastCommitAt: null,
       pushedAt: repo.pushed_at,
       isActive: isWithinDays(repo.pushed_at, 30),
