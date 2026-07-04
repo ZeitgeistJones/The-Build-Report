@@ -27,6 +27,14 @@ export const LEGACY_BI_LABELS = [
   'Passes walkaway test',
 ] as const
 
+export const LEGACY_BI_WEIGHTS = new Set(['40%', '35%', '25%'])
+
+export const LEGACY_BI_WEIGHT_BY_LABEL: Record<string, string> = {
+  'Serves stated vision at time of build': '40%',
+  'Genuine autonomous build': '35%',
+  'Passes walkaway test': '25%',
+}
+
 export function isNewBuilderIntegrityRubric(rows: RubricRow[]): boolean {
   return rows.length === 5 && rows.some(r => r.label === BI_ROW_LABELS[0])
 }
@@ -64,22 +72,52 @@ export function calcBuilderIntegrityPct(rows: RubricRow[]): number {
   return Math.round((total / 3) * 100)
 }
 
-export function validateBuilderIntegrityRows(rows: unknown[]): rows is RubricRow[] {
-  if (!Array.isArray(rows) || rows.length !== 5) return false
-  const labels = new Set(rows.map(r => (r as RubricRow).label))
+export function isLegacyBuilderIntegrityRubric(rows: RubricRow[]): boolean {
+  if (rows.length !== 3) return false
+  const labels = rows.map(r => r.label)
+  return LEGACY_BI_LABELS.every(l => labels.includes(l))
+}
+
+function normalizeBiLevel(level: unknown): Level | null {
+  if (level === 'high' || level === 'mid' || level === 'low') return level
+  if (level === 'medium') return 'mid'
+  return null
+}
+
+function validateLegacyBuilderIntegrityRows(rows: RubricRow[]): boolean {
+  if (!isLegacyBuilderIntegrityRubric(rows)) return false
+  return rows.every(row => {
+    const level = normalizeBiLevel(row.level)
+    return (
+      level !== null &&
+      typeof row.source === 'string' &&
+      LEGACY_BI_WEIGHTS.has(row.weight) &&
+      row.weight === LEGACY_BI_WEIGHT_BY_LABEL[row.label]
+    )
+  })
+}
+
+function validateV3BuilderIntegrityRows(rows: RubricRow[]): boolean {
+  if (rows.length !== 5) return false
+  const labels = new Set(rows.map(r => r.label))
   if (!BI_ROW_LABELS.every(l => labels.has(l))) return false
 
-  return rows.every(r => {
-    if (typeof r !== 'object' || r === null) return false
-    const row = r as RubricRow
+  return rows.every(row => {
+    const level = normalizeBiLevel(row.level)
     return (
-      typeof row.label === 'string' &&
+      level !== null &&
       typeof row.source === 'string' &&
       BI_WEIGHTS.has(row.weight) &&
-      (row.level === 'high' || row.level === 'mid' || row.level === 'low') &&
       row.weight === BI_WEIGHT_BY_LABEL[row.label as BiRowLabel]
     )
   })
+}
+
+/** Accept v3 (5-row) or launch baseline (3-row) builder integrity rubrics. */
+export function validateBuilderIntegrityRows(rows: unknown[]): rows is RubricRow[] {
+  if (!Array.isArray(rows)) return false
+  const typed = rows as RubricRow[]
+  return validateV3BuilderIntegrityRows(typed) || validateLegacyBuilderIntegrityRows(typed)
 }
 
 export const BI_PROMPT_ROWS = BI_ROW_LABELS.map(label => {

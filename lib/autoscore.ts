@@ -17,7 +17,7 @@ import {
 import {
   TM_CONSUMER_PROMPT,
   TM_EDGE_RULES,
-  normalizeTokenMechanicRows,
+  coerceTokenMechanicRows,
   validateTokenMechanicRows,
 } from './rubrics/tokenMechanic'
 import {
@@ -219,17 +219,32 @@ Respond ONLY with valid JSON, no markdown:
         }
       }
     } else {
-      const tokenMechanicRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
-      if (!validateTokenMechanicRows(tokenMechanicRows, tag)) {
-        console.error(`[autoscore] invalid tokenMechanic rubric for ${repo.name}`)
+      const rawTm: unknown =
+        parsed.tokenMechanic ??
+        parsed.holderRelevance ??
+        (Array.isArray(parsed.shippingLeverage) && parsed.shippingLeverage.length === 3
+          ? parsed.shippingLeverage
+          : null)
+      const coercedTm = coerceTokenMechanicRows(rawTm, tag)
+      if (!coercedTm) {
+        console.error(
+          `[autoscore] invalid tokenMechanic rubric for ${repo.name}:`,
+          JSON.stringify({
+            tokenMechanic: parsed.tokenMechanic,
+            shippingLeverage: parsed.shippingLeverage,
+            holderRelevance: parsed.holderRelevance,
+          }),
+        )
         return null
       }
-      const normalizedTm = normalizeTokenMechanicRows(tokenMechanicRows, tag)
-      tokenMechanic = normalizedTm.length ? makeTmScore(normalizedTm) : null
+      tokenMechanic = makeTmScore(coercedTm)
     }
 
     if (!validateBuilderIntegrityRows(parsed.builderIntegrity)) {
-      console.error(`[autoscore] invalid builderIntegrity rubric for ${repo.name}`)
+      console.error(
+        `[autoscore] invalid builderIntegrity rubric for ${repo.name}:`,
+        JSON.stringify(parsed.builderIntegrity),
+      )
       return null
     }
 

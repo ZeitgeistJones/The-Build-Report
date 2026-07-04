@@ -1,4 +1,4 @@
-import type { RubricRow, Tag } from '@/lib/scores'
+import type { Level, RubricRow, Tag } from '@/lib/scores'
 
 export const TM_WEIGHTS = new Set(['50%', '30%', '20%'])
 
@@ -89,6 +89,62 @@ export function validateTokenMechanicRows(rows: unknown[], tag: Tag): rows is Ru
     (!isInfraTag(tag) && isLegacyTokenMechanicRubric(typed))
   if (!labelsOk) return false
   return rowsHaveValidTmShape(typed)
+}
+
+function normalizeLevel(level: unknown): Level | null {
+  if (level === 'high' || level === 'mid' || level === 'low') return level
+  if (level === 'medium') return 'mid'
+  return null
+}
+
+function normalizeWeight(weight: unknown): string | null {
+  if (typeof weight !== 'string') return null
+  const w = weight.trim()
+  if (TM_WEIGHTS.has(w)) return w
+  if (/^\d+$/.test(w)) return `${w}%`
+  return null
+}
+
+function sanitizeRubricRow(raw: unknown): RubricRow | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const row = raw as RubricRow
+  const level = normalizeLevel(row.level)
+  const weight = normalizeWeight(row.weight)
+  if (!level || !weight || typeof row.label !== 'string' || typeof row.source !== 'string') return null
+  return { ...row, level, weight: weight as RubricRow['weight'] }
+}
+
+const TM_WEIGHT_ORDER = ['50%', '30%', '20%'] as const
+
+/**
+ * Accept v3, legacy, or mis-tagged rows (e.g. shipping-leverage labels on a direct repo).
+ * When labels/weights don't match, preserve levels/sources and assign consumer TM labels by weight order.
+ */
+export function coerceTokenMechanicRows(rows: unknown, tag: Tag): RubricRow[] | null {
+  if (!Array.isArray(rows) || rows.length !== 3) return null
+  const sanitized = rows.map(sanitizeRubricRow).filter((r): r is RubricRow => r !== null)
+  if (sanitized.length !== 3) return null
+
+  if (validateTokenMechanicRows(sanitized, tag)) {
+    return normalizeTokenMechanicRows(sanitized, tag)
+  }
+
+  if (isInfraTag(tag)) return null
+
+  const byWeight = [...sanitized].sort(
+    (a, b) => TM_WEIGHT_ORDER.indexOf(a.weight as (typeof TM_WEIGHT_ORDER)[number]) -
+      TM_WEIGHT_ORDER.indexOf(b.weight as (typeof TM_WEIGHT_ORDER)[number]),
+  )
+
+  // Claude often returns SL weights (40/35/25) or wrong labels — coerce by row order.
+  const ordered = byWeight.every(r => TM_WEIGHTS.has(r.weight)) ? byWeight : sanitized
+
+  return TM_CONSUMER_LABELS.map((label, i) => ({
+    label,
+    weight: TM_WEIGHT_BY_LABEL[label] as RubricRow['weight'],
+    level: ordered[i]!.level,
+    source: ordered[i]!.source,
+  }))
 }
 
 export function tmRubricLevelScore(
