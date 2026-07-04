@@ -7,7 +7,7 @@ export function shouldSkipRepo(name: string): boolean {
   return false
 }
 
-export function isAutoInferredNote(note: string | undefined): boolean {
+export function isAutoInferredNote(note: string | null | undefined): boolean {
   if (!note) return false
   return note.startsWith('Scores auto-inferred') || note.startsWith('Live AI score')
 }

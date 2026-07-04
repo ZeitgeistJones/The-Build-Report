@@ -65,7 +65,7 @@ export const SCORE_TYPE_STYLES = {
   },
 } as const
 
-export function isLaunchBaseline(adminNote: string | undefined): boolean {
+export function isLaunchBaseline(adminNote: string | null | undefined): boolean {
   return !isAutoInferredNote(adminNote)
 }
 
