@@ -85,10 +85,18 @@ export function looksLikeBaselineDate(scoredAt: string | null | undefined): bool
 }
 
 export function formatScoredDateLabel(scoredAt: string | null | undefined): string {
-  if (!scoredAt) return 'unknown'
+  if (!scoredAt) return 'Not scored yet'
   const d = new Date(scoredAt)
   if (!Number.isNaN(d.getTime())) {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
   return scoredAt
 }
+
+/** Prior score date in rescore before/after — first live score has no prior timestamp. */
+export function formatRescoreOldDateLabel(scoredAt: string | null | undefined): string {
+  if (!scoredAt) return 'First score'
+  return formatScoredDateLabel(scoredAt)
+}
+
+export const RESCORE_NOT_SCORED_LABEL = 'Not scored'

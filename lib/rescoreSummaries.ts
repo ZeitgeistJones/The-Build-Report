@@ -2,6 +2,8 @@ import { Redis } from '@upstash/redis'
 import { getRedis } from '@/lib/redis'
 import { Repo, Score } from './scores'
 import { getConsumerEconomicScore, getShippingLeverage } from './economicGrade'
+import { type RescoreRubricsSnapshot, snapshotRubricsFromRepo } from './rescoreDeltas'
+import { RESCORE_NOT_SCORED_LABEL } from './scoringCopy'
 
 function formatEconomicLabel(repo: Repo | null | undefined): string | null {
   if (!repo) return null
@@ -16,6 +18,7 @@ const KEY_PREFIX = 'build-report:rescore-summary:'
 
 export type RescoreSummaryRecord = {
   summary: string
+  deltaHeader?: string | null
   oldTokenMechanic: string | null
   newTokenMechanic: string | null
   oldBuilderIntegrity: string
@@ -24,6 +27,7 @@ export type RescoreSummaryRecord = {
   newScoredAt: string
   commits30dAtRescore: number
   rescoreAt: string
+  oldRubrics?: RescoreRubricsSnapshot | null
 }
 
 function summaryKey(slug: string) {
@@ -39,19 +43,22 @@ export function buildRescoreSummaryRecord(params: {
   oldRepo: Repo | null
   newRepo: Repo
   summary: string | null
+  deltaHeader: string | null
   commits30dAtRescore: number
 }): RescoreSummaryRecord {
-  const { oldRepo, newRepo, summary, commits30dAtRescore } = params
+  const { oldRepo, newRepo, summary, deltaHeader, commits30dAtRescore } = params
   return {
     summary: summary?.trim() ?? '',
+    deltaHeader: deltaHeader?.trim() || null,
     oldTokenMechanic: formatEconomicLabel(oldRepo),
     newTokenMechanic: formatEconomicLabel(newRepo),
-    oldBuilderIntegrity: formatScoreLabel(oldRepo?.builderIntegrity) ?? '—',
+    oldBuilderIntegrity: formatScoreLabel(oldRepo?.builderIntegrity) ?? RESCORE_NOT_SCORED_LABEL,
     newBuilderIntegrity: formatScoreLabel(newRepo.builderIntegrity) ?? '—',
     oldScoredAt: oldRepo?.scoredAt ?? null,
     newScoredAt: newRepo.scoredAt,
     commits30dAtRescore,
     rescoreAt: new Date().toISOString(),
+    oldRubrics: snapshotRubricsFromRepo(oldRepo),
   }
 }
 

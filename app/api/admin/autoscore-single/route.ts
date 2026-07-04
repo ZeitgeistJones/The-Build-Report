@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Could not score repo' }, { status: 500 })
     }
 
-    const changeSummary = await generateRescoreChangeSummary({
+    const { summary: changeSummary, deltaHeader } = await generateRescoreChangeSummary({
       oldRepo,
       newRepo: repo,
       commitMessages,
@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
       oldRepo,
       newRepo: repo,
       summary: changeSummary,
+      deltaHeader,
       commits30dAtRescore,
     })
     await saveRescoreSummary(repoSlug, rescoreMeta, redis)

@@ -37,12 +37,15 @@ import ScoreTypeBadge from '@/components/ScoreTypeBadge'
 import {
   CONFIDENCE_LABEL,
   formatBaselineDate,
+  formatRescoreOldDateLabel,
   formatScoredDateLabel,
   getConfidenceTooltip,
   isLaunchBaseline,
   looksLikeBaselineDate,
+  RESCORE_NOT_SCORED_LABEL,
   RESCORE_SUMMARY_NOTE,
 } from '@/lib/scoringCopy'
+import { diffRubricRows, rowDeltaByLabel } from '@/lib/rescoreDeltas'
 import { integritySectionFraming } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
@@ -231,10 +234,18 @@ function VerdictBlock({ text }: { text: string }) {
   )
 }
 
+function formatRescoreOldGrade(label: string | null | undefined): string {
+  if (!label || label === '—') return RESCORE_NOT_SCORED_LABEL
+  return label
+}
+
 function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
   const rescoreDate = formatScoredDateLabel(meta.rescoreAt)
-  const oldDate = formatScoredDateLabel(meta.oldScoredAt)
+  const oldDate = formatRescoreOldDateLabel(meta.oldScoredAt)
   const fromBaseline = looksLikeBaselineDate(meta.oldScoredAt)
+  const oldEconomic = meta.oldTokenMechanic ?? RESCORE_NOT_SCORED_LABEL
+  const newEconomic = meta.newTokenMechanic ?? 'N/A'
+  const showWhatChanged = meta.deltaHeader || meta.summary
 
   return (
     <div style={{
@@ -262,14 +273,14 @@ function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
           {RESCORE_SUMMARY_NOTE}
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: meta.summary ? '8px' : 0, fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: showWhatChanged ? '8px' : 0, fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
         <div>
           <span style={{ color: 'var(--text-muted)' }}>Economic: </span>
-          {meta.oldTokenMechanic ?? 'N/A'} → {meta.newTokenMechanic ?? 'N/A'}
+          {oldEconomic} → {newEconomic}
         </div>
         <div>
           <span style={{ color: 'var(--text-muted)' }}>Builder integrity: </span>
-          {meta.oldBuilderIntegrity} → {meta.newBuilderIntegrity}
+          {formatRescoreOldGrade(meta.oldBuilderIntegrity)} → {meta.newBuilderIntegrity}
         </div>
         <div>
           <span style={{ color: 'var(--text-muted)' }}>Scored: </span>
@@ -280,11 +291,20 @@ function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
           {meta.commits30dAtRescore.toLocaleString()}
         </div>
       </div>
-      {meta.summary && (
-        <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+      {showWhatChanged && (
+        <div style={{ margin: 0, color: 'var(--text-secondary)' }}>
           <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>What changed: </span>
-          {meta.summary}
-        </p>
+          {meta.deltaHeader && (
+            <span style={{ display: 'block', marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+              {meta.deltaHeader}
+            </span>
+          )}
+          {meta.summary && (
+            <span style={{ display: 'block', marginTop: meta.deltaHeader ? '6px' : '4px' }}>
+              {meta.summary}
+            </span>
+          )}
+        </div>
       )}
     </div>
   )
@@ -512,6 +532,15 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
     const economicNa = showsEconomicNa(repo)
     const shippingLeverage = getShippingLeverage(repo)
     const tokenMechanic = getTokenMechanicForDisplay(repo)
+    const slRowDeltas = rescoreMeta?.oldRubrics
+      ? rowDeltaByLabel(diffRubricRows(rescoreMeta.oldRubrics.shippingLeverage, shippingLeverage?.rubric ?? []))
+      : null
+    const tmRowDeltas = rescoreMeta?.oldRubrics
+      ? rowDeltaByLabel(diffRubricRows(rescoreMeta.oldRubrics.tokenMechanic, tokenMechanic?.rubric ?? []))
+      : null
+    const biRowDeltas = rescoreMeta?.oldRubrics
+      ? rowDeltaByLabel(diffRubricRows(rescoreMeta.oldRubrics.builderIntegrity, repo.builderIntegrity.rubric))
+      : null
 
     return (
       <div
@@ -838,7 +867,9 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                   {hasSL && shippingLeverage && (
                     <div style={rubricSectionGridStyle('sl', hasSL, hasTM, isMobile)}>
                       <RubricSectionTitle>Shipping leverage</RubricSectionTitle>
-                      {shippingLeverage.rubric.map((row, i) => (
+                      {shippingLeverage.rubric.map((row, i) => {
+                        const delta = slRowDeltas?.get(row.label)
+                        return (
                         <RubricCriterionRow
                           key={i}
                           label={row.label}
@@ -846,8 +877,12 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                           level={row.level}
                           source={row.source}
                           isMobile={isMobile}
+                          deltaEarned={slRowDeltas ? (delta?.deltaEarned ?? 0) : null}
+                          levelChangeLabel={delta?.levelChangeLabel ?? null}
+                          isNewRow={delta?.oldLevel == null && !!delta}
                         />
-                      ))}
+                        )
+                      })}
                       <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', marginBottom: 0, lineHeight: 1.35 }}>
                         Indirect holder value — how much this repo multiplies the builder&apos;s ability to ship consumer apps that burn or lock CLAWD.
                       </p>
@@ -857,7 +892,9 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                   {hasTM && tokenMechanic && (
                     <div style={rubricSectionGridStyle('tm', hasSL, hasTM, isMobile)}>
                       <RubricSectionTitle>Token mechanic</RubricSectionTitle>
-                      {tokenMechanic.rubric.map((row, i) => (
+                      {tokenMechanic.rubric.map((row, i) => {
+                        const delta = tmRowDeltas?.get(row.label)
+                        return (
                         <RubricCriterionRow
                           key={i}
                           label={row.label}
@@ -865,8 +902,12 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                           level={row.level}
                           source={row.source}
                           isMobile={isMobile}
+                          deltaEarned={tmRowDeltas ? (delta?.deltaEarned ?? 0) : null}
+                          levelChangeLabel={delta?.levelChangeLabel ?? null}
+                          isNewRow={delta?.oldLevel == null && !!delta}
                         />
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
 
@@ -886,7 +927,9 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                         {integritySectionFraming(repo)}
                       </p>
                     )}
-                    {repo.builderIntegrity.rubric.map((row, i) => (
+                    {repo.builderIntegrity.rubric.map((row, i) => {
+                      const delta = biRowDeltas?.get(row.label)
+                      return (
                       <RubricCriterionRow
                         key={i}
                         label={row.label}
@@ -894,8 +937,12 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                         level={row.level}
                         source={row.source}
                         isMobile={isMobile}
+                        deltaEarned={biRowDeltas ? (delta?.deltaEarned ?? 0) : null}
+                        levelChangeLabel={delta?.levelChangeLabel ?? null}
+                        isNewRow={delta?.oldLevel == null && !!delta}
                       />
-                    ))}
+                      )
+                    })}
                   </div>
 
                   {lifecycleHint(lifecycle) && (
