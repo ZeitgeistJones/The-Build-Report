@@ -579,7 +579,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 </div>
               ) : (
               <>
-              ) : economicNa ? (
+              {economicNa ? (
               <>
               <div style={{ textAlign: 'center', minWidth: '36px' }}>
                 <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
