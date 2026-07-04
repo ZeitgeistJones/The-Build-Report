@@ -1,7 +1,10 @@
 import { Redis } from '@upstash/redis'
 import { getRedis } from '@/lib/redis'
 import { SCORE_PAYMENT_WEI, RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
-import { getClawdBurnedViaContract, getContractEthBalance } from '@/lib/clawdBurnIndex'
+import {
+  fetchOnChainBurnTotals,
+  getContractEthBalance,
+} from '@/lib/clawdBurnIndex'
 
 const RESCORE_COUNT_KEY = 'build-report:burns:rescore-count'
 const ETH_TOTAL_KEY = 'build-report:burns:eth-total'
@@ -13,6 +16,7 @@ export type RescoreBurnStats = {
   ethContributed: number
   ethPendingInReceiver: number
   clawdBurnedOnChain: number
+  lastBurnAt: string | null
 }
 
 export async function recordRescoreBurn(redisClient: Redis): Promise<void> {
@@ -25,18 +29,19 @@ export async function recordRescoreBurn(redisClient: Redis): Promise<void> {
 export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
   try {
     const r = getRedis()
-    const [countRaw, ethRaw, ethPending, clawdBurnedOnChain] = await Promise.all([
+    const [countRaw, ethRaw, ethPending, onChain] = await Promise.all([
       r.get<number>(RESCORE_COUNT_KEY),
       r.get<number>(ETH_TOTAL_KEY),
       getContractEthBalance(RECEIVER_BUY_AND_BURN),
-      getClawdBurnedViaContract(RECEIVER_BUY_AND_BURN),
+      fetchOnChainBurnTotals([RECEIVER_BUY_AND_BURN]),
     ])
 
     return {
       count: typeof countRaw === 'number' ? countRaw : 0,
       ethContributed: typeof ethRaw === 'number' ? ethRaw : 0,
       ethPendingInReceiver: ethPending,
-      clawdBurnedOnChain,
+      clawdBurnedOnChain: onChain.clawdBurned,
+      lastBurnAt: onChain.lastBurnAt,
     }
   } catch {
     return null

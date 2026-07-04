@@ -8,6 +8,7 @@ interface Props {
     count: number
     ethPendingInReceiver: number
     clawdBurnedOnChain: number
+    lastBurnAt: string | null
   } | null
 }
 
@@ -49,6 +50,7 @@ export default function HomeHeader({ rescoreBurns }: Props) {
           count={rescoreBurns!.count}
           ethPendingInReceiver={rescoreBurns!.ethPendingInReceiver}
           clawdBurnedOnChain={rescoreBurns!.clawdBurnedOnChain}
+          lastBurnAt={rescoreBurns!.lastBurnAt}
         />
       )}
     </div>
