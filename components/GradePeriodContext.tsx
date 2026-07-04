@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import { PeriodKey, PERIOD_TOGGLE_OPTIONS, REPO_WINDOW_OPTIONS } from '@/lib/grades'
+import { Period, PeriodKey, PERIOD_TOGGLE_OPTIONS, REPO_WINDOW_OPTIONS } from '@/lib/grades'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
@@ -29,26 +29,19 @@ export function useGradePeriod(): GradePeriodContextValue {
   return ctx
 }
 
-interface PeriodOption<K extends PeriodKey = PeriodKey> {
-  key: K
-  label: string
-  short: string
-}
+type PeriodOption = { key: PeriodKey; label: string; short: string }
 
-interface PeriodKeyToggleProps<K extends PeriodKey = PeriodKey> {
-  period: K
-  onChange: (period: K) => void
-  /** When true, buttons stretch on mobile. Default false for inline repo controls. */
-  stretchMobile?: boolean
-  options?: readonly PeriodOption<K>[]
-}
-
-export function PeriodKeyToggle<K extends PeriodKey = PeriodKey>({
+function PeriodButtonRow({
   period,
   onChange,
-  stretchMobile = false,
-  options = PERIOD_TOGGLE_OPTIONS as readonly PeriodOption<K>[],
-}: PeriodKeyToggleProps<K>) {
+  options,
+  stretchMobile,
+}: {
+  period: PeriodKey
+  onChange: (period: PeriodKey) => void
+  options: readonly PeriodOption[]
+  stretchMobile?: boolean
+}) {
   const isMobile = useIsMobile()
 
   return (
@@ -90,6 +83,45 @@ export function PeriodKeyToggle<K extends PeriodKey = PeriodKey>({
         </button>
       ))}
     </div>
+  )
+}
+
+export function PeriodKeyToggle({
+  period,
+  onChange,
+  stretchMobile = false,
+  options = PERIOD_TOGGLE_OPTIONS,
+}: {
+  period: PeriodKey
+  onChange: (period: PeriodKey) => void
+  stretchMobile?: boolean
+  options?: readonly PeriodOption[]
+}) {
+  return (
+    <PeriodButtonRow
+      period={period}
+      onChange={onChange}
+      options={options}
+      stretchMobile={stretchMobile}
+    />
+  )
+}
+
+export function RepoWindowToggle({
+  period,
+  onChange,
+}: {
+  period: Period
+  onChange: (period: Period) => void
+}) {
+  return (
+    <PeriodButtonRow
+      period={period}
+      onChange={p => {
+        if (p === '7d' || p === '30d' || p === '60d') onChange(p)
+      }}
+      options={REPO_WINDOW_OPTIONS}
+    />
   )
 }
 

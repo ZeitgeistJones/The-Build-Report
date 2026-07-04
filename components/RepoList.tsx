@@ -25,7 +25,7 @@ import GateBlur from '@/components/wallet/GateBlur'
 import GateOverlay from '@/components/wallet/GateOverlay'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import RepoScoreButton from '@/components/RepoScoreButton'
-import { PeriodKeyToggle, REPO_WINDOW_OPTIONS } from '@/components/GradePeriodContext'
+import { RepoWindowToggle } from '@/components/GradePeriodContext'
 import { periodKeyLabel, repoCommitsForPeriodKey, type Period } from '@/lib/grades'
 import RubricCriterionRow from '@/components/RubricCriterionRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -911,7 +911,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
         <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           Window
         </span>
-        <PeriodKeyToggle period={repoPeriod} onChange={setRepoPeriod} options={REPO_WINDOW_OPTIONS} />
+        <RepoWindowToggle period={repoPeriod} onChange={setRepoPeriod} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

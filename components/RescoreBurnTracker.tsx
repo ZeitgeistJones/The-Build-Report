@@ -1,84 +1,97 @@
 'use client'
 
 import { useState } from 'react'
-import { formatClawdBurned } from '@/lib/rescoreBurns'
+import { formatClawdAmount, formatEthAmount } from '@/lib/clawdBurnIndex'
+import TriggerExecuteBurnButton from '@/components/TriggerExecuteBurnButton'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
 const TOOLTIP =
-  'Approximate — calculated at time of each rescore using CoinGecko ETH/CLAWD prices. Actual amount may vary slightly due to swap fees and price movement. Falls back to cached or estimated rates if live prices are unavailable.'
+  'Rescores send 0.000008 ETH to the receiver contract. CLAWD is only destroyed when someone calls execute() on that contract. Counts here are on-chain — not price estimates.'
 
 interface Props {
   count: number
-  clawdDisplay: number
+  ethPendingInReceiver: number
+  clawdBurnedOnChain: number
 }
 
-export default function RescoreBurnTracker({ count, clawdDisplay }: Props) {
+export default function RescoreBurnTracker({
+  count,
+  ethPendingInReceiver,
+  clawdBurnedOnChain,
+}: Props) {
   const [showTooltip, setShowTooltip] = useState(false)
   const isMobile = useIsMobile()
 
-  if (count <= 0 && clawdDisplay <= 0) return null
+  if (count <= 0 && clawdBurnedOnChain <= 0 && ethPendingInReceiver <= 0) return null
 
   return (
     <div
       style={{
         position: 'relative',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: isMobile ? 'flex-start' : 'flex-end',
+        flexDirection: 'column',
+        alignItems: isMobile ? 'flex-start' : 'flex-end',
         gap: '6px',
         flexShrink: 0,
-        width: isMobile ? '100%' : undefined,
+        minWidth: isMobile ? undefined : '200px',
       }}
     >
-      <span
-        style={{
-          fontSize: '11px',
-          color: 'var(--text-muted)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-        }}
-      >
-        CLAWD BURNED
-      </span>
-      <span style={{ fontSize: '11px', lineHeight: 1 }} aria-hidden>
-        🔥
-      </span>
-      <span
-        style={{
-          fontSize: isMobile ? '16px' : '20px',
-          fontWeight: 600,
-          color: '#f97316',
-          fontFamily: 'var(--font-mono)',
-          letterSpacing: '-0.02em',
-          lineHeight: 1,
-        }}
-      >
-        {formatClawdBurned(clawdDisplay)}
-      </span>
-      <button
-        type="button"
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        onClick={() => setShowTooltip(s => !s)}
-        aria-label="About CLAWD burned total"
-        style={{
-          width: isMobile ? MIN_TAP : 14,
-          height: isMobile ? MIN_TAP : 14,
-          borderRadius: '50%',
-          background: 'transparent',
-          color: 'var(--text-muted)',
-          fontSize: '11px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          cursor: 'default',
-          padding: 0,
-        }}
-      >
-        ⓘ
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span
+          style={{
+            fontSize: '11px',
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}
+        >
+          Build Report · rescores
+        </span>
+        <span style={{ fontSize: '18px', fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+          {count}
+        </span>
+        <button
+          type="button"
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+          onClick={() => setShowTooltip(s => !s)}
+          aria-label="About rescore burns"
+          style={{
+            width: isMobile ? MIN_TAP : 14,
+            height: isMobile ? MIN_TAP : 14,
+            borderRadius: '50%',
+            background: 'transparent',
+            color: 'var(--text-muted)',
+            fontSize: '11px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            cursor: 'default',
+            padding: 0,
+          }}
+        >
+          ⓘ
+        </button>
+      </div>
+
+      <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45, textAlign: isMobile ? 'left' : 'right' }}>
+        <div>
+          <span style={{ color: '#f97316', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+            {formatClawdAmount(clawdBurnedOnChain)} CLAWD
+          </span>
+          {' '}burned on-chain
+        </div>
+        {ethPendingInReceiver > 0 && (
+          <div>
+            {formatEthAmount(ethPendingInReceiver)} ETH pending swap
+          </div>
+        )}
+      </div>
+
+      <TriggerExecuteBurnButton ethPending={ethPendingInReceiver} compact />
+
       {showTooltip && (
         <div
           style={{
@@ -92,7 +105,7 @@ export default function RescoreBurnTracker({ count, clawdDisplay }: Props) {
             fontSize: '12px',
             color: 'var(--text-secondary)',
             lineHeight: 1.5,
-            width: isMobile ? 'min(280px, calc(100vw - 32px))' : '240px',
+            width: isMobile ? 'min(280px, calc(100vw - 32px))' : '260px',
             zIndex: 10,
             pointerEvents: 'none',
             textAlign: 'left',

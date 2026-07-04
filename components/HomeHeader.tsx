@@ -4,13 +4,18 @@ import RescoreBurnTracker from '@/components/RescoreBurnTracker'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface Props {
-  rescoreBurns: { count: number; clawdDisplay: number } | null
+  rescoreBurns: {
+    count: number
+    ethPendingInReceiver: number
+    clawdBurnedOnChain: number
+  } | null
 }
 
 export default function HomeHeader({ rescoreBurns }: Props) {
   const isMobile = useIsMobile()
   const showBurn =
-    rescoreBurns && (rescoreBurns.count > 0 || rescoreBurns.clawdDisplay > 0)
+    rescoreBurns &&
+    (rescoreBurns.count > 0 || rescoreBurns.clawdBurnedOnChain > 0 || rescoreBurns.ethPendingInReceiver > 0)
 
   return (
     <div
@@ -42,7 +47,8 @@ export default function HomeHeader({ rescoreBurns }: Props) {
       {showBurn && (
         <RescoreBurnTracker
           count={rescoreBurns!.count}
-          clawdDisplay={rescoreBurns!.clawdDisplay}
+          ethPendingInReceiver={rescoreBurns!.ethPendingInReceiver}
+          clawdBurnedOnChain={rescoreBurns!.clawdBurnedOnChain}
         />
       )}
     </div>

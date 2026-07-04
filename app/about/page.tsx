@@ -34,7 +34,7 @@ This is not a real-time data feed. Launch baseline grades are a fixed Jun 15 sna
 
 Cost: 0.000008 ETH per score. That is a fixed onchain amount; at the time this was built (July 2026) it was approximately $0.02, but ETH price fluctuates so the USD equivalent may be closer to $0.01 or $0.04 depending on when you use it.
 
-When you pay, the ETH is sent to the receiver-buy-and-burn contract (0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad), which automatically buys and burns $CLAWD via Uniswap V3 — supporting the ecosystem rather than going to a private wallet.
+When you pay, the ETH is sent to the receiver-buy-and-burn contract (0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad). CLAWD is destroyed when someone calls execute() on that contract (batch swap to dead via Uniswap V3). The homepage shows rescore count, on-chain CLAWD burned, and a button to trigger the batch burn.
 
 Who can use it: any wallet that passes CLAWDGate tier 1 on Base (10M+ $CLAWD). The full report blur gate uses the same check.
 
