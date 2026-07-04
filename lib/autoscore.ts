@@ -225,16 +225,7 @@ Respond ONLY with valid JSON, no markdown:
         (Array.isArray(parsed.shippingLeverage) && parsed.shippingLeverage.length === 3
           ? parsed.shippingLeverage
           : null)
-      // #region agent log
-      const _dbgTmInput = { repo: repo.name, tag, rawTm, parsedTm: parsed.tokenMechanic, parsedSl: parsed.shippingLeverage }
-      console.error('[debug-a33a7a] tm-input', JSON.stringify(_dbgTmInput))
-      fetch('http://127.0.0.1:7256/ingest/3d647f41-94f6-4ef4-ad7a-689496799481',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'autoscore.ts:inferScore:tm-input',message:'TM coerce input',data:_dbgTmInput,timestamp:Date.now(),hypothesisId:'H1-H3'})}).catch(()=>{});
-      // #endregion
       const coercedTm = coerceTokenMechanicRows(rawTm, tag)
-      // #region agent log
-      console.error('[debug-a33a7a] tm-coerced', JSON.stringify({ repo: repo.name, tag, coercedTm }))
-      fetch('http://127.0.0.1:7256/ingest/3d647f41-94f6-4ef4-ad7a-689496799481',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'autoscore.ts:inferScore:tm-coerced',message:'TM coerce result',data:{repo:repo.name,tag,coercedTm},timestamp:Date.now(),hypothesisId:'H1-H4'})}).catch(()=>{});
-      // #endregion
       if (!coercedTm) {
         console.error(
           `[autoscore] invalid tokenMechanic rubric for ${repo.name}:`,
@@ -250,10 +241,6 @@ Respond ONLY with valid JSON, no markdown:
     }
 
     if (!validateBuilderIntegrityRows(parsed.builderIntegrity)) {
-      // #region agent log
-      console.error('[debug-a33a7a] bi-fail', JSON.stringify({ repo: repo.name, bi: parsed.builderIntegrity }))
-      fetch('http://127.0.0.1:7256/ingest/3d647f41-94f6-4ef4-ad7a-689496799481',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'a33a7a'},body:JSON.stringify({sessionId:'a33a7a',location:'autoscore.ts:inferScore:bi-fail',message:'BI validation failed',data:{repo:repo.name,bi:parsed.builderIntegrity},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
-      // #endregion
       console.error(
         `[autoscore] invalid builderIntegrity rubric for ${repo.name}:`,
         JSON.stringify(parsed.builderIntegrity),

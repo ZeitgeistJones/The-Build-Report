@@ -1,6 +1,7 @@
 'use client'
 
 import { useGradePeriod } from './GradePeriodContext'
+import { periodKeyToBase } from '@/lib/grades'
 import { EcosystemPulse, ecosystemPulseSummary } from '@/lib/ecosystemPulse'
 
 interface Props {
@@ -31,7 +32,8 @@ function PulseStat({ label, value }: { label: string; value: number }) {
 }
 
 export default function EcosystemPulsePanel({ pulse30, pulse7, pulse60 }: Props) {
-  const { period } = useGradePeriod()
+  const { period: periodKey } = useGradePeriod()
+  const period = periodKeyToBase(periodKey)
   const pulse = period === '30d' ? pulse30 : period === '7d' ? pulse7 : pulse60
   const summary = ecosystemPulseSummary(pulse, period)
 

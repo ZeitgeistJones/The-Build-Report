@@ -1,19 +1,19 @@
 'use client'
 
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import { Period } from '@/lib/grades'
+import { PeriodKey, PERIOD_TOGGLE_OPTIONS } from '@/lib/grades'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
 interface GradePeriodContextValue {
-  period: Period
-  setPeriod: (period: Period) => void
+  period: PeriodKey
+  setPeriod: (period: PeriodKey) => void
 }
 
 const GradePeriodContext = createContext<GradePeriodContextValue | null>(null)
 
 export function GradePeriodProvider({ children }: { children: ReactNode }) {
-  const [period, setPeriod] = useState<Period>('30d')
+  const [period, setPeriod] = useState<PeriodKey>('30d')
   return (
     <GradePeriodContext.Provider value={{ period, setPeriod }}>
       {children}
@@ -29,8 +29,14 @@ export function useGradePeriod(): GradePeriodContextValue {
   return ctx
 }
 
-export function PeriodToggle() {
-  const { period, setPeriod } = useGradePeriod()
+interface PeriodKeyToggleProps {
+  period: PeriodKey
+  onChange: (period: PeriodKey) => void
+  /** When true, buttons stretch on mobile. Default false for inline repo controls. */
+  stretchMobile?: boolean
+}
+
+export function PeriodKeyToggle({ period, onChange, stretchMobile = false }: PeriodKeyToggleProps) {
   const isMobile = useIsMobile()
 
   return (
@@ -41,31 +47,41 @@ export function PeriodToggle() {
         background: 'var(--surface-1)',
         borderRadius: '6px',
         padding: '3px',
+        flexWrap: 'wrap',
+        justifyContent: stretchMobile && isMobile ? 'stretch' : 'flex-start',
       }}
     >
-      {(['7d', '30d', '60d'] as const).map(p => (
+      {PERIOD_TOGGLE_OPTIONS.map(({ key, label, short }) => (
         <button
-          key={p}
+          key={key}
           type="button"
-          onClick={() => setPeriod(p)}
+          title={label}
+          onClick={() => onChange(key)}
           style={{
-            fontSize: '12px',
-            padding: isMobile ? '8px 14px' : '4px 12px',
+            fontSize: '11px',
+            padding: isMobile ? '8px 10px' : '4px 10px',
             minHeight: isMobile ? MIN_TAP : undefined,
             borderRadius: '4px',
-            background: period === p ? 'var(--accent-dim)' : 'transparent',
-            color: period === p ? 'var(--accent)' : 'var(--text-muted)',
-            fontWeight: period === p ? 500 : 400,
-            border: period === p ? '1px solid var(--accent-border)' : '1px solid transparent',
+            background: period === key ? 'var(--accent-dim)' : 'transparent',
+            color: period === key ? 'var(--accent)' : 'var(--text-muted)',
+            fontWeight: period === key ? 500 : 400,
+            border: period === key ? '1px solid var(--accent-border)' : '1px solid transparent',
             transition: 'all 0.15s',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
+            flex: stretchMobile && isMobile ? '1 1 auto' : undefined,
+            whiteSpace: 'nowrap',
           }}
         >
-          {p}
+          {short}
         </button>
       ))}
     </div>
   )
+}
+
+export function PeriodToggle() {
+  const { period, setPeriod } = useGradePeriod()
+  return <PeriodKeyToggle period={period} onChange={setPeriod} stretchMobile />
 }

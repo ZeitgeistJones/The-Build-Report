@@ -33,6 +33,56 @@ export function letterGrade(pct: number): string {
 
 export type Period = '30d' | '7d' | '60d'
 
+/** Extended period for repo list filtering — includes prior comparison windows. */
+export type PeriodKey = Period | '7d-prior' | '30d-prior'
+
+export const PERIOD_TOGGLE_OPTIONS: { key: PeriodKey; label: string; short: string }[] = [
+  { key: '7d', label: 'Last 7 days', short: '7d' },
+  { key: '7d-prior', label: 'Prior 7 days (8–14)', short: '7d prev' },
+  { key: '30d', label: 'Last 30 days', short: '30d' },
+  { key: '30d-prior', label: 'Prior 30 days (31–60)', short: '30d prev' },
+  { key: '60d', label: 'Last 60 days', short: '60d' },
+]
+
+export function periodKeyToBase(pk: PeriodKey): Period {
+  if (pk === '7d-prior') return '7d'
+  if (pk === '30d-prior') return '30d'
+  return pk
+}
+
+export function periodKeyLabel(pk: PeriodKey): string {
+  return PERIOD_TOGGLE_OPTIONS.find(o => o.key === pk)?.short ?? pk
+}
+
+export function periodKeyWindowHint(pk: PeriodKey): string | null {
+  if (pk === '7d-prior') return 'days 8–14'
+  if (pk === '30d-prior') return 'days 31–60'
+  return null
+}
+
+export function repoCommitsForPeriodKey(
+  repo: {
+    commits7d?: number | null
+    commits7_14?: number | null
+    commits30d?: number | null
+    commits30_60?: number | null
+  },
+  pk: PeriodKey,
+): number {
+  switch (pk) {
+    case '7d':
+      return repo.commits7d ?? 0
+    case '7d-prior':
+      return repo.commits7_14 ?? 0
+    case '30d':
+      return repo.commits30d ?? 0
+    case '30d-prior':
+      return repo.commits30_60 ?? 0
+    case '60d':
+      return (repo.commits30d ?? 0) + (repo.commits30_60 ?? 0)
+  }
+}
+
 export interface TrendExplanation {
   headline: string
   bullets: string[]

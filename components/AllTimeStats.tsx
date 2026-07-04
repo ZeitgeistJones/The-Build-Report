@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { pctChange } from '@/lib/grades'
+import { pctChange, periodKeyToBase } from '@/lib/grades'
 import GateBlur from '@/components/wallet/GateBlur'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import { useGradePeriod } from '@/components/GradePeriodContext'
@@ -145,7 +145,8 @@ export default function AllTimeStats({
   lastCommitRepo,
 }: Props) {
   const { unlocked } = useClawdAccess()
-  const { period } = useGradePeriod()
+  const { period: periodKey } = useGradePeriod()
+  const period = periodKeyToBase(periodKey)
   const isMobile = useIsMobile()
   const gated = !unlocked
 

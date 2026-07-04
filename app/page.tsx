@@ -71,6 +71,7 @@ export default async function Home() {
       pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
       commits30d: activity?.commits30d ?? null,
       commits7d: activity?.commits7d ?? null,
+      commits7_14: activity?.commits7_14 ?? null,
       commits30_60: activity?.commits30_60 ?? null,
     }
   })

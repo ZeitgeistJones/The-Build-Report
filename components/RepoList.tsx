@@ -2,7 +2,7 @@
 
 import { useState, useEffect, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Repo, Tag, Level, Confidence } from '@/lib/scores'
+import { Repo, Tag, Confidence } from '@/lib/scores'
 import {
   getEffectiveTag,
   getShippingLeverage,
@@ -25,8 +25,9 @@ import GateBlur from '@/components/wallet/GateBlur'
 import GateOverlay from '@/components/wallet/GateOverlay'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import RepoScoreButton from '@/components/RepoScoreButton'
-import { useGradePeriod } from '@/components/GradePeriodContext'
-import { Period } from '@/lib/grades'
+import { PeriodKeyToggle } from '@/components/GradePeriodContext'
+import { periodKeyLabel, periodKeyWindowHint, repoCommitsForPeriodKey, type PeriodKey } from '@/lib/grades'
+import RubricCriterionRow from '@/components/RubricCriterionRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
@@ -60,6 +61,8 @@ const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
 }
 
 type Density = 'compact' | 'comfortable'
+type ActivityScope = 'active' | 'all'
+type RepoSort = 'recent' | 'commits' | 'grade'
 
 const DENSITY_STYLES = {
   compact: { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20 },
@@ -145,12 +148,6 @@ function PillButton({
       {children}
     </button>
   )
-}
-
-const LEVEL_STYLES: Record<Level, { color: string; bg: string }> = {
-  high: { color: '#5cb87a', bg: 'rgba(92,184,122,0.1)' },
-  mid: { color: '#d4943a', bg: 'rgba(212,148,58,0.1)' },
-  low: { color: '#e05c5c', bg: 'rgba(224,92,92,0.1)' },
 }
 
 function ConfidenceLabel({ confidence, isBaseline }: { confidence: Confidence; isBaseline: boolean }) {
@@ -241,10 +238,26 @@ function githubOrderIndex(slug: string, order: string[]): number {
   return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
 }
 
-function repoCommitsForPeriod(repo: RepoWithLive, period: Period): number {
-  if (period === '7d') return repo.commits7d ?? 0
-  if (period === '30d') return repo.commits30d ?? 0
-  return (repo.commits30d ?? 0) + (repo.commits30_60 ?? 0)
+function repoRecentTimestamp(repo: RepoWithLive): number {
+  const raw = repo.lastCommitAt ?? repo.pushedAt
+  if (!raw) return 0
+  const t = new Date(raw).getTime()
+  return Number.isNaN(t) ? 0 : t
+}
+
+function repoGradeSortKey(repo: RepoWithLive): number {
+  if (isUnscoredRecent(repo)) return -1
+  const bi = repo.builderIntegrity?.pct ?? 0
+  if (showsEconomicNa(repo)) {
+    const sl = getShippingLeverage(repo)?.pct
+    return sl != null ? (bi + sl) / 2 : bi
+  }
+  const tm = getTokenMechanicForDisplay(repo)?.pct
+  return tm != null ? (bi + tm) / 2 : bi
+}
+
+function repoCommitsForPeriod(repo: RepoWithLive, period: PeriodKey): number {
+  return repoCommitsForPeriodKey(repo, period)
 }
 
 function parseScoredAt(scoredAt: string | null | undefined): Date | null {
@@ -301,6 +314,7 @@ interface RepoWithLive extends Repo {
   pushedAt: string | null
   commits30d: number | null
   commits7d: number | null
+  commits7_14: number | null
   commits30_60: number | null
 }
 
@@ -314,12 +328,14 @@ interface Props {
 
 export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSummaries = {} }: Props) {
   const [activeFilter, setActiveFilter] = useState<Tag | 'all'>('all')
+  const [activityScope, setActivityScope] = useState<ActivityScope>('active')
+  const [sortBy, setSortBy] = useState<RepoSort>('recent')
+  const [repoPeriod, setRepoPeriod] = useState<PeriodKey>('30d')
   const [density, setDensity] = useState<Density>('compact')
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
   const [rescoreSummaries, setRescoreSummaries] = useState(initialRescoreSummaries)
   const { unlocked } = useClawdAccess()
-  const { period } = useGradePeriod()
   const isMobile = useIsMobile()
   const effectiveDensity = isMobile ? 'compact' : density
   const d = DENSITY_STYLES[effectiveDensity]
@@ -347,6 +363,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
               pushedAt: r.pushedAt,
               commits30d: r.commits30d,
               commits7d: r.commits7d,
+              commits7_14: r.commits7_14,
               commits30_60: r.commits30_60,
             }
           : r,
@@ -363,21 +380,43 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
     { key: 'theoretical', label: 'Theoretical' },
   ]
 
-  const filtered = repoItems
-    .filter(r => activeFilter === 'all' || r.tag === activeFilter)
+  const tagFiltered = repoItems.filter(r => activeFilter === 'all' || r.tag === activeFilter)
+  const activeInPeriod = tagFiltered.filter(r => repoCommitsForPeriodKey(r, repoPeriod) > 0)
+  const filtered = (activityScope === 'active' ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
+      if (sortBy === 'grade') {
+        const diff = repoGradeSortKey(b) - repoGradeSortKey(a)
+        if (diff !== 0) return diff
+        return a.name.localeCompare(b.name)
+      }
+
+      if (sortBy === 'commits') {
+        const diff = repoCommitsForPeriodKey(b, repoPeriod) - repoCommitsForPeriodKey(a, repoPeriod)
+        if (diff !== 0) return diff
+        return repoRecentTimestamp(b) - repoRecentTimestamp(a)
+      }
+
+      const aRecent = repoRecentTimestamp(a)
+      const bRecent = repoRecentTimestamp(b)
+      if (aRecent !== bRecent) return bRecent - aRecent
+
       if (githubSlugOrder.length) {
         const aIdx = githubOrderIndex(a.githubSlug, githubSlugOrder)
         const bIdx = githubOrderIndex(b.githubSlug, githubSlugOrder)
         if (aIdx !== bIdx) return aIdx - bIdx
       }
 
-      const aPushed = a.pushedAt ? new Date(a.pushedAt).getTime() : 0
-      const bPushed = b.pushedAt ? new Date(b.pushedAt).getTime() : 0
-      if (aPushed !== bPushed) return bPushed - aPushed
-
       return a.name.localeCompare(b.name)
     })
+
+  const periodHint = periodKeyWindowHint(repoPeriod)
+  const repoCountLabel = activityScope === 'active'
+    ? activeFilter === 'all'
+      ? ` · ${filtered.length} active (${periodKeyLabel(repoPeriod)}${periodHint ? `, ${periodHint}` : ''})`
+      : ` · ${filtered.length} of ${activeInPeriod.length} active (${periodKeyLabel(repoPeriod)})`
+    : activeFilter === 'all'
+      ? ` · ${filtered.length} total`
+      : ` · ${filtered.length} of ${tagFiltered.length}`
 
   function isAutoInferred(repo: RepoWithLive) {
     return isAutoInferredNote(repo.adminNote)
@@ -404,9 +443,9 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
     const auto = isAutoInferred(repo)
     const pending = isUnscoredRecent(repo)
     const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
-    const periodCommits = repoCommitsForPeriod(repo, period)
+    const periodCommits = repoCommitsForPeriod(repo, repoPeriod)
     const lifecycle = computeRepoLifecycle(repo, periodCommits)
-    const commitSuffix = periodCommits > 0 ? ` · ${periodCommits} commits (${period})` : ''
+    const commitSuffix = periodCommits > 0 ? ` · ${periodCommits} commits (${periodKeyLabel(repoPeriod)})` : ''
     const sinceScored = getScoreAgeDisplay(repo, pending)
     const criticalPath = getCriticalPathRole(repo.githubSlug)
     const lcStyle = LIFECYCLE_STYLES[lifecycle]
@@ -691,38 +730,14 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                     Shipping leverage
                   </div>
                   {shippingLeverage.rubric.map((row, i) => (
-                    <div key={i} style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '10px',
-                      marginBottom: '6px',
-                      flexWrap: isMobile ? 'wrap' : 'nowrap',
-                    }}>
-                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
-                      <span style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        padding: '2px 8px',
-                        borderRadius: '99px',
-                        color: LEVEL_STYLES[row.level].color,
-                        background: LEVEL_STYLES[row.level].bg,
-                        flexShrink: 0,
-                      }}>
-                        {row.level}
-                      </span>
-                      <span style={{
-                        fontSize: '11px',
-                        color: 'var(--text-muted)',
-                        maxWidth: isMobile ? undefined : '220px',
-                        width: isMobile ? '100%' : undefined,
-                        textAlign: isMobile ? 'left' : 'right',
-                        lineHeight: 1.3,
-                        flexShrink: isMobile ? 1 : 0,
-                      }}>
-                        {row.source}
-                      </span>
-                    </div>
+                    <RubricCriterionRow
+                      key={i}
+                      label={row.label}
+                      weight={row.weight}
+                      level={row.level}
+                      source={row.source}
+                      isMobile={isMobile}
+                    />
                   ))}
                   <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: 0, lineHeight: 1.45 }}>
                     Indirect holder value — how much this repo multiplies the builder&apos;s ability to ship consumer apps that burn or lock CLAWD. No in-repo burn is expected.
@@ -736,38 +751,14 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                     Token mechanic
                   </div>
                   {tokenMechanic.rubric.map((row, i) => (
-                    <div key={i} style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '10px',
-                      marginBottom: '6px',
-                      flexWrap: isMobile ? 'wrap' : 'nowrap',
-                    }}>
-                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
-                      <span style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        padding: '2px 8px',
-                        borderRadius: '99px',
-                        color: LEVEL_STYLES[row.level].color,
-                        background: LEVEL_STYLES[row.level].bg,
-                        flexShrink: 0,
-                      }}>
-                        {row.level}
-                      </span>
-                      <span style={{
-                        fontSize: '11px',
-                        color: 'var(--text-muted)',
-                        maxWidth: isMobile ? undefined : '220px',
-                        width: isMobile ? '100%' : undefined,
-                        textAlign: isMobile ? 'left' : 'right',
-                        lineHeight: 1.3,
-                        flexShrink: isMobile ? 1 : 0,
-                      }}>
-                        {row.source}
-                      </span>
-                    </div>
+                    <RubricCriterionRow
+                      key={i}
+                      label={row.label}
+                      weight={row.weight}
+                      level={row.level}
+                      source={row.source}
+                      isMobile={isMobile}
+                    />
                   ))}
                 </div>
               )}
@@ -800,38 +791,14 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                   </p>
                 )}
                 {repo.builderIntegrity.rubric.map((row, i) => (
-                  <div key={i} style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px',
-                    marginBottom: '6px',
-                    flexWrap: isMobile ? 'wrap' : 'nowrap',
-                  }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flex: 1, minWidth: 0, lineHeight: 1.4 }}>{row.label}</span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '36px', textAlign: 'right', flexShrink: 0, paddingTop: '1px' }}>{row.weight}</span>
-                    <span style={{
-                      fontSize: '11px',
-                      fontWeight: 500,
-                      padding: '2px 8px',
-                      borderRadius: '99px',
-                      color: LEVEL_STYLES[row.level].color,
-                      background: LEVEL_STYLES[row.level].bg,
-                      flexShrink: 0,
-                    }}>
-                      {row.level}
-                    </span>
-                    <span style={{
-                      fontSize: '11px',
-                      color: 'var(--text-muted)',
-                      maxWidth: isMobile ? undefined : '220px',
-                      width: isMobile ? '100%' : undefined,
-                      textAlign: isMobile ? 'left' : 'right',
-                      lineHeight: 1.3,
-                      flexShrink: isMobile ? 1 : 0,
-                    }}>
-                      {row.source}
-                    </span>
-                  </div>
+                  <RubricCriterionRow
+                    key={i}
+                    label={row.label}
+                    weight={row.weight}
+                    level={row.level}
+                    source={row.source}
+                    isMobile={isMobile}
+                  />
                 ))}
               </div>
               )}
@@ -879,15 +846,12 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
         display: 'flex',
         alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between',
-        marginBottom: '12px',
+        marginBottom: '8px',
         flexDirection: isMobile ? 'column' : 'row',
         gap: isMobile ? '10px' : 0,
       }}>
         <div style={{ fontSize: '11px', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Repos
-          {activeFilter === 'all'
-            ? ` · ${repoItems.length}`
-            : ` · ${filtered.length} of ${repoItems.length}`}
+          Repos{repoCountLabel}
         </div>
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
           {filters.map(f => (
@@ -912,6 +876,42 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
             </>
           )}
         </div>
+      </div>
+
+      <div style={{
+        display: 'flex',
+        gap: '4px',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        marginBottom: '12px',
+      }}>
+        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Show
+        </span>
+        <PillButton active={activityScope === 'active'} onClick={() => setActivityScope('active')} isMobile={isMobile}>
+          Active in window
+        </PillButton>
+        <PillButton active={activityScope === 'all'} onClick={() => setActivityScope('all')} isMobile={isMobile}>
+          All repos
+        </PillButton>
+        <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 4px' }} />
+        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Sort
+        </span>
+        <PillButton active={sortBy === 'recent'} onClick={() => setSortBy('recent')} isMobile={isMobile}>
+          Recent
+        </PillButton>
+        <PillButton active={sortBy === 'commits'} onClick={() => setSortBy('commits')} isMobile={isMobile}>
+          Commits
+        </PillButton>
+        <PillButton active={sortBy === 'grade'} onClick={() => setSortBy('grade')} isMobile={isMobile}>
+          Grades
+        </PillButton>
+        <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 4px' }} />
+        <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Window
+        </span>
+        <PeriodKeyToggle period={repoPeriod} onChange={setRepoPeriod} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
