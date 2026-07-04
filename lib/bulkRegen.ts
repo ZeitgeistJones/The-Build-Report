@@ -9,6 +9,7 @@ import {
   RawRepo,
   toRawRepo,
 } from './autoscore'
+import { BULK_REGEN_DEFAULT_BATCH, BULK_REGEN_MAX_BATCH } from './bulkRegenConfig'
 
 export interface BaselineBackup {
   version: 'scoring-v2-baseline'
@@ -56,7 +57,7 @@ export async function runBulkRegenerateBatch(options: {
 }): Promise<BulkRegenBatchResult> {
   const { slugs, rawRepos } = await listBulkRegenTargets()
   const offset = Math.max(0, options.offset ?? 0)
-  const limit = Math.min(Math.max(1, options.limit ?? 15), 30)
+  const limit = Math.min(Math.max(1, options.limit ?? BULK_REGEN_DEFAULT_BATCH), BULK_REGEN_MAX_BATCH)
   const batch = rawRepos.slice(offset, offset + limit)
 
   const scored: string[] = []

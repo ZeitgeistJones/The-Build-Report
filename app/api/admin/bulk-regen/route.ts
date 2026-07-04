@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminPassword } from '@/lib/admin'
 import { listCachedAutoScores } from '@/lib/autoscore'
+import { BULK_REGEN_DEFAULT_BATCH, BULK_REGEN_MAX_BATCH } from '@/lib/bulkRegenConfig'
 import {
   exportBaselineBackup,
   getBulkRegenStatus,
@@ -43,7 +44,10 @@ export async function POST(req: NextRequest) {
     }
 
     const offset = typeof body?.offset === 'number' ? body.offset : 0
-    const limit = typeof body?.limit === 'number' ? body.limit : 15
+    const limit =
+      typeof body?.limit === 'number'
+        ? Math.min(Math.max(1, body.limit), BULK_REGEN_MAX_BATCH)
+        : BULK_REGEN_DEFAULT_BATCH
 
     try {
       const result = await runBulkRegenerateBatch({ flushFirst, offset, limit })

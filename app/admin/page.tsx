@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { REPOS } from '@/lib/scores'
+import { BULK_REGEN_DEFAULT_BATCH } from '@/lib/bulkRegenConfig'
 
 export default function AdminPage() {
   const [password, setPassword] = useState('')
@@ -218,10 +219,38 @@ export default function AdminPage() {
             confirmFlush: flushFirst,
             acknowledgeFlush: flushFirst && backupDownloaded,
             offset,
-            limit: 15,
+            limit: BULK_REGEN_DEFAULT_BATCH,
           }),
         })
-        const data = await res.json()
+
+        if (!res.ok) {
+          const statusHint =
+            res.status === 504
+              ? 'Server timed out (504).'
+              : `HTTP ${res.status}.`
+          setBulkResult(
+            `${statusHint} ${totalScored} repo(s) scored so far — deploy the latest admin fix or run locally, then retry (safe to continue).`,
+          )
+          break
+        }
+
+        let data: {
+          ok?: boolean
+          error?: string
+          scored?: string[]
+          failed?: string[]
+          nextOffset?: number | null
+          totalEligible?: number
+        }
+        try {
+          data = await res.json()
+        } catch {
+          setBulkResult(
+            `Invalid response after ${totalScored} repo(s) scored — retry to continue.`,
+          )
+          break
+        }
+
         if (!data.ok) {
           setBulkResult(data.error ?? 'Bulk regen failed')
           break
@@ -532,10 +561,10 @@ export default function AdminPage() {
       {/* Scoring v2 — bulk regenerate */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Scoring v2 — bulk regenerate</h2>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Bulk regenerate (Live AI)</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
-            Download a baseline backup before flushing. Spot-test individual repos via paid rescore first.
-            Bulk flush replaces all cached Live AI scores with v2 rubrics (BI 5-row, TM v2, activity math is automatic on homepage).
+            Download a baseline backup before flushing. Scores {BULK_REGEN_DEFAULT_BATCH} repos per request to avoid server timeouts — the button runs until all are done.
+            Bulk flush replaces cached Live AI scores with the current v3 prompt and rubrics.
           </p>
           {bulkStatus && (
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
@@ -593,7 +622,7 @@ export default function AdminPage() {
             border: `1px solid ${bulkFlushAck && backupDownloaded ? 'var(--accent-border)' : 'var(--border)'}`,
           }}
         >
-          {bulkRunning ? 'Bulk regenerating…' : 'Flush all & bulk regenerate (v2)'}
+          {bulkRunning ? 'Bulk regenerating…' : 'Flush all & bulk regenerate'}
         </button>
         {bulkResult && (
           <div style={{
