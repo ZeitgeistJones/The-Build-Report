@@ -44,7 +44,7 @@ async function fetchContractTxPage(contract: string, page: number): Promise<Bloc
 function clawdToDeadInLogs(
   logs: { address: string; topics: readonly `0x${string}`[]; data: `0x${string}` }[],
 ): bigint {
-  let total = 0n
+  let total = BigInt(0)
   const token = CLAWD_TOKEN_ADDRESS.toLowerCase()
 
   for (const log of logs) {
@@ -60,7 +60,7 @@ function clawdToDeadInLogs(
 /** Sum CLAWD sent to dead in any non-receive tx to this contract (execute, incinerate, burn, etc.). */
 export async function getClawdBurnedViaContract(contract: string): Promise<number> {
   const client = createBaseClient()
-  let total = 0n
+  let total = BigInt(0)
   let page = 1
 
   for (;;) {
