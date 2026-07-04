@@ -125,16 +125,19 @@ export function coerceTokenMechanicRows(rows: unknown, tag: Tag): RubricRow[] | 
   const sanitized = rows.map(sanitizeRubricRow).filter((r): r is RubricRow => r !== null)
   if (sanitized.length !== 3) return null
 
-  if (validateTokenMechanicRows(sanitized, tag)) {
+  const tmValid = validateTokenMechanicRows([...sanitized], tag)
+  if (tmValid) {
     return normalizeTokenMechanicRows(sanitized, tag)
   }
 
   if (isInfraTag(tag)) return null
 
-  const byWeight = [...sanitized].sort(
-    (a, b) => TM_WEIGHT_ORDER.indexOf(a.weight as (typeof TM_WEIGHT_ORDER)[number]) -
-      TM_WEIGHT_ORDER.indexOf(b.weight as (typeof TM_WEIGHT_ORDER)[number]),
-  )
+  const weightRank = (w: string) => {
+    const i = TM_WEIGHT_ORDER.indexOf(w as (typeof TM_WEIGHT_ORDER)[number])
+    return i === -1 ? 99 : i
+  }
+
+  const byWeight = [...sanitized].sort((a, b) => weightRank(a.weight) - weightRank(b.weight))
 
   // Claude often returns SL weights (40/35/25) or wrong labels — coerce by row order.
   const ordered = byWeight.every(r => TM_WEIGHTS.has(r.weight)) ? byWeight : sanitized
