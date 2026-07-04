@@ -18,6 +18,12 @@ export const LIFECYCLE_TOOLTIPS: Record<RepoLifecycle, string> = {
 export const AWAITING_SCORE_TOOLTIP =
   'Recently pushed on GitHub but not scored yet. Pay to run Live AI for rubric grades.'
 
+export const ECONOMIC_NA_TOOLTIP =
+  'Not in the burn-apps grade at the top. This repo type uses shipping leverage instead of direct CLAWD burns. Only direct and supply-lock repos feed the ecosystem economic average.'
+
+export const SHIPPING_LEVERAGE_COLUMN_TOOLTIP =
+  'How this repo multiplies holder value indirectly — display only, excluded from the burn-apps grade at the top.'
+
 export function criticalPathTooltip(roleBadge: string): string {
   return `${roleBadge} — locked tag on the builder critical path. Floor grades at C when functioning as designed.`
 }

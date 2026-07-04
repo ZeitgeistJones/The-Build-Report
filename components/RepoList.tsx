@@ -9,6 +9,7 @@ import {
   getTokenMechanicForDisplay,
   showsEconomicNa,
 } from '@/lib/economicGrade'
+import { hasShippingLeverageTag } from '@/lib/rubrics/shippingLeverage'
 import { getCriticalPathRole } from '@/lib/criticalPath'
 import {
   computeRepoLifecycle,
@@ -49,7 +50,9 @@ import RepoBadge from '@/components/RepoBadge'
 import {
   AWAITING_SCORE_TOOLTIP,
   criticalPathTooltip,
+  ECONOMIC_NA_TOOLTIP,
   LIFECYCLE_TOOLTIPS,
+  SHIPPING_LEVERAGE_COLUMN_TOOLTIP,
   TAG_TOOLTIPS,
 } from '@/lib/badgeTooltips'
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
@@ -70,6 +73,7 @@ const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
 
 type ActivityScope = 'active' | 'all'
 type RepoSort = 'recent' | 'commits' | 'grade'
+type RepoFilter = 'all' | 'burn-apps' | 'leverage' | Tag
 
 const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20 } as const
 
@@ -85,6 +89,14 @@ type ScoreAgeDisplay =
   | { kind: 'auto_count'; count: number; capped: boolean }
   | { kind: 'auto_new' }
   | { kind: 'auto_age'; days: number }
+
+function repoMatchesFilter(repo: RepoWithLive, filter: RepoFilter): boolean {
+  const tag = getEffectiveTag(repo)
+  if (filter === 'all') return true
+  if (filter === 'burn-apps') return tag === 'direct' || tag === 'supply-lock'
+  if (filter === 'leverage') return hasShippingLeverageTag(tag)
+  return tag === filter
+}
 
 function truncate120(text: string): string {
   return text.length > 120 ? `${text.slice(0, 119)}…` : text
@@ -376,7 +388,7 @@ interface Props {
 }
 
 export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSummaries = {} }: Props) {
-  const [activeFilter, setActiveFilter] = useState<Tag | 'all'>('all')
+  const [activeFilter, setActiveFilter] = useState<RepoFilter>('all')
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
   const [sortBy, setSortBy] = useState<RepoSort>('recent')
   const [repoPeriod, setRepoPeriod] = useState<Period>('30d')
@@ -418,8 +430,10 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
     )
   }
 
-  const filters: { key: Tag | 'all'; label: string }[] = [
+  const filters: { key: RepoFilter; label: string }[] = [
     { key: 'all', label: 'All' },
+    { key: 'burn-apps', label: 'Burn apps' },
+    { key: 'leverage', label: 'Leverage' },
     { key: 'direct', label: 'Direct' },
     { key: 'supply-lock', label: 'Supply lock' },
     { key: 'indirect', label: 'Indirect' },
@@ -427,7 +441,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
     { key: 'theoretical', label: 'Theoretical' },
   ]
 
-  const tagFiltered = repoItems.filter(r => activeFilter === 'all' || r.tag === activeFilter)
+  const tagFiltered = repoItems.filter(r => repoMatchesFilter(r, activeFilter))
   const activeInPeriod = tagFiltered.filter(r => repoCommitsForPeriodKey(r, repoPeriod) > 0)
   const filtered = (activityScope === 'active' ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
@@ -709,16 +723,22 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
               <>
               {economicNa ? (
               <>
-              <div style={{ textAlign: 'center', minWidth: '36px' }}>
+              <RepoBadge
+                tooltip={ECONOMIC_NA_TOOLTIP}
+                style={{ textAlign: 'center', minWidth: '36px', display: 'block' }}
+              >
                 <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
                 <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                  economic<br />indirect
+                  not in<br />burn avg
                 </div>
-              </div>
+              </RepoBadge>
 
               <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
 
-              <div style={{ textAlign: 'center', minWidth: '36px' }}>
+              <RepoBadge
+                tooltip={SHIPPING_LEVERAGE_COLUMN_TOOLTIP}
+                style={{ textAlign: 'center', minWidth: '36px', display: 'block' }}
+              >
                 {shippingLeverage ? (
                   <>
                     <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(shippingLeverage.letter) }}>
@@ -732,7 +752,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
                   shipping<br />leverage
                 </div>
-              </div>
+              </RepoBadge>
               </>
               ) : (
               <div style={{ textAlign: 'center', minWidth: '40px' }}>

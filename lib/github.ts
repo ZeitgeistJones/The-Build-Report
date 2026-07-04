@@ -1,5 +1,6 @@
 import { REPOS } from './scores'
 import { shouldSkipRepo } from './repoFilters'
+import { setLastGithubScanAt } from './githubScan'
 
 const GITHUB_ORG = 'clawdbotatg'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
@@ -27,6 +28,11 @@ async function ghFetch(path: string, options?: { fresh?: boolean }) {
   return res.json()
 }
 
+export interface RecentCommit {
+  date: string
+  message: string
+}
+
 export interface RepoActivity {
   slug: string
   commits30d: number
@@ -35,6 +41,8 @@ export interface RepoActivity {
   commits30_60: number
   /** ISO timestamps from the 60d commit scan (newest first, capped at 100). */
   commitTimestamps: string[]
+  /** Newest first, capped at 20 per repo — used for build brief. */
+  recentCommits: RecentCommit[]
   lastCommitAt: string | null
   pushedAt: string
   isActive: boolean
@@ -151,6 +159,22 @@ function selectReposForActivityScan(repos: any[], maxCount = 40): any[] {
   return selected
 }
 
+const RECENT_COMMITS_CAP = 20
+
+function firstCommitLine(message: string): string {
+  return message.split('\n')[0].trim()
+}
+
+function parseRecentCommits(commits: { commit: { author: { date: string }; message: string } }[]): RecentCommit[] {
+  return commits
+    .slice(0, RECENT_COMMITS_CAP)
+    .map(c => ({
+      date: c.commit.author.date,
+      message: firstCommitLine(c.commit.message ?? ''),
+    }))
+    .filter(c => c.date && c.message)
+}
+
 export async function getGitHubStats(options?: { fresh?: boolean }): Promise<GitHubStats> {
   const since60 = new Date(Date.now() - 60 * 86400000).toISOString()
   const fresh = options?.fresh ?? false
@@ -230,6 +254,7 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
         commits7_14: c7_14.length,
         commits30_60: c30_60.length,
         commitTimestamps: commits.map((c: { commit: { author: { date: string } } }) => c.commit.author.date),
+        recentCommits: parseRecentCommits(commits),
         lastCommitAt: commits[0]?.commit?.author?.date ?? null,
         pushedAt: repo.pushed_at,
         isActive: c30.length > 0,
@@ -252,6 +277,7 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
       commits7_14: 0,
       commits30_60: 0,
       commitTimestamps: [],
+      recentCommits: [],
       lastCommitAt: null,
       pushedAt: repo.pushed_at,
       isActive: isWithinDays(repo.pushed_at, 30),
@@ -276,6 +302,10 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
     .sort((a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime())
 
   const trackableRepos = sortedRepos.filter(r => !shouldSkipRepo(r.name))
+
+  if (!rateLimited) {
+    await setLastGithubScanAt(new Date().toISOString()).catch(() => {})
+  }
 
   return {
     totalRepos,

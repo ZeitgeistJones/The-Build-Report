@@ -2,6 +2,11 @@ import { getRedis } from '@/lib/redis'
 
 const SCAN_AT_KEY = 'build-report:github-scan-at'
 
+export async function setLastGithubScanAt(iso: string): Promise<void> {
+  const r = getRedis()
+  await r.set(SCAN_AT_KEY, iso)
+}
+
 export async function getLastGithubScanAt(): Promise<string | null> {
   try {
     const r = getRedis()

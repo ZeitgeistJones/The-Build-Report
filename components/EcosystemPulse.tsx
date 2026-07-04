@@ -29,7 +29,7 @@ export function PulseMicrostats({ pulse30, pulse7, pulse60, commits }: Props) {
         fontVariantNumeric: 'tabular-nums',
       }}
     >
-      Pulse · {parts.join(' · ')}
+      Activity · {parts.join(' · ')}
     </span>
   )
 }

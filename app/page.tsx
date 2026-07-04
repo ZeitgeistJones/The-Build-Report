@@ -24,9 +24,11 @@ import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 import HomeHeader from '@/components/HomeHeader'
 import HowWeScoreSection from '@/components/HowWeScoreSection'
+import BuildBriefCard from '@/components/BuildBriefCard'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 import { getRescoreSummaries } from '@/lib/rescoreSummaries'
+import { getBuildBrief } from '@/lib/buildBrief'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +37,7 @@ export default async function Home() {
   let error = false
   const chronicle = await getChronicleBannerData().catch(() => null)
   const rescoreBurns = await getRescoreBurnStats().catch(() => null)
+  const buildBrief = await getBuildBrief().catch(() => null)
 
   try {
     stats = await getGitHubStats()
@@ -151,6 +154,8 @@ export default async function Home() {
           </a>
         </div>
       )}
+
+      <BuildBriefCard brief={buildBrief} />
 
       <div style={{ marginBottom: '32px' }}>
       <GradesPanel

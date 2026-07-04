@@ -11,8 +11,9 @@ const CARD_STYLE = {
 } as const
 
 const TOC_LINKS = [
+  { href: '#hw-score-brief', label: 'Build brief' },
   { href: '#hw-score-grades', label: 'Ecosystem grades' },
-  { href: '#hw-score-pulse', label: 'Ecosystem pulse' },
+  { href: '#hw-score-activity', label: 'Activity counts' },
   { href: '#hw-score-repos', label: 'Repo card scores' },
   { href: '#hw-score-scale', label: 'Letter scale' },
   { href: '#hw-score-rubrics', label: 'Rubrics' },
@@ -159,7 +160,7 @@ function UiMap() {
         {mapItem('Builder activity', 'Ecosystem-wide GitHub velocity — letter grade')}
         {mapItem('Burn apps (economic)', 'Commit-weighted consumer-app scores — letter grade')}
         {mapItem('Builder integrity', 'Commit-weighted trust scores — letter grade')}
-        {mapItem('Pulse', 'Status counts (shipping / stable) — not a letter grade')}
+        {mapItem('Activity', 'Status counts (shipping / stable) next to Grades — not a letter grade')}
       </div>
       <div>
         <div
@@ -172,8 +173,9 @@ function UiMap() {
             marginBottom: '12px',
           }}
         >
-          Each repo card
+          Build brief + repo cards
         </div>
+        {mapItem('Build brief', 'Daily AI summary of what got worked on (repos + commit themes)')}
         {mapItem('Tag pill', 'Which rubric applies (direct, infra, etc.)')}
         {mapItem('Token mechanic or shipping leverage', 'Per-repo economic score; infra shows N/A + display score')}
         {mapItem('Builder integrity', 'Per-repo trust score — every repo')}
@@ -292,7 +294,30 @@ export default function HowWeScoreSection() {
       </section>
 
       <section
-        id="hw-score-pulse"
+        id="hw-score-brief"
+        style={{
+          marginBottom: '24px',
+          padding: '14px 16px',
+          background: 'var(--surface-1)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          fontSize: '13px',
+          color: 'var(--text-secondary)',
+          lineHeight: 1.6,
+        }}
+      >
+        <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '6px' }}>
+          Build brief
+        </div>
+        <p style={{ margin: 0 }}>
+          The card above the Grades panel — a daily plain-English summary of what repos moved in the last 24 hours
+          and what kind of work landed (features, fixes, infra). Generated from commit messages in sampled active repos
+          via AI after the daily autoscore cron. This is the semantic &quot;pulse&quot; of the ecosystem.
+        </p>
+      </section>
+
+      <section
+        id="hw-score-activity"
         style={{
           marginBottom: '24px',
           padding: '14px 16px',
@@ -305,11 +330,11 @@ export default function HowWeScoreSection() {
         }}
       >
         <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '6px' }}>
-          Ecosystem pulse
+          Activity counts
         </div>
         <p style={{ margin: 0 }}>
           Snapshot next to the <strong style={{ fontWeight: 500 }}>Grades</strong> header (labeled{' '}
-          <strong style={{ fontWeight: 500 }}>Pulse ·</strong> on the page). Counts scored repos that are{' '}
+          <strong style={{ fontWeight: 500 }}>Activity ·</strong> on the page). Counts scored repos that are{' '}
           <strong style={{ fontWeight: 500 }}>shipping</strong> ({LIFECYCLE_TOOLTIPS.shipping.toLowerCase()}),{' '}
           <strong style={{ fontWeight: 500 }}>stable</strong> ({LIFECYCLE_TOOLTIPS.stable.toLowerCase()}), or{' '}
           <strong style={{ fontWeight: 500 }}>done</strong> ({LIFECYCLE_TOOLTIPS.done.toLowerCase()}).

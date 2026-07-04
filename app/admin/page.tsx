@@ -18,6 +18,8 @@ export default function AdminPage() {
   const [flushed, setFlushed] = useState<string | null>(null)
   const [autoscoreRunning, setAutoscoreRunning] = useState(false)
   const [autoscoreResult, setAutoscoreResult] = useState<string | null>(null)
+  const [briefRunning, setBriefRunning] = useState(false)
+  const [briefResult, setBriefResult] = useState<string | null>(null)
   const [refreshRunning, setRefreshRunning] = useState(false)
   const [refreshResult, setRefreshResult] = useState<string | null>(null)
   const [chronicleContext, setChronicleContextText] = useState('')
@@ -86,6 +88,29 @@ export default function AdminPage() {
       setAutoscoreResult('Autoscore request failed')
     }
     setAutoscoreRunning(false)
+  }
+
+  async function regenerateBuildBrief() {
+    setBriefRunning(true)
+    setBriefResult(null)
+    try {
+      const res = await fetch('/api/admin/build-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setBriefResult(
+          `Brief saved — ${data.repoCount} repos, ${data.commitCount} commits. ${String(data.text).slice(0, 140)}…`,
+        )
+      } else {
+        setBriefResult(data.error ?? 'Build brief generation failed')
+      }
+    } catch {
+      setBriefResult('Build brief request failed')
+    }
+    setBriefRunning(false)
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -635,6 +660,46 @@ export default function AdminPage() {
             color: 'var(--text-secondary)',
           }}>
             {bulkResult}
+          </div>
+        )}
+      </div>
+
+      {/* Build brief */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Build brief</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Daily AI summary of what got worked on in the last 24h (sampled repos). Regenerates automatically after the daily autoscore cron; use this to refresh immediately after a GitHub scan.
+            </p>
+          </div>
+          <button
+            onClick={regenerateBuildBrief}
+            disabled={briefRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {briefRunning ? 'Generating…' : 'Regenerate build brief'}
+          </button>
+        </div>
+        {briefResult && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {briefResult}
           </div>
         )}
       </div>

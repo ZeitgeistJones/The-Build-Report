@@ -17,8 +17,8 @@ export function listUnscoredTrackable(
     .map(toRawRepo)
 }
 
-export async function runAutoscorePipeline() {
-  const stats = await getGitHubStats()
+export async function runAutoscorePipeline(options?: { fresh?: boolean }) {
+  const stats = await getGitHubStats({ fresh: options?.fresh ?? false })
   const trackable = stats.trackableRepos
   const knownRepoSlugs = new Set(REPOS.map(r => r.githubSlug))
   const excludedMap = await getExcludedSlugs()
@@ -29,6 +29,7 @@ export async function runAutoscorePipeline() {
   const { repos, inferred, deferred } = await runAutoScores(unscoredRepos, { githubOrder })
 
   return {
+    stats,
     found: unscoredRepos.length,
     scoredReturned: repos.length,
     inferred,

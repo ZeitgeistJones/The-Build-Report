@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runAutoscorePipeline } from '@/lib/autoscorePipeline'
+import { generateAndCacheBuildBrief, loadReposForBrief } from '@/lib/buildBrief'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -16,8 +17,16 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const result = await runAutoscorePipeline()
-    return NextResponse.json({ ok: true, ...result })
+    const result = await runAutoscorePipeline({ fresh: true })
+    const repos = await loadReposForBrief(result.stats)
+    const brief = await generateAndCacheBuildBrief(result.stats, repos)
+    return NextResponse.json({
+      ok: true,
+      ...result,
+      briefGenerated: true,
+      briefRepoCount: brief.repoCount,
+      briefCommitCount: brief.commitCount,
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Autoscore cron failed'
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
