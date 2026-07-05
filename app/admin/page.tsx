@@ -45,9 +45,9 @@ export default function AdminPage() {
   })
   const [forceIncludeInput, setForceIncludeInput] = useState('')
   const [collectionBusy, setCollectionBusy] = useState<string | null>(null)
-  const [contextRemoveId, setContextRemoveId] = useState('')
-  const [contextRemoveBusy, setContextRemoveBusy] = useState(false)
-  const [contextRemoveResult, setContextRemoveResult] = useState<string | null>(null)
+  const [contextModId, setContextModId] = useState('')
+  const [contextModBusy, setContextModBusy] = useState<'accept' | 'remove' | null>(null)
+  const [contextModResult, setContextModResult] = useState<string | null>(null)
 
   async function refreshGitHubData() {
     setRefreshRunning(true)
@@ -374,24 +374,36 @@ export default function AdminPage() {
     setBulkRunning(false)
   }
 
-  async function removeCommunityContext() {
-    const submissionId = contextRemoveId.trim()
+  async function moderateCommunityContext(mode: 'accept' | 'remove') {
+    const submissionId = contextModId.trim()
     if (!submissionId) return
-    setContextRemoveBusy(true)
-    setContextRemoveResult(null)
+    setContextModBusy(mode)
+    setContextModResult(null)
     try {
       const res = await fetch('/api/admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'removeContext', password, submissionId }),
+        body: JSON.stringify({
+          action: mode === 'accept' ? 'acceptContext' : 'removeContext',
+          password,
+          submissionId,
+        }),
       })
       const data = await res.json()
-      setContextRemoveResult(data.ok ? 'Removed — hidden from the card and the AI.' : data.error ?? 'Not found')
-      if (data.ok) setContextRemoveId('')
+      if (data.ok) {
+        setContextModResult(
+          mode === 'accept'
+            ? 'Accepted — the next paid rescore on that repo will read it.'
+            : 'Removed — hidden from the card and the AI.',
+        )
+        setContextModId('')
+      } else {
+        setContextModResult(data.error ?? 'Not found')
+      }
     } catch {
-      setContextRemoveResult('Request failed')
+      setContextModResult('Request failed')
     }
-    setContextRemoveBusy(false)
+    setContextModBusy(null)
   }
 
   async function saveNote(repoId: string) {
@@ -595,22 +607,25 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Community context moderation — emergency kill-switch */}
+      {/* Community context moderation — launch fast-track + emergency kill-switch */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Community context</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px', lineHeight: 1.6 }}>
-            Emergency kill-switch only. Community votes decide what gets accepted; this force-removes a specific
-            submission (by ID, visible in the public list) from both the card and future AI rescores. The removal is logged.
+            Community votes normally decide acceptance. Two admin overrides by submission ID (visible in the public list),
+            both logged: <strong>Accept</strong> is a launch fast-track so context can ground a rescore before there are
+            enough voters; <strong>Force-remove</strong> is the emergency kill-switch that hides a submission from the card
+            and future AI rescores.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', maxWidth: '520px' }}>
+        <div style={{ display: 'flex', gap: '8px', maxWidth: '620px', flexWrap: 'wrap' }}>
           <input
-            value={contextRemoveId}
-            onChange={e => setContextRemoveId(e.target.value)}
+            value={contextModId}
+            onChange={e => setContextModId(e.target.value)}
             placeholder="submission id"
             style={{
               flex: 1,
+              minWidth: '220px',
               fontSize: '12px',
               fontFamily: 'var(--font-mono)',
               padding: '6px 10px',
@@ -619,14 +634,26 @@ export default function AdminPage() {
               background: 'var(--surface-2)',
               color: 'var(--text-primary)',
             }}
-            onKeyDown={e => {
-              if (e.key === 'Enter') void removeCommunityContext()
-            }}
           />
           <button
             type="button"
-            onClick={() => void removeCommunityContext()}
-            disabled={!contextRemoveId.trim() || contextRemoveBusy}
+            onClick={() => void moderateCommunityContext('accept')}
+            disabled={!contextModId.trim() || contextModBusy !== null}
+            style={{
+              fontSize: '12px',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--accent-dim)',
+              color: 'var(--accent)',
+              border: '1px solid var(--accent-border)',
+            }}
+          >
+            {contextModBusy === 'accept' ? 'Accepting…' : 'Accept'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void moderateCommunityContext('remove')}
+            disabled={!contextModId.trim() || contextModBusy !== null}
             style={{
               fontSize: '12px',
               padding: '6px 14px',
@@ -636,11 +663,11 @@ export default function AdminPage() {
               border: '1px solid var(--border-strong)',
             }}
           >
-            {contextRemoveBusy ? 'Removing…' : 'Force-remove'}
+            {contextModBusy === 'remove' ? 'Removing…' : 'Force-remove'}
           </button>
         </div>
-        {contextRemoveResult && (
-          <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>{contextRemoveResult}</div>
+        {contextModResult && (
+          <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>{contextModResult}</div>
         )}
       </div>
 

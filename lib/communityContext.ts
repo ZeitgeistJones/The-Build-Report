@@ -234,3 +234,21 @@ export async function adminRemoveSubmission(id: string): Promise<boolean> {
   })
   return true
 }
+
+/**
+ * Admin fast-track — force-accept a submission so the loop can close during the
+ * quiet launch phase before there are enough voters. Terminal, logged by caller.
+ */
+export async function adminAcceptSubmission(id: string): Promise<boolean> {
+  const r = getRedis()
+  const submission = await getSubmission(id)
+  if (!submission || submission.state === 'removed') return false
+  const now = new Date().toISOString()
+  await r.set(submissionKey(id), {
+    ...submission,
+    state: 'accepted',
+    stateChangedAt: now,
+    acceptedAt: submission.acceptedAt ?? now,
+  })
+  return true
+}
