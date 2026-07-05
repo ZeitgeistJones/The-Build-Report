@@ -33,43 +33,30 @@ import { getBuildBrief } from '@/lib/buildBrief'
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
-  const perfStart = Date.now()
-  const perf: Record<string, number> = {}
   let stats
   let error = false
-  let statsSource: 'snapshot' | 'live' | 'none' = 'snapshot'
 
-  const parallelStart = Date.now()
   const [rescoreBurns, buildBrief] = await Promise.all([
     getRescoreBurnStats().catch(() => null),
     getBuildBrief().catch(() => null),
   ])
-  perf.parallel_initial = Date.now() - parallelStart
 
-  const githubStart = Date.now()
   const { stats: loadedStats, source: loadedSource } = await loadGitHubStatsForPage()
   stats = loadedStats
-  statsSource = loadedSource
   if (loadedSource === 'none') error = true
-  if (loadedSource === 'live') perf.github_live_fallback = Date.now() - githubStart
-  else perf.github_load = Date.now() - githubStart
 
-  const metaStart = Date.now()
   const [adminNotes, excludedMap, collectionSlugs, forceIncludeSet] = await Promise.all([
     getAdminNotes(),
     getExcludedSlugs(),
     getAllCollectionSlugs().catch(() => ({ 'cv-related': [] as string[], 'clawd-gated': [] as string[] })),
     getTrackableForceIncludeSet().catch(() => new Set<string>()),
   ])
-  perf.parallel_meta = Date.now() - metaStart
 
   const excludedSlugs = new Set(Object.keys(excludedMap).filter(k => excludedMap[k]))
 
   const trackableGithub = stats?.trackableRepos ?? []
   const cacheSlugs = cacheLookupSlugs(REPOS, trackableGithub, excludedSlugs)
-  const autoscoreStart = Date.now()
   const autoScoredRaw = cacheSlugs.length > 0 ? await getCachedAutoScoresForSlugs(cacheSlugs) : []
-  perf.autoscore_cache = Date.now() - autoscoreStart
   const autoScored = autoScoredRaw.filter(r => !shouldSkipRepo(r.githubSlug, { forceInclude: forceIncludeSet }))
 
   const allRepos = filterPublicRepos(applyExcludedToRepos(mergeRepoSources(REPOS, autoScored), excludedMap))
@@ -100,20 +87,7 @@ export default async function Home() {
     applyExcludedToRepos(reposWithLive, excludedMap),
   )
 
-  const rescoreStart = Date.now()
   const rescoreSummaries = await getRescoreSummaries(repos.map(r => r.githubSlug)).catch(() => ({}))
-  perf.rescore_summaries = Date.now() - rescoreStart
-
-  perf.totalMs = Date.now() - perfStart
-  // #region agent log
-  console.log('[home-perf]', JSON.stringify({
-    sessionId: '8818b3',
-    hypothesisId: 'H3',
-    statsSource,
-    slugCount: cacheSlugs.length,
-    perf,
-  }))
-  // #endregion
 
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
 
