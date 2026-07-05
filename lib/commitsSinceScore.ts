@@ -1,4 +1,4 @@
-const COMMIT_CAP = 100
+export const COMMIT_CAP = 100
 
 export function parseScoredAtMs(scoredAt: string | null | undefined): number | null {
   if (!scoredAt?.trim()) return null

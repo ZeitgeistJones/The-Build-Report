@@ -2,6 +2,7 @@ import { REPOS } from './scores'
 import { shouldSkipRepo } from './repoFilters'
 import { getTrackableForceIncludeSet } from './repoCollections'
 import { setLastGithubScanAt } from './githubScan'
+import { COMMIT_CAP } from './commitsSinceScore'
 
 const GITHUB_ORG = 'clawdbotatg'
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
@@ -47,6 +48,8 @@ export interface RepoActivity {
   lastCommitAt: string | null
   pushedAt: string
   isActive: boolean
+  /** True when the GitHub commits fetch returned the per-repo cap (100). */
+  commitsCapped?: boolean
 }
 
 export interface GitHubRepo {
@@ -168,14 +171,15 @@ function selectReposForActivityScan(
   return selected
 }
 
-/** Latest commit among trackable repos (excludes job/cv noise repos). */
+/** Latest commit among non-noise repos (ignores force-include overrides for job/cv repos). */
 export function getTrackableLastCommit(stats: GitHubStats): {
   lastCommitAt: string | null
   lastCommitRepo: string | null
 } {
   let lastCommitAt: string | null = null
   let lastCommitRepo: string | null = null
-  for (const repo of stats.trackableRepos) {
+  for (const repo of stats.repos) {
+    if (shouldSkipRepo(repo.name)) continue
     const at = stats.repoActivity[repo.name]?.lastCommitAt
     if (at && (!lastCommitAt || at > lastCommitAt)) {
       lastCommitAt = at
@@ -223,7 +227,8 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
   const newRepos30_60 = repos.filter(r => isCreatedInDayRange(r.created_at, 30, 60)).length
 
   const forceInclude = await getTrackableForceIncludeSet()
-  const includeInActivityScan = (name: string) => !shouldSkipRepo(name, { forceInclude })
+  // Activity stats always exclude noise repos — force-include is for listing only.
+  const includeInActivityScan = (name: string) => !shouldSkipRepo(name)
   const reposToScan = selectReposForActivityScan(repos, 40, includeInActivityScan)
 
   const activeDaySet30 = new Set<string>()
@@ -288,6 +293,7 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
         lastCommitAt: commits[0]?.commit?.author?.date ?? null,
         pushedAt: repo.pushed_at,
         isActive: c30.length > 0,
+        commitsCapped: commits.length >= COMMIT_CAP,
       }
     } catch (err: any) {
       if (err.message === 'rate_limited') {
@@ -337,7 +343,7 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
     await setLastGithubScanAt(new Date().toISOString()).catch(() => {})
   }
 
-  return {
+  const baseStats: GitHubStats = {
     totalRepos,
     totalCommits30d,
     totalCommits7d,
@@ -357,6 +363,13 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
     repos: sortedRepos,
     trackableRepos,
     rateLimited,
+  }
+
+  const filteredLast = getTrackableLastCommit(baseStats)
+  return {
+    ...baseStats,
+    lastCommitAt: filteredLast.lastCommitAt,
+    lastCommitRepo: filteredLast.lastCommitRepo,
   }
 }
 

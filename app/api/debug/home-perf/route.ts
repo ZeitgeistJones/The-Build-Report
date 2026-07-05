@@ -83,8 +83,14 @@ export async function GET() {
     : null
   const trackableLastCommit = stats ? getTrackableLastCommit(stats) : null
   const lastCommitSkipped = rawLastCommit?.lastCommitRepo
-    ? shouldSkipRepo(rawLastCommit.lastCommitRepo, { forceInclude: forceIncludeSet })
+    ? shouldSkipRepo(rawLastCommit.lastCommitRepo)
     : null
+  const cappedReposSample = stats
+    ? Object.entries(stats.repoActivity)
+        .filter(([, a]) => a.commitsCapped)
+        .slice(0, 5)
+        .map(([slug, a]) => ({ slug, commits30d: a.commits30d, commits60d: a.commits30d + a.commits30_60 }))
+    : []
 
   // #region agent log
   const lastCommitDebug = {
@@ -92,9 +98,11 @@ export async function GET() {
     trackableLastCommit,
     lastCommitSkipped,
     leftclawInActivity: rawLastCommit?.lastCommitRepo?.startsWith('leftclaw-service-job') ?? false,
+    forceInclude: [...forceIncludeSet],
+    cappedReposSample,
   }
   console.log('[home-perf]', JSON.stringify({ timings, statsSource, slugCount: cacheSlugs.length, lastCommitDebug }))
-  fetch('http://127.0.0.1:7483/ingest/84e5d7e1-b2bc-4b0e-8677-7b0875f46cc6',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8818b3'},body:JSON.stringify({sessionId:'8818b3',location:'home-perf/route.ts:GET',message:'last commit filter debug',data:lastCommitDebug,timestamp:Date.now(),hypothesisId:'H1',runId:'pre-fix'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7483/ingest/84e5d7e1-b2bc-4b0e-8677-7b0875f46cc6',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8818b3'},body:JSON.stringify({sessionId:'8818b3',location:'home-perf/route.ts:GET',message:'last commit filter debug',data:lastCommitDebug,timestamp:Date.now(),hypothesisId:'H1',runId:'post-fix-2'})}).catch(()=>{});
   // #endregion
 
   return NextResponse.json({

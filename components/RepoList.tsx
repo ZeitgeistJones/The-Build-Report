@@ -62,6 +62,7 @@ import {
   ECONOMIC_NA_TOOLTIP,
   LIFECYCLE_TOOLTIPS,
   commitsColumnTooltip,
+  formatPeriodCommitDisplay,
   SHIPPING_LEVERAGE_COLUMN_TOOLTIP,
   SUPPLY_LOCK_TM_COLUMN_TOOLTIP,
   DIRECT_TM_COLUMN_TOOLTIP,
@@ -479,6 +480,7 @@ interface RepoWithLive extends Repo {
   commits7_14: number | null
   commits30_60: number | null
   commitTimestamps: string[] | null
+  commitsCapped?: boolean | null
 }
 
 export type { RepoWithLive }
@@ -615,6 +617,11 @@ export default function RepoList({
     const pending = isUnscoredRecent(repo)
     const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
     const periodCommits = repoCommitsForPeriod(repo, repoPeriod)
+    const commitsHitCap = Boolean(
+      repo.commitsCapped ?? ((repo.commitTimestamps?.length ?? 0) >= GITHUB_COMMITS_CAP),
+    )
+    const periodCommitsCapped = commitsHitCap && periodCommits >= GITHUB_COMMITS_CAP
+    const periodCommitsLabel = formatPeriodCommitDisplay(periodCommits, commitsHitCap)
     const lifecycle = computeRepoLifecycle(repo, periodCommits)
     const sinceScored = getScoreAgeDisplay(repo, pending)
     const criticalPath = getCriticalPathRole(repo.githubSlug)
@@ -921,11 +928,11 @@ export default function RepoList({
                 <MetricDivider show={!isMobile} />
 
                 <RepoBadge
-                  tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits)}
+                  tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits, periodCommitsCapped)}
                   style={{ textAlign: 'center', minWidth: isMobile ? undefined : '36px', display: 'block' }}
                 >
                   <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: commitCountColor(periodCommits) }}>
-                    {periodCommits}
+                    {periodCommitsLabel}
                   </div>
                   <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
                     commits<br />{periodKeyLabel(repoPeriod)}
@@ -1001,11 +1008,11 @@ export default function RepoList({
               <MetricDivider show={!isMobile} />
 
               <RepoBadge
-                tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits)}
+                tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits, periodCommitsCapped)}
                 style={{ textAlign: 'center', minWidth: isMobile ? undefined : '36px', display: 'block' }}
               >
                 <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: commitCountColor(periodCommits) }}>
-                  {periodCommits}
+                  {periodCommitsLabel}
                 </div>
                 <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
                   commits<br />{periodKeyLabel(repoPeriod)}

@@ -82,6 +82,7 @@ export default async function Home() {
       commits7_14: activity?.commits7_14 ?? null,
       commits30_60: activity?.commits30_60 ?? null,
       commitTimestamps: activity?.commitTimestamps ?? null,
+      commitsCapped: activity?.commitsCapped ?? null,
     }
   })
 
