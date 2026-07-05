@@ -6,7 +6,7 @@ export default function ChronicleSection({ chronicle }: { chronicle: ChronicleBa
   return (
     <section id="chronicle" style={{ marginBottom: '28px' }}>
       <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
-        Chronicle
+        Latest Chronicle update
       </h3>
       <div
         style={{

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { getChronicleBannerData } from '@/lib/chronicle'
+import { getChronicleContext } from '@/lib/chronicleContext'
 import { DEFAULT_ECOSYSTEM_CONTEXT, getEcosystemContext } from '@/lib/ecosystemContext'
 import HowWeScoreContent from '@/components/HowWeScoreContent'
 
@@ -9,9 +10,10 @@ export const metadata = {
 }
 
 export default async function HowWeScorePage() {
-  const [chronicle, override] = await Promise.all([
+  const [chronicle, override, chronicleContextText] = await Promise.all([
     getChronicleBannerData().catch(() => null),
     getEcosystemContext().catch(() => null),
+    getChronicleContext().catch(() => null),
   ])
   const activeText = override?.trim() || DEFAULT_ECOSYSTEM_CONTEXT
 
@@ -29,6 +31,7 @@ export default async function HowWeScorePage() {
 
       <HowWeScoreContent
         chronicle={chronicle}
+        chronicleContextText={chronicleContextText}
         scoringContextText={activeText}
         scoringContextOverride={Boolean(override?.trim())}
       />

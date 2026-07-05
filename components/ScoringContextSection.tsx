@@ -10,11 +10,11 @@ export default function ScoringContextSection({
   return (
     <section id="context" style={{ marginBottom: '28px' }}>
       <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
-        Scoring context v{SCORING_CONTEXT_VERSION}
+        Ecosystem context v{SCORING_CONTEXT_VERSION}
       </h3>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.55, margin: '0 0 12px' }}>
-        Live AI scores read this background plus each repo&apos;s GitHub metadata. Launch baseline (Jun 15) grades used a
-        separate editorial pass with row-by-row Chronicle citations.
+        Background rules prepended to all live AI scoring prompts, plus each repo&apos;s GitHub metadata. Launch baseline
+        (Jun 15) grades used a separate editorial pass with row-by-row Chronicle citations.
       </p>
       {usingOverride && (
         <p

@@ -5,6 +5,7 @@ import type { ChronicleBannerData } from '@/lib/chronicle'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import HowWeScoreRubrics from '@/components/HowWeScoreRubrics'
 import ChronicleSection from '@/components/ChronicleSection'
+import ChronicleContextSection from '@/components/ChronicleContextSection'
 import ScoringContextSection from '@/components/ScoringContextSection'
 
 const CARD_STYLE = {
@@ -17,8 +18,9 @@ const CARD_STYLE = {
 const TOC_LINKS = [
   { href: '#hw-score-rubrics', label: 'Rubrics' },
   { href: '#hw-score-grades', label: 'Ecosystem grades' },
-  { href: '#chronicle', label: 'Chronicle' },
-  { href: '#context', label: 'Scoring context' },
+  { href: '#chronicle', label: 'Latest Chronicle' },
+  { href: '#chronicle-context', label: 'Chronicle context' },
+  { href: '#context', label: 'Ecosystem context' },
   { href: '#hw-score-brief', label: 'Build brief' },
   { href: '#hw-score-activity', label: 'Activity' },
   { href: '#hw-score-scale', label: 'Letter scale' },
@@ -61,11 +63,17 @@ function TocNav() {
 
 interface Props {
   chronicle: ChronicleBannerData | null
+  chronicleContextText: string | null
   scoringContextText: string
   scoringContextOverride: boolean
 }
 
-export default function HowWeScoreContent({ chronicle, scoringContextText, scoringContextOverride }: Props) {
+export default function HowWeScoreContent({
+  chronicle,
+  chronicleContextText,
+  scoringContextText,
+  scoringContextOverride,
+}: Props) {
   return (
     <>
       <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '12px' }}>
@@ -78,9 +86,10 @@ export default function HowWeScoreContent({ chronicle, scoringContextText, scori
         <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>launch baseline</strong>{' '}
         (fixed Jun 15 snapshot) or{' '}
         <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>live AI</strong>{' '}
-        (auto-inferred or paid Rescore). See{' '}
-        <Link href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</Link>{' '}
-        and <a href="#context" style={{ color: 'var(--accent)' }}>scoring context below</a>.
+        (auto-inferred or paid Rescore). Live AI reads{' '}
+        <a href="#chronicle-context" style={{ color: 'var(--accent)' }}>Chronicle context</a> (optional admin paste) and{' '}
+        <a href="#context" style={{ color: 'var(--accent)' }}>ecosystem context</a> before scoring each repo. See{' '}
+        <Link href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</Link>.
       </p>
 
       <TocNav />
@@ -115,6 +124,7 @@ export default function HowWeScoreContent({ chronicle, scoringContextText, scori
       </section>
 
       <ChronicleSection chronicle={chronicle} />
+      <ChronicleContextSection activeText={chronicleContextText} />
       <ScoringContextSection activeText={scoringContextText} usingOverride={scoringContextOverride} />
 
       <section
