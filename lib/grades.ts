@@ -97,6 +97,8 @@ export interface TrendExplanation {
   bullets: string[]
 }
 
+export type TrendDirection = 'up' | 'flat' | 'down' | 'new'
+
 export interface BuilderGrade {
   letter: string
   pct: number
@@ -104,12 +106,12 @@ export interface BuilderGrade {
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   trendPct: number | null
-  trend: 'up' | 'flat' | 'down'
+  trend: TrendDirection
   trendExplanation?: TrendExplanation
 }
 
 export interface TokenMechanicGrade {
-  counts: { direct: number; lock: number; indirect: number; infra: number; repos: number }
+  counts: { high: number; mid: number; low: number; repos: number }
   tagCommits?: { direct: number; lock: number; indirect: number; infra: number }
   letter: string
   pct: number
@@ -117,7 +119,7 @@ export interface TokenMechanicGrade {
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   trendPct: number | null
-  trend: 'up' | 'flat' | 'down'
+  trend: TrendDirection
   trendExplanation?: TrendExplanation
 }
 
@@ -129,25 +131,40 @@ export interface IntegrityGrade {
   summary: string
   signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
   trendPct: number | null
-  trend: 'up' | 'flat' | 'down'
+  trend: TrendDirection
   trendExplanation?: TrendExplanation
 }
 
+/** Relative % change for display ("+12% vs prior"). Null when prior is 0 and current > 0 ("new"). */
 export function pctChange(curr: number, prev: number): number | null {
   if (prev === 0) return curr > 0 ? null : 0
   return Math.round(((curr - prev) / prev) * 100)
 }
 
-export function trendFromPct(change: number | null): 'up' | 'flat' | 'down' {
-  if (change === null) return 'up'
+/**
+ * Trend direction decided on an ABSOLUTE point band (flat within +/-3 points), so low and high
+ * scores flip on the same real movement. `prev === null` means no prior window (e.g. 60d).
+ */
+export function trendDirection(curr: number, prev: number | null): TrendDirection {
+  if (prev === null) return 'new'
+  if (prev === 0) return curr > 0 ? 'new' : 'flat'
+  const delta = curr - prev
+  if (delta > 3) return 'up'
+  if (delta < -3) return 'down'
+  return 'flat'
+}
+
+/** @deprecated Use {@link trendDirection} — decides on absolute points and surfaces the 'new' state. */
+export function trendFromPct(change: number | null): TrendDirection {
+  if (change === null) return 'new'
   if (change > 3) return 'up'
   if (change < -3) return 'down'
   return 'flat'
 }
 
 function toLevel(pct: number): 'high' | 'mid' | 'low' {
-  if (pct >= 0.66) return 'high'
-  if (pct >= 0.33) return 'mid'
+  if (pct >= 0.75) return 'high'
+  if (pct >= 0.42) return 'mid'
   return 'low'
 }
 
@@ -266,7 +283,7 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
     pct,
     priorPct,
     trendPct,
-    trend: trendFromPct(trendPct),
+    trend: trendDirection(pct, priorPct),
     summary: builderActivitySummary(pct),
     signals: builderSignals(current, period),
   }
@@ -323,6 +340,30 @@ function weightedAvgByCommits(
     weight += w
   }
   return weight ? Math.round(sum / weight) : 0
+}
+
+/**
+ * Commit-weighted average, but on a quiet window (no commit weight) falls back to an unweighted
+ * average of the sample's scores. Prevents a no-commits window collapsing a grade to 0 (F-)
+ * when the underlying quality is unchanged.
+ */
+function weightedOrFlatAvg(
+  stats: GitHubStats,
+  repos: Repo[],
+  period: Period,
+  window: 'current' | 'prior',
+  scoreFn: (repo: Repo) => number,
+): number {
+  let sum = 0
+  let weight = 0
+  for (const repo of repos) {
+    const w = commitsForRepo(stats, repo.githubSlug, period, window)
+    if (w <= 0) continue
+    sum += scoreFn(repo) * w
+    weight += w
+  }
+  if (weight > 0) return Math.round(sum / weight)
+  return avg(repos.map(scoreFn))
 }
 
 function integrityCommitCounts(
@@ -431,7 +472,7 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
   const sample = activeRepos.length ? activeRepos : scored
   const priorSample = priorActiveRepos
 
-  const pct = weightedAvgByCommits(stats, sample, period, 'current', r => getConsumerEconomicScorePct(r) ?? 0)
+  const pct = weightedOrFlatAvg(stats, sample, period, 'current', r => getConsumerEconomicScorePct(r) ?? 0)
   const priorPct =
     period === '60d' || !priorSample.length
       ? null
@@ -441,13 +482,13 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
   const rubricCounts = tokenMechanicRubricCommitCounts(stats, sample, period)
   const weightBase = rubricCounts.commitWeight || 1
 
-  const impactAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
+  const impactAvg = weightedOrFlatAvg(stats, sample, period, 'current', r =>
     slRubricLevelScore(r, [SL_LABELS[0], TM_CONSUMER_LABELS[0], LEGACY_TM_LABELS[0]]),
   )
-  const clarityAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
+  const clarityAvg = weightedOrFlatAvg(stats, sample, period, 'current', r =>
     slRubricLevelScore(r, [SL_LABELS[1], TM_CONSUMER_LABELS[1], LEGACY_TM_LABELS[1]]),
   )
-  const alignmentAvg = weightedAvgByCommits(stats, sample, period, 'current', r =>
+  const alignmentAvg = weightedOrFlatAvg(stats, sample, period, 'current', r =>
     slRubricLevelScore(r, [SL_LABELS[2], TM_CONSUMER_LABELS[2], LEGACY_TM_LABELS[2]]),
   )
 
@@ -458,10 +499,9 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
 
   return {
     counts: {
-      direct: rubricCounts.high,
-      lock: rubricCounts.mid,
-      indirect: rubricCounts.low,
-      infra: 0,
+      high: rubricCounts.high,
+      mid: rubricCounts.mid,
+      low: rubricCounts.low,
       repos: sample.length,
     },
     tagCommits,
@@ -469,7 +509,7 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
     pct,
     priorPct,
     trendPct,
-    trend: period === '60d' ? 'flat' : trendFromPct(trendPct),
+    trend: period === '60d' ? 'flat' : trendDirection(pct, priorPct),
     summary: tokenMechanicSummary(pct, period),
     signals: [
       { label: 'CLAWD economic impact', level: toLevel(impactAvg / 100), pct: impactAvg },
@@ -493,7 +533,9 @@ function reposForEcosystemIntegrity(repos: Repo[]): Repo[] {
 }
 
 export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, repoSet: Repo[]): IntegrityGrade {
-  const integrityRepos = reposForEcosystemIntegrity(repoSet)
+  const integrityRepos = reposForEcosystemIntegrity(repoSet).filter(
+    r => r.builderIntegrity.letter !== '—',
+  )
   const activeRepos = !stats
     ? integrityRepos
     : reposActiveInWindow(stats, integrityRepos, period, 'current')
@@ -507,14 +549,15 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
 
   const pct = !stats
     ? avg(sample.map(repo => repo.builderIntegrity.pct))
-    : weightedAvgByCommits(stats, sample, period, 'current', r => r.builderIntegrity.pct)
+    : weightedOrFlatAvg(stats, sample, period, 'current', r => r.builderIntegrity.pct)
 
-  const priorPct = !stats || !priorSample.length || period === '60d'
-    ? 0
-    : weightedAvgByCommits(stats, priorSample, period, 'prior', r => r.builderIntegrity.pct)
+  const hasPrior = Boolean(stats) && priorSample.length > 0 && period !== '60d'
+  const priorPct = hasPrior
+    ? weightedAvgByCommits(stats!, priorSample, period, 'prior', r => r.builderIntegrity.pct)
+    : null
 
-  const priorPctValue = period === '60d' ? null : priorPct
-  const trendPct = period === '60d' ? null : pctChange(pct, priorPct)
+  const priorPctValue = priorPct
+  const trendPct = period === '60d' ? null : pctChange(pct, priorPct ?? 0)
 
   const commitCounts = stats
     ? integrityCommitCounts(stats, sample, period, 'current')
@@ -532,19 +575,19 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
   const rubricScore = (repo: Repo, labels: string[]) => biRubricLevelScore(repo, labels)
 
   const onChainAvg = stats
-    ? weightedAvgByCommits(stats, sample, period, 'current', r =>
+    ? weightedOrFlatAvg(stats, sample, period, 'current', r =>
         rubricScore(r, [BI_ROW_LABELS[0], LEGACY_BI_LABELS[0]]),
       )
     : avg(sample.map(r => rubricScore(r, [BI_ROW_LABELS[0], LEGACY_BI_LABELS[0]])))
 
   const safetyAvg = stats
-    ? weightedAvgByCommits(stats, sample, period, 'current', r =>
+    ? weightedOrFlatAvg(stats, sample, period, 'current', r =>
         rubricScore(r, [BI_ROW_LABELS[1], LEGACY_BI_LABELS[1]]),
       )
     : avg(sample.map(r => rubricScore(r, [BI_ROW_LABELS[1], LEGACY_BI_LABELS[1]])))
 
   const transparencyAvg = stats
-    ? weightedAvgByCommits(stats, sample, period, 'current', r =>
+    ? weightedOrFlatAvg(stats, sample, period, 'current', r =>
         rubricScore(r, [BI_ROW_LABELS[2], LEGACY_BI_LABELS[2]]),
       )
     : avg(sample.map(r => rubricScore(r, [BI_ROW_LABELS[2], LEGACY_BI_LABELS[2]])))
@@ -555,7 +598,7 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
     pct,
     priorPct: priorPctValue,
     trendPct,
-    trend: period === '60d' ? 'flat' : trendFromPct(trendPct),
+    trend: period === '60d' ? 'flat' : trendDirection(pct, priorPct),
     summary:
       period === '60d'
         ? pct >= 80

@@ -5,9 +5,10 @@ import { formatTrendPct } from '@/lib/grades'
 import { OverallGradeWithTrend } from '@/lib/overallGrade'
 import { useGradePeriod } from './GradePeriodContext'
 
-function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
+function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' | 'new' }) {
   if (trend === 'up') return <span style={{ color: 'var(--green)', fontSize: '12px' }}>↑</span>
   if (trend === 'down') return <span style={{ color: 'var(--red)', fontSize: '12px' }}>↓</span>
+  if (trend === 'new') return <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>•</span>
   return <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>→</span>
 }
 

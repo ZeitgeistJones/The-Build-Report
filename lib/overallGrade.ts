@@ -3,7 +3,7 @@ import { getEconomicScore } from './economicGrade'
 import { GitHubStats, RepoActivity } from './github'
 import { pctToLetter } from './gradeLetters'
 import { isUnscoredRecent } from './recentRepos'
-import { pctChange, trendFromPct, Period } from './grades'
+import { pctChange, trendDirection, Period, TrendDirection } from './grades'
 
 export interface OverallGrade {
   letter: string
@@ -14,7 +14,7 @@ export interface OverallGrade {
 
 export interface OverallGradeWithTrend extends OverallGrade {
   trendPct: number | null
-  trend: 'up' | 'flat' | 'down'
+  trend: TrendDirection
 }
 
 export type LetterBucketDistribution = Record<'A' | 'B' | 'C' | 'D' | 'F', number>
@@ -79,23 +79,44 @@ export function calcOverallGradeWithTrend(
   builder: { pct: number; priorPct: number | null } | null,
   integrity: { pct: number; priorPct: number | null },
   reposScored: number,
+  period: Period,
 ): OverallGradeWithTrend | null {
   const overall = calcOverallGrade(tokenMechanic, builder, integrity, reposScored)
   if (!overall) return null
 
-  const priorOverall = calcOverallGrade(
-    tokenMechanic ? { pct: tokenMechanic.priorPct ?? 0 } : null,
-    builder ? { pct: builder.priorPct ?? 0 } : null,
-    { pct: integrity.priorPct ?? 0 },
-    reposScored,
+  // 60d has no prior window by design — never show a trend.
+  if (period === '60d') {
+    return { ...overall, trendPct: null, trend: 'flat' }
+  }
+
+  // Build the prior blend from only the axes that actually have a prior value, renormalizing
+  // their weights. Treating a missing prior as 0 would deflate the prior Overall and fake a spike.
+  const priorAxes: { pct: number; weight: number }[] = []
+  if (tokenMechanic && tokenMechanic.priorPct != null) {
+    priorAxes.push({ pct: tokenMechanic.priorPct, weight: NOMINAL_WEIGHTS.tokenMechanic })
+  }
+  if (builder && builder.priorPct != null) {
+    priorAxes.push({ pct: builder.priorPct, weight: NOMINAL_WEIGHTS.builder })
+  }
+  if (integrity.priorPct != null) {
+    priorAxes.push({ pct: integrity.priorPct, weight: NOMINAL_WEIGHTS.integrity })
+  }
+
+  if (!priorAxes.length) {
+    return { ...overall, trendPct: null, trend: 'new' }
+  }
+
+  const totalWeight = priorAxes.reduce((s, a) => s + a.weight, 0)
+  const priorPct = Math.round(
+    priorAxes.reduce((s, a) => s + a.pct * (a.weight / totalWeight), 0),
   )
 
-  const trendPct = pctChange(overall.pct, priorOverall?.pct ?? 0)
+  const trendPct = pctChange(overall.pct, priorPct)
 
   return {
     ...overall,
     trendPct,
-    trend: trendFromPct(trendPct),
+    trend: trendDirection(overall.pct, priorPct),
   }
 }
 

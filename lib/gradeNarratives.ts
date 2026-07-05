@@ -1,6 +1,6 @@
 import { Repo, Tag } from './scores'
 import { GitHubStats, RepoActivity } from './github'
-import { Period, formatTrendPct, TrendExplanation } from './grades'
+import { Period, formatTrendPct, TrendExplanation, TrendDirection } from './grades'
 
 export type { TrendExplanation }
 
@@ -106,7 +106,7 @@ export function buildBuilderTrendExplanation(
   stats: GitHubStats,
   period: Period,
   trendPct: number | null,
-  trend: 'up' | 'flat' | 'down',
+  trend: TrendDirection,
 ): TrendExplanation {
   const current = builderInputs(stats, period, 'current')
   const prior = builderInputs(stats, period, 'prior')
@@ -157,7 +157,7 @@ export function buildTokenMechanicTrendExplanation(
   period: Period,
   repoSet: Repo[],
   trendPct: number | null,
-  trend: 'up' | 'flat' | 'down',
+  trend: TrendDirection,
 ): TrendExplanation {
   const activeNow = reposActiveInWindow(stats, repoSet, period, 'current')
   const activePrior = reposActiveInWindow(stats, repoSet, period, 'prior')
@@ -264,7 +264,7 @@ export function buildIntegrityTrendExplanation(
   period: Period,
   repoSet: Repo[],
   trendPct: number | null,
-  trend: 'up' | 'flat' | 'down',
+  trend: TrendDirection,
 ): TrendExplanation {
   const activeNow = reposActiveInWindow(stats, repoSet, period, 'current')
   const activePrior = reposActiveInWindow(stats, repoSet, period, 'prior')

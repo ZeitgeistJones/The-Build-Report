@@ -46,9 +46,10 @@ const CARD_RUBRIC_ID: Record<CardId, string> = {
   integrity: 'builder-integrity',
 }
 
-function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
+function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' | 'new' }) {
   if (trend === 'up') return <span style={{ color: 'var(--green)', fontSize: '12px' }}>↑</span>
   if (trend === 'down') return <span style={{ color: 'var(--red)', fontSize: '12px' }}>↓</span>
+  if (trend === 'new') return <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>•</span>
   return <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>→</span>
 }
 
@@ -207,7 +208,7 @@ function GradeCard({
   grade: {
     letter: string
     pct: number
-    trend: 'up' | 'flat' | 'down'
+    trend: 'up' | 'flat' | 'down' | 'new'
     trendPct: number | null
   } | null
   label: string
@@ -538,26 +539,26 @@ export default function GradesPanel({
                 )}
                 {period === '60d' || !tg.tagCommits ? (
                   <>
-                    {tg.counts.direct > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.direct} high-TM commits</span>
+                    {tg.counts.high > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.high} high-TM commits</span>
                     )}
-                    {tg.counts.lock > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.lock} mid-TM commits</span>
+                    {tg.counts.mid > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.mid} mid-TM commits</span>
                     )}
-                    {tg.counts.indirect > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.indirect} low-TM commits</span>
+                    {tg.counts.low > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.low} low-TM commits</span>
                     )}
                   </>
                 ) : (
                   <>
-                    {tg.counts.direct > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.direct} high-TM commits</span>
+                    {tg.counts.high > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.high} high-TM commits</span>
                     )}
-                    {tg.counts.lock > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.lock} mid-TM commits</span>
+                    {tg.counts.mid > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.mid} mid-TM commits</span>
                     )}
-                    {tg.counts.indirect > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.indirect} low-TM commits</span>
+                    {tg.counts.low > 0 && (
+                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.low} low-TM commits</span>
                     )}
                     {tg.tagCommits.direct > 0 && (
                       <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.tagCommits.direct} direct-tag commits</span>
