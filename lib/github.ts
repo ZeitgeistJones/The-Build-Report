@@ -227,9 +227,22 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
   const newRepos30_60 = repos.filter(r => isCreatedInDayRange(r.created_at, 30, 60)).length
 
   const forceInclude = await getTrackableForceIncludeSet()
-  // Activity stats always exclude noise repos — force-include is for listing only.
+  // Ecosystem aggregate stats always exclude noise repos — force-include is for listing only.
   const includeInActivityScan = (name: string) => !shouldSkipRepo(name)
   const reposToScan = selectReposForActivityScan(repos, 40, includeInActivityScan)
+
+  // B1: also scan force-included repos (few, admin-tracked job/cv repos) so they get real
+  // per-repo commit stats for the listing — without competing for the 40 ecosystem slots or
+  // contributing to aggregate totals (guarded by includeInActivityScan below).
+  if (forceInclude.size > 0) {
+    const alreadyScanning = new Set(reposToScan.map(r => r.name))
+    for (const repo of repos) {
+      if (forceInclude.has(repo.name) && !alreadyScanning.has(repo.name)) {
+        reposToScan.push(repo)
+        alreadyScanning.add(repo.name)
+      }
+    }
+  }
 
   const activeDaySet30 = new Set<string>()
   const activeDaySet7 = new Set<string>()
@@ -254,33 +267,35 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
       const c7_14 = commits.filter((c: any) => isInDayRange(c.commit.author.date, 7, 14))
       const c30_60 = commits.filter((c: any) => isInDayRange(c.commit.author.date, 30, 60))
 
-      totalCommits30d += c30.length
-      totalCommits7d += c7.length
-      totalCommits7_14 += c7_14.length
-      totalCommits30_60 += c30_60.length
+      // Force-included noise repos get per-repo stats but are excluded from ecosystem aggregates.
+      const countsTowardEcosystem = includeInActivityScan(repo.name)
 
-      c30.forEach((c: any) => {
-        const day = c.commit.author.date.slice(0, 10)
-        activeDaySet30.add(day)
-        if (includeInActivityScan(repo.name)) {
+      if (countsTowardEcosystem) {
+        totalCommits30d += c30.length
+        totalCommits7d += c7.length
+        totalCommits7_14 += c7_14.length
+        totalCommits30_60 += c30_60.length
+
+        c30.forEach((c: any) => {
+          activeDaySet30.add(c.commit.author.date.slice(0, 10))
           if (!lastCommitAt || c.commit.author.date > lastCommitAt) {
             lastCommitAt = c.commit.author.date
             lastCommitRepo = repo.name
           }
-        }
-      })
+        })
 
-      c7.forEach((c: any) => {
-        activeDaySet7.add(c.commit.author.date.slice(0, 10))
-      })
+        c7.forEach((c: any) => {
+          activeDaySet7.add(c.commit.author.date.slice(0, 10))
+        })
 
-      c7_14.forEach((c: any) => {
-        activeDaySet7_14.add(c.commit.author.date.slice(0, 10))
-      })
+        c7_14.forEach((c: any) => {
+          activeDaySet7_14.add(c.commit.author.date.slice(0, 10))
+        })
 
-      c30_60.forEach((c: any) => {
-        activeDaySet30_60.add(c.commit.author.date.slice(0, 10))
-      })
+        c30_60.forEach((c: any) => {
+          activeDaySet30_60.add(c.commit.author.date.slice(0, 10))
+        })
+      }
 
       repoActivity[repo.name] = {
         slug: repo.name,

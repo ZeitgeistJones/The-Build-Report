@@ -10,10 +10,7 @@ import {
   type BuilderActivityActuals,
   windowLengthDays,
 } from './rubrics/builderActivity'
-import {
-  BI_ROW_LABELS,
-  LEGACY_BI_LABELS,
-} from './rubrics/builderIntegrity'
+import { BI_ROW_LABELS } from './rubrics/builderIntegrity'
 import {
   LEGACY_TM_LABELS,
   TM_CONSUMER_LABELS,
@@ -348,22 +345,6 @@ function cappedCommitWeights(
   return raw.map(r => ({ repo: r.repo, weight: Math.min(r.weight, cap) }))
 }
 
-function weightedAvgByCommits(
-  stats: GitHubStats,
-  repos: Repo[],
-  period: Period,
-  window: 'current' | 'prior',
-  scoreFn: (repo: Repo) => number,
-): number {
-  let sum = 0
-  let weight = 0
-  for (const { repo, weight: w } of cappedCommitWeights(stats, repos, period, window)) {
-    sum += scoreFn(repo) * w
-    weight += w
-  }
-  return weight ? Math.round(sum / weight) : 0
-}
-
 /**
  * Commit-weighted average, but on a quiet window (no commit weight) falls back to an unweighted
  * average of the sample's scores. Prevents a no-commits window collapsing a grade to 0 (F-)
@@ -490,13 +471,15 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
   const activeRepos = reposActiveInWindow(stats, scored, period, 'current')
   const priorActiveRepos = reposActiveInWindow(stats, scored, period, 'prior')
   const sample = activeRepos.length ? activeRepos : scored
-  const priorSample = priorActiveRepos
+  // B3: prior window uses the same fallback sample + quiet-safe average as the current window,
+  // so a quiet prior period reads 'flat' (unchanged quality) instead of a phantom 'new'/collapse.
+  const priorSample = priorActiveRepos.length ? priorActiveRepos : scored
 
   const pct = weightedOrFlatAvg(stats, sample, period, 'current', r => getConsumerEconomicScorePct(r) ?? 0)
   const priorPct =
     period === '60d' || !priorSample.length
       ? null
-      : weightedAvgByCommits(stats, priorSample, period, 'prior', r => getConsumerEconomicScorePct(r) ?? 0)
+      : weightedOrFlatAvg(stats, priorSample, period, 'prior', r => getConsumerEconomicScorePct(r) ?? 0)
   const trendPct = period === '60d' ? null : pctChange(pct, priorPct ?? 0)
 
   const rubricCounts = tokenMechanicRubricCommitCounts(stats, sample, period)
@@ -571,7 +554,9 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
     : reposActiveInWindow(stats, integrityRepos, period, 'prior')
 
   const sample = activeRepos.length ? activeRepos : integrityRepos
-  const priorSample = priorActiveRepos
+  // B3: prior window uses the same fallback sample + quiet-safe average as the current window,
+  // so a quiet prior period reads 'flat' (unchanged quality) instead of a phantom 'new'/collapse.
+  const priorSample = priorActiveRepos.length ? priorActiveRepos : integrityRepos
 
   const pct = !stats
     ? avg(sample.map(repo => repo.builderIntegrity.pct))
@@ -579,7 +564,7 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
 
   const hasPrior = Boolean(stats) && priorSample.length > 0 && period !== '60d'
   const priorPct = hasPrior
-    ? weightedAvgByCommits(stats!, priorSample, period, 'prior', r => r.builderIntegrity.pct)
+    ? weightedOrFlatAvg(stats!, priorSample, period, 'prior', r => r.builderIntegrity.pct)
     : null
 
   const priorPctValue = priorPct
@@ -598,25 +583,35 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
   const { high, mid, low, commitWeight } = commitCounts
   const weightBase = commitWeight || 1
 
-  const rubricScore = (repo: Repo, labels: string[]) => biRubricLevelScore(repo, labels)
+  // v5 integrity signals: average each of the 5 real rubric rows over ONLY the repos that
+  // actually have that row (v5-scored). No positional fallback onto legacy 3-row labels —
+  // a legacy "Serves stated vision" row is not "On-chain commitments" and must not masquerade
+  // as one. Legacy repos still drive the overall pct/counts; they just don't fake v5 signals.
+  const v5SignalAvg = (label: string): { pct: number; count: number } => {
+    const contributors = sample.filter(r =>
+      r.builderIntegrity.rubric.some(row => row.label === label),
+    )
+    if (!contributors.length) return { pct: 0, count: 0 }
+    return {
+      pct: Math.round(avg(contributors.map(r => biRubricLevelScore(r, [label])))),
+      count: contributors.length,
+    }
+  }
 
-  const onChainAvg = stats
-    ? weightedOrFlatAvg(stats, sample, period, 'current', r =>
-        rubricScore(r, [BI_ROW_LABELS[0], LEGACY_BI_LABELS[0]]),
-      )
-    : avg(sample.map(r => rubricScore(r, [BI_ROW_LABELS[0], LEGACY_BI_LABELS[0]])))
+  const V5_SIGNAL_LABELS: { row: string; display: string }[] = [
+    { row: BI_ROW_LABELS[0], display: 'On-chain commitments' },
+    { row: BI_ROW_LABELS[1], display: 'User safety' },
+    { row: BI_ROW_LABELS[2], display: 'Transparency' },
+    { row: BI_ROW_LABELS[3], display: 'Governance & alignment' },
+    { row: BI_ROW_LABELS[4], display: 'Security & testing' },
+  ]
 
-  const safetyAvg = stats
-    ? weightedOrFlatAvg(stats, sample, period, 'current', r =>
-        rubricScore(r, [BI_ROW_LABELS[1], LEGACY_BI_LABELS[1]]),
-      )
-    : avg(sample.map(r => rubricScore(r, [BI_ROW_LABELS[1], LEGACY_BI_LABELS[1]])))
-
-  const transparencyAvg = stats
-    ? weightedOrFlatAvg(stats, sample, period, 'current', r =>
-        rubricScore(r, [BI_ROW_LABELS[2], LEGACY_BI_LABELS[2]]),
-      )
-    : avg(sample.map(r => rubricScore(r, [BI_ROW_LABELS[2], LEGACY_BI_LABELS[2]])))
+  const v5Signals = V5_SIGNAL_LABELS.map(({ row, display }) => ({
+    display,
+    ...v5SignalAvg(row),
+  }))
+    .filter(s => s.count > 0)
+    .map(s => ({ label: s.display, level: toLevel(s.pct / 100), pct: s.pct }))
 
   return {
     counts: { active: sample.length, high, mid, low, commitWeight },
@@ -642,9 +637,7 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
             ? 'Integrity is mixed across where commit volume landed this window.'
             : 'Most commits this window landed on repos with weaker builder-values scores.',
     signals: [
-      { label: 'On-chain commitments', level: toLevel(onChainAvg / 100), pct: onChainAvg },
-      { label: 'User safety', level: toLevel(safetyAvg / 100), pct: safetyAvg },
-      { label: 'Transparency', level: toLevel(transparencyAvg / 100), pct: transparencyAvg },
+      ...v5Signals,
       { label: 'High-integrity share', level: toLevel(high / weightBase), pct: Math.round((high / weightBase) * 100) },
     ],
   }

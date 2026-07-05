@@ -1,5 +1,5 @@
 import { Repo, Tag } from './scores'
-import { getEconomicScore } from './economicGrade'
+import { getTokenMechanicForDisplay } from './economicGrade'
 import { GitHubStats, RepoActivity } from './github'
 import { pctToLetter } from './gradeLetters'
 import { isUnscoredRecent } from './recentRepos'
@@ -153,7 +153,9 @@ export function buildOverallGradeContext(
   let reposWithTokenMechanicGrade = 0
 
   for (const repo of scored) {
-    const economic = getEconomicScore(repo)
+    // B4: match the TM panel grade sample — consumer/supply-lock only, infra excluded — so the
+    // letter distribution can't contradict the headline token-mechanic grade.
+    const economic = getTokenMechanicForDisplay(repo)
     if (economic) {
       reposWithTokenMechanicGrade++
       tokenMechanicDistribution[letterBucket(economic.letter)]++
