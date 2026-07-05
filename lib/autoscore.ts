@@ -315,12 +315,36 @@ export async function getCachedAutoScoresForSlugs(slugs: string[]): Promise<Repo
   const r = getRedis()
   const results: Repo[] = []
 
-  await Promise.all(
-    slugs.map(async slug => {
-      const cached = await readCachedScore(r, slug)
-      if (cached) results.push(cached)
-    }),
-  )
+  const v3Keys = slugs.map(slug => `${CACHE_KEY_PREFIX}${slug}`)
+  const v3Values = await r.mget<(Record<string, unknown> | null)[]>(...v3Keys)
+
+  const needV2: string[] = []
+  slugs.forEach((slug, i) => {
+    const repo = normalizeCachedRepo(v3Values[i])
+    if (repo) results.push(repo)
+    else needV2.push(slug)
+  })
+
+  if (needV2.length > 0) {
+    const v2Keys = needV2.map(slug => `${CACHE_KEY_PREFIX_V2}${slug}`)
+    const v2Values = await r.mget<(Record<string, unknown> | null)[]>(...v2Keys)
+    const needV1: string[] = []
+
+    needV2.forEach((slug, i) => {
+      const repo = normalizeCachedRepo(v2Values[i])
+      if (repo) results.push(repo)
+      else needV1.push(slug)
+    })
+
+    if (needV1.length > 0) {
+      const v1Keys = needV1.map(slug => `${CACHE_KEY_PREFIX_V1}${slug}`)
+      const v1Values = await r.mget<(Record<string, unknown> | null)[]>(...v1Keys)
+      needV1.forEach((slug, i) => {
+        const repo = normalizeCachedRepo(v1Values[i])
+        if (repo) results.push(repo)
+      })
+    }
+  }
 
   return results
 }

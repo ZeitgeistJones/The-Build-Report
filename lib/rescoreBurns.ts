@@ -28,12 +28,16 @@ export async function recordRescoreBurn(redisClient: Redis): Promise<void> {
 export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
   try {
     const r = getRedis()
-    const [countRaw, ethRaw, ethPending, snapshot] = await Promise.all([
+    const [countRaw, ethRaw, snapshot] = await Promise.all([
       r.get<number>(RESCORE_COUNT_KEY),
       r.get<number>(ETH_TOTAL_KEY),
-      getContractEthBalance(RECEIVER_BUY_AND_BURN),
       getBurnSnapshotForDisplay(),
     ])
+
+    let ethPending = snapshot.ethPendingInReceiver
+    if (!snapshot.updatedAt) {
+      ethPending = await getContractEthBalance(RECEIVER_BUY_AND_BURN)
+    }
 
     return {
       count: typeof countRaw === 'number' ? countRaw : 0,
