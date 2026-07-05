@@ -585,7 +585,7 @@ export default function GradesPanel({
           grade={ig}
           label="Builder Integrity"
           period={period}
-          mini="Commit-weighted trust & safety on consumer apps and supply-lock repos (infra excluded)."
+          mini="Commit-weighted trust & safety across all tracked repos (infra scored on infra-appropriate criteria)."
           summary={ig?.summary ?? 'Integrity score unavailable'}
           trendExplanation={ig?.trendExplanation}
           isSelected={selectedCard === 'integrity'}

@@ -22,7 +22,7 @@ import {
   SL_LABELS,
   slRubricLevelScore,
 } from './rubrics/shippingLeverage'
-import { getConsumerEconomicScorePct, isConsumerEconomicScored, isEcosystemIntegritySample } from './economicGrade'
+import { getConsumerEconomicScorePct, isConsumerEconomicScored } from './economicGrade'
 
 export { pctToLetter }
 
@@ -324,6 +324,30 @@ function tokenMechanicTagCommitCounts(
   return counts
 }
 
+/** No single repo may exceed this share of total commit weight, so one hot repo can't capture a grade. */
+const MAX_SINGLE_REPO_WEIGHT_SHARE = 0.5
+
+/**
+ * Commit weights per repo with a single-repo cap applied: no repo contributes more than
+ * {@link MAX_SINGLE_REPO_WEIGHT_SHARE} of the total. Preserves "grade follows the work" while
+ * preventing one repo shipping the bulk of a window's commits from being the entire grade.
+ */
+function cappedCommitWeights(
+  stats: GitHubStats,
+  repos: Repo[],
+  period: Period,
+  window: 'current' | 'prior',
+): { repo: Repo; weight: number }[] {
+  const raw = repos
+    .map(repo => ({ repo, weight: commitsForRepo(stats, repo.githubSlug, period, window) }))
+    .filter(r => r.weight > 0)
+  if (raw.length <= 1) return raw
+
+  const total = raw.reduce((s, r) => s + r.weight, 0)
+  const cap = total * MAX_SINGLE_REPO_WEIGHT_SHARE
+  return raw.map(r => ({ repo: r.repo, weight: Math.min(r.weight, cap) }))
+}
+
 function weightedAvgByCommits(
   stats: GitHubStats,
   repos: Repo[],
@@ -333,9 +357,7 @@ function weightedAvgByCommits(
 ): number {
   let sum = 0
   let weight = 0
-  for (const repo of repos) {
-    const w = commitsForRepo(stats, repo.githubSlug, period, window)
-    if (w <= 0) continue
+  for (const { repo, weight: w } of cappedCommitWeights(stats, repos, period, window)) {
     sum += scoreFn(repo) * w
     weight += w
   }
@@ -356,9 +378,7 @@ function weightedOrFlatAvg(
 ): number {
   let sum = 0
   let weight = 0
-  for (const repo of repos) {
-    const w = commitsForRepo(stats, repo.githubSlug, period, window)
-    if (w <= 0) continue
+  for (const { repo, weight: w } of cappedCommitWeights(stats, repos, period, window)) {
     sum += scoreFn(repo) * w
     weight += w
   }
@@ -528,8 +548,14 @@ export function calcTokenMechanicGrade(stats: GitHubStats, period: Period, repoS
   return calcTokenMechanicGradeUnified(stats, repoSet, period)
 }
 
+/**
+ * Ecosystem integrity now spans all tags. Infra/indirect/theoretical are scored on
+ * infra-appropriate integrity criteria (BI_SHIPPING_LEVERAGE_RULES), so the old "unfair yardstick"
+ * reason to exclude them is gone — including them keeps Builder Integrity from diverging from a
+ * heavy infra week that already moves Builder Activity. Infra stays out of Token Mechanic only.
+ */
 function reposForEcosystemIntegrity(repos: Repo[]): Repo[] {
-  return repos.filter(r => isEcosystemIntegritySample(r))
+  return repos
 }
 
 export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, repoSet: Repo[]): IntegrityGrade {

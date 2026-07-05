@@ -9,18 +9,21 @@ export interface ActivitySignalConfig {
   targets: Record<ActivityWindowKey, number>
 }
 
+// Targets raised to match this agent's observed output (~480 commits/30d) so signals aren't
+// permanently pinned at max. Interim fix — the honest long-term solution is a rolling baseline
+// (target = median of trailing windows); tracked as a follow-up since it needs stored history.
 export const BUILDER_ACTIVITY_SIGNALS: ActivitySignalConfig[] = [
   {
     label: 'totalCommits',
     displayLabel: 'Total commits',
     weight: 20,
-    targets: { '7d': 14, '30d': 60, '60d': 120 },
+    targets: { '7d': 120, '30d': 500, '60d': 900 },
   },
   {
     label: 'activeDays',
     displayLabel: 'Active days',
     weight: 20,
-    targets: { '7d': 4, '30d': 16, '60d': 30 },
+    targets: { '7d': 7, '30d': 30, '60d': 55 },
   },
   {
     label: 'newRepos',
@@ -32,7 +35,7 @@ export const BUILDER_ACTIVITY_SIGNALS: ActivitySignalConfig[] = [
     label: 'reposWithCommits',
     displayLabel: 'Repos with commits',
     weight: 20,
-    targets: { '7d': 6, '30d': 20, '60d': 35 },
+    targets: { '7d': 14, '30d': 34, '60d': 40 },
   },
   {
     label: 'commitConsistency',

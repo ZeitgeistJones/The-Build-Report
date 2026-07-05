@@ -23,5 +23,5 @@ export function economicSectionFraming(repo: Repo): string | null {
 }
 
 export function integrityGradeFootnote(): string {
-  return 'Consumer apps + supply-lock repos only — infra and R&D excluded from this average.'
+  return 'All tracked repos, commit-weighted — infra scored on infra-appropriate integrity criteria.'
 }
