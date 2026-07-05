@@ -58,7 +58,7 @@ function normalizeSlug(slug: string): string {
 function effectiveSlugs(id: RepoCollectionId, store: CollectionsStore): string[] {
   const def = defFor(id)
   const patch = store[id] ?? emptyPatch()
-  const added = new Set(patch.added.map(normalizeSlug))
+  const added = patch.added.map(normalizeSlug)
   const removed = new Set(patch.removed.map(normalizeSlug))
   const out = new Set<string>()
   for (const s of def.defaultSlugs) {
@@ -68,7 +68,7 @@ function effectiveSlugs(id: RepoCollectionId, store: CollectionsStore): string[]
   for (const s of added) {
     if (!removed.has(s)) out.add(s)
   }
-  return [...out].sort()
+  return Array.from(out).sort()
 }
 
 export async function getCollectionsStore(): Promise<CollectionsStore> {
