@@ -52,6 +52,11 @@ import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
 import { BI_WEIGHTS_TOOLTIP_SHORT } from '@/lib/rubrics/builderIntegrity'
 import {
+  REPO_COLLECTIONS,
+  collectionIdsForSlug,
+  type RepoCollectionId,
+} from '@/lib/repoCollections'
+import {
   AWAITING_SCORE_TOOLTIP,
   criticalPathTooltip,
   ECONOMIC_NA_TOOLTIP,
@@ -79,7 +84,12 @@ const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
 
 type ActivityScope = 'active' | 'all'
 type RepoSort = 'recent' | 'commits' | 'grade'
-type RepoFilter = 'all' | 'burn-apps' | 'leverage' | Tag
+type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'cv-related' | 'clawd-gated' | Tag
+
+const COLLECTION_BADGE: Record<RepoCollectionId, { label: string; color: string; bg: string }> = {
+  'cv-related': { label: 'CV', color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
+  'clawd-gated': { label: 'CLAWD gate', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
+}
 
 const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20 } as const
 
@@ -96,12 +106,28 @@ type ScoreAgeDisplay =
   | { kind: 'auto_new' }
   | { kind: 'auto_age'; days: number }
 
-function repoMatchesFilter(repo: RepoWithLive, filter: RepoFilter): boolean {
+function repoMatchesFilter(
+  repo: RepoWithLive,
+  filter: RepoFilter,
+  collectionSets: Record<RepoCollectionId, Set<string>>,
+): boolean {
+  const slug = repo.githubSlug
   const tag = getEffectiveTag(repo)
   if (filter === 'all') return true
   if (filter === 'burn-apps') return tag === 'direct' || tag === 'supply-lock'
   if (filter === 'leverage') return hasShippingLeverageTag(tag)
+  if (filter === 'cv-related') return collectionSets['cv-related'].has(slug)
+  if (filter === 'clawd-gated') return collectionSets['clawd-gated'].has(slug)
   return tag === filter
+}
+
+function buildCollectionSets(
+  collections: Record<RepoCollectionId, string[]> | undefined,
+): Record<RepoCollectionId, Set<string>> {
+  return {
+    'cv-related': new Set(collections?.['cv-related'] ?? []),
+    'clawd-gated': new Set(collections?.['clawd-gated'] ?? []),
+  }
 }
 
 function truncate120(text: string): string {
@@ -145,15 +171,19 @@ function PillButton({
   onClick,
   children,
   isMobile,
+  title,
 }: {
   active: boolean
   onClick: () => void
   children: ReactNode
   isMobile: boolean
+  title?: string
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      title={title}
       style={{
         fontSize: '12px',
         padding: isMobile ? '8px 14px' : '4px 11px',
@@ -434,9 +464,15 @@ interface Props {
   repos: RepoWithLive[]
   githubSlugOrder?: string[]
   initialRescoreSummaries?: Record<string, RescoreSummaryRecord>
+  repoCollections?: Record<RepoCollectionId, string[]>
 }
 
-export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSummaries = {} }: Props) {
+export default function RepoList({
+  repos,
+  githubSlugOrder = [],
+  initialRescoreSummaries = {},
+  repoCollections,
+}: Props) {
   const [activeFilter, setActiveFilter] = useState<RepoFilter>('all')
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
   const [sortBy, setSortBy] = useState<RepoSort>('recent')
@@ -447,6 +483,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
   const { unlocked } = useClawdAccess()
   const isMobile = useIsMobile()
   const d = CARD
+  const collectionSets = buildCollectionSets(repoCollections)
 
   useEffect(() => {
     setRepoItems(repos)
@@ -479,9 +516,11 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
     )
   }
 
-  const filters: { key: RepoFilter; label: string }[] = [
+  const filters: { key: RepoFilter; label: string; title?: string }[] = [
     { key: 'all', label: 'All' },
     { key: 'burn-apps', label: 'Burn apps' },
+    { key: 'cv-related', label: 'CV & gov', title: REPO_COLLECTIONS.find(c => c.id === 'cv-related')?.tooltip },
+    { key: 'clawd-gated', label: 'CLAWD-gated', title: REPO_COLLECTIONS.find(c => c.id === 'clawd-gated')?.tooltip },
     { key: 'leverage', label: 'Leverage' },
     { key: 'direct', label: 'Direct' },
     { key: 'supply-lock', label: 'Supply lock' },
@@ -490,7 +529,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
     { key: 'theoretical', label: 'Theoretical' },
   ]
 
-  const tagFiltered = repoItems.filter(r => repoMatchesFilter(r, activeFilter))
+  const tagFiltered = repoItems.filter(r => repoMatchesFilter(r, activeFilter, collectionSets))
   const activeInPeriod = tagFiltered.filter(r => repoCommitsForPeriodKey(r, repoPeriod) > 0)
   const filtered = (activityScope === 'active' ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
@@ -571,6 +610,10 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
       ? rowDeltaByLabel(diffRubricRows(rescoreMeta.oldRubrics.builderIntegrity, repo.builderIntegrity.rubric))
       : null
     const economicCol = economicColumnMeta(repo)
+    const collectionIds = collectionIdsForSlug(repo.githubSlug, {
+      'cv-related': [...collectionSets['cv-related']],
+      'clawd-gated': [...collectionSets['clawd-gated']],
+    })
 
     return (
       <div
@@ -662,6 +705,28 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                     {criticalPath.roleBadge}
                   </RepoBadge>
                 )}
+                {collectionIds.map(id => {
+                  const badge = COLLECTION_BADGE[id]
+                  const def = REPO_COLLECTIONS.find(c => c.id === id)
+                  return (
+                    <RepoBadge
+                      key={id}
+                      tooltip={def?.tooltip ?? badge.label}
+                      style={{
+                        fontSize: '10px',
+                        padding: '2px 7px',
+                        borderRadius: '99px',
+                        fontWeight: 500,
+                        color: badge.color,
+                        background: badge.bg,
+                        letterSpacing: '0.02em',
+                        display: 'inline-block',
+                      }}
+                    >
+                      {badge.label}
+                    </RepoBadge>
+                  )
+                })}
                 {!pending && (
                   <RepoBadge
                     tooltip={LIFECYCLE_TOOLTIPS[lifecycle]}
@@ -1054,6 +1119,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
               active={activeFilter === f.key}
               onClick={() => setActiveFilter(f.key)}
               isMobile={isMobile}
+              title={f.title}
             >
               {f.label}
             </PillButton>

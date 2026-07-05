@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { REPOS } from '@/lib/scores'
 import { BULK_REGEN_DEFAULT_BATCH } from '@/lib/bulkRegenConfig'
+import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
 
 export default function AdminPage() {
   const [password, setPassword] = useState('')
@@ -33,6 +34,17 @@ export default function AdminPage() {
   const [bulkResult, setBulkResult] = useState<string | null>(null)
   const [bulkFlushAck, setBulkFlushAck] = useState(false)
   const [backupDownloaded, setBackupDownloaded] = useState(false)
+  const [collections, setCollections] = useState<Record<RepoCollectionId, string[]>>({
+    'cv-related': [],
+    'clawd-gated': [],
+  })
+  const [forceInclude, setForceInclude] = useState<string[]>([])
+  const [collectionInputs, setCollectionInputs] = useState<Record<RepoCollectionId, string>>({
+    'cv-related': '',
+    'clawd-gated': '',
+  })
+  const [forceIncludeInput, setForceIncludeInput] = useState('')
+  const [collectionBusy, setCollectionBusy] = useState<string | null>(null)
 
   async function refreshGitHubData() {
     setRefreshRunning(true)
@@ -128,6 +140,8 @@ export default function AdminPage() {
       setAutoScored(data.autoScored ?? [])
       setChronicleContextText(data.chronicleContext ?? '')
       setEcosystemContextText(data.ecosystemContext ?? '')
+      setCollections(data.collections ?? { 'cv-related': [], 'clawd-gated': [] })
+      setForceInclude(data.forceInclude ?? [])
       void loadBulkStatus()
     } else {
       setAuthError('Wrong password.')
@@ -152,6 +166,60 @@ export default function AdminPage() {
       return next
     })
     setTogglingExclude(null)
+  }
+
+  async function addCollectionMember(collectionId: RepoCollectionId) {
+    const slug = collectionInputs[collectionId].trim()
+    if (!slug) return
+    setCollectionBusy(`add:${collectionId}:${slug}`)
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'addCollectionSlug', password, collectionId, slug }),
+    })
+    const data = await res.json()
+    if (data.ok && data.collections) setCollections(data.collections)
+    setCollectionInputs(prev => ({ ...prev, [collectionId]: '' }))
+    setCollectionBusy(null)
+  }
+
+  async function removeCollectionMember(collectionId: RepoCollectionId, slug: string) {
+    setCollectionBusy(`rm:${collectionId}:${slug}`)
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'removeCollectionSlug', password, collectionId, slug }),
+    })
+    const data = await res.json()
+    if (data.ok && data.collections) setCollections(data.collections)
+    setCollectionBusy(null)
+  }
+
+  async function addForceIncludeMember() {
+    const slug = forceIncludeInput.trim()
+    if (!slug) return
+    setCollectionBusy(`fi-add:${slug}`)
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'addForceInclude', password, slug }),
+    })
+    const data = await res.json()
+    if (data.ok && data.forceInclude) setForceInclude(data.forceInclude)
+    setForceIncludeInput('')
+    setCollectionBusy(null)
+  }
+
+  async function removeForceIncludeMember(slug: string) {
+    setCollectionBusy(`fi-rm:${slug}`)
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'removeForceInclude', password, slug }),
+    })
+    const data = await res.json()
+    if (data.ok && data.forceInclude) setForceInclude(data.forceInclude)
+    setCollectionBusy(null)
   }
 
   async function saveChronicleContext() {
@@ -501,6 +569,185 @@ export default function AdminPage() {
           >
             {savingEcosystem ? 'Saving…' : ecosystemSaved ? 'Saved ✓' : 'Save ecosystem context'}
           </button>
+        </div>
+      </div>
+
+      {/* Filter collections — homepage repo filters */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Filter collections</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px', lineHeight: 1.6 }}>
+            Curated slug lists for homepage filters (CV &amp; gov, CLAWD-gated). Add or remove GitHub slugs — no deploy needed.
+            Defaults are baked in; removals hide defaults, additions extend the list.
+          </p>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+          {REPO_COLLECTIONS.map(def => (
+            <div
+              key={def.id}
+              style={{
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '14px 16px',
+              }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>{def.label}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.45 }}>
+                {def.tooltip}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                {(collections[def.id] ?? []).map(slug => (
+                  <span
+                    key={slug}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '3px 8px',
+                      borderRadius: '99px',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    {slug}
+                    <button
+                      type="button"
+                      onClick={() => void removeCollectionMember(def.id, slug)}
+                      disabled={collectionBusy === `rm:${def.id}:${slug}`}
+                      style={{ fontSize: '10px', color: 'var(--text-muted)', padding: 0 }}
+                      aria-label={`Remove ${slug}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                {!collections[def.id]?.length && (
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No slugs</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  value={collectionInputs[def.id]}
+                  onChange={e => setCollectionInputs(prev => ({ ...prev, [def.id]: e.target.value }))}
+                  placeholder="github-slug"
+                  style={{
+                    flex: 1,
+                    fontSize: '12px',
+                    fontFamily: 'var(--font-mono)',
+                    padding: '6px 10px',
+                    borderRadius: 'var(--radius)',
+                    border: '1px solid var(--border)',
+                    background: 'var(--surface-2)',
+                    color: 'var(--text-primary)',
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') void addCollectionMember(def.id)
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => void addCollectionMember(def.id)}
+                  disabled={!collectionInputs[def.id].trim() || collectionBusy?.startsWith(`add:${def.id}`)}
+                  style={{
+                    fontSize: '12px',
+                    padding: '6px 12px',
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--accent-dim)',
+                    color: 'var(--accent)',
+                    border: '1px solid var(--accent-border)',
+                  }}
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            marginTop: '16px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '14px 16px',
+            maxWidth: '520px',
+          }}
+        >
+          <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '4px' }}>Force-track repos</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.45 }}>
+            Bypass job-* / cv-* skip rules so repos like <code style={{ fontSize: '10px' }}>leftclaw-service-job-66</code> appear in the list. Run GitHub refresh after adding.
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+            {forceInclude.map(slug => (
+              <span
+                key={slug}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-mono)',
+                  padding: '3px 8px',
+                  borderRadius: '99px',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                {slug}
+                <button
+                  type="button"
+                  onClick={() => void removeForceIncludeMember(slug)}
+                  disabled={collectionBusy === `fi-rm:${slug}`}
+                  style={{ fontSize: '10px', color: 'var(--text-muted)', padding: 0 }}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+            {!forceInclude.length && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>None — job-* repos stay hidden</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              value={forceIncludeInput}
+              onChange={e => setForceIncludeInput(e.target.value)}
+              placeholder="leftclaw-service-job-66"
+              style={{
+                flex: 1,
+                fontSize: '12px',
+                fontFamily: 'var(--font-mono)',
+                padding: '6px 10px',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--border)',
+                background: 'var(--surface-2)',
+                color: 'var(--text-primary)',
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') void addForceIncludeMember()
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => void addForceIncludeMember()}
+              disabled={!forceIncludeInput.trim()}
+              style={{
+                fontSize: '12px',
+                padding: '6px 12px',
+                borderRadius: 'var(--radius)',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              Track
+            </button>
+          </div>
         </div>
       </div>
 

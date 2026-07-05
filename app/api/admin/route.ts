@@ -5,6 +5,14 @@ import { flushAutoScore, listCachedAutoScores } from '@/lib/autoscore'
 import { getChronicleContext, setChronicleContext } from '@/lib/chronicleContext'
 import { getEcosystemContext, setEcosystemContext } from '@/lib/ecosystemContext'
 import { getExcludedSlugs, setRepoExcluded } from '@/lib/repoExclude'
+import {
+  addCollectionSlug,
+  addTrackableForceInclude,
+  getCollectionsAdminState,
+  isRepoCollectionId,
+  removeCollectionSlug,
+  removeTrackableForceInclude,
+} from '@/lib/repoCollections'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -19,6 +27,7 @@ export async function POST(req: NextRequest) {
     const excluded = await getExcludedSlugs()
     const chronicleContext = await getChronicleContext()
     const ecosystemContext = await getEcosystemContext()
+    const { collections, forceInclude } = await getCollectionsAdminState()
     return NextResponse.json({
       ok: true,
       notes,
@@ -26,6 +35,8 @@ export async function POST(req: NextRequest) {
       excluded,
       chronicleContext: chronicleContext ?? '',
       ecosystemContext: ecosystemContext ?? '',
+      collections,
+      forceInclude,
     })
   }
 
@@ -58,6 +69,48 @@ export async function POST(req: NextRequest) {
     await setRepoExcluded(slug, action === 'exclude')
     revalidatePath('/')
     return NextResponse.json({ ok: true })
+  }
+
+  if (action === 'addCollectionSlug') {
+    const collectionId = typeof body.collectionId === 'string' ? body.collectionId : ''
+    const slug = typeof body.slug === 'string' ? body.slug.trim() : ''
+    if (!isRepoCollectionId(collectionId) || !slug) {
+      return NextResponse.json({ ok: false, error: 'Invalid collection or slug' }, { status: 400 })
+    }
+    await addCollectionSlug(collectionId, slug)
+    revalidatePath('/')
+    const { collections } = await getCollectionsAdminState()
+    return NextResponse.json({ ok: true, collections })
+  }
+
+  if (action === 'removeCollectionSlug') {
+    const collectionId = typeof body.collectionId === 'string' ? body.collectionId : ''
+    const slug = typeof body.slug === 'string' ? body.slug.trim() : ''
+    if (!isRepoCollectionId(collectionId) || !slug) {
+      return NextResponse.json({ ok: false, error: 'Invalid collection or slug' }, { status: 400 })
+    }
+    await removeCollectionSlug(collectionId, slug)
+    revalidatePath('/')
+    const { collections } = await getCollectionsAdminState()
+    return NextResponse.json({ ok: true, collections })
+  }
+
+  if (action === 'addForceInclude') {
+    const slug = typeof body.slug === 'string' ? body.slug.trim() : ''
+    if (!slug) return NextResponse.json({ ok: false, error: 'Missing slug' }, { status: 400 })
+    await addTrackableForceInclude(slug)
+    revalidatePath('/')
+    const { forceInclude } = await getCollectionsAdminState()
+    return NextResponse.json({ ok: true, forceInclude })
+  }
+
+  if (action === 'removeForceInclude') {
+    const slug = typeof body.slug === 'string' ? body.slug.trim() : ''
+    if (!slug) return NextResponse.json({ ok: false, error: 'Missing slug' }, { status: 400 })
+    await removeTrackableForceInclude(slug)
+    revalidatePath('/')
+    const { forceInclude } = await getCollectionsAdminState()
+    return NextResponse.json({ ok: true, forceInclude })
   }
 
   return NextResponse.json({ ok: false, error: 'Unknown action' }, { status: 400 })

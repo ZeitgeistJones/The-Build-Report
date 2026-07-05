@@ -4,6 +4,7 @@ import { REPOS } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
 import { makeUnscoredRecentRepo } from '@/lib/recentRepos'
+import { getAllCollectionSlugs, getTrackableForceIncludeSet } from '@/lib/repoCollections'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { getExcludedSlugs, applyExcludedToRepos, filterPublicRepos } from '@/lib/repoExclude'
 import {
@@ -50,10 +51,15 @@ export default async function Home() {
   const excludedMap = await getExcludedSlugs()
   const excludedSlugs = new Set(Object.keys(excludedMap).filter(k => excludedMap[k]))
 
+  const [collectionSlugs, forceIncludeSet] = await Promise.all([
+    getAllCollectionSlugs().catch(() => ({ 'cv-related': [] as string[], 'clawd-gated': [] as string[] })),
+    getTrackableForceIncludeSet().catch(() => new Set<string>()),
+  ])
+
   const trackableGithub = stats?.trackableRepos ?? []
   const cacheSlugs = cacheLookupSlugs(REPOS, trackableGithub, excludedSlugs)
   const autoScoredRaw = cacheSlugs.length > 0 ? await getCachedAutoScoresForSlugs(cacheSlugs) : []
-  const autoScored = autoScoredRaw.filter(r => !shouldSkipRepo(r.githubSlug))
+  const autoScored = autoScoredRaw.filter(r => !shouldSkipRepo(r.githubSlug, { forceInclude: forceIncludeSet }))
 
   const allRepos = filterPublicRepos(applyExcludedToRepos(mergeRepoSources(REPOS, autoScored), excludedMap))
 
@@ -291,7 +297,12 @@ export default async function Home() {
         </div>
       )}
 
-      <RepoList repos={repos} githubSlugOrder={githubOrder} initialRescoreSummaries={rescoreSummaries} />
+      <RepoList
+        repos={repos}
+        githubSlugOrder={githubOrder}
+        initialRescoreSummaries={rescoreSummaries}
+        repoCollections={collectionSlugs}
+      />
       </div>
 
       <HowWeScoreSection />

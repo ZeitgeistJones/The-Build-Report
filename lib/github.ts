@@ -1,5 +1,6 @@
 import { REPOS } from './scores'
 import { shouldSkipRepo } from './repoFilters'
+import { getTrackableForceIncludeSet } from './repoCollections'
 import { setLastGithubScanAt } from './githubScan'
 
 const GITHUB_ORG = 'clawdbotatg'
@@ -301,7 +302,8 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
     }))
     .sort((a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime())
 
-  const trackableRepos = sortedRepos.filter(r => !shouldSkipRepo(r.name))
+  const forceInclude = await getTrackableForceIncludeSet()
+  const trackableRepos = sortedRepos.filter(r => !shouldSkipRepo(r.name, { forceInclude }))
 
   if (!rateLimited) {
     await setLastGithubScanAt(new Date().toISOString()).catch(() => {})
