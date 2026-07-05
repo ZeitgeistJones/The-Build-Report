@@ -611,8 +611,8 @@ export default function RepoList({
       : null
     const economicCol = economicColumnMeta(repo)
     const collectionIds = collectionIdsForSlug(repo.githubSlug, {
-      'cv-related': [...collectionSets['cv-related']],
-      'clawd-gated': [...collectionSets['clawd-gated']],
+      'cv-related': Array.from(collectionSets['cv-related']),
+      'clawd-gated': Array.from(collectionSets['clawd-gated']),
     })
 
     return (
