@@ -61,6 +61,7 @@ import {
   criticalPathTooltip,
   ECONOMIC_NA_TOOLTIP,
   LIFECYCLE_TOOLTIPS,
+  commitsColumnTooltip,
   SHIPPING_LEVERAGE_COLUMN_TOOLTIP,
   SUPPLY_LOCK_TM_COLUMN_TOOLTIP,
   DIRECT_TM_COLUMN_TOOLTIP,
@@ -98,6 +99,18 @@ const STALE_AMBER = '#f59e0b'
 const STALE_RED = '#ef4444'
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const GITHUB_COMMITS_CAP = 100
+
+const PERIOD_WINDOW_LABEL: Record<Period, string> = {
+  '7d': 'last 7 days',
+  '30d': 'last 30 days',
+  '60d': 'last 60 days',
+}
+
+function commitCountColor(count: number): string {
+  if (count === 0) return 'var(--text-muted)'
+  if (count < 5) return '#7aab82'
+  return '#5cb87a'
+}
 
 type ScoreAgeDisplay =
   | { kind: 'hidden' }
@@ -475,7 +488,7 @@ export default function RepoList({
 }: Props) {
   const [activeFilter, setActiveFilter] = useState<RepoFilter>('all')
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
-  const [sortBy, setSortBy] = useState<RepoSort>('recent')
+  const [sortBy, setSortBy] = useState<RepoSort>('commits')
   const [repoPeriod, setRepoPeriod] = useState<Period>('30d')
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
@@ -593,7 +606,6 @@ export default function RepoList({
     const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
     const periodCommits = repoCommitsForPeriod(repo, repoPeriod)
     const lifecycle = computeRepoLifecycle(repo, periodCommits)
-    const commitSuffix = periodCommits > 0 ? ` · ${periodCommits} commits (${periodKeyLabel(repoPeriod)})` : ''
     const sinceScored = getScoreAgeDisplay(repo, pending)
     const criticalPath = getCriticalPathRole(repo.githubSlug)
     const lcStyle = LIFECYCLE_STYLES[lifecycle]
@@ -799,7 +811,7 @@ export default function RepoList({
                 marginTop: '2px',
                 ...(isMobile ? { lineHeight: 1.45 } : {}),
               }}>
-                Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}{commitSuffix}
+                Last pushed {timeAgo(repo.pushedAt ?? repo.lastCommitAt)}
                 {sinceScored.kind === 'baseline' && (
                   <>
                     {' · '}
@@ -837,12 +849,28 @@ export default function RepoList({
               ...(isMobile ? { width: '100%', justifyContent: 'space-between' } : {}),
             }}>
               {pending ? (
+                <>
                 <div style={{ textAlign: 'center', minWidth: '88px', paddingTop: '3px' }}>
                   <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>Pending</div>
                   <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.3 }}>
                     not yet scored
                   </div>
                 </div>
+
+                <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
+
+                <RepoBadge
+                  tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits)}
+                  style={{ textAlign: 'center', minWidth: '36px', display: 'block' }}
+                >
+                  <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: commitCountColor(periodCommits) }}>
+                    {periodCommits}
+                  </div>
+                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                    commits<br />{periodKeyLabel(repoPeriod)}
+                  </div>
+                </RepoBadge>
+                </>
               ) : (
               <>
               {economicNa ? (
@@ -908,6 +936,20 @@ export default function RepoList({
                 <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>builder<br />integrity</div>
               </div>
+
+              <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
+
+              <RepoBadge
+                tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits)}
+                style={{ textAlign: 'center', minWidth: '36px', display: 'block' }}
+              >
+                <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: commitCountColor(periodCommits) }}>
+                  {periodCommits}
+                </div>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                  commits<br />{periodKeyLabel(repoPeriod)}
+                </div>
+              </RepoBadge>
 
               <div style={{ fontSize: '14px', color: 'var(--text-muted)', paddingTop: '3px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>
                 ↓
@@ -1129,7 +1171,7 @@ export default function RepoList({
             Recent
           </PillButton>
           <PillButton active={sortBy === 'commits'} onClick={() => setSortBy('commits')} isMobile={isMobile}>
-            Commits
+            Most active
           </PillButton>
           <PillButton active={sortBy === 'grade'} onClick={() => setSortBy('grade')} isMobile={isMobile}>
             Grades

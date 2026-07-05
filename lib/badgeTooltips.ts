@@ -33,3 +33,11 @@ export const DIRECT_TM_COLUMN_TOOLTIP =
 export function criticalPathTooltip(roleBadge: string): string {
   return `${roleBadge} — locked tag on the builder critical path. Floor grades at C when functioning as designed.`
 }
+
+export function commitsColumnTooltip(windowLabel: string, count: number): string {
+  const activity =
+    count === 0
+      ? `No commits in the ${windowLabel}.`
+      : `${count} commit${count === 1 ? '' : 's'} in the ${windowLabel}.`
+  return `${activity} Sampled GitHub scan — may show 0 if the repo was not in the scan batch.`
+}
