@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runAutoscorePipeline } from '@/lib/autoscorePipeline'
 import { generateAndCacheBuildBrief, loadReposForBrief } from '@/lib/buildBrief'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
+import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const result = await runAutoscorePipeline({ fresh: true })
+    await syncGitHubStatsSnapshot(result.stats)
     const repos = await loadReposForBrief(result.stats)
     const brief = await generateAndCacheBuildBrief(result.stats, repos)
     const burnSnapshot = await syncBurnSnapshot()

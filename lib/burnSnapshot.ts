@@ -5,6 +5,7 @@ import { fetchOnChainBurnTotals } from '@/lib/clawdBurnIndex'
 const CLAWD_BURNED_KEY = 'build-report:burns:hub:clawdBurned'
 const LAST_BURN_AT_KEY = 'build-report:burns:hub:lastBurnAt'
 const UPDATED_AT_KEY = 'build-report:burns:hub:updatedAt'
+const LEGACY_ONCHAIN_CACHE_KEY = 'build-report:burns:onchain-cache'
 
 export type BurnSnapshot = {
   clawdBurned: number
@@ -42,11 +43,30 @@ export async function getBurnSnapshotForDisplay(): Promise<BurnSnapshot> {
       r.get<string | null>(UPDATED_AT_KEY),
     ])
 
-    return {
-      clawdBurned: typeof clawdBurnedRaw === 'number' ? clawdBurnedRaw : 0,
-      lastBurnAt: lastBurnAt ?? null,
-      updatedAt: updatedAt ?? null,
+    if (typeof clawdBurnedRaw === 'number') {
+      return {
+        clawdBurned: clawdBurnedRaw,
+        lastBurnAt: lastBurnAt ?? null,
+        updatedAt: updatedAt ?? null,
+      }
     }
+
+    const legacy = await r.get<{ clawdBurned: number; lastBurnAt: string | null }>(LEGACY_ONCHAIN_CACHE_KEY)
+    if (legacy && typeof legacy.clawdBurned === 'number') {
+      const migrated: BurnSnapshot = {
+        clawdBurned: legacy.clawdBurned,
+        lastBurnAt: legacy.lastBurnAt ?? null,
+        updatedAt: new Date().toISOString(),
+      }
+      await Promise.all([
+        r.set(CLAWD_BURNED_KEY, migrated.clawdBurned),
+        r.set(LAST_BURN_AT_KEY, migrated.lastBurnAt),
+        r.set(UPDATED_AT_KEY, migrated.updatedAt),
+      ])
+      return migrated
+    }
+
+    return { clawdBurned: 0, lastBurnAt: null, updatedAt: null }
   } catch {
     return { clawdBurned: 0, lastBurnAt: null, updatedAt: null }
   }

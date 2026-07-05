@@ -3,6 +3,7 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 import { verifyAdminPassword } from '@/lib/admin'
 import { getGitHubStats } from '@/lib/github'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
+import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
 
 export const maxDuration = 300
 
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const stats = await getGitHubStats({ fresh: true })
+    await syncGitHubStatsSnapshot(stats)
     const burnSnapshot = await syncBurnSnapshot()
     revalidateTag('github-stats')
     revalidatePath('/')

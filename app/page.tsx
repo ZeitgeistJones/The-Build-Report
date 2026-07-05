@@ -1,4 +1,5 @@
 import { getGitHubStats, timeAgo } from '@/lib/github'
+import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 import { REPOS } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
@@ -34,16 +35,21 @@ export const dynamic = 'force-dynamic'
 export default async function Home() {
   let stats
   let error = false
-  const [rescoreBurns, buildBrief] = await Promise.all([
+  const [rescoreBurns, buildBrief, statsFromSnapshot] = await Promise.all([
     getRescoreBurnStats().catch(() => null),
     getBuildBrief().catch(() => null),
+    getGitHubStatsForDisplay().catch(() => null),
   ])
 
-  try {
-    stats = await getGitHubStats()
-  } catch {
-    error = true
-    stats = null
+  if (statsFromSnapshot) {
+    stats = statsFromSnapshot
+  } else {
+    try {
+      stats = await getGitHubStats()
+    } catch {
+      error = true
+      stats = null
+    }
   }
 
   const adminNotes = await getAdminNotes()
