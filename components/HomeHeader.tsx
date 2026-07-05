@@ -11,9 +11,11 @@ interface Props {
     lastBurnAt: string | null
   } | null
   latestCommitLabel?: string | null
+  dataAsOfLabel?: string | null
+  dataStale?: boolean
 }
 
-export default function HomeHeader({ rescoreBurns, latestCommitLabel }: Props) {
+export default function HomeHeader({ rescoreBurns, latestCommitLabel, dataAsOfLabel, dataStale }: Props) {
   const isMobile = useIsMobile()
   const showBurn =
     rescoreBurns &&
@@ -51,6 +53,15 @@ export default function HomeHeader({ rescoreBurns, latestCommitLabel }: Props) {
             <>
               {' '}
               · {latestCommitLabel}
+            </>
+          )}
+          {dataAsOfLabel && (
+            <>
+              {' '}
+              · Updated {dataAsOfLabel}
+              {dataStale && (
+                <span style={{ color: 'var(--text-muted)' }}> (refresh delayed)</span>
+              )}
             </>
           )}
         </p>

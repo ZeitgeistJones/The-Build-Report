@@ -4,3 +4,4 @@
 node_modules
 .cursor/
 *.plan.md
+tsconfig.tsbuildinfo

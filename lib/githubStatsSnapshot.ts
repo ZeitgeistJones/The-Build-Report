@@ -29,10 +29,35 @@ function normalizeStats(raw: unknown): GitHubStats | null {
   return { ...s, totalRepos } as GitHubStats
 }
 
-/** Write path — call after getGitHubStats({ fresh: true }) in cron/admin/live fallback. */
+/** Materially smaller than last good = likely a partial/failed scan, not a real shrink. */
+const MIN_TRACKABLE_RETENTION = 0.8
+
+/**
+ * Write path — call after getGitHubStats({ fresh: true }) in cron/admin/live fallback.
+ * Never overwrites an existing good snapshot with a rate-limited or partial one; on skip
+ * it keeps the last good snapshot and returns that snapshot's updatedAt.
+ */
 export async function syncGitHubStatsSnapshot(stats: GitHubStats): Promise<string> {
-  const updatedAt = new Date().toISOString()
   const r = getRedis()
+
+  const existing = await getGitHubStatsForDisplay()
+  if (existing) {
+    const existingCount = existing.trackableRepos?.length ?? 0
+    const incomingCount = stats.trackableRepos?.length ?? 0
+    const materiallySmaller =
+      existingCount > 0 && incomingCount < existingCount * MIN_TRACKABLE_RETENTION
+
+    if (stats.rateLimited || materiallySmaller) {
+      const reason = stats.rateLimited
+        ? 'rate-limited scan'
+        : `fewer trackable repos (${incomingCount} < ${existingCount})`
+      console.warn(`[github-snapshot] skipping overwrite (${reason}); keeping last good snapshot`)
+      const existingUpdatedAt = await getGitHubStatsSnapshotUpdatedAt()
+      return existingUpdatedAt ?? new Date().toISOString()
+    }
+  }
+
+  const updatedAt = new Date().toISOString()
   await Promise.all([
     r.set(SNAPSHOT_KEY, stats),
     r.set(SNAPSHOT_UPDATED_AT_KEY, updatedAt),
@@ -83,13 +108,46 @@ export async function getGitHubStatsSnapshotDiagnostics(): Promise<{
   }
 }
 
+/** Just past the daily cron cadence — a snapshot older than this means a cron likely failed. */
+const SNAPSHOT_STALE_MS = 26 * 60 * 60 * 1000
+let staleRefreshInFlight = false
+
+function isSnapshotStale(updatedAt: string | null): boolean {
+  if (!updatedAt) return true
+  const age = Date.now() - new Date(updatedAt).getTime()
+  return !Number.isFinite(age) || age > SNAPSHOT_STALE_MS
+}
+
+/**
+ * Fire-and-forget refresh when the snapshot is stale. Best-effort: never blocks render,
+ * and the module-level flag avoids stacking refreshes when many visitors hit a stale page.
+ */
+function scheduleStaleSnapshotRefresh(): void {
+  if (staleRefreshInFlight) return
+  staleRefreshInFlight = true
+  void (async () => {
+    try {
+      const fresh = await getGitHubStats({ fresh: true })
+      await syncGitHubStatsSnapshot(fresh)
+    } catch (err) {
+      console.error('[github-snapshot] stale self-heal refresh failed', err)
+    } finally {
+      staleRefreshInFlight = false
+    }
+  })()
+}
+
 /** Snapshot first; on miss fetch live GitHub once and persist for subsequent visits. */
 export async function loadGitHubStatsForPage(): Promise<{
   stats: GitHubStats | null
   source: 'snapshot' | 'live' | 'none'
 }> {
   const cached = await getGitHubStatsForDisplay()
-  if (cached) return { stats: cached, source: 'snapshot' }
+  if (cached) {
+    const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
+    if (isSnapshotStale(updatedAt)) scheduleStaleSnapshotRefresh()
+    return { stats: cached, source: 'snapshot' }
+  }
 
   try {
     const live = await getGitHubStats()

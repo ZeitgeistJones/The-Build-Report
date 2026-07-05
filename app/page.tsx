@@ -1,5 +1,5 @@
 import { timeAgo } from '@/lib/github'
-import { loadGitHubStatsForPage } from '@/lib/githubStatsSnapshot'
+import { loadGitHubStatsForPage, getGitHubStatsSnapshotUpdatedAt } from '@/lib/githubStatsSnapshot'
 import { getTrackableLastCommit } from '@/lib/github'
 import { REPOS } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
@@ -46,6 +46,12 @@ export default async function Home() {
   stats = loadedStats
   if (loadedSource === 'none') error = true
   const trackableLastCommit = stats ? getTrackableLastCommit(stats) : { lastCommitAt: null, lastCommitRepo: null }
+
+  const snapshotUpdatedAt = await getGitHubStatsSnapshotUpdatedAt().catch(() => null)
+  const dataAsOfLabel = snapshotUpdatedAt ? timeAgo(snapshotUpdatedAt) : null
+  const dataStale = snapshotUpdatedAt
+    ? Date.now() - new Date(snapshotUpdatedAt).getTime() > 26 * 60 * 60 * 1000
+    : false
 
   const [adminNotes, excludedMap, collectionSlugs, forceIncludeSet] = await Promise.all([
     getAdminNotes(),
@@ -138,6 +144,8 @@ export default async function Home() {
         <HomeHeader
           rescoreBurns={rescoreBurns}
           latestCommitLabel={trackableLastCommit.lastCommitAt ? `Latest commit ${timeAgo(trackableLastCommit.lastCommitAt)}` : null}
+          dataAsOfLabel={dataAsOfLabel}
+          dataStale={dataStale}
         />
       </div>
 
