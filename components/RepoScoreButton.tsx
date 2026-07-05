@@ -15,6 +15,7 @@ import {
   shouldConfirmRescore,
   type RepoActivitySnapshot,
 } from '@/lib/rescoreGuards'
+import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import InfoTooltip from '@/components/InfoTooltip'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
@@ -51,6 +52,12 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
   const busy = phase !== 'idle' || isSending
   const showScoreMeta = scoringStatus === 'scored' && activity.scoredAt
+  const { hasNew: hasNewCommitsSinceScore } = countCommitsSinceScore(
+    activity.scoredAt,
+    activity.commitTimestamps,
+    { lastCommitAt: activity.lastCommitAt, pushedAt: activity.pushedAt },
+  )
+  const nudgeRescore = Boolean(showScoreMeta) && hasNewCommitsSinceScore && !busy
 
   async function runRescore() {
     if (!address) return
@@ -158,7 +165,12 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       {showScoreMeta && (
         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35 }}>
           <div>Last scored {formatScoredDateLabel(activity.scoredAt)}</div>
-          <div>{commitsSinceScoreLabel(activity)}</div>
+          <div style={nudgeRescore ? { color: 'var(--accent)', fontWeight: 500 } : undefined}>
+            {commitsSinceScoreLabel(activity)}
+          </div>
+          {nudgeRescore && (
+            <div style={{ color: 'var(--accent)', fontWeight: 500 }}>Rescore to update ↑</div>
+          )}
         </div>
       )}
 
