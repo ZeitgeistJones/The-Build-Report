@@ -535,6 +535,8 @@ export default function RepoList({
               commits7d: r.commits7d,
               commits7_14: r.commits7_14,
               commits30_60: r.commits30_60,
+              commitTimestamps: r.commitTimestamps,
+              commitsCapped: r.commitsCapped,
             }
           : r,
       ),

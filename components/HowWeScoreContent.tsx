@@ -112,7 +112,7 @@ export default function HowWeScoreContent({
               ).
             </li>
             <li style={{ marginTop: '6px' }}>
-              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Builder integrity</strong> — commit-weighted trust blend on consumer apps + supply-lock (
+              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Builder integrity</strong> — commit-weighted trust blend across all scored repos, including infrastructure (
               <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>see rubric</a>
               ).
             </li>
