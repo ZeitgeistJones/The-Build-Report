@@ -19,7 +19,7 @@ import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import InfoTooltip from '@/components/InfoTooltip'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
-import { formatScoredDateLabel, RESCORE_BUTTON_TOOLTIP } from '@/lib/scoringCopy'
+import { formatScoredDateLabel, isLaunchBaseline, RESCORE_BUTTON_TOOLTIP } from '@/lib/scoringCopy'
 
 interface Props {
   repoSlug: string
@@ -58,6 +58,8 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     { lastCommitAt: activity.lastCommitAt, pushedAt: activity.pushedAt },
   )
   const nudgeRescore = Boolean(showScoreMeta) && hasNewCommitsSinceScore && !busy
+  const nudgeBaselineRefresh =
+    Boolean(showScoreMeta) && isLaunchBaseline(activity.adminNote) && !nudgeRescore && !busy
 
   async function runRescore() {
     if (!address) return
@@ -170,6 +172,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           </div>
           {nudgeRescore && (
             <div style={{ color: 'var(--accent)', fontWeight: 500 }}>Rescore to update ↑</div>
+          )}
+          {nudgeBaselineRefresh && (
+            <div style={{ color: 'var(--accent)', fontWeight: 500 }}>Rescore to refresh ↑</div>
           )}
         </div>
       )}
