@@ -13,6 +13,7 @@ import {
   removeCollectionSlug,
   removeTrackableForceInclude,
 } from '@/lib/repoCollections'
+import { adminRemoveSubmission } from '@/lib/communityContext'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -111,6 +112,15 @@ export async function POST(req: NextRequest) {
     revalidatePath('/')
     const { forceInclude } = await getCollectionsAdminState()
     return NextResponse.json({ ok: true, forceInclude })
+  }
+
+  if (action === 'removeContext') {
+    const submissionId = typeof body.submissionId === 'string' ? body.submissionId.trim() : ''
+    if (!submissionId) return NextResponse.json({ ok: false, error: 'Missing submissionId' }, { status: 400 })
+    const removed = await adminRemoveSubmission(submissionId)
+    console.log(`[admin] community context force-removed: ${submissionId} (found=${removed})`)
+    revalidatePath('/')
+    return NextResponse.json({ ok: removed, error: removed ? undefined : 'Submission not found' })
   }
 
   return NextResponse.json({ ok: false, error: 'Unknown action' }, { status: 400 })

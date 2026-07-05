@@ -45,6 +45,9 @@ export default function AdminPage() {
   })
   const [forceIncludeInput, setForceIncludeInput] = useState('')
   const [collectionBusy, setCollectionBusy] = useState<string | null>(null)
+  const [contextRemoveId, setContextRemoveId] = useState('')
+  const [contextRemoveBusy, setContextRemoveBusy] = useState(false)
+  const [contextRemoveResult, setContextRemoveResult] = useState<string | null>(null)
 
   async function refreshGitHubData() {
     setRefreshRunning(true)
@@ -371,6 +374,26 @@ export default function AdminPage() {
     setBulkRunning(false)
   }
 
+  async function removeCommunityContext() {
+    const submissionId = contextRemoveId.trim()
+    if (!submissionId) return
+    setContextRemoveBusy(true)
+    setContextRemoveResult(null)
+    try {
+      const res = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'removeContext', password, submissionId }),
+      })
+      const data = await res.json()
+      setContextRemoveResult(data.ok ? 'Removed — hidden from the card and the AI.' : data.error ?? 'Not found')
+      if (data.ok) setContextRemoveId('')
+    } catch {
+      setContextRemoveResult('Request failed')
+    }
+    setContextRemoveBusy(false)
+  }
+
   async function saveNote(repoId: string) {
     setSaving(repoId)
     await fetch('/api/admin', {
@@ -570,6 +593,55 @@ export default function AdminPage() {
             {savingEcosystem ? 'Saving…' : ecosystemSaved ? 'Saved ✓' : 'Save ecosystem context'}
           </button>
         </div>
+      </div>
+
+      {/* Community context moderation — emergency kill-switch */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Community context</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px', lineHeight: 1.6 }}>
+            Emergency kill-switch only. Community votes decide what gets accepted; this force-removes a specific
+            submission (by ID, visible in the public list) from both the card and future AI rescores. The removal is logged.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', maxWidth: '520px' }}>
+          <input
+            value={contextRemoveId}
+            onChange={e => setContextRemoveId(e.target.value)}
+            placeholder="submission id"
+            style={{
+              flex: 1,
+              fontSize: '12px',
+              fontFamily: 'var(--font-mono)',
+              padding: '6px 10px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface-2)',
+              color: 'var(--text-primary)',
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') void removeCommunityContext()
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => void removeCommunityContext()}
+            disabled={!contextRemoveId.trim() || contextRemoveBusy}
+            style={{
+              fontSize: '12px',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--red)',
+              border: '1px solid var(--border-strong)',
+            }}
+          >
+            {contextRemoveBusy ? 'Removing…' : 'Force-remove'}
+          </button>
+        </div>
+        {contextRemoveResult && (
+          <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>{contextRemoveResult}</div>
+        )}
       </div>
 
       {/* Filter collections — homepage repo filters */}

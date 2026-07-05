@@ -30,12 +30,14 @@ import { GradePeriodProvider } from '@/components/GradePeriodContext'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 import { getRescoreSummaries } from '@/lib/rescoreSummaries'
 import { getBuildBrief } from '@/lib/buildBrief'
+import { isCommunityContextEnabled } from '@/lib/communityContext'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
   let stats
   let error = false
+  const communityContextEnabled = isCommunityContextEnabled()
 
   const [rescoreBurns, buildBrief] = await Promise.all([
     getRescoreBurnStats().catch(() => null),
@@ -240,6 +242,7 @@ export default async function Home() {
         githubSlugOrder={githubOrder}
         initialRescoreSummaries={rescoreSummaries}
         repoCollections={collectionSlugs}
+        communityContextEnabled={communityContextEnabled}
       />
       </div>
     </>

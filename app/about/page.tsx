@@ -2,8 +2,10 @@ import {
   ABOUT_SCORE_TYPES_CALLOUT,
   ABOUT_SCORE_TYPES_SECTIONS,
 } from '@/lib/scoringCopy'
+import { isCommunityContextEnabled } from '@/lib/communityContext'
 
 export default function AboutPage() {
+  const communityContextEnabled = isCommunityContextEnabled()
   const sections = [
     {
       heading: 'What this is',
@@ -39,6 +41,18 @@ Result is shared: once a repo is scored, the result is cached in Redis and every
 
 Live AI scores read public scoring context on the How we score page. Optional Chronicle grounding can be configured in admin for richer rescore prompts.`,
     },
+    ...(communityContextEnabled
+      ? [
+          {
+            heading: 'Community context',
+            body: `Holders can submit real-world context on any repo — onchain state (e.g. a burn contract turning back on), governance changes, or utility that GitHub activity cannot show. Submitting burns a small amount of CLAWD; voting is free for CLAWD holders.
+
+Other holders vote it up or down. Enough net upvotes auto-accepts the context, which the AI then reads on the next paid rescore. Sources are encouraged — context with no source is labeled "No source provided" so voters can weigh it, and anyone can downvote fabricated claims.
+
+Accepted context is grounding the AI weighs, not a direct score override. Every submission, its votes, and its acceptance are public and permanently logged. Context that influences a score is visible on the repo card before and after it is read by a rescore.`,
+          },
+        ]
+      : []),
     {
       heading: 'Important distinctions',
       body: `CV burns are not CLAWD burns. Burning ClawdViction points removes governance tokens, not $CLAWD itself.

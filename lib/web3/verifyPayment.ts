@@ -81,7 +81,11 @@ async function getBlockTimestamp(
   )
 }
 
-export async function verifyPaymentTx(txHash: string, walletAddress: string): Promise<void> {
+export async function verifyPaymentTx(
+  txHash: string,
+  walletAddress: string,
+  expectedWei: bigint = SCORE_PAYMENT_WEI,
+): Promise<void> {
   const hash = txHash as `0x${string}`
   const client = createBaseClient()
 
@@ -107,7 +111,7 @@ export async function verifyPaymentTx(txHash: string, walletAddress: string): Pr
     throw new Error('Transaction was not sent to the receiver-buy-and-burn contract')
   }
 
-  if (tx.value !== SCORE_PAYMENT_WEI) {
+  if (tx.value !== expectedWei) {
     throw new Error('Incorrect payment amount')
   }
 
@@ -119,5 +123,35 @@ export async function verifyPaymentTx(txHash: string, walletAddress: string): Pr
   })
   if (!hasAccess) {
     throw new Error('Wallet does not meet CLAWDGate access requirements')
+  }
+}
+
+/** CLAWDGate tier-1 check without requiring a payment (used for free, signed votes). */
+export async function walletHasGateAccess(walletAddress: string): Promise<boolean> {
+  const client = createBaseClient()
+  const hasAccess = await client.readContract({
+    address: CLAWD_GATE_ADDRESS,
+    abi: CLAWD_GATE_ABI,
+    functionName: 'hasAccess',
+    args: [getAddress(walletAddress), CLAWD_GATE_TIER],
+  })
+  return !!hasAccess
+}
+
+/** Verify a personal_sign message. Uses client-side verify so smart wallets (ERC-1271/6492) work. */
+export async function verifyWalletSignature(
+  walletAddress: string,
+  message: string,
+  signature: string,
+): Promise<boolean> {
+  const client = createBaseClient()
+  try {
+    return await client.verifyMessage({
+      address: getAddress(walletAddress),
+      message,
+      signature: signature as `0x${string}`,
+    })
+  } catch {
+    return false
   }
 }

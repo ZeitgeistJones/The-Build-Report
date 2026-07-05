@@ -8,6 +8,7 @@ import { bustOverallSummaryCache } from '@/lib/overallSummary'
 import { recordRescoreBurn } from '@/lib/rescoreBurns'
 import { generateRescoreChangeSummary } from '@/lib/rescoreChangeSummary'
 import { buildRescoreSummaryRecord, saveRescoreSummary } from '@/lib/rescoreSummaries'
+import { isCommunityContextEnabled, markAcceptedConsumed } from '@/lib/communityContext'
 import { getRedis } from '@/lib/redis'
 import { PAID_TX_KEY_PREFIX } from '@/lib/web3/constants'
 import { verifyPaymentTx } from '@/lib/web3/verifyPayment'
@@ -89,6 +90,9 @@ export async function POST(req: NextRequest) {
     await redis.set(paidKey, `complete:${repoSlug}`)
     await bustOverallSummaryCache(redis)
     await recordRescoreBurn(redis)
+    if (isCommunityContextEnabled()) {
+      await markAcceptedConsumed(repoSlug, new Date().toISOString())
+    }
 
     return NextResponse.json({ ok: true, repo, changeSummary, rescoreMeta })
   } catch (err: unknown) {

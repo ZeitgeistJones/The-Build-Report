@@ -66,6 +66,7 @@ interface Props {
   chronicleContextText: string | null
   scoringContextText: string
   scoringContextOverride: boolean
+  communityContextEnabled?: boolean
 }
 
 export default function HowWeScoreContent({
@@ -73,6 +74,7 @@ export default function HowWeScoreContent({
   chronicleContextText,
   scoringContextText,
   scoringContextOverride,
+  communityContextEnabled = false,
 }: Props) {
   return (
     <>
@@ -122,6 +124,26 @@ export default function HowWeScoreContent({
           </p>
         </div>
       </section>
+
+      {communityContextEnabled && (
+        <section id="hw-score-community" style={{ marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            Community context
+          </h3>
+          <div className="how-we-score-card" style={{ ...CARD_STYLE, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            <p style={{ margin: 0 }}>
+              Holders can submit real-world context on a repo — onchain state, governance, or utility that GitHub activity
+              cannot show. Submitting burns a small amount of CLAWD; voting is free for holders. Enough net upvotes
+              auto-accepts context, which the AI then reads on the next paid rescore.
+            </p>
+            <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+              Sources are encouraged — context with no source is labeled &quot;No source provided.&quot; Accepted context is
+              grounding the AI weighs, not a direct score override. Every submission, its votes, and its acceptance are
+              public and permanently logged.
+            </p>
+          </div>
+        </section>
+      )}
 
       <ChronicleSection chronicle={chronicle} />
       <ChronicleContextSection activeText={chronicleContextText} />

@@ -50,6 +50,7 @@ import { integritySectionFraming, economicSectionFraming } from '@/lib/cardFrami
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
+import CommunityContextSection from '@/components/CommunityContextSection'
 import { BI_WEIGHTS_TOOLTIP_SHORT } from '@/lib/rubrics/builderIntegrity'
 import {
   REPO_COLLECTIONS,
@@ -490,6 +491,7 @@ interface Props {
   githubSlugOrder?: string[]
   initialRescoreSummaries?: Record<string, RescoreSummaryRecord>
   repoCollections?: Record<RepoCollectionId, string[]>
+  communityContextEnabled?: boolean
 }
 
 export default function RepoList({
@@ -497,6 +499,7 @@ export default function RepoList({
   githubSlugOrder = [],
   initialRescoreSummaries = {},
   repoCollections,
+  communityContextEnabled = false,
 }: Props) {
   const [activeFilter, setActiveFilter] = useState<RepoFilter>('all')
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
@@ -1198,6 +1201,10 @@ export default function RepoList({
                 <span style={{ color: 'var(--accent)', fontWeight: 500, marginRight: '6px' }}>Note:</span>
                 {repo.adminNote}
               </div>
+            )}
+
+            {communityContextEnabled && (
+              <CommunityContextSection repoSlug={repo.githubSlug} enabled={communityContextEnabled} />
             )}
 
             <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>

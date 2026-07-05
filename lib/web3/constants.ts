@@ -18,6 +18,8 @@ export const CLAWD_GATE_ABI = [
 
 export const RECEIVER_BUY_AND_BURN = '0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad' as const
 export const SCORE_PAYMENT_WEI = BigInt('8000000000000') // 0.000008 ETH
+/** Burn required to submit community context. Same amount as a rescore for now. */
+export const CONTEXT_SUBMIT_WEI = SCORE_PAYMENT_WEI
 
 export const RECEIVER_BUY_AND_BURN_ABI = [
   {
