@@ -18,7 +18,7 @@ export default async function HowWeScorePage() {
   const activeText = override?.trim() || DEFAULT_ECOSYSTEM_CONTEXT
 
   return (
-    <main style={{ maxWidth: '720px', margin: '0 auto', padding: '32px 20px 64px' }}>
+    <main className="how-we-score-page" style={{ maxWidth: '720px', margin: '0 auto', padding: '32px 20px 64px' }}>
       <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-muted)' }}>
         <Link href="/" style={{ color: 'var(--text-muted)' }}>
           ← Build Report

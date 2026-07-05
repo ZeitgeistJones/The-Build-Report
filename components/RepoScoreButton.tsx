@@ -16,6 +16,8 @@ import {
   type RepoActivitySnapshot,
 } from '@/lib/rescoreGuards'
 import InfoTooltip from '@/components/InfoTooltip'
+import { useIsMobile } from '@/hooks/useIsMobile'
+import { MIN_TAP } from '@/lib/responsive'
 import { formatScoredDateLabel, RESCORE_BUTTON_TOOLTIP } from '@/lib/scoringCopy'
 
 interface Props {
@@ -37,6 +39,7 @@ function RescoreTooltipContent() {
 }
 
 export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onScored }: Props) {
+  const isMobile = useIsMobile()
   const { isConnected, hasAccess, connectWallet, address, isWrongChain, switchToBase } = useClawdAccess()
   const [inlineMsg, setInlineMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -130,7 +133,8 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           disabled={busy}
           style={{
             fontSize: '11px',
-            padding: '3px 8px',
+            padding: isMobile ? '8px 12px' : '3px 8px',
+            minHeight: isMobile ? MIN_TAP : undefined,
             borderRadius: '99px',
             border: '1px solid var(--border)',
             background: 'var(--surface-2)',
@@ -182,7 +186,8 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
               }}
               style={{
                 fontSize: '10px',
-                padding: '4px 8px',
+                padding: isMobile ? '8px 12px' : '4px 8px',
+                minHeight: isMobile ? MIN_TAP : undefined,
                 borderRadius: '99px',
                 border: '1px solid var(--accent-border)',
                 background: 'var(--accent-dim)',
@@ -202,7 +207,8 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
               }}
               style={{
                 fontSize: '10px',
-                padding: '4px 8px',
+                padding: isMobile ? '8px 12px' : '4px 8px',
+                minHeight: isMobile ? MIN_TAP : undefined,
                 borderRadius: '99px',
                 border: '1px solid var(--border)',
                 background: 'transparent',

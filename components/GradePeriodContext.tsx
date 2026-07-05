@@ -110,9 +110,11 @@ export function PeriodKeyToggle({
 export function RepoWindowToggle({
   period,
   onChange,
+  stretchMobile = false,
 }: {
   period: Period
   onChange: (period: Period) => void
+  stretchMobile?: boolean
 }) {
   return (
     <PeriodButtonRow
@@ -121,6 +123,7 @@ export function RepoWindowToggle({
         if (p === '7d' || p === '30d' || p === '60d') onChange(p)
       }}
       options={REPO_WINDOW_OPTIONS}
+      stretchMobile={stretchMobile}
     />
   )
 }

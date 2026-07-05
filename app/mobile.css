@@ -121,4 +121,37 @@
   .about-prose-section {
     margin-bottom: 24px !important;
   }
+
+  main.how-we-score-page {
+    padding: 24px 16px 48px !important;
+  }
+
+  main.how-we-score-page .how-we-score-card {
+    padding: 12px 14px !important;
+  }
+
+  main.how-we-score-page pre,
+  main.how-we-score-page code {
+    overflow-x: auto;
+    max-width: 100%;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  main.how-we-score-page pre {
+    padding: 12px !important;
+  }
+
+  main.how-we-score-page details summary {
+    padding: 12px 14px !important;
+  }
+
+  main.how-we-score-page details > div {
+    padding: 0 14px 14px !important;
+  }
+
+  .build-brief-card {
+    padding: 12px 14px !important;
+    margin-bottom: 16px !important;
+  }
 }

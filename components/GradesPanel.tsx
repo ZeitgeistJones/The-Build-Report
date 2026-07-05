@@ -55,9 +55,11 @@ function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
 function RubricBreakdownTray({
   cardId,
   onClose,
+  isMobile,
 }: {
   cardId: CardId
   onClose: () => void
+  isMobile: boolean
 }) {
   const block = rubricBlockById(CARD_RUBRIC_ID[cardId])
   if (!block) return null
@@ -69,7 +71,7 @@ function RubricBreakdownTray({
         background: 'var(--surface-2)',
         border: '1px solid var(--accent-border)',
         borderRadius: 'var(--radius-lg)',
-        padding: '20px 24px',
+        padding: isMobile ? '14px 16px' : '20px 24px',
         animation: 'fadeTray 0.15s ease',
       }}
     >
@@ -122,10 +124,12 @@ function TrendDetailTray({
   cardId,
   explanation,
   onClose,
+  isMobile,
 }: {
   cardId: CardId
   explanation: TrendExplanation
   onClose: () => void
+  isMobile: boolean
 }) {
   return (
     <div
@@ -134,7 +138,7 @@ function TrendDetailTray({
         background: 'var(--surface-2)',
         border: '1px solid var(--accent-border)',
         borderRadius: 'var(--radius-lg)',
-        padding: '20px 24px',
+        padding: isMobile ? '14px 16px' : '20px 24px',
         animation: 'fadeTray 0.15s ease',
       }}
     >
@@ -441,13 +445,14 @@ export default function GradesPanel({
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: isMobile ? 'stretch' : 'center',
           marginBottom: '16px',
-          flexWrap: isMobile ? 'wrap' : 'nowrap',
+          flexDirection: isMobile ? 'column' : 'row',
+          flexWrap: isMobile ? 'nowrap' : 'nowrap',
           gap: isMobile ? '10px' : '16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: isMobile ? '10px' : '16px', flexWrap: 'wrap' }}>
           <span
             style={{
               fontSize: '11px',
@@ -462,7 +467,7 @@ export default function GradesPanel({
           <Link href="/how-we-score" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none' }}>
             How we score →
           </Link>
-          {pulse30 && pulse7 && pulse60 && (
+          {!isMobile && pulse30 && pulse7 && pulse60 && (
             <PulseMicrostats
               pulse30={pulse30}
               pulse7={pulse7}
@@ -471,7 +476,9 @@ export default function GradesPanel({
             />
           )}
         </div>
-        <PeriodToggle />
+        <div style={isMobile ? { width: '100%', display: 'flex' } : undefined}>
+          <PeriodToggle />
+        </div>
       </div>
 
       <div
@@ -612,11 +619,12 @@ export default function GradesPanel({
           cardId={selectedCard}
           explanation={selectedExplanation}
           onClose={() => setSelectedCard(null)}
+          isMobile={isMobile}
         />
       )}
 
       {rubricCard && (
-        <RubricBreakdownTray cardId={rubricCard} onClose={() => setRubricCard(null)} />
+        <RubricBreakdownTray cardId={rubricCard} onClose={() => setRubricCard(null)} isMobile={isMobile} />
       )}
     </div>
   )

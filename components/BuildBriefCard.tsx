@@ -11,6 +11,7 @@ export default function BuildBriefCard({ brief }: Props) {
 
   return (
     <div
+      className="build-brief-card"
       style={{
         marginBottom: '20px',
         padding: '14px 16px',

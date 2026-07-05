@@ -92,7 +92,7 @@ const COLLECTION_BADGE: Record<RepoCollectionId, { label: string; color: string;
   'clawd-gated': { label: 'CLAWD gate', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
 }
 
-const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20 } as const
+const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20, metricLabel: 9, pctLabel: 10 } as const
 
 const META_MUTED = '#5e5a55'
 const STALE_AMBER = '#f59e0b'
@@ -110,6 +110,16 @@ function commitCountColor(count: number): string {
   if (count === 0) return 'var(--text-muted)'
   if (count < 5) return '#7aab82'
   return '#5cb87a'
+}
+
+function MetricDivider({ show }: { show: boolean }) {
+  if (!show) return null
+  return <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
+}
+
+function cardLayout(isMobile: boolean) {
+  if (!isMobile) return CARD
+  return { ...CARD, gradeLetter: 16, metricLabel: 8, pctLabel: 9 }
 }
 
 type ScoreAgeDisplay =
@@ -495,7 +505,7 @@ export default function RepoList({
   const [rescoreSummaries, setRescoreSummaries] = useState(initialRescoreSummaries)
   const { unlocked } = useClawdAccess()
   const isMobile = useIsMobile()
-  const d = CARD
+  const d = cardLayout(isMobile)
   const collectionSets = buildCollectionSets(repoCollections)
 
   useEffect(() => {
@@ -879,32 +889,45 @@ export default function RepoList({
               </div>
             </div>
 
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              alignItems: 'flex-start',
-              flexShrink: 0,
-              ...(isMobile ? { width: '100%', justifyContent: 'space-between' } : {}),
-            }}>
+            <div style={
+              isMobile
+                ? {
+                    display: 'grid',
+                    gridTemplateColumns: pending
+                      ? 'repeat(2, minmax(0, 1fr))'
+                      : economicNa
+                        ? 'repeat(4, minmax(0, 1fr))'
+                        : 'repeat(3, minmax(0, 1fr))',
+                    gap: '6px',
+                    width: '100%',
+                    alignItems: 'start',
+                  }
+                : {
+                    display: 'flex',
+                    gap: '12px',
+                    alignItems: 'flex-start',
+                    flexShrink: 0,
+                  }
+            }>
               {pending ? (
                 <>
-                <div style={{ textAlign: 'center', minWidth: '88px', paddingTop: '3px' }}>
+                <div style={{ textAlign: 'center', minWidth: isMobile ? undefined : '88px', paddingTop: '3px' }}>
                   <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>Pending</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.3 }}>
+                  <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.3 }}>
                     not yet scored
                   </div>
                 </div>
 
-                <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
+                <MetricDivider show={!isMobile} />
 
                 <RepoBadge
                   tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits)}
-                  style={{ textAlign: 'center', minWidth: '36px', display: 'block' }}
+                  style={{ textAlign: 'center', minWidth: isMobile ? undefined : '36px', display: 'block' }}
                 >
                   <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: commitCountColor(periodCommits) }}>
                     {periodCommits}
                   </div>
-                  <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                  <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
                     commits<br />{periodKeyLabel(repoPeriod)}
                   </div>
                 </RepoBadge>
@@ -915,31 +938,31 @@ export default function RepoList({
               <>
               <RepoBadge
                 tooltip={ECONOMIC_NA_TOOLTIP}
-                style={{ textAlign: 'center', minWidth: '36px', display: 'block' }}
+                style={{ textAlign: 'center', minWidth: isMobile ? undefined : '36px', display: 'block' }}
               >
                 <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
-                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
                   not in<br />burn avg
                 </div>
               </RepoBadge>
 
-              <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
+              <MetricDivider show={!isMobile} />
 
               <RepoBadge
                 tooltip={SHIPPING_LEVERAGE_COLUMN_TOOLTIP}
-                style={{ textAlign: 'center', minWidth: '36px', display: 'block' }}
+                style={{ textAlign: 'center', minWidth: isMobile ? undefined : '36px', display: 'block' }}
               >
                 {shippingLeverage ? (
                   <>
                     <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(shippingLeverage.letter) }}>
                       {shippingLeverage.letter}
                     </div>
-                    <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{shippingLeverage.pct}%</div>
+                    <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{shippingLeverage.pct}%</div>
                   </>
                 ) : (
                   <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>—</div>
                 )}
-                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
                   shipping<br />leverage
                 </div>
               </RepoBadge>
@@ -947,44 +970,44 @@ export default function RepoList({
               ) : (
               <RepoBadge
                 tooltip={economicCol.tooltip}
-                style={{ textAlign: 'center', minWidth: '40px', display: 'block' }}
+                style={{ textAlign: 'center', minWidth: isMobile ? undefined : '40px', display: 'block' }}
               >
                 {tokenMechanic ? (
                   <>
                     <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(tokenMechanic.letter) }}>
                       {tokenMechanic.letter}
                     </div>
-                    <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{tokenMechanic.pct}%</div>
+                    <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{tokenMechanic.pct}%</div>
                   </>
                 ) : (
                   <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
                 )}
-                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
                   {economicCol.line1}<br />{economicCol.line2}
                 </div>
               </RepoBadge>
               )}
 
-              <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
+              <MetricDivider show={!isMobile} />
 
-              <div style={{ textAlign: 'center', minWidth: '40px' }}>
+              <div style={{ textAlign: 'center', minWidth: isMobile ? undefined : '40px' }}>
                 <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(repo.builderIntegrity.letter) }}>
                   {repo.builderIntegrity.letter}
                 </div>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>builder<br />integrity</div>
+                <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
+                <div style={{ fontSize: `${d.pctLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>builder<br />integrity</div>
               </div>
 
-              <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
+              <MetricDivider show={!isMobile} />
 
               <RepoBadge
                 tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits)}
-                style={{ textAlign: 'center', minWidth: '36px', display: 'block' }}
+                style={{ textAlign: 'center', minWidth: isMobile ? undefined : '36px', display: 'block' }}
               >
                 <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: commitCountColor(periodCommits) }}>
                   {periodCommits}
                 </div>
-                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
                   commits<br />{periodKeyLabel(repoPeriod)}
                 </div>
               </RepoBadge>
@@ -1190,7 +1213,7 @@ export default function RepoList({
           Repos{repoCountLabel}
         </span>
         {isMobile && <div style={{ width: '100%', height: 0 }} />}
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginLeft: isMobile ? 0 : 'auto' }}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginLeft: isMobile ? 0 : 'auto', ...(isMobile ? { width: '100%' } : {}) }}>
           {filters.map(f => (
             <PillButton
               key={f.key}
@@ -1202,7 +1225,7 @@ export default function RepoList({
               {f.label}
             </PillButton>
           ))}
-          <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />
+          {!isMobile && <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />}
           <PillButton active={sortBy === 'recent'} onClick={() => setSortBy('recent')} isMobile={isMobile}>
             Recent
           </PillButton>
@@ -1212,9 +1235,11 @@ export default function RepoList({
           <PillButton active={sortBy === 'grade'} onClick={() => setSortBy('grade')} isMobile={isMobile}>
             Grades
           </PillButton>
-          <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />
-          <RepoWindowToggle period={repoPeriod} onChange={setRepoPeriod} />
-          <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />
+          {isMobile && <div style={{ width: '100%', height: 0 }} />}
+          <div style={isMobile ? { width: '100%', display: 'flex' } : undefined}>
+            <RepoWindowToggle period={repoPeriod} onChange={setRepoPeriod} stretchMobile={isMobile} />
+          </div>
+          {!isMobile && <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />}
           <PillButton active={activityScope === 'active'} onClick={() => setActivityScope('active')} isMobile={isMobile}>
             Active
           </PillButton>

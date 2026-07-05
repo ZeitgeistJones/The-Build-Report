@@ -99,7 +99,7 @@ export default function HowWeScoreContent({
         <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
           Ecosystem grades
         </h3>
-        <div style={{ ...CARD_STYLE, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+        <div className="how-we-score-card" style={{ ...CARD_STYLE, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           <ul style={{ margin: 0, paddingLeft: '18px' }}>
             <li>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Builder activity</strong> — GitHub velocity across ~150–200 repos (
@@ -129,6 +129,7 @@ export default function HowWeScoreContent({
 
       <section
         id="hw-score-brief"
+        className="how-we-score-card"
         style={{
           marginBottom: '16px',
           ...CARD_STYLE,
@@ -171,7 +172,7 @@ export default function HowWeScoreContent({
         <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
           Letter grade scale
         </h3>
-        <div style={CARD_STYLE}>
+        <div className="how-we-score-card" style={CARD_STYLE}>
           <div className="letter-grade-scale" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
             A+ 97–100 · A 93–96 · A- 90–92 · B+ 87–89 · B 83–86 · B- 80–82 · C+ 77–79 · C 73–76 · C- 70–72 · D+ 67–69 · D 63–66 · D- 60–62 · F+ 50–59 · F 40–49 · F- below 40
           </div>

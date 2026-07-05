@@ -1,6 +1,7 @@
 'use client'
 
 import InfoTooltip from '@/components/InfoTooltip'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   APPROX_PENDING_LABEL,
   CLAWD_BURNED_TOOLTIP,
@@ -25,6 +26,7 @@ export default function RescoreBurnTracker({
   clawdBurnedOnChain,
   lastBurnAt,
 }: Props) {
+  const isMobile = useIsMobile()
   const lastBurnLabel = formatLastBurnLabel(lastBurnAt)
 
   if (count <= 0 && clawdBurnedOnChain <= 0 && ethPendingInReceiver <= 0) return null
@@ -33,13 +35,13 @@ export default function RescoreBurnTracker({
   if (lastBurnLabel) metaParts.push(lastBurnLabel)
 
   return (
-    <div style={{ textAlign: 'right', maxWidth: '200px' }}>
+    <div style={{ textAlign: isMobile ? 'left' : 'right', maxWidth: isMobile ? undefined : '200px' }}>
       <div
         style={{
           display: 'inline-flex',
           alignItems: 'baseline',
           gap: '5px',
-          justifyContent: 'flex-end',
+          justifyContent: isMobile ? 'flex-start' : 'flex-end',
         }}
       >
         <span
@@ -70,7 +72,7 @@ export default function RescoreBurnTracker({
             lineHeight: 1.4,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'flex-end',
+            justifyContent: isMobile ? 'flex-start' : 'flex-end',
             gap: '4px',
             flexWrap: 'wrap',
           }}
@@ -92,7 +94,7 @@ export default function RescoreBurnTracker({
         </div>
       )}
 
-      <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ marginTop: '6px', display: 'flex', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
         <TriggerExecuteBurnButton ethPending={ethPendingInReceiver} compact />
       </div>
     </div>
