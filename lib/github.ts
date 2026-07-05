@@ -126,18 +126,24 @@ export const SCORED_SLUGS = [
   'yet-another-builder-agent',
 ]
 
-function selectReposForActivityScan(repos: any[], maxCount = 40): any[] {
+function selectReposForActivityScan(
+  repos: any[],
+  maxCount = 40,
+  shouldInclude?: (name: string) => boolean,
+): any[] {
   const sorted = [...repos].sort(
     (a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime(),
   )
 
   const selected: any[] = []
   const seen = new Set<string>()
+  const include = (repo: any) => !shouldInclude || shouldInclude(repo.name)
 
   // Always include the most recently pushed repos (captures local-question, etc.)
   for (const repo of sorted) {
     if (selected.length >= 15) break
     if (!isWithinDays(repo.pushed_at, 60)) continue
+    if (!include(repo)) continue
     selected.push(repo)
     seen.add(repo.name)
   }
@@ -146,6 +152,7 @@ function selectReposForActivityScan(repos: any[], maxCount = 40): any[] {
     if (selected.length >= maxCount) break
     if (seen.has(repo.name)) continue
     if (!PRIORITY_SLUGS.includes(repo.name)) continue
+    if (!include(repo)) continue
     selected.push(repo)
     seen.add(repo.name)
   }
@@ -153,11 +160,29 @@ function selectReposForActivityScan(repos: any[], maxCount = 40): any[] {
   for (const repo of sorted) {
     if (selected.length >= maxCount) break
     if (seen.has(repo.name) || !isWithinDays(repo.pushed_at, 30)) continue
+    if (!include(repo)) continue
     selected.push(repo)
     seen.add(repo.name)
   }
 
   return selected
+}
+
+/** Latest commit among trackable repos (excludes job/cv noise repos). */
+export function getTrackableLastCommit(stats: GitHubStats): {
+  lastCommitAt: string | null
+  lastCommitRepo: string | null
+} {
+  let lastCommitAt: string | null = null
+  let lastCommitRepo: string | null = null
+  for (const repo of stats.trackableRepos) {
+    const at = stats.repoActivity[repo.name]?.lastCommitAt
+    if (at && (!lastCommitAt || at > lastCommitAt)) {
+      lastCommitAt = at
+      lastCommitRepo = repo.name
+    }
+  }
+  return { lastCommitAt, lastCommitRepo }
 }
 
 const RECENT_COMMITS_CAP = 20
@@ -197,7 +222,9 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
   const newRepos7_14 = repos.filter(r => isCreatedInDayRange(r.created_at, 7, 14)).length
   const newRepos30_60 = repos.filter(r => isCreatedInDayRange(r.created_at, 30, 60)).length
 
-  const reposToScan = selectReposForActivityScan(repos)
+  const forceInclude = await getTrackableForceIncludeSet()
+  const includeInActivityScan = (name: string) => !shouldSkipRepo(name, { forceInclude })
+  const reposToScan = selectReposForActivityScan(repos, 40, includeInActivityScan)
 
   const activeDaySet30 = new Set<string>()
   const activeDaySet7 = new Set<string>()
@@ -230,9 +257,11 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
       c30.forEach((c: any) => {
         const day = c.commit.author.date.slice(0, 10)
         activeDaySet30.add(day)
-        if (!lastCommitAt || c.commit.author.date > lastCommitAt) {
-          lastCommitAt = c.commit.author.date
-          lastCommitRepo = repo.name
+        if (includeInActivityScan(repo.name)) {
+          if (!lastCommitAt || c.commit.author.date > lastCommitAt) {
+            lastCommitAt = c.commit.author.date
+            lastCommitRepo = repo.name
+          }
         }
       })
 
@@ -302,7 +331,6 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
     }))
     .sort((a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime())
 
-  const forceInclude = await getTrackableForceIncludeSet()
   const trackableRepos = sortedRepos.filter(r => !shouldSkipRepo(r.name, { forceInclude }))
 
   if (!rateLimited) {

@@ -12,6 +12,8 @@ import { cacheLookupSlugs } from '@/lib/repoOrder'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 import { getRescoreSummaries } from '@/lib/rescoreSummaries'
 import { getBuildBrief } from '@/lib/buildBrief'
+import { shouldSkipRepo } from '@/lib/repoFilters'
+import { getTrackableLastCommit } from '@/lib/github'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -76,7 +78,24 @@ export async function GET() {
 
   timings.totalMs = Date.now() - totalStart
 
-  console.log('[home-perf]', JSON.stringify({ timings, statsSource, slugCount: cacheSlugs.length }))
+  const rawLastCommit = stats
+    ? { lastCommitAt: stats.lastCommitAt, lastCommitRepo: stats.lastCommitRepo }
+    : null
+  const trackableLastCommit = stats ? getTrackableLastCommit(stats) : null
+  const lastCommitSkipped = rawLastCommit?.lastCommitRepo
+    ? shouldSkipRepo(rawLastCommit.lastCommitRepo, { forceInclude: forceIncludeSet })
+    : null
+
+  // #region agent log
+  const lastCommitDebug = {
+    rawLastCommit,
+    trackableLastCommit,
+    lastCommitSkipped,
+    leftclawInActivity: rawLastCommit?.lastCommitRepo?.startsWith('leftclaw-service-job') ?? false,
+  }
+  console.log('[home-perf]', JSON.stringify({ timings, statsSource, slugCount: cacheSlugs.length, lastCommitDebug }))
+  fetch('http://127.0.0.1:7483/ingest/84e5d7e1-b2bc-4b0e-8677-7b0875f46cc6',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8818b3'},body:JSON.stringify({sessionId:'8818b3',location:'home-perf/route.ts:GET',message:'last commit filter debug',data:lastCommitDebug,timestamp:Date.now(),hypothesisId:'H1',runId:'pre-fix'})}).catch(()=>{});
+  // #endregion
 
   return NextResponse.json({
     timings,
@@ -89,5 +108,6 @@ export async function GET() {
     hasBurns: Boolean(rescoreBurns?.clawdBurnedOnChain),
     hasBrief: Boolean(buildBrief?.text),
     hasAdminNotes: Object.keys(adminNotes).length,
+    lastCommitDebug,
   })
 }

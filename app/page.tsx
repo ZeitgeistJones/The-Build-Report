@@ -1,5 +1,6 @@
 import { timeAgo } from '@/lib/github'
 import { loadGitHubStatsForPage } from '@/lib/githubStatsSnapshot'
+import { getTrackableLastCommit } from '@/lib/github'
 import { REPOS } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
@@ -44,6 +45,7 @@ export default async function Home() {
   const { stats: loadedStats, source: loadedSource } = await loadGitHubStatsForPage()
   stats = loadedStats
   if (loadedSource === 'none') error = true
+  const trackableLastCommit = stats ? getTrackableLastCommit(stats) : { lastCommitAt: null, lastCommitRepo: null }
 
   const [adminNotes, excludedMap, collectionSlugs, forceIncludeSet] = await Promise.all([
     getAdminNotes(),
@@ -134,7 +136,7 @@ export default async function Home() {
       <div style={{ marginBottom: '24px' }}>
         <HomeHeader
           rescoreBurns={rescoreBurns}
-          latestCommitLabel={stats?.lastCommitAt ? `Latest commit ${timeAgo(stats.lastCommitAt)}` : null}
+          latestCommitLabel={trackableLastCommit.lastCommitAt ? `Latest commit ${timeAgo(trackableLastCommit.lastCommitAt)}` : null}
         />
       </div>
 
@@ -217,8 +219,8 @@ export default async function Home() {
           activeDays7d={stats.activeDays7d}
           activeDays30_60={stats.activeDays30_60}
           activeDays7_14={stats.activeDays7_14}
-          lastCommitAt={stats.lastCommitAt}
-          lastCommitRepo={stats.lastCommitRepo}
+          lastCommitAt={trackableLastCommit.lastCommitAt}
+          lastCommitRepo={trackableLastCommit.lastCommitRepo}
         />
       </div>
       )}
