@@ -40,6 +40,17 @@ function debugLog(
     body: JSON.stringify(payload),
   }).catch(() => {})
 }
+
+function accountLabel(account: unknown): string {
+  const addr =
+    typeof account === 'string'
+      ? account
+      : account && typeof account === 'object' && 'address' in account
+        ? String((account as { address: string }).address)
+        : null
+  if (!addr) return 'unknown'
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`
+}
 // #endregion
 
 interface ClawdAccessContextValue {
@@ -64,7 +75,7 @@ export function ClawdAccessProvider({ children }: { children: ReactNode }) {
       onSuccess: data => {
         // #region agent log
         debugLog('ClawdAccessContext.tsx:connect:onSuccess', 'Connect mutation succeeded', {
-          accounts: data.accounts?.map(a => `${a.slice(0, 6)}…${a.slice(-4)}`),
+          accounts: data.accounts?.map(accountLabel),
           chainId: data.chainId,
         }, 'H3')
         // #endregion
