@@ -13,14 +13,17 @@ export type RubricReferenceBlock = {
   appliesTo: string
   note: string
   rows: RubricReferenceRow[]
+  /** Repo-card rubrics vs ecosystem-only grade */
+  scope: 'repo' | 'ecosystem'
 }
 
 export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
   {
     id: 'token-mechanic',
     title: 'Token mechanic',
-    appliesTo: 'direct and supply-lock repos (burn apps)',
-    note: 'Each row is low / mid / high (33 / 67 / 100). Score = weighted sum of row points.',
+    appliesTo: 'direct burn apps and supply-lock repos',
+    note: 'Each row is low / mid / high (33 / 67 / 100). Score = weighted sum of row points. Supply-lock scores CLAWD lock impact — CV burns are not CLAWD burns.',
+    scope: 'repo',
     rows: [
       {
         label: 'Direct CLAWD economic impact',
@@ -50,6 +53,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
     title: 'Shipping leverage',
     appliesTo: 'infrastructure, indirect, and theoretical repos',
     note: 'Replaces token mechanic where direct burn is not expected. Score the multiplier on autonomous-builder shipping.',
+    scope: 'repo',
     rows: [
       {
         label: 'Multiplies builder shipping capacity',
@@ -79,6 +83,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
     title: 'Builder integrity',
     appliesTo: 'every repo — scoring rules vary by tag',
     note: 'Five rows, weighted sum. Infra uses different BI rules than burn apps (see row detail). CV is not CLAWD; supply lock is not a burn.',
+    scope: 'repo',
     rows: [
       {
         label: 'On-chain commitments and constraints',
@@ -122,6 +127,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
     title: 'Builder activity',
     appliesTo: 'ecosystem-wide grade only — not shown on repo cards',
     note: 'Each signal contributes up to 20%. Targets scale by 7d / 30d / 60d window.',
+    scope: 'ecosystem',
     rows: [
       {
         label: 'Total commits in window',
@@ -160,3 +166,6 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
 export function rubricBlockById(id: string): RubricReferenceBlock | undefined {
   return RUBRIC_REFERENCE.find(b => b.id === id)
 }
+
+export const RUBRIC_REFERENCE_REPO = RUBRIC_REFERENCE.filter(b => b.scope === 'repo')
+export const RUBRIC_REFERENCE_ECOSYSTEM = RUBRIC_REFERENCE.filter(b => b.scope === 'ecosystem')

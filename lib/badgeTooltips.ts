@@ -24,6 +24,12 @@ export const ECONOMIC_NA_TOOLTIP =
 export const SHIPPING_LEVERAGE_COLUMN_TOOLTIP =
   'How this repo multiplies holder value indirectly — display only, excluded from the burn-apps grade at the top.'
 
+export const SUPPLY_LOCK_TM_COLUMN_TOOLTIP =
+  'Scores CLAWD lock / supply impact — not CV burns. Larv.ai stakes CLAWD; burning CV is a separate token.'
+
+export const DIRECT_TM_COLUMN_TOOLTIP =
+  'Direct CLAWD burn or lock mechanic — feeds the burn-apps grade at the top.'
+
 export function criticalPathTooltip(roleBadge: string): string {
   return `${roleBadge} — locked tag on the builder critical path. Floor grades at C when functioning as designed.`
 }

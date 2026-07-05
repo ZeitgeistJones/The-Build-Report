@@ -20,41 +20,44 @@ export default function HomeHeader({ rescoreBurns, latestCommitLabel }: Props) {
     (rescoreBurns.count > 0 || rescoreBurns.clawdBurnedOnChain > 0 || rescoreBurns.ethPendingInReceiver > 0)
 
   return (
-    <div style={{ position: 'relative', marginBottom: '8px', paddingRight: showBurn && !isMobile ? '180px' : 0 }}>
-      <p
-        style={{
-          fontSize: isMobile ? '15px' : '16px',
-          color: 'var(--text-secondary)',
-          lineHeight: 1.55,
-          margin: 0,
-          maxWidth: '56ch',
-        }}
-      >
-        A plain English look at the repos, scored and sourced.
-      </p>
-      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: 1.5 }}>
-        Independent community project · Interpretive scores ·{' '}
-        <a href="/about" style={{ color: 'var(--accent)' }}>
-          Disclaimer
-        </a>
-        {latestCommitLabel && (
-          <>
-            {' '}
-            · {latestCommitLabel}
-          </>
-        )}
-      </p>
-
-      {showBurn && (
-        <div
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        justifyContent: 'space-between',
+        alignItems: isMobile ? 'stretch' : 'flex-start',
+        gap: isMobile ? '12px' : '24px',
+        marginBottom: '8px',
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
           style={{
-            position: isMobile ? 'relative' : 'absolute',
-            top: isMobile ? undefined : 0,
-            right: isMobile ? undefined : 0,
-            marginTop: isMobile ? '12px' : 0,
-            ...(isMobile ? { display: 'flex', justifyContent: 'flex-start' } : {}),
+            fontSize: isMobile ? '15px' : '16px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.55,
+            margin: 0,
+            maxWidth: '56ch',
           }}
         >
+          A plain English look at the repos, scored and sourced.
+        </p>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: 1.5 }}>
+          Independent community project · Interpretive scores ·{' '}
+          <a href="/about" style={{ color: 'var(--accent)' }}>
+            Disclaimer
+          </a>
+          {latestCommitLabel && (
+            <>
+              {' '}
+              · {latestCommitLabel}
+            </>
+          )}
+        </p>
+      </div>
+
+      {showBurn && (
+        <div style={{ flexShrink: 0, alignSelf: isMobile ? 'flex-start' : 'flex-start' }}>
           <RescoreBurnTracker
             count={rescoreBurns!.count}
             ethPendingInReceiver={rescoreBurns!.ethPendingInReceiver}

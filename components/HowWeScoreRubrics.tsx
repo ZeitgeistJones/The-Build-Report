@@ -1,7 +1,11 @@
 'use client'
 
 import InfoTooltip from '@/components/InfoTooltip'
-import { RUBRIC_REFERENCE } from '@/lib/rubricReference'
+import {
+  RUBRIC_REFERENCE_ECOSYSTEM,
+  RUBRIC_REFERENCE_REPO,
+  type RubricReferenceBlock,
+} from '@/lib/rubricReference'
 import { BI_WEIGHTS_TOOLTIP } from '@/lib/rubrics/builderIntegrity'
 
 const ROW_SUMMARY_STYLE = {
@@ -15,7 +19,7 @@ const ROW_SUMMARY_STYLE = {
   borderBottom: '1px solid var(--border)',
 } as const
 
-function RubricRowDetail({ row }: { row: (typeof RUBRIC_REFERENCE)[number]['rows'][number] }) {
+function RubricRowDetail({ row }: { row: RubricReferenceBlock['rows'][number] }) {
   return (
     <details className="hw-rubric-row">
       <summary style={ROW_SUMMARY_STYLE}>
@@ -45,13 +49,15 @@ function RubricRowDetail({ row }: { row: (typeof RUBRIC_REFERENCE)[number]['rows
   )
 }
 
-function RubricBlockPanel({ block }: { block: (typeof RUBRIC_REFERENCE)[number] }) {
+function RubricBlockPanel({ block }: { block: RubricReferenceBlock }) {
   const isBi = block.id === 'builder-integrity'
+  const defaultOpen = block.id === 'token-mechanic' || block.id === 'builder-integrity'
 
   return (
     <details
+      id={`hw-rubric-${block.id}`}
       className="hw-rubric-block"
-      open={block.id === 'builder-integrity'}
+      open={defaultOpen}
       style={{
         marginTop: '12px',
         background: 'var(--surface-2)',
@@ -113,9 +119,30 @@ export default function HowWeScoreRubrics() {
         Score rubrics
       </h3>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
-        Expand each rubric and row for weights and definitions. Repo cards use token mechanic or shipping leverage plus builder integrity.
+        Per-repo cards use token mechanic or shipping leverage plus builder integrity. Expand each row for definitions.
       </p>
-      {RUBRIC_REFERENCE.map(block => (
+
+      <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
+        Per-repo (3 grades on each card)
+      </div>
+      {RUBRIC_REFERENCE_REPO.map(block => (
+        <RubricBlockPanel key={block.id} block={block} />
+      ))}
+
+      <div
+        style={{
+          fontSize: '11px',
+          fontWeight: 600,
+          color: 'var(--text-muted)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          marginTop: '20px',
+          marginBottom: '4px',
+        }}
+      >
+        Ecosystem-only (Grades panel)
+      </div>
+      {RUBRIC_REFERENCE_ECOSYSTEM.map(block => (
         <RubricBlockPanel key={block.id} block={block} />
       ))}
     </section>

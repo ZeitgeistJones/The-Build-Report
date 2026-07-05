@@ -7,7 +7,6 @@ import {
   RECEIVER_BUY_AND_BURN,
   RECEIVER_BUY_AND_BURN_ABI,
 } from '@/lib/web3/constants'
-import { formatEthAmount } from '@/lib/clawdBurnIndex'
 import { MIN_TAP } from '@/lib/responsive'
 import { useIsMobile } from '@/hooks/useIsMobile'
 
@@ -38,8 +37,13 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
       switchToBase()
       return
     }
-    if (!canBurn) {
-      setError('No ETH waiting in the receiver contract right now.')
+    if (!canBurn && !isSuccess) {
+      setError('No swap waiting in the receiver contract right now.')
+      return
+    }
+    if (isSuccess && hash) {
+      window.open(`https://basescan.org/tx/${hash}`, '_blank', 'noopener,noreferrer')
+      reset()
       return
     }
 
@@ -59,22 +63,31 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
   if (!isConnected) label = 'Connect'
   else if (isWrongChain) label = 'Switch to Base'
   else if (busy) label = 'Confirm…'
+  else if (isSuccess && compact) label = 'Submitted ✓ · Basescan'
   else if (isSuccess) label = 'Submitted ✓'
-  else if (canBurn && compact) label = `Execute burn · ${formatEthAmount(ethPending)} ETH`
-  else if (!canBurn && compact && isConnected && !isWrongChain) label = 'No ETH pending'
+  else if (canBurn && compact) label = 'Execute burn'
+  else if (!canBurn && compact && isConnected && !isWrongChain) label = 'Nothing pending'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: compact ? 'flex-end' : 'flex-start' }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        alignItems: compact ? 'flex-end' : 'flex-start',
+        maxWidth: compact ? '200px' : undefined,
+      }}
+    >
       {!compact && (
         <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, maxWidth: '420px' }}>
-          Rescore ETH sits in the receiver until someone calls <code style={{ fontSize: '12px' }}>execute()</code>.
-          Anyone can trigger it — you pay a small gas fee on Base; the contract swaps its ETH for CLAWD and sends it to dead.
+          Rescore payments sit in the receiver until someone calls <code style={{ fontSize: '12px' }}>execute()</code>.
+          Anyone can trigger it — you pay Base gas; the contract swaps for CLAWD and sends it to dead.
         </p>
       )}
 
       {!compact && ethPending > 0 && (
         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-          {formatEthAmount(ethPending)} ETH ready to swap (~{Math.round(ethPending / 0.000008)} rescores worth)
+          Swap batch ready (~{Math.max(1, Math.round(ethPending / 0.000008))} rescores worth)
         </div>
       )}
 
@@ -89,16 +102,19 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
           minHeight: isMobile && !compact ? MIN_TAP : undefined,
           borderRadius: '99px',
           border: '1px solid var(--accent-border)',
-          background: canBurn || !isConnected ? 'var(--accent-dim)' : 'var(--surface-2)',
-          color: canBurn || !isConnected ? 'var(--accent)' : 'var(--text-muted)',
+          background: canBurn || !isConnected || isSuccess ? 'var(--accent-dim)' : 'var(--surface-2)',
+          color: canBurn || !isConnected || isSuccess ? 'var(--accent)' : 'var(--text-muted)',
           cursor: busy ? 'wait' : 'pointer',
           whiteSpace: 'nowrap',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
         }}
       >
         {label}
       </button>
 
-      {isSuccess && hash && (
+      {isSuccess && hash && !compact && (
         <a
           href={`https://basescan.org/tx/${hash}`}
           target="_blank"
@@ -118,7 +134,7 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
 
       {!compact && (
         <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-          No 10M CLAWD required — only Base gas. Totals on this page refresh within a few minutes after the tx confirms.
+          No 10M CLAWD required — only Base gas. Totals refresh within a few minutes after the tx confirms.
         </p>
       )}
     </div>

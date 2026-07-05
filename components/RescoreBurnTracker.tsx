@@ -1,15 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import InfoTooltip from '@/components/InfoTooltip'
+import {
+  APPROX_PENDING_LABEL,
+  CLAWD_BURNED_TOOLTIP,
+  ETH_PENDING_TOOLTIP,
+} from '@/lib/burnTrackerCopy'
 import {
   formatClawdAmount,
-  formatEthAmount,
   formatLastBurnLabel,
 } from '@/lib/clawdBurnIndex'
 import TriggerExecuteBurnButton from '@/components/TriggerExecuteBurnButton'
-
-const TOOLTIP =
-  'Cumulative CLAWD sent to dead from execute() on the receiver contract — counted on-chain via Blockscout. Rescore payments deposit ETH until someone triggers a burn.'
 
 interface Props {
   count: number
@@ -24,17 +25,15 @@ export default function RescoreBurnTracker({
   clawdBurnedOnChain,
   lastBurnAt,
 }: Props) {
-  const [showTooltip, setShowTooltip] = useState(false)
   const lastBurnLabel = formatLastBurnLabel(lastBurnAt)
 
   if (count <= 0 && clawdBurnedOnChain <= 0 && ethPendingInReceiver <= 0) return null
 
   const metaParts: string[] = []
   if (lastBurnLabel) metaParts.push(lastBurnLabel)
-  if (ethPendingInReceiver > 0) metaParts.push(`${formatEthAmount(ethPendingInReceiver)} ETH pending`)
 
   return (
-    <div style={{ position: 'relative', textAlign: 'right' }}>
+    <div style={{ textAlign: 'right', maxWidth: '200px' }}>
       <div
         style={{
           display: 'inline-flex',
@@ -54,63 +53,48 @@ export default function RescoreBurnTracker({
         >
           {formatClawdAmount(clawdBurnedOnChain)} CLAWD
         </span>
-        <button
-          type="button"
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
-          onClick={() => setShowTooltip(s => !s)}
-          aria-label="About CLAWD burned total"
-          style={{
-            width: 14,
-            height: 14,
-            borderRadius: '50%',
-            background: 'var(--surface-3)',
-            color: 'var(--text-muted)',
-            fontSize: '9px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            cursor: 'default',
-            padding: 0,
-          }}
-        >
-          ⓘ
-        </button>
+        <InfoTooltip
+          content={CLAWD_BURNED_TOOLTIP}
+          ariaLabel="About CLAWD burned total"
+          compact
+          width={240}
+        />
       </div>
 
-      {metaParts.length > 0 && (
-        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '3px', lineHeight: 1.4 }}>
-          {metaParts.join(' · ')}
+      {(metaParts.length > 0 || ethPendingInReceiver > 0) && (
+        <div
+          style={{
+            fontSize: '10px',
+            color: 'var(--text-muted)',
+            marginTop: '3px',
+            lineHeight: 1.4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: '4px',
+            flexWrap: 'wrap',
+          }}
+        >
+          {metaParts.length > 0 && <span>{metaParts.join(' · ')}</span>}
+          {metaParts.length > 0 && ethPendingInReceiver > 0 && <span>·</span>}
+          {ethPendingInReceiver > 0 && (
+            <>
+              <span>{APPROX_PENDING_LABEL}</span>
+              <InfoTooltip
+                content={ETH_PENDING_TOOLTIP}
+                ariaLabel="About approximate burn pending"
+                icon="question"
+                compact
+                width={260}
+              />
+            </>
+          )}
         </div>
       )}
 
       <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'flex-end' }}>
         <TriggerExecuteBurnButton ethPending={ethPendingInReceiver} compact />
       </div>
-
-      {showTooltip && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            right: 0,
-            background: 'var(--surface-3)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: 'var(--radius)',
-            padding: '8px 10px',
-            fontSize: '11px',
-            color: 'var(--text-secondary)',
-            lineHeight: 1.5,
-            width: '240px',
-            zIndex: 10,
-            pointerEvents: 'none',
-            textAlign: 'left',
-          }}
-        >
-          {TOOLTIP}
-        </div>
-      )}
     </div>
   )
 }

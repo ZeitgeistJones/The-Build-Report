@@ -46,7 +46,7 @@ import {
   RESCORE_SUMMARY_NOTE,
 } from '@/lib/scoringCopy'
 import { diffRubricRows, rowDeltaByLabel } from '@/lib/rescoreDeltas'
-import { integritySectionFraming } from '@/lib/cardFraming'
+import { integritySectionFraming, economicSectionFraming } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
@@ -57,6 +57,8 @@ import {
   ECONOMIC_NA_TOOLTIP,
   LIFECYCLE_TOOLTIPS,
   SHIPPING_LEVERAGE_COLUMN_TOOLTIP,
+  SUPPLY_LOCK_TM_COLUMN_TOOLTIP,
+  DIRECT_TM_COLUMN_TOOLTIP,
   TAG_TOOLTIPS,
 } from '@/lib/badgeTooltips'
 const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
@@ -200,6 +202,21 @@ function rubricSectionGridStyle(
   if (section === 'bi' && (hasSL || hasTM)) return { gridColumn: 2 }
   if ((section === 'sl' || section === 'tm') && (hasSL || hasTM)) return { gridColumn: 1 }
   return undefined
+}
+
+function economicColumnMeta(repo: Repo): { line1: string; line2: string; tooltip: string } {
+  if (repo.tag === 'supply-lock') {
+    return {
+      line1: 'CLAWD',
+      line2: 'lock score',
+      tooltip: SUPPLY_LOCK_TM_COLUMN_TOOLTIP,
+    }
+  }
+  return {
+    line1: 'token',
+    line2: 'mechanic',
+    tooltip: DIRECT_TM_COLUMN_TOOLTIP,
+  }
 }
 
 function RubricSectionTitle({ children, hint }: { children: ReactNode; hint?: string }) {
@@ -553,6 +570,7 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
     const biRowDeltas = rescoreMeta?.oldRubrics
       ? rowDeltaByLabel(diffRubricRows(rescoreMeta.oldRubrics.builderIntegrity, repo.builderIntegrity.rubric))
       : null
+    const economicCol = economicColumnMeta(repo)
 
     return (
       <div
@@ -796,7 +814,10 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
               </RepoBadge>
               </>
               ) : (
-              <div style={{ textAlign: 'center', minWidth: '40px' }}>
+              <RepoBadge
+                tooltip={economicCol.tooltip}
+                style={{ textAlign: 'center', minWidth: '40px', display: 'block' }}
+              >
                 {tokenMechanic ? (
                   <>
                     <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(tokenMechanic.letter) }}>
@@ -807,8 +828,10 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
                 ) : (
                   <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
                 )}
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>token<br />mechanic</div>
-              </div>
+                <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
+                  {economicCol.line1}<br />{economicCol.line2}
+                </div>
+              </RepoBadge>
               )}
 
               <div style={{ width: '1px', background: 'var(--border)', alignSelf: 'stretch' }} />
@@ -903,7 +926,14 @@ export default function RepoList({ repos, githubSlugOrder = [], initialRescoreSu
 
                   {hasTM && tokenMechanic && (
                     <div style={rubricSectionGridStyle('tm', hasSL, hasTM, isMobile)}>
-                      <RubricSectionTitle>Token mechanic</RubricSectionTitle>
+                      <RubricSectionTitle>
+                        {repo.tag === 'supply-lock' ? 'CLAWD lock score' : 'Token mechanic'}
+                      </RubricSectionTitle>
+                      {economicSectionFraming(repo) && (
+                        <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.35 }}>
+                          {economicSectionFraming(repo)}
+                        </p>
+                      )}
                       {tokenMechanic.rubric.map((row, i) => {
                         const delta = tmRowDeltas?.get(row.label)
                         return (

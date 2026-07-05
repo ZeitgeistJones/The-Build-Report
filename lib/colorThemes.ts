@@ -1,9 +1,10 @@
-export type ColorThemeId = 'teal' | 'lime' | 'warm' | 'slate' | 'light'
+export type ColorThemeId = 'teal' | 'lime' | 'warm' | 'slate' | 'true-dark' | 'light'
 
 export const COLOR_THEME_STORAGE_KEY = 'build-report-color-theme'
 
 export const COLOR_THEMES: { id: ColorThemeId; label: string; hint: string }[] = [
   { id: 'teal', label: 'Teal', hint: 'Default — cool dark' },
+  { id: 'true-dark', label: 'True dark', hint: 'Pure black & white' },
   { id: 'lime', label: 'Lime', hint: 'Original accent' },
   { id: 'warm', label: 'Warm', hint: 'Sand & amber' },
   { id: 'slate', label: 'Slate', hint: 'Neutral blue-gray' },

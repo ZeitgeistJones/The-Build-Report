@@ -108,6 +108,7 @@ export default function ColorThemePicker() {
 function ThemeSwatch({ themeId }: { themeId: string }) {
   const swatches: Record<string, string> = {
     teal: '#5FB3A1',
+    'true-dark': '#ffffff',
     lime: '#c8f060',
     warm: '#C4A882',
     slate: '#8BA4BC',

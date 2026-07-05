@@ -12,6 +12,16 @@ export function integritySectionFraming(repo: Repo): string | null {
   return 'Accountability on stated vision, safety, and follow-through for holder-facing repos.'
 }
 
+export function economicSectionFraming(repo: Repo): string | null {
+  if (repo.tag === 'supply-lock') {
+    return 'CLAWD lock / supply impact — CV burns are not CLAWD burns. Expand rows for detail.'
+  }
+  if (repo.tag === 'direct') {
+    return 'Direct CLAWD burn or lock on use — expand rows for detail.'
+  }
+  return null
+}
+
 export function integrityGradeFootnote(): string {
   return 'Consumer apps + supply-lock repos only — infra and R&D excluded from this average.'
 }

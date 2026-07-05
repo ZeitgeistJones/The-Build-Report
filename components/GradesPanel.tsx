@@ -37,6 +37,12 @@ const CARD_LABELS: Record<CardId, string> = {
   integrity: 'Builder integrity',
 }
 
+const CARD_RUBRIC_HREF: Record<CardId, string> = {
+  builder: '#hw-rubric-builder-activity',
+  economic: '#hw-rubric-token-mechanic',
+  integrity: '#hw-rubric-builder-integrity',
+}
+
 function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
   if (trend === 'up') return <span style={{ color: 'var(--green)', fontSize: '12px' }}>↑</span>
   if (trend === 'down') return <span style={{ color: 'var(--red)', fontSize: '12px' }}>↓</span>
@@ -121,6 +127,7 @@ function GradeCard({
   isSelected,
   onSelectTrend,
   isMobile,
+  rubricHref,
 }: {
   cardId: CardId
   grade: {
@@ -138,6 +145,7 @@ function GradeCard({
   isSelected: boolean
   onSelectTrend: (id: CardId | null) => void
   isMobile: boolean
+  rubricHref: string
 }) {
   const canShowTrend = Boolean(trendExplanation && period !== '60d')
 
@@ -272,22 +280,49 @@ function GradeCard({
       )}
 
       {canShowTrend && (
-        <button
-          type="button"
-          onClick={() => onSelectTrend(isSelected ? null : cardId)}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: '4px' }}>
+          <button
+            type="button"
+            onClick={() => onSelectTrend(isSelected ? null : cardId)}
+            style={{
+              fontSize: '12px',
+              color: 'var(--accent)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              textAlign: 'left',
+              padding: '8px 0 0',
+            }}
+          >
+            {isSelected ? 'Close ✕' : 'Why this trend? →'}
+          </button>
+          <a
+            href={rubricHref}
+            style={{
+              fontSize: '12px',
+              color: 'var(--accent)',
+              padding: '8px 0 0',
+              textDecoration: 'none',
+            }}
+          >
+            How we score →
+          </a>
+        </div>
+      )}
+      {!canShowTrend && (
+        <a
+          href={rubricHref}
           style={{
             fontSize: '12px',
             color: 'var(--accent)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            textAlign: 'left',
             padding: '8px 0 0',
             marginTop: '4px',
+            display: 'inline-block',
+            textDecoration: 'none',
           }}
         >
-          {isSelected ? 'Close ✕' : 'Why this trend? →'}
-        </button>
+          How we score →
+        </a>
       )}
     </div>
   )
@@ -376,6 +411,7 @@ export default function GradesPanel({
         <GradeCard
           cardId="builder"
           isMobile={isMobile}
+          rubricHref={CARD_RUBRIC_HREF.builder}
           grade={bg}
           label="builder activity"
           period={period}
@@ -398,6 +434,7 @@ export default function GradesPanel({
         <GradeCard
           cardId="economic"
           isMobile={isMobile}
+          rubricHref={CARD_RUBRIC_HREF.economic}
           grade={tg}
           label="burn apps (economic)"
           period={period}
@@ -461,6 +498,7 @@ export default function GradesPanel({
         <GradeCard
           cardId="integrity"
           isMobile={isMobile}
+          rubricHref={CARD_RUBRIC_HREF.integrity}
           grade={ig}
           label="Builder Integrity"
           period={period}
@@ -472,7 +510,6 @@ export default function GradesPanel({
           footer={
             ig && (
               <>
-                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{integrityGradeFootnote()}</span>
                 <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.active} repos in sample</span>
                 {ig.counts.commitWeight > 0 && (
                   <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.commitWeight} commits weighted</span>
@@ -486,6 +523,7 @@ export default function GradesPanel({
                 {ig.counts.low > 0 && (
                   <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.low} low-integrity commits</span>
                 )}
+                <span style={{ fontSize: footerSize, color: 'var(--text-muted)', flexBasis: '100%' }}>{integrityGradeFootnote()}</span>
               </>
             )
           }
