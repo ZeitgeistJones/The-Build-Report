@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getGitHubStats } from '@/lib/github'
-import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
+import {
+  getGitHubStatsSnapshotDiagnostics,
+  loadGitHubStatsForPage,
+} from '@/lib/githubStatsSnapshot'
 import { REPOS } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
@@ -29,23 +31,22 @@ export async function GET() {
   const totalStart = Date.now()
   let statsSource: 'snapshot' | 'live' | 'none' = 'none'
 
-  const [rescoreBurns, buildBrief, statsFromSnapshot] = await timed('parallel_initial', timings, () =>
+  const snapshotDiag = await getGitHubStatsSnapshotDiagnostics()
+
+  const [rescoreBurns, buildBrief] = await timed('parallel_initial', timings, () =>
     Promise.all([
       getRescoreBurnStats().catch(() => null),
       getBuildBrief().catch(() => null),
-      getGitHubStatsForDisplay().catch(() => null),
     ]),
   )
 
-  let stats = statsFromSnapshot
-  if (stats) {
-    statsSource = 'snapshot'
-  } else {
-    stats = await timed('github_live_fallback', timings, () =>
-      getGitHubStats().catch(() => null),
-    )
-    statsSource = stats ? 'live' : 'none'
-  }
+  let stats: Awaited<ReturnType<typeof loadGitHubStatsForPage>>['stats'] = null
+  const githubStart = Date.now()
+  const loaded = await loadGitHubStatsForPage()
+  stats = loaded.stats
+  statsSource = loaded.source
+  if (loaded.source === 'live') timings.github_live_fallback = Date.now() - githubStart
+  else timings.github_load = Date.now() - githubStart
 
   const [adminNotes, excludedMap, collectionSlugs, forceIncludeSet] = await timed('parallel_meta', timings, () =>
     Promise.all([
@@ -80,6 +81,8 @@ export async function GET() {
   return NextResponse.json({
     timings,
     statsSource,
+    snapshotBefore: snapshotDiag,
+    snapshotAfter: await getGitHubStatsSnapshotDiagnostics(),
     slugCount: cacheSlugs.length,
     autoScoredCount: autoScoredRaw.length,
     rescoreSummaryCount: Object.keys(rescoreSummaries).length,

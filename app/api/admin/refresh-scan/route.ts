@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const stats = await getGitHubStats({ fresh: true })
-    await syncGitHubStatsSnapshot(stats)
+    const githubSnapshotUpdatedAt = await syncGitHubStatsSnapshot(stats)
     const burnSnapshot = await syncBurnSnapshot()
     revalidateTag('github-stats')
     revalidatePath('/')
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       trackableRepos: stats.trackableRepos.length,
       rateLimited: stats.rateLimited,
       lastCommitAt: stats.lastCommitAt,
+      githubSnapshotUpdatedAt,
       burnSnapshot,
     })
   } catch (err: unknown) {

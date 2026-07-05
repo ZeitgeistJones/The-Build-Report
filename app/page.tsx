@@ -1,5 +1,5 @@
-import { getGitHubStats, timeAgo } from '@/lib/github'
-import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
+import { timeAgo } from '@/lib/github'
+import { loadGitHubStatsForPage } from '@/lib/githubStatsSnapshot'
 import { REPOS } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
@@ -37,29 +37,22 @@ export default async function Home() {
   const perf: Record<string, number> = {}
   let stats
   let error = false
-  let statsSource: 'snapshot' | 'live' = 'snapshot'
+  let statsSource: 'snapshot' | 'live' | 'none' = 'snapshot'
 
   const parallelStart = Date.now()
-  const [rescoreBurns, buildBrief, statsFromSnapshot] = await Promise.all([
+  const [rescoreBurns, buildBrief] = await Promise.all([
     getRescoreBurnStats().catch(() => null),
     getBuildBrief().catch(() => null),
-    getGitHubStatsForDisplay().catch(() => null),
   ])
   perf.parallel_initial = Date.now() - parallelStart
 
-  if (statsFromSnapshot) {
-    stats = statsFromSnapshot
-  } else {
-    statsSource = 'live'
-    const githubStart = Date.now()
-    try {
-      stats = await getGitHubStats()
-    } catch {
-      error = true
-      stats = null
-    }
-    perf.github_live_fallback = Date.now() - githubStart
-  }
+  const githubStart = Date.now()
+  const { stats: loadedStats, source: loadedSource } = await loadGitHubStatsForPage()
+  stats = loadedStats
+  statsSource = loadedSource
+  if (loadedSource === 'none') error = true
+  if (loadedSource === 'live') perf.github_live_fallback = Date.now() - githubStart
+  else perf.github_load = Date.now() - githubStart
 
   const metaStart = Date.now()
   const [adminNotes, excludedMap, collectionSlugs, forceIncludeSet] = await Promise.all([
