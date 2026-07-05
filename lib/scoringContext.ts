@@ -8,5 +8,5 @@ export function formatScoringContextLabel(version: number | null | undefined): s
 
 export function scoringContextTooltip(version: number | null | undefined): string {
   const label = formatScoringContextLabel(version)
-  return `Scored against ${label}. See /context for the background the AI read.`
+  return `Scored against ${label}. See /how-we-score#context for the background the AI read.`
 }

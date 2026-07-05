@@ -12,25 +12,11 @@ function DesktopNavLinks() {
       <a href="/" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Repos
       </a>
-      <a href="/context" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-        Context
-      </a>
-      <a href="/#chronicle" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-        Chronicle
+      <a href="/how-we-score" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        How we score
       </a>
       <a href="/about" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         About
-      </a>
-      <a href="/#how-we-score" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-        How we score
-      </a>
-      <a
-        href="https://github.com/clawdbotatg"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{ fontSize: '13px', color: 'var(--text-muted)' }}
-      >
-        ↗ clawdbotatg
       </a>
       <ConnectWalletButton />
       <ColorThemePicker />
@@ -66,26 +52,11 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         <a href="/" className="mobile-nav-link" onClick={onClose}>
           Repos
         </a>
-        <a href="/context" className="mobile-nav-link" onClick={onClose}>
-          Context
-        </a>
-        <a href="/#chronicle" className="mobile-nav-link" onClick={onClose}>
-          Chronicle
+        <a href="/how-we-score" className="mobile-nav-link" onClick={onClose}>
+          How we score
         </a>
         <a href="/about" className="mobile-nav-link" onClick={onClose}>
           About
-        </a>
-        <a href="/#how-we-score" className="mobile-nav-link" onClick={onClose}>
-          How we score
-        </a>
-        <a
-          href="https://github.com/clawdbotatg"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mobile-nav-link"
-          onClick={onClose}
-        >
-          ↗ clawdbotatg on GitHub
         </a>
         <div className="mobile-nav-link" style={{ paddingTop: '8px' }} onClick={e => e.stopPropagation()}>
           <ColorThemePicker />

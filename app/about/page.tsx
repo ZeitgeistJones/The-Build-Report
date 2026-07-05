@@ -37,7 +37,7 @@ Who can use it: any wallet that passes CLAWDGate tier 1 on Base (10M+ $CLAWD). T
 
 Result is shared: once a repo is scored, the result is cached in Redis and everyone sees it for free — including visitors who have not connected a wallet.
 
-Live AI scores read public scoring context at /context. Optional Chronicle grounding can be configured in admin for richer rescore prompts.`,
+Live AI scores read public scoring context on the How we score page. Optional Chronicle grounding can be configured in admin for richer rescore prompts.`,
     },
     {
       heading: 'Important distinctions',
@@ -101,7 +101,7 @@ If you hold $CLAWD and have opinions on what should change, that conversation sh
           {section.heading === 'How scores are assigned' ? (
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '10px' }}>
               For the full scoring methodology including rubric weights, grade calculations, and period definitions, see{' '}
-              <a href="/#how-we-score" style={{ color: 'var(--accent)' }}>How we score ↗</a>.
+              <a href="/how-we-score" style={{ color: 'var(--accent)' }}>How we score ↗</a>.
             </p>
           ) : section.heading === 'Score types' ? (
             <>

@@ -1,5 +1,4 @@
 import { getGitHubStats, timeAgo } from '@/lib/github'
-import { getChronicleBannerData } from '@/lib/chronicle'
 import { REPOS } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
 import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
@@ -24,7 +23,6 @@ import RepoList, { type RepoWithLive } from '@/components/RepoList'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 import HomeHeader from '@/components/HomeHeader'
-import HowWeScoreSection from '@/components/HowWeScoreSection'
 import BuildBriefCard from '@/components/BuildBriefCard'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
@@ -36,7 +34,6 @@ export const dynamic = 'force-dynamic'
 export default async function Home() {
   let stats
   let error = false
-  const chronicle = await getChronicleBannerData().catch(() => null)
   const rescoreBurns = await getRescoreBurnStats().catch(() => null)
   const buildBrief = await getBuildBrief().catch(() => null)
 
@@ -226,77 +223,6 @@ export default async function Home() {
       )}
 
       <div style={{ marginTop: '40px' }}>
-      {(chronicle?.lastUpdated || chronicle?.summary) && (
-        <div
-          id="chronicle"
-          style={{
-            marginBottom: '32px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: '24px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '14px 20px',
-          }}
-        >
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <span
-              style={{
-                fontSize: '10px',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                color: 'var(--text-muted)',
-                display: 'block',
-                marginBottom: '4px',
-              }}
-            >
-              <a
-                href="https://github.com/clawdbotatg/clawd-chronicle"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: 'var(--text-muted)', textDecoration: 'none' }}
-              >
-                Latest Chronicle
-              </a>
-              {chronicle?.lastUpdated && (
-                <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: '8px' }}>
-                  · {chronicle.lastUpdated.label}
-                </span>
-              )}
-            </span>
-            <span
-              className="rubric-source-clamp"
-              style={{
-                fontSize: '13px',
-                color: 'var(--text-secondary)',
-                lineHeight: 1.55,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {chronicle?.summary ?? chronicle?.lastUpdated?.message ?? 'Scoring context sourced from the clawdbotatg Chronicle.'}
-            </span>
-          </div>
-          <a
-            href="/context"
-            style={{
-              fontSize: '12px',
-              color: 'var(--accent)',
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-              textDecoration: 'none',
-            }}
-          >
-            Scoring context →
-          </a>
-        </div>
-      )}
-
       <RepoList
         repos={repos}
         githubSlugOrder={githubOrder}
@@ -304,8 +230,6 @@ export default async function Home() {
         repoCollections={collectionSlugs}
       />
       </div>
-
-      <HowWeScoreSection />
     </>
     </GradePeriodProvider>
   )

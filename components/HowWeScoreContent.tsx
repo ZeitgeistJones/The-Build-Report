@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import { CHANGELOG } from '@/lib/scores'
 import { TAG_TOOLTIPS, LIFECYCLE_TOOLTIPS } from '@/lib/badgeTooltips'
+import type { ChronicleBannerData } from '@/lib/chronicle'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import HowWeScoreRubrics from '@/components/HowWeScoreRubrics'
+import ChronicleSection from '@/components/ChronicleSection'
+import ScoringContextSection from '@/components/ScoringContextSection'
 
 const CARD_STYLE = {
   background: 'var(--surface-1)',
@@ -14,6 +17,8 @@ const CARD_STYLE = {
 const TOC_LINKS = [
   { href: '#hw-score-rubrics', label: 'Rubrics' },
   { href: '#hw-score-grades', label: 'Ecosystem grades' },
+  { href: '#chronicle', label: 'Chronicle' },
+  { href: '#context', label: 'Scoring context' },
   { href: '#hw-score-brief', label: 'Build brief' },
   { href: '#hw-score-activity', label: 'Activity' },
   { href: '#hw-score-scale', label: 'Letter scale' },
@@ -54,15 +59,18 @@ function TocNav() {
   )
 }
 
-export default function HowWeScoreSection() {
-  return (
-    <div id="how-we-score" style={{ marginTop: '48px', borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
-      <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: 'var(--text-primary)' }}>
-        How we score
-      </h2>
+interface Props {
+  chronicle: ChronicleBannerData | null
+  scoringContextText: string
+  scoringContextOverride: boolean
+}
 
+export default function HowWeScoreContent({ chronicle, scoringContextText, scoringContextOverride }: Props) {
+  return (
+    <>
       <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '12px' }}>
-        Three ecosystem letter grades at the top, plus per-repo scores on each card. Together they answer: is the builder shipping, does value flow to holders, and can you trust the work?
+        Three ecosystem letter grades at the top, plus per-repo scores on each card. Together they answer: is the builder
+        shipping, does value flow to holders, and can you trust the work?
       </p>
 
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.55, marginBottom: '16px' }}>
@@ -72,7 +80,7 @@ export default function HowWeScoreSection() {
         <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>live AI</strong>{' '}
         (auto-inferred or paid Rescore). See{' '}
         <Link href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</Link>{' '}
-        and <Link href="/context" style={{ color: 'var(--accent)' }}>scoring context</Link>.
+        and <a href="#context" style={{ color: 'var(--accent)' }}>scoring context below</a>.
       </p>
 
       <TocNav />
@@ -105,6 +113,9 @@ export default function HowWeScoreSection() {
           </p>
         </div>
       </section>
+
+      <ChronicleSection chronicle={chronicle} />
+      <ScoringContextSection activeText={scoringContextText} usingOverride={scoringContextOverride} />
 
       <section
         id="hw-score-brief"
@@ -207,12 +218,9 @@ export default function HowWeScoreSection() {
       </CollapsibleSection>
 
       <p style={{ marginTop: '20px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-        Primary source:{' '}
-        <a href="https://github.com/clawdbotatg" target="_blank" rel="noopener noreferrer">
-          github.com/clawdbotatg
-        </a>{' '}
-        and the clawdbotatg Chronicle. Scores are interpretive — launch baseline grades are a fixed snapshot; live AI scores update via Rescore.
+        Scores are interpretive — launch baseline grades are a fixed snapshot; live AI scores update via Rescore. This is an
+        independent community project, not an official builder source.
       </p>
-    </div>
+    </>
   )
 }

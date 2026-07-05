@@ -654,19 +654,57 @@ export default function RepoList({
               toggleExpand(repo.githubSlug)
             }}
             aria-expanded={isExpanded}
+            aria-label={isExpanded ? 'Collapse repo rubric details' : 'Expand repo rubric details'}
             style={{
               flex: 1,
               minWidth: 0,
               width: isMobile ? '100%' : undefined,
               display: 'flex',
               alignItems: 'flex-start',
-              gap: '12px',
-              flexDirection: isMobile ? 'column' : 'row',
+              gap: '10px',
               textAlign: 'left',
               background: 'transparent',
               cursor: 'pointer',
             }}
           >
+            <div
+              style={{
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '2px',
+                paddingTop: '2px',
+                minWidth: '24px',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <span
+                aria-hidden
+                style={{
+                  fontSize: '14px',
+                  lineHeight: 1,
+                  transition: 'transform 0.2s',
+                  transform: isExpanded ? 'rotate(180deg)' : 'none',
+                }}
+              >
+                ↓
+              </span>
+              <span style={{ fontSize: '8px', letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+                details
+              </span>
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px',
+                flexDirection: isMobile ? 'column' : 'row',
+              }}
+            >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: '5px', marginBottom: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <RepoBadge
@@ -761,7 +799,7 @@ export default function RepoList({
                 )}
                 {!pending && isAutoInferredNote(repo.adminNote) && (
                   <Link
-                    href="/context"
+                    href="/how-we-score#context"
                     title={scoringContextTooltip(repo.scoringContextVersion)}
                     style={{
                       fontSize: '10px',
@@ -951,11 +989,9 @@ export default function RepoList({
                 </div>
               </RepoBadge>
 
-              <div style={{ fontSize: '14px', color: 'var(--text-muted)', paddingTop: '3px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'none' }}>
-                ↓
-              </div>
               </>
               )}
+            </div>
             </div>
           </button>
 

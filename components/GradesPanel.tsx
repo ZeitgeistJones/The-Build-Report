@@ -1,13 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation, Period } from '@/lib/grades'
 import { gradeColor } from '@/lib/gradeLetters'
+import { rubricBlockById } from '@/lib/rubricReference'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
 import { PulseMicrostats } from './EcosystemPulse'
 import { EcosystemPulse } from '@/lib/ecosystemPulse'
 import { integrityGradeFootnote } from '@/lib/cardFraming'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import RubricBlockPanel from '@/components/RubricBlockPanel'
 
 type CardId = 'builder' | 'economic' | 'integrity'
 
@@ -37,16 +40,82 @@ const CARD_LABELS: Record<CardId, string> = {
   integrity: 'Builder integrity',
 }
 
-const CARD_RUBRIC_HREF: Record<CardId, string> = {
-  builder: '#hw-rubric-builder-activity',
-  economic: '#hw-rubric-token-mechanic',
-  integrity: '#hw-rubric-builder-integrity',
+const CARD_RUBRIC_ID: Record<CardId, string> = {
+  builder: 'builder-activity',
+  economic: 'token-mechanic',
+  integrity: 'builder-integrity',
 }
 
 function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' }) {
   if (trend === 'up') return <span style={{ color: 'var(--green)', fontSize: '12px' }}>↑</span>
   if (trend === 'down') return <span style={{ color: 'var(--red)', fontSize: '12px' }}>↓</span>
   return <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>→</span>
+}
+
+function RubricBreakdownTray({
+  cardId,
+  onClose,
+}: {
+  cardId: CardId
+  onClose: () => void
+}) {
+  const block = rubricBlockById(CARD_RUBRIC_ID[cardId])
+  if (!block) return null
+
+  return (
+    <div
+      style={{
+        marginTop: '12px',
+        background: 'var(--surface-2)',
+        border: '1px solid var(--accent-border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '20px 24px',
+        animation: 'fadeTray 0.15s ease',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px',
+          gap: '12px',
+        }}
+      >
+        <span
+          style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: 'var(--text-muted)',
+          }}
+        >
+          Grade breakdown — {CARD_LABELS[cardId]}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            fontSize: '13px',
+            padding: 0,
+          }}
+        >
+          ✕
+        </button>
+      </div>
+      <RubricBlockPanel block={block} defaultOpen compact />
+      <p style={{ margin: '12px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+        <Link href={`/how-we-score#hw-rubric-${block.id}`} style={{ color: 'var(--accent)' }}>
+          Full methodology →
+        </Link>
+      </p>
+    </div>
+  )
 }
 
 function TrendDetailTray({
@@ -126,8 +195,9 @@ function GradeCard({
   trendExplanation,
   isSelected,
   onSelectTrend,
+  isRubricSelected,
+  onSelectRubric,
   isMobile,
-  rubricHref,
 }: {
   cardId: CardId
   grade: {
@@ -144,16 +214,17 @@ function GradeCard({
   trendExplanation?: TrendExplanation
   isSelected: boolean
   onSelectTrend: (id: CardId | null) => void
+  isRubricSelected: boolean
+  onSelectRubric: (id: CardId | null) => void
   isMobile: boolean
-  rubricHref: string
 }) {
   const canShowTrend = Boolean(trendExplanation && period !== '60d')
 
   return (
     <div
       style={{
-        background: isSelected ? 'var(--surface-2)' : 'var(--surface-1)',
-        border: `1px solid ${isSelected ? 'var(--accent-border)' : 'var(--border)'}`,
+        background: isSelected || isRubricSelected ? 'var(--surface-2)' : 'var(--surface-1)',
+        border: `1px solid ${isSelected || isRubricSelected ? 'var(--accent-border)' : 'var(--border)'}`,
         borderRadius: 'var(--radius-lg)',
         padding: '16px',
         display: 'flex',
@@ -279,8 +350,8 @@ function GradeCard({
         </div>
       )}
 
-      {canShowTrend && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: '4px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: '4px' }}>
+        {canShowTrend && (
           <button
             type="button"
             onClick={() => onSelectTrend(isSelected ? null : cardId)}
@@ -296,34 +367,23 @@ function GradeCard({
           >
             {isSelected ? 'Close ✕' : 'Why this trend? →'}
           </button>
-          <a
-            href={rubricHref}
-            style={{
-              fontSize: '12px',
-              color: 'var(--accent)',
-              padding: '8px 0 0',
-              textDecoration: 'none',
-            }}
-          >
-            How we score →
-          </a>
-        </div>
-      )}
-      {!canShowTrend && (
-        <a
-          href={rubricHref}
+        )}
+        <button
+          type="button"
+          onClick={() => onSelectRubric(isRubricSelected ? null : cardId)}
           style={{
             fontSize: '12px',
             color: 'var(--accent)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
             padding: '8px 0 0',
-            marginTop: '4px',
-            display: 'inline-block',
-            textDecoration: 'none',
           }}
         >
-          How we score →
-        </a>
-      )}
+          {isRubricSelected ? 'Close breakdown ✕' : 'Grade breakdown →'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -349,6 +409,17 @@ export default function GradesPanel({
   const isMobile = useIsMobile()
   const footerSize = isMobile ? '11px' : '10px'
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
+  const [rubricCard, setRubricCard] = useState<CardId | null>(null)
+
+  function handleSelectTrend(id: CardId | null) {
+    setSelectedCard(id)
+    if (id) setRubricCard(null)
+  }
+
+  function handleSelectRubric(id: CardId | null) {
+    setRubricCard(id)
+    if (id) setSelectedCard(null)
+  }
 
   const bg = period === '30d' ? builderGrade30 : period === '7d' ? builderGrade7 : builderGrade60
   const tg = period === '30d' ? tokenMechanicGrade30 : period === '7d' ? tokenMechanicGrade7 : tokenMechanicGrade60
@@ -388,6 +459,9 @@ export default function GradesPanel({
           >
             Grades
           </span>
+          <Link href="/how-we-score" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none' }}>
+            How we score →
+          </Link>
           {pulse30 && pulse7 && pulse60 && (
             <PulseMicrostats
               pulse30={pulse30}
@@ -411,7 +485,6 @@ export default function GradesPanel({
         <GradeCard
           cardId="builder"
           isMobile={isMobile}
-          rubricHref={CARD_RUBRIC_HREF.builder}
           grade={bg}
           label="builder activity"
           period={period}
@@ -419,7 +492,9 @@ export default function GradesPanel({
           summary={bg?.summary ?? 'GitHub data unavailable'}
           trendExplanation={bg?.trendExplanation}
           isSelected={selectedCard === 'builder'}
-          onSelectTrend={setSelectedCard}
+          onSelectTrend={handleSelectTrend}
+          isRubricSelected={rubricCard === 'builder'}
+          onSelectRubric={handleSelectRubric}
           footer={
             stats && (
               <>
@@ -434,7 +509,6 @@ export default function GradesPanel({
         <GradeCard
           cardId="economic"
           isMobile={isMobile}
-          rubricHref={CARD_RUBRIC_HREF.economic}
           grade={tg}
           label="burn apps (economic)"
           period={period}
@@ -446,7 +520,9 @@ export default function GradesPanel({
           summary={tg?.summary ?? 'Token mechanic score unavailable'}
           trendExplanation={tg?.trendExplanation}
           isSelected={selectedCard === 'economic'}
-          onSelectTrend={setSelectedCard}
+          onSelectTrend={handleSelectTrend}
+          isRubricSelected={rubricCard === 'economic'}
+          onSelectRubric={handleSelectRubric}
           footer={
             tg?.counts && (
               <>
@@ -498,7 +574,6 @@ export default function GradesPanel({
         <GradeCard
           cardId="integrity"
           isMobile={isMobile}
-          rubricHref={CARD_RUBRIC_HREF.integrity}
           grade={ig}
           label="Builder Integrity"
           period={period}
@@ -506,7 +581,9 @@ export default function GradesPanel({
           summary={ig?.summary ?? 'Integrity score unavailable'}
           trendExplanation={ig?.trendExplanation}
           isSelected={selectedCard === 'integrity'}
-          onSelectTrend={setSelectedCard}
+          onSelectTrend={handleSelectTrend}
+          isRubricSelected={rubricCard === 'integrity'}
+          onSelectRubric={handleSelectRubric}
           footer={
             ig && (
               <>
@@ -536,6 +613,10 @@ export default function GradesPanel({
           explanation={selectedExplanation}
           onClose={() => setSelectedCard(null)}
         />
+      )}
+
+      {rubricCard && (
+        <RubricBreakdownTray cardId={rubricCard} onClose={() => setRubricCard(null)} />
       )}
     </div>
   )
