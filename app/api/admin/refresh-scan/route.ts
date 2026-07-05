@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { verifyAdminPassword } from '@/lib/admin'
 import { getGitHubStats } from '@/lib/github'
+import { syncBurnSnapshot } from '@/lib/burnSnapshot'
 
 export const maxDuration = 300
 
@@ -15,6 +16,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const stats = await getGitHubStats({ fresh: true })
+    const burnSnapshot = await syncBurnSnapshot()
     revalidateTag('github-stats')
     revalidatePath('/')
 
@@ -24,6 +26,7 @@ export async function POST(req: NextRequest) {
       trackableRepos: stats.trackableRepos.length,
       rateLimited: stats.rateLimited,
       lastCommitAt: stats.lastCommitAt,
+      burnSnapshot,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'GitHub refresh failed'

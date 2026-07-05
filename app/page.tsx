@@ -34,8 +34,10 @@ export const dynamic = 'force-dynamic'
 export default async function Home() {
   let stats
   let error = false
-  const rescoreBurns = await getRescoreBurnStats().catch(() => null)
-  const buildBrief = await getBuildBrief().catch(() => null)
+  const [rescoreBurns, buildBrief] = await Promise.all([
+    getRescoreBurnStats().catch(() => null),
+    getBuildBrief().catch(() => null),
+  ])
 
   try {
     stats = await getGitHubStats()
