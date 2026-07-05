@@ -74,24 +74,7 @@ export default function ConnectWalletButton() {
   return (
     <button
       type="button"
-      onClick={() => {
-        // #region agent log
-        fetch('http://127.0.0.1:7483/ingest/84e5d7e1-b2bc-4b0e-8677-7b0875f46cc6', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '8818b3' },
-          body: JSON.stringify({
-            sessionId: '8818b3',
-            location: 'ConnectWalletButton.tsx:click',
-            message: 'Connect wallet button clicked',
-            data: { isLoading, isMobile, source: 'navbar' },
-            timestamp: Date.now(),
-            hypothesisId: 'H1',
-            runId: 'pre-fix',
-          }),
-        }).catch(() => {})
-        // #endregion
-        connectWallet()
-      }}
+      onClick={connectWallet}
       disabled={isLoading}
       style={{
         ...base,
