@@ -554,6 +554,82 @@ export async function fetchRepoBySlug(slug: string): Promise<GitHubRepo | null> 
   }
 }
 
+export interface RepoEvidenceFlags {
+  hasLicense: boolean
+  hasSecurityMd: boolean
+  hasTests: boolean
+  hasLockfile: boolean
+  hasCi: boolean
+  hasChangelog: boolean
+  hasContributing: boolean
+}
+
+export interface RepoEvidence {
+  readmeExcerpt: string | null
+  rootFiles: string[]
+  flags: RepoEvidenceFlags
+}
+
+const README_MAX_CHARS = 2000
+
+function deriveFlags(rootFiles: string[], hasCi: boolean): RepoEvidenceFlags {
+  const names = rootFiles.map(f => f.toLowerCase())
+  return {
+    hasLicense: names.some(n => n === 'license' || n === 'license.md' || n === 'license.txt'),
+    hasSecurityMd: names.some(n => n === 'security.md' || n === 'security.txt' || n === 'security'),
+    hasTests: names.some(n => n === 'test' || n === 'tests' || n === '__tests__' || n === 'spec' || n === 'jest.config.js' || n === 'jest.config.ts' || n === 'vitest.config.ts'),
+    hasLockfile: names.some(n => n === 'package-lock.json' || n === 'yarn.lock' || n === 'pnpm-lock.yaml' || n === 'poetry.lock' || n === 'cargo.lock'),
+    hasCi,
+    hasChangelog: names.some(n => n === 'changelog.md' || n === 'changelog' || n === 'changes.md' || n === 'history.md'),
+    hasContributing: names.some(n => n === 'contributing.md' || n === 'contributing'),
+  }
+}
+
+export async function fetchRepoEvidence(slug: string): Promise<RepoEvidence | null> {
+  try {
+    const authHeaders: Record<string, string> = {}
+    if (GITHUB_TOKEN) authHeaders['Authorization'] = `Bearer ${GITHUB_TOKEN}`
+
+    const [readmeRes, contentsRes] = await Promise.all([
+      fetch(`https://api.github.com/repos/${GITHUB_ORG}/${slug}/readme`, {
+        headers: { ...authHeaders, Accept: 'application/vnd.github.raw+json' },
+        next: { revalidate: 3600, tags: ['github-stats'] },
+      }),
+      fetch(`https://api.github.com/repos/${GITHUB_ORG}/${slug}/contents/`, {
+        headers: { ...authHeaders, Accept: 'application/vnd.github.v3+json' },
+        next: { revalidate: 3600, tags: ['github-stats'] },
+      }),
+    ])
+
+    const readmeExcerpt = readmeRes.ok
+      ? (await readmeRes.text()).slice(0, README_MAX_CHARS)
+      : null
+
+    const rootFiles: string[] = []
+    if (contentsRes.ok) {
+      const listing = await contentsRes.json()
+      if (Array.isArray(listing)) {
+        for (const entry of listing) {
+          if (typeof entry?.name === 'string') rootFiles.push(entry.name)
+        }
+      }
+    }
+
+    const ciRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_ORG}/${slug}/contents/.github/workflows`,
+      {
+        headers: { ...authHeaders, Accept: 'application/vnd.github.v3+json' },
+        next: { revalidate: 3600, tags: ['github-stats'] },
+      },
+    )
+    const hasCi = ciRes.ok && ciRes.status !== 404
+
+    return { readmeExcerpt, rootFiles, flags: deriveFlags(rootFiles, hasCi) }
+  } catch {
+    return null
+  }
+}
+
 export async function fetchCommits30dCount(slug: string): Promise<number> {
   try {
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
