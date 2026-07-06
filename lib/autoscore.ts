@@ -184,6 +184,9 @@ async function inferScore(
   }
 
   const evidenceBlock = buildEvidenceBlock()
+  const evidenceInstructions =
+    'Ground builderIntegrity rows in the evidence block above. If evidence is absent for a row, say so in source and default per the tag rules — do not invent artifacts.\n' +
+    'If Chronicle/ecosystem context and repo evidence conflict, repo evidence wins for builderIntegrity rows; Chronicle/ecosystem context governs economic role, tag choice, and TM/SL framing.\n\n'
 
   const prompt = `You are scoring a GitHub repository for the clawdbotatg CLAWD ecosystem (scoring v3).
 
@@ -197,7 +200,7 @@ Created: ${repo.createdAt}
 Last pushed: ${repo.pushedAt}
 Status (computed from push date): ${derivedStatus}
 
-${evidenceBlock}Infer:
+${evidenceBlock}${evidenceInstructions}Infer:
 1. tag: one of direct | supply-lock | indirect | infrastructure | theoretical
 2. Economic axis (pick ONE based on tag):
    - direct or supply-lock → tokenMechanic rubric (consumer labels), shippingLeverage: null
