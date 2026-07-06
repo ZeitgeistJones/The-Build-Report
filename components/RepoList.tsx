@@ -88,7 +88,7 @@ const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
 
 type ActivityScope = 'active' | 'all'
 type RepoSort = 'recent' | 'commits' | 'grade'
-type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'cv-related' | 'clawd-gated' | 'community-context' | Tag
+export type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'cv-related' | 'clawd-gated' | 'community-context' | Tag
 
 const COLLECTION_BADGE: Record<RepoCollectionId, { label: string; color: string; bg: string }> = {
   'cv-related': { label: 'CV', color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
@@ -104,6 +104,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000
 const GITHUB_COMMITS_CAP = 100
 
 const PERIOD_WINDOW_LABEL: Record<Period, string> = {
+  '24h': 'last 24 hours',
   '7d': 'last 7 days',
   '30d': 'last 30 days',
   '60d': 'last 60 days',

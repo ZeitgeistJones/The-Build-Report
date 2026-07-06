@@ -6,18 +6,21 @@ import { LetterBucketDistribution, OverallGradeContext } from './overallGrade'
 import { Period } from './grades'
 
 const SUMMARY_KEYS: Record<Period, string> = {
+  '24h': 'build-report:overall-summary-24h-v2',
   '30d': 'build-report:overall-summary-v2',
   '7d': 'build-report:overall-summary-7d-v2',
   '60d': 'build-report:overall-summary-60d-v2',
 }
 
 const PERIOD_LABELS: Record<Period, string> = {
+  '24h': '24-hour',
   '7d': '7-day',
   '30d': '30-day',
   '60d': '60-day',
 }
 
 const PERIOD_FOCUS: Record<Period, string> = {
+  '24h': 'Focus on what happened in the last day: same-day momentum, where commits landed, and the immediate signal for holders.',
   '7d': 'Focus on what happened this week: recent momentum, where commits landed, and the short-term signal for holders.',
   '30d': 'Focus on the current month: what is being built right now and what the grades mean for holders today.',
   '60d': 'Focus on the broader two-month picture: sustained patterns, whether activity is consistent or bursty, and how this week\'s work fits the longer arc.',

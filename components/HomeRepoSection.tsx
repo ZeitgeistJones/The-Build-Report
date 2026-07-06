@@ -1,14 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import RepoList, { type RepoWithLive } from '@/components/RepoList'
+import RepoList, { type RepoWithLive, type RepoFilter } from '@/components/RepoList'
 import CommunityPulseBanner from '@/components/CommunityPulseBanner'
 import type { CommunityPulse } from '@/lib/communityContextTypes'
 import type { RepoContextSummary } from '@/lib/communityContextTypes'
 import type { RescoreSummaryRecord } from '@/lib/rescoreSummaries'
 import type { RepoCollectionId } from '@/lib/repoCollections'
-
-type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'cv-related' | 'clawd-gated' | 'community-context' | string
 
 interface Props {
   repos: RepoWithLive[]
