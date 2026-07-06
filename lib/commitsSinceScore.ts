@@ -77,28 +77,6 @@ export function countCommitsSinceScore(
         fallback.pushedAt ?? null,
       )
       if (hasNew) {
-        // #region agent log
-        fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
-          body: JSON.stringify({
-            sessionId: 'a33a7a',
-            location: 'lib/commitsSinceScore.ts:countCommitsSinceScore',
-            message: 'stale snapshot fallback — pushed after scored',
-            data: {
-              scoredAt,
-              scoredMs,
-              tsCount: commitTimestamps.length,
-              newestTs: commitTimestamps[0] ?? null,
-              lastCommitAt: fallback.lastCommitAt,
-              pushedAt: fallback.pushedAt,
-            },
-            timestamp: Date.now(),
-            hypothesisId: 'H1',
-            runId: 'post-fix',
-          }),
-        }).catch(() => {})
-        // #endregion
         return { count: -1, exact: false, hasNew: true, capped: false }
       }
     }

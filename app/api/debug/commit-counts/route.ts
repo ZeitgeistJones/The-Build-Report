@@ -110,21 +110,5 @@ export async function GET() {
     samples,
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
-    body: JSON.stringify({
-      sessionId: 'a33a7a',
-      location: 'api/debug/commit-counts/route.ts:GET',
-      message: 'commit counts diagnostic',
-      data: payload,
-      timestamp: Date.now(),
-      hypothesisId: 'H1-H4',
-      runId: 'pre-fix',
-    }),
-  }).catch(() => {})
-  // #endregion
-
   return NextResponse.json(payload)
 }

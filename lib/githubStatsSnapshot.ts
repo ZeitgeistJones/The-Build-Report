@@ -194,32 +194,7 @@ export async function loadGitHubStatsForPage(): Promise<{
   const cached = await getGitHubStatsForDisplay()
   if (cached) {
     const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
-    const { needsRefresh, behindSlugs, reason } = await snapshotNeedsLiveRefresh(cached, updatedAt)
-
-    // #region agent log
-    fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
-      body: JSON.stringify({
-        sessionId: 'a33a7a',
-        location: 'lib/githubStatsSnapshot.ts:loadGitHubStatsForPage',
-        message: 'snapshot refresh decision',
-        data: {
-          needsRefresh,
-          reason,
-          behindSlugs,
-          snapshotUpdatedAt: updatedAt,
-          snapshotAgeHours:
-            updatedAt != null
-              ? Math.round(((Date.now() - new Date(updatedAt).getTime()) / 3600000) * 10) / 10
-              : null,
-        },
-        timestamp: Date.now(),
-        hypothesisId: 'H5',
-        runId: 'post-fix',
-      }),
-    }).catch(() => {})
-    // #endregion
+    const { needsRefresh } = await snapshotNeedsLiveRefresh(cached, updatedAt)
 
     if (needsRefresh) {
       try {
