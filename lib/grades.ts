@@ -20,6 +20,8 @@ import {
   slRubricLevelScore,
 } from './rubrics/shippingLeverage'
 import { getConsumerEconomicScorePct, isConsumerEconomicScored } from './economicGrade'
+import type { GradeNewArrival } from './gradeNewArrivals'
+import type { PathToCHint } from './gradePathToC'
 
 export { pctToLetter }
 
@@ -130,6 +132,7 @@ export interface TokenMechanicGrade {
   trendPct: number | null
   trend: TrendDirection
   trendExplanation?: TrendExplanation
+  newArrivals?: GradeNewArrival[]
 }
 
 export interface IntegrityDragRepo {
@@ -150,6 +153,8 @@ export interface IntegrityGrade {
   trendPct: number | null
   trend: TrendDirection
   trendExplanation?: TrendExplanation
+  newArrivals?: GradeNewArrival[]
+  pathToC?: PathToCHint | null
 }
 
 /** Relative % change for display ("+12% vs prior"). Null when prior is 0 and current > 0 ("new"). */

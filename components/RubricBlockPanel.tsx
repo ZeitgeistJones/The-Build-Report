@@ -2,6 +2,7 @@
 
 import InfoTooltip from '@/components/InfoTooltip'
 import type { RubricReferenceBlock } from '@/lib/rubricReference'
+import { BUILDER_STANDARDS_BY_ANCHOR } from '@/lib/builderStandardsExamples'
 import { BI_WEIGHTS_TOOLTIP } from '@/lib/rubrics/builderIntegrity'
 
 const ROW_SUMMARY_STYLE = {
@@ -15,9 +16,40 @@ const ROW_SUMMARY_STYLE = {
   borderBottom: '1px solid var(--border)',
 } as const
 
+function StandardsExamples({ anchorId }: { anchorId: string }) {
+  const ex = BUILDER_STANDARDS_BY_ANCHOR[anchorId]
+  if (!ex) return null
+  const tier = (label: string, items: string[]) =>
+    items.length ? (
+      <div style={{ marginTop: '8px' }}>
+        <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '4px' }}>
+          {label}
+        </div>
+        <ul style={{ margin: 0, paddingLeft: '16px' }}>
+          {items.map(item => (
+            <li key={item} style={{ marginBottom: '3px' }}>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null
+
+  return (
+    <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed var(--border)' }}>
+      <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+        Observable signals (generic)
+      </div>
+      {tier('High', ex.high)}
+      {tier('Mid', ex.mid)}
+      {tier('Low', ex.low)}
+    </div>
+  )
+}
+
 function RubricRowDetail({ row }: { row: RubricReferenceBlock['rows'][number] }) {
   return (
-    <details className="hw-rubric-row">
+    <details className="hw-rubric-row" id={row.anchorId}>
       <summary style={ROW_SUMMARY_STYLE}>
         <span style={{ fontSize: '13px', color: 'var(--text-secondary)', flex: 1, minWidth: 0 }}>
           {row.label}
@@ -40,6 +72,7 @@ function RubricRowDetail({ row }: { row: RubricReferenceBlock['rows'][number] })
         <p style={{ margin: '8px 0 0', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
           low 33 · mid 67 · high 100 pts (per row max)
         </p>
+        {row.anchorId && <StandardsExamples anchorId={row.anchorId} />}
       </div>
     </details>
   )
@@ -89,7 +122,7 @@ export default function RubricBlockPanel({
             {isBi && (
               <InfoTooltip
                 content={BI_WEIGHTS_TOOLTIP}
-                ariaLabel="Why builder integrity weights are 22% and 18%"
+                ariaLabel="Why builder standards weights are 22% and 18%"
                 icon="question"
                 width={280}
                 compact

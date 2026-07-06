@@ -5,6 +5,8 @@ export type RubricReferenceRow = {
   weight: string
   teaser: string
   detail: string
+  /** How we score anchor for standards examples + path-to-C links */
+  anchorId?: string
 }
 
 export type RubricReferenceBlock = {
@@ -80,14 +82,15 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
   },
   {
     id: 'builder-integrity',
-    title: 'Builder integrity',
+    title: 'Builder standards',
     appliesTo: 'every repo — scoring rules vary by tag',
-    note: 'Five rows, weighted sum. Infra uses different BI rules than burn apps (see row detail). CV is not CLAWD; supply lock is not a burn.',
+    note: 'Commit-weighted rubric quality where work landed — not a moral verdict. Infra uses different rules than burn apps. CV is not CLAWD; supply lock is not a burn.',
     scope: 'repo',
     rows: [
       {
         label: 'On-chain commitments and constraints',
         weight: '22%',
+        anchorId: 'bi-on-chain',
         teaser: 'Contracts, locks, and architectural restraint — or honest absence of them.',
         detail:
           'Burn apps: verifiable on-chain commitments. Infra: no contract can be appropriate — score session boundaries, secrets handling, and restraint; not “missing Solidity.”',
@@ -95,6 +98,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
       {
         label: 'User funds, risk, and safety posture',
         weight: '20%',
+        anchorId: 'bi-safety',
         teaser: 'How are user funds and credentials protected?',
         detail:
           'Money-moving apps need fail-safes and clear fund flows. Dev tools with no user funds default mid; low only for careless credential exposure.',
@@ -102,6 +106,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
       {
         label: 'Transparency and verifiability',
         weight: '18%',
+        anchorId: 'bi-transparency',
         teaser: 'Can outsiders verify what this repo claims?',
         detail:
           'Public code, documented scope, and reproducible claims score higher. Polished landing pages without on-chain routing score lower on TM, not automatically high here.',
@@ -109,6 +114,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
       {
         label: 'Governance, token-economics, and ecosystem alignment',
         weight: '20%',
+        anchorId: 'bi-governance',
         teaser: 'Does the repo align with the autonomous-builder / CLAWD thesis?',
         detail:
           'Infra should not default low for lacking holder UI. Score whether work supports shipping and honest ecosystem role — low only for misleading CLAWD claims.',
@@ -116,6 +122,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
       {
         label: 'Security, testing, and cryptographic rigor',
         weight: '20%',
+        anchorId: 'bi-security',
         teaser: 'Evidence of security practice proportional to risk.',
         detail:
           'Rapid ships without tests can be mid, not auto-low. Low for obvious negligence — especially when recent commits introduce auth or crypto risk.',

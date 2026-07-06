@@ -1,6 +1,7 @@
 'use client'
 
 import { RUBRIC_REFERENCE_ECOSYSTEM, RUBRIC_REFERENCE_REPO } from '@/lib/rubricReference'
+import { BUILDER_STANDARDS_CROSS_CUTTING } from '@/lib/builderStandardsExamples'
 import RubricBlockPanel from '@/components/RubricBlockPanel'
 
 export default function HowWeScoreRubrics() {
@@ -10,8 +11,32 @@ export default function HowWeScoreRubrics() {
         Score rubrics
       </h3>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
-        Per-repo cards use token mechanic or shipping leverage plus builder integrity. Expand each row for definitions.
+        Per-repo cards use token mechanic or shipping leverage plus builder standards. Expand each row for definitions and observable signal examples.
       </p>
+
+      <div
+        id="bi-cross-cutting"
+        className="how-we-score-card"
+        style={{
+          marginBottom: '16px',
+          padding: '12px 14px',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          fontSize: '12px',
+          color: 'var(--text-secondary)',
+          lineHeight: 1.55,
+        }}
+      >
+        <div style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '8px' }}>
+          Cross-cutting signals
+        </div>
+        <ul style={{ margin: 0, paddingLeft: '18px' }}>
+          {BUILDER_STANDARDS_CROSS_CUTTING.map(line => (
+            <li key={line} style={{ marginBottom: '4px' }}>{line}</li>
+          ))}
+        </ul>
+      </div>
 
       <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
         Per-repo (3 grades on each card)

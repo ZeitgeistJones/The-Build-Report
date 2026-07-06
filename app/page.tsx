@@ -14,13 +14,27 @@ import {
   githubSlugOrder,
   cacheLookupSlugs,
 } from '@/lib/repoOrder'
-import { calcBuilderGrade, calcTokenMechanicGrade, calcIntegrityGrade, consumerEconomicRepos } from '@/lib/grades'
+import {
+  ensureArrivalBootstrap,
+  getSeenArrivals,
+  markArrivalsSeen,
+} from '@/lib/gradeArrivalSeen'
+import { buildGradeNewArrivals, sampleSlugsForCategory } from '@/lib/gradeNewArrivals'
+import { buildPathToC } from '@/lib/gradePathToC'
+import {
+  calcBuilderGrade,
+  calcTokenMechanicGrade,
+  calcIntegrityGrade,
+  consumerEconomicRepos,
+  type Period,
+  type TokenMechanicGrade,
+  type IntegrityGrade,
+} from '@/lib/grades'
 import {
   buildBuilderTrendExplanation,
   buildTokenMechanicTrendExplanation,
   buildIntegrityTrendExplanation,
 } from '@/lib/gradeNarratives'
-import { calcEcosystemPulse } from '@/lib/ecosystemPulse'
 import { type RepoWithLive } from '@/components/RepoList'
 import HomeRepoSection from '@/components/HomeRepoSection'
 import GradesPanel from '@/components/GradesPanel'
@@ -32,11 +46,13 @@ import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 import { getRescoreSummaries } from '@/lib/rescoreSummaries'
 import { getBuildBrief } from '@/lib/buildBrief'
 import { isCommunityContextEnabled, getContextSummaryBySlug, buildCommunityPulse } from '@/lib/communityContext'
+import { calcEcosystemPulse } from '@/lib/ecosystemPulse'
+import type { GitHubStats } from '@/lib/github'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
-  let stats
+  let stats: GitHubStats | null = null
   let error = false
   const communityContextEnabled = isCommunityContextEnabled()
   const contextSummary = communityContextEnabled ? await getContextSummaryBySlug().catch(() => ({})) : {}
@@ -110,19 +126,63 @@ export default async function Home() {
 
   const holderEconRepos = consumerEconomicRepos(allRepos)
 
+  const holderSampleSlugs = sampleSlugsForCategory('holder-econ', allRepos)
+  const integritySampleSlugs = sampleSlugsForCategory('integrity', allRepos)
+  await Promise.all([
+    ensureArrivalBootstrap('holder-econ', holderSampleSlugs),
+    ensureArrivalBootstrap('integrity', integritySampleSlugs),
+  ])
+  const [seenHolder, seenIntegrity] = await Promise.all([
+    getSeenArrivals('holder-econ'),
+    getSeenArrivals('integrity'),
+  ])
+
+  const holderArrivalsToMark = new Set<string>()
+  const integrityArrivalsToMark = new Set<string>()
+
+  function attachHolderArrivals(grade: TokenMechanicGrade | null, period: Period): TokenMechanicGrade | null {
+    if (!grade || !stats) return grade
+    const newArrivals = buildGradeNewArrivals(stats, allRepos, period, 'holder-econ', seenHolder, seenIntegrity)
+    for (const a of newArrivals) holderArrivalsToMark.add(a.slug)
+    return { ...grade, newArrivals }
+  }
+
+  function attachIntegrityArrivals(grade: IntegrityGrade | null, period: Period): IntegrityGrade | null {
+    if (!grade || !stats) return grade
+    const newArrivals = buildGradeNewArrivals(stats, allRepos, period, 'integrity', seenIntegrity, seenHolder)
+    for (const a of newArrivals) integrityArrivalsToMark.add(a.slug)
+    const pathToC = buildPathToC(grade)
+    return { ...grade, newArrivals, pathToC: pathToC ?? undefined }
+  }
+
   const builderGrade24Raw = stats ? calcBuilderGrade(stats, '24h') : null
   const builderGrade30Raw = stats ? calcBuilderGrade(stats, '30d') : null
   const builderGrade7Raw = stats ? calcBuilderGrade(stats, '7d') : null
-  const tokenMechanicGrade24Raw = stats ? calcTokenMechanicGrade(stats, '24h', allRepos) : null
-  const tokenMechanicGrade30Raw = stats ? calcTokenMechanicGrade(stats, '30d', allRepos) : null
-  const tokenMechanicGrade7Raw = stats ? calcTokenMechanicGrade(stats, '7d', allRepos) : null
-  const integrityGrade24Raw = stats ? calcIntegrityGrade(stats, '24h', allRepos) : calcIntegrityGrade(null, '24h', allRepos)
-  const integrityGrade30Raw = stats ? calcIntegrityGrade(stats, '30d', allRepos) : calcIntegrityGrade(null, '30d', allRepos)
-  const integrityGrade7Raw = stats ? calcIntegrityGrade(stats, '7d', allRepos) : calcIntegrityGrade(null, '7d', allRepos)
+  const tokenMechanicGrade24Raw = stats ? attachHolderArrivals(calcTokenMechanicGrade(stats, '24h', allRepos), '24h') : null
+  const tokenMechanicGrade30Raw = stats ? attachHolderArrivals(calcTokenMechanicGrade(stats, '30d', allRepos), '30d') : null
+  const tokenMechanicGrade7Raw = stats ? attachHolderArrivals(calcTokenMechanicGrade(stats, '7d', allRepos), '7d') : null
+  const integrityGrade24Raw = stats
+    ? attachIntegrityArrivals(calcIntegrityGrade(stats, '24h', allRepos), '24h')
+    : calcIntegrityGrade(null, '24h', allRepos)
+  const integrityGrade30Raw = stats
+    ? attachIntegrityArrivals(calcIntegrityGrade(stats, '30d', allRepos), '30d')
+    : calcIntegrityGrade(null, '30d', allRepos)
+  const integrityGrade7Raw = stats
+    ? attachIntegrityArrivals(calcIntegrityGrade(stats, '7d', allRepos), '7d')
+    : calcIntegrityGrade(null, '7d', allRepos)
 
   const builderGrade60Raw = stats ? calcBuilderGrade(stats, '60d') : null
-  const tokenMechanicGrade60Raw = stats ? calcTokenMechanicGrade(stats, '60d', allRepos) : null
-  const integrityGrade60Raw = stats ? calcIntegrityGrade(stats, '60d', allRepos) : calcIntegrityGrade(null, '60d', allRepos)
+  const tokenMechanicGrade60Raw = stats ? attachHolderArrivals(calcTokenMechanicGrade(stats, '60d', allRepos), '60d') : null
+  const integrityGrade60Raw = stats
+    ? attachIntegrityArrivals(calcIntegrityGrade(stats, '60d', allRepos), '60d')
+    : calcIntegrityGrade(null, '60d', allRepos)
+
+  if (holderArrivalsToMark.size || integrityArrivalsToMark.size) {
+    await Promise.all([
+      markArrivalsSeen('holder-econ', [...holderArrivalsToMark]),
+      markArrivalsSeen('integrity', [...integrityArrivalsToMark]),
+    ])
+  }
 
   const builderGrade24 = builderGrade24Raw && stats
     ? { ...builderGrade24Raw, trendExplanation: buildBuilderTrendExplanation(stats, '24h', builderGrade24Raw.trendPct, builderGrade24Raw.trend, allRepos) }
@@ -134,22 +194,85 @@ export default async function Home() {
     ? { ...builderGrade7Raw, trendExplanation: buildBuilderTrendExplanation(stats, '7d', builderGrade7Raw.trendPct, builderGrade7Raw.trend, allRepos) }
     : builderGrade7Raw
   const tokenMechanicGrade24 = tokenMechanicGrade24Raw && stats
-    ? { ...tokenMechanicGrade24Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '24h', holderEconRepos, tokenMechanicGrade24Raw.trendPct, tokenMechanicGrade24Raw.trend, allRepos) }
+    ? {
+        ...tokenMechanicGrade24Raw,
+        trendExplanation: buildTokenMechanicTrendExplanation(
+          stats,
+          '24h',
+          holderEconRepos,
+          tokenMechanicGrade24Raw.trendPct,
+          tokenMechanicGrade24Raw.trend,
+          allRepos,
+          tokenMechanicGrade24Raw.newArrivals?.length,
+        ),
+      }
     : tokenMechanicGrade24Raw
   const tokenMechanicGrade30 = tokenMechanicGrade30Raw && stats
-    ? { ...tokenMechanicGrade30Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '30d', holderEconRepos, tokenMechanicGrade30Raw.trendPct, tokenMechanicGrade30Raw.trend, allRepos) }
+    ? {
+        ...tokenMechanicGrade30Raw,
+        trendExplanation: buildTokenMechanicTrendExplanation(
+          stats,
+          '30d',
+          holderEconRepos,
+          tokenMechanicGrade30Raw.trendPct,
+          tokenMechanicGrade30Raw.trend,
+          allRepos,
+          tokenMechanicGrade30Raw.newArrivals?.length,
+        ),
+      }
     : tokenMechanicGrade30Raw
   const tokenMechanicGrade7 = tokenMechanicGrade7Raw && stats
-    ? { ...tokenMechanicGrade7Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '7d', holderEconRepos, tokenMechanicGrade7Raw.trendPct, tokenMechanicGrade7Raw.trend, allRepos) }
+    ? {
+        ...tokenMechanicGrade7Raw,
+        trendExplanation: buildTokenMechanicTrendExplanation(
+          stats,
+          '7d',
+          holderEconRepos,
+          tokenMechanicGrade7Raw.trendPct,
+          tokenMechanicGrade7Raw.trend,
+          allRepos,
+          tokenMechanicGrade7Raw.newArrivals?.length,
+        ),
+      }
     : tokenMechanicGrade7Raw
   const integrityGrade24 = integrityGrade24Raw && stats
-    ? { ...integrityGrade24Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '24h', allRepos, integrityGrade24Raw.trendPct, integrityGrade24Raw.trend) }
+    ? {
+        ...integrityGrade24Raw,
+        trendExplanation: buildIntegrityTrendExplanation(
+          stats,
+          '24h',
+          allRepos,
+          integrityGrade24Raw.trendPct,
+          integrityGrade24Raw.trend,
+          integrityGrade24Raw.newArrivals?.length,
+        ),
+      }
     : integrityGrade24Raw
   const integrityGrade30 = integrityGrade30Raw && stats
-    ? { ...integrityGrade30Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '30d', allRepos, integrityGrade30Raw.trendPct, integrityGrade30Raw.trend) }
+    ? {
+        ...integrityGrade30Raw,
+        trendExplanation: buildIntegrityTrendExplanation(
+          stats,
+          '30d',
+          allRepos,
+          integrityGrade30Raw.trendPct,
+          integrityGrade30Raw.trend,
+          integrityGrade30Raw.newArrivals?.length,
+        ),
+      }
     : integrityGrade30Raw
   const integrityGrade7 = integrityGrade7Raw && stats
-    ? { ...integrityGrade7Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '7d', allRepos, integrityGrade7Raw.trendPct, integrityGrade7Raw.trend) }
+    ? {
+        ...integrityGrade7Raw,
+        trendExplanation: buildIntegrityTrendExplanation(
+          stats,
+          '7d',
+          allRepos,
+          integrityGrade7Raw.trendPct,
+          integrityGrade7Raw.trend,
+          integrityGrade7Raw.newArrivals?.length,
+        ),
+      }
     : integrityGrade7Raw
   const builderGrade60 = builderGrade60Raw
   const tokenMechanicGrade60 = tokenMechanicGrade60Raw

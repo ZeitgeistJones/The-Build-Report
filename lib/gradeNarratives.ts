@@ -213,6 +213,7 @@ export function buildTokenMechanicTrendExplanation(
   trendPct: number | null,
   trend: TrendDirection,
   allRepos?: Repo[],
+  newArrivalCount?: number,
 ): TrendExplanation {
   const activeNow = reposActiveInWindow(stats, holderRepoSet, period, 'current')
   const activePrior = reposActiveInWindow(stats, holderRepoSet, period, 'prior')
@@ -237,7 +238,11 @@ export function buildTokenMechanicTrendExplanation(
     }
   }
 
-  if (newlyActive.length) {
+  if (newArrivalCount && newArrivalCount > 0 && bullets.length < 4) {
+    bullets.push(
+      `${newArrivalCount} project${newArrivalCount === 1 ? '' : 's'} newly entered this sample — see New arrivals →`,
+    )
+  } else if (newlyActive.length) {
     if (newlyActive.length === 1) {
       const name = formatRepoNames(newlyActive, stats, period, 1)
       bullets.push(`${name} joined the holder-economics sample with new activity.`)
@@ -315,6 +320,7 @@ export function buildIntegrityTrendExplanation(
   repoSet: Repo[],
   trendPct: number | null,
   trend: TrendDirection,
+  newArrivalCount?: number,
 ): TrendExplanation {
   const activeNow = reposActiveInWindow(stats, repoSet, period, 'current')
   const activePrior = reposActiveInWindow(stats, repoSet, period, 'prior')
@@ -332,7 +338,11 @@ export function buildIntegrityTrendExplanation(
 
   const bullets: string[] = []
 
-  if (added.length) {
+  if (newArrivalCount && newArrivalCount > 0) {
+    bullets.push(
+      `${newArrivalCount} project${newArrivalCount === 1 ? '' : 's'} newly entered this sample — see New arrivals →`,
+    )
+  } else if (added.length) {
     const names = formatRepoNames(added, stats, period, 2)
     bullets.push(`New projects entered the sample${names ? `, including ${names}` : ''}.`)
   }
