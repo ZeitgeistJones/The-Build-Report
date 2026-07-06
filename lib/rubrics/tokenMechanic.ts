@@ -40,6 +40,7 @@ export const LEGACY_TM_TO_V3_LABEL: Record<string, string> = {
   'Mechanic is operational': 'Alignment with CLAWD economic story',
 }
 
+// NOTE: deliberately excludes 'indirect'. expectedTmLabels('indirect') must return consumer labels so autoscore.ts's recovery path (indirect repo + model-emitted consumer TM rows → scored as shipping leverage) keeps validating. Do not "fix" by adding indirect here.
 export function isInfraTag(tag: Tag): boolean {
   return tag === 'infrastructure' || tag === 'theoretical'
 }
@@ -163,7 +164,7 @@ export function tmRubricLevelScore(
   return 33
 }
 
-export const TM_CONSUMER_PROMPT = `- tokenMechanic (consumer — direct, supply-lock, indirect tags):
+export const TM_CONSUMER_PROMPT = `- tokenMechanic (consumer — direct and supply-lock tags ONLY):
   "Direct CLAWD economic impact" (50%): High = core function burns/locks/uses CLAWD as main economic unit; Mid = meaningful but secondary CLAWD use; Low = no visible CLAWD mechanic in core logic.
   "Mechanism clarity and holder relevance" (30%): High = holder can infer specific CLAWD effect from repo/Chronicle; Mid = partial/vague; Low = generic or absent CLAWD mention.
   "Alignment with CLAWD economic story" (20%): High = fits apps-that-burn-lock-pay narrative; Mid = compatible but not central; Low = ornamental or off-story.`

@@ -385,8 +385,12 @@ function cappedCommitWeights(
   if (raw.length <= 1) return raw
 
   const total = raw.reduce((s, r) => s + r.weight, 0)
-  const cap = total * MAX_SINGLE_REPO_WEIGHT_SHARE
-  return raw.map(r => ({ repo: r.repo, weight: Math.min(r.weight, cap) }))
+  return raw.map(r => {
+    const others = total - r.weight
+    // ≤ MAX share of final total ⇔ weight ≤ others * share/(1-share); at 0.5 that's simply `others`
+    const cap = others * (MAX_SINGLE_REPO_WEIGHT_SHARE / (1 - MAX_SINGLE_REPO_WEIGHT_SHARE))
+    return { repo: r.repo, weight: Math.min(r.weight, Math.max(cap, 1)) }
+  })
 }
 
 /**
@@ -421,10 +425,8 @@ function integrityCommitCounts(
   let mid = 0
   let low = 0
   let total = 0
-  for (const repo of repos) {
+  for (const { repo, weight: w } of cappedCommitWeights(stats, repos, period, window)) {
     if (repo.builderIntegrity.letter === '—') continue
-    const w = commitsForRepo(stats, repo.githubSlug, period, window)
-    if (w <= 0) continue
     total += w
     if (repo.builderIntegrity.pct >= 80) high += w
     else if (repo.builderIntegrity.pct >= 60) mid += w
@@ -514,11 +516,9 @@ function tokenMechanicRubricCommitCounts(
   let mid = 0
   let low = 0
   let total = 0
-  for (const repo of repos) {
+  for (const { repo, weight: w } of cappedCommitWeights(stats, repos, period, 'current')) {
     const pct = getConsumerEconomicScorePct(repo)
     if (pct == null) continue
-    const w = commitsForRepo(stats, repo.githubSlug, period, 'current')
-    if (w <= 0) continue
     total += w
     if (pct >= 80) high += w
     else if (pct >= 60) mid += w

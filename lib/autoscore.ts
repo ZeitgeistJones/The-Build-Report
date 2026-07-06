@@ -104,6 +104,23 @@ function makeSlScore(rows: RubricRow[]): Score {
   return { letter: pctToLetter(pct), pct, rubric: rows }
 }
 
+const SL_RELABEL_TARGETS = [
+  { label: 'Multiplies builder shipping capacity', weight: '40%' },
+  { label: 'Downstream path to holder value', weight: '35%' },
+  { label: 'Role in ecosystem workflow', weight: '25%' },
+] as const
+
+/** Map recovered consumer TM rows onto SL labels before storing under shippingLeverage. */
+function relabelLegacyTmRowsToSl(rows: RubricRow[]): RubricRow[] {
+  const suffix = ' (relabeled from consumer rubric)'
+  return rows.map((row, i) => {
+    const target = SL_RELABEL_TARGETS[i]
+    if (!target) return row
+    const source = row.source.endsWith(suffix) ? row.source : `${row.source}${suffix}`
+    return { ...row, label: target.label, weight: target.weight, source }
+  })
+}
+
 const VALID_TAGS = new Set(['direct', 'supply-lock', 'indirect', 'infrastructure', 'theoretical'])
 
 export function toRawRepo(gh: {
@@ -220,7 +237,7 @@ Respond ONLY with valid JSON, no markdown:
       } else {
         const legacyRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
         if (legacyRows?.length && validateTokenMechanicRows(legacyRows, tag)) {
-          shippingLeverage = makeSlScore(legacyRows)
+          shippingLeverage = makeSlScore(relabelLegacyTmRowsToSl(legacyRows))
         } else {
           console.error(`[autoscore] invalid shippingLeverage rubric for ${repo.name}`)
           return null
