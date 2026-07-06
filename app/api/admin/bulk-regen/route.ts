@@ -51,6 +51,12 @@ export async function POST(req: NextRequest) {
 
     try {
       const result = await runBulkRegenerateBatch({ flushFirst, offset, limit })
+      if (result.nextOffset === null) {
+        const { getGitHubStats } = await import('@/lib/github')
+        const { syncGitHubStatsSnapshot } = await import('@/lib/githubStatsSnapshot')
+        const fresh = await getGitHubStats({ fresh: true })
+        await syncGitHubStatsSnapshot(fresh)
+      }
       return NextResponse.json({ ok: true, ...result })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Bulk regenerate batch failed'

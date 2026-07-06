@@ -34,6 +34,42 @@ export function countCommitsSinceScore(
       const ms = new Date(ts).getTime()
       return !Number.isNaN(ms) && ms > scoredMs
     }).length
+
+    // Stale snapshot: scoredAt can be newer than every cached timestamp (e.g. bulk regen)
+    // while pushedAt/lastCommitAt still moved — don't show a false exact zero.
+    if (count === 0 && fallback) {
+      const hasNew = hasCommitAfterScore(
+        scoredAt,
+        fallback.lastCommitAt ?? null,
+        fallback.pushedAt ?? null,
+      )
+      if (hasNew) {
+        // #region agent log
+        fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
+          body: JSON.stringify({
+            sessionId: 'a33a7a',
+            location: 'lib/commitsSinceScore.ts:countCommitsSinceScore',
+            message: 'stale snapshot fallback — pushed after scored',
+            data: {
+              scoredAt,
+              scoredMs,
+              tsCount: commitTimestamps.length,
+              newestTs: commitTimestamps[0] ?? null,
+              lastCommitAt: fallback.lastCommitAt,
+              pushedAt: fallback.pushedAt,
+            },
+            timestamp: Date.now(),
+            hypothesisId: 'H1',
+            runId: 'pre-fix',
+          }),
+        }).catch(() => {})
+        // #endregion
+        return { count: -1, exact: false, hasNew: true, capped: false }
+      }
+    }
+
     return {
       count,
       exact: true,
