@@ -9,10 +9,17 @@ import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
 import { PulseMicrostats } from './EcosystemPulse'
 import { EcosystemPulse } from '@/lib/ecosystemPulse'
 import { integrityGradeFootnote } from '@/lib/cardFraming'
+import type { DailyDigestCards } from '@/lib/buildBrief'
+import {
+  builderCardLayman,
+  economicCardLayman,
+  integrityCardLayman,
+  type GradeCardId,
+} from '@/lib/gradeCardCopy'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import RubricBlockPanel from '@/components/RubricBlockPanel'
 
-type CardId = 'builder' | 'economic' | 'integrity'
+type CardId = GradeCardId
 
 interface Props {
   pulse30: EcosystemPulse | null
@@ -30,6 +37,7 @@ interface Props {
   stats30d: { commits: number; activeDays: number; newRepos: number } | null
   stats7d: { commits: number; activeDays: number; newRepos: number } | null
   stats60d: { commits: number; activeDays: number; newRepos: number } | null
+  digestCards: DailyDigestCards | null
 }
 
 const TREND_UNAVAILABLE_60D = 'Trend requires 120d scan history'
@@ -193,8 +201,7 @@ function GradeCard({
   cardId,
   grade,
   label,
-  mini,
-  summary,
+  laymanCopy,
   period,
   footer,
   trendExplanation,
@@ -212,8 +219,7 @@ function GradeCard({
     trendPct: number | null
   } | null
   label: string
-  mini: string
-  summary: string
+  laymanCopy: string
   period: Period
   footer?: React.ReactNode
   trendExplanation?: TrendExplanation
@@ -315,29 +321,18 @@ function GradeCard({
             </span>
           )}
         </div>
-
-        <div
-          style={{
-            fontSize: '11px',
-            color: 'var(--text-muted)',
-            lineHeight: 1.4,
-            maxWidth: 220,
-          }}
-        >
-          {mini}
-        </div>
       </div>
 
       <p
         style={{
-          fontSize: '12px',
+          fontSize: '13px',
           color: 'var(--text-secondary)',
-          lineHeight: 1.5,
-          marginBottom: canShowTrend ? '8px' : '12px',
+          lineHeight: 1.6,
+          margin: '0 0 12px',
           flexGrow: 1,
         }}
       >
-        {summary}
+        {laymanCopy}
       </p>
 
       {footer && (
@@ -409,6 +404,7 @@ export default function GradesPanel({
   stats30d,
   stats7d,
   stats60d,
+  digestCards,
 }: Props) {
   const { period } = useGradePeriod()
   const isMobile = useIsMobile()
@@ -439,6 +435,16 @@ export default function GradesPanel({
         : selectedCard === 'integrity'
           ? ig?.trendExplanation
           : undefined
+
+  const builderCopy =
+    digestCards?.[period]?.builder ??
+    (bg ? builderCardLayman(bg, period, stats) : 'GitHub data unavailable')
+  const economicCopy =
+    digestCards?.[period]?.economic ??
+    (tg ? economicCardLayman(tg, period) : 'Token mechanic score unavailable')
+  const integrityCopy =
+    digestCards?.[period]?.integrity ??
+    (ig ? integrityCardLayman(ig, period) : 'Integrity score unavailable')
 
   return (
     <div>
@@ -496,8 +502,7 @@ export default function GradesPanel({
           grade={bg}
           label="builder activity"
           period={period}
-          mini="Recent GitHub activity quality across the selected window."
-          summary={bg?.summary ?? 'GitHub data unavailable'}
+          laymanCopy={builderCopy}
           trendExplanation={bg?.trendExplanation}
           isSelected={selectedCard === 'builder'}
           onSelectTrend={handleSelectTrend}
@@ -520,12 +525,7 @@ export default function GradesPanel({
           grade={tg}
           label="burn apps (economic)"
           period={period}
-          mini={
-            period === '60d'
-              ? 'Commit-weighted token mechanic scores for direct/supply-lock repos only — infra excluded.'
-              : 'Burn-app economic scores only — infra and tools excluded from this average.'
-          }
-          summary={tg?.summary ?? 'Token mechanic score unavailable'}
+          laymanCopy={economicCopy}
           trendExplanation={tg?.trendExplanation}
           isSelected={selectedCard === 'economic'}
           onSelectTrend={handleSelectTrend}
@@ -585,8 +585,7 @@ export default function GradesPanel({
           grade={ig}
           label="Builder Integrity"
           period={period}
-          mini="Commit-weighted trust & safety across all tracked repos (infra scored on infra-appropriate criteria)."
-          summary={ig?.summary ?? 'Integrity score unavailable'}
+          laymanCopy={integrityCopy}
           trendExplanation={ig?.trendExplanation}
           isSelected={selectedCard === 'integrity'}
           onSelectTrend={handleSelectTrend}

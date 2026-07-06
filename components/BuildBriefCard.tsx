@@ -4,10 +4,21 @@ interface Props {
   brief: BuildBriefData | null
 }
 
-export default function BuildBriefCard({ brief }: Props) {
-  if (!brief?.text) return null
+function formatDigestDate(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  if (!y || !m || !d) return dateKey
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'America/New_York',
+  })
+}
 
-  const ageLabel = brief.isToday ? 'today' : 'yesterday'
+export default function BuildBriefCard({ brief }: Props) {
+  const text = brief?.general ?? brief?.text
+  if (!text) return null
+
+  const dayLabel = brief.dateKey ? formatDigestDate(brief.dateKey) : 'yesterday'
 
   return (
     <div
@@ -40,10 +51,10 @@ export default function BuildBriefCard({ brief }: Props) {
             letterSpacing: '0.08em',
           }}
         >
-          Build brief
+          Yesterday&apos;s build
         </span>
         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          {ageLabel}
+          {dayLabel}
           {brief.repoCount > 0 && (
             <>
               {' '}
@@ -61,10 +72,10 @@ export default function BuildBriefCard({ brief }: Props) {
           lineHeight: 1.65,
         }}
       >
-        {brief.text}
+        {text}
       </p>
       <p style={{ margin: '10px 0 0', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-        Based on sampled active repos · refreshes daily after autoscore
+        Plain-English summary · refreshes daily around midnight Eastern
       </p>
     </div>
   )

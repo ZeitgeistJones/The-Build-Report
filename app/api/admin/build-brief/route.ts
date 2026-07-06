@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       text: brief.text,
+      general: brief.text,
       repoCount: brief.repoCount,
       commitCount: brief.commitCount,
       generatedAt: brief.generatedAt,

@@ -9,10 +9,22 @@ import { shouldSkipRepo } from '@/lib/repoFilters'
 import { REPOS, type Repo } from '@/lib/scores'
 import type { GitHubStats } from '@/lib/github'
 import { stripMarkdown } from '@/lib/textCleanup'
+import {
+  calcBuilderGrade,
+  calcIntegrityGrade,
+  calcTokenMechanicGrade,
+  type Period,
+} from '@/lib/grades'
+import {
+  builderCardLayman,
+  economicCardLayman,
+  integrityCardLayman,
+} from '@/lib/gradeCardCopy'
 
+const DIGEST_KEY_PREFIX = 'build-report:daily-digest:'
 const BRIEF_KEY_PREFIX = 'build-report:build-brief:'
-const BRIEF_TTL_SEC = 48 * 3600
-const WINDOW_HOURS = 24
+const DIGEST_TTL_SEC = 72 * 3600
+const EASTERN_TZ = 'America/New_York'
 
 export interface RepoBuildActivity {
   slug: string
@@ -20,8 +32,31 @@ export interface RepoBuildActivity {
   commits: string[]
 }
 
+export interface CardBlurbs {
+  builder: string
+  economic: string
+  integrity: string
+}
+
+export interface DailyDigestCards {
+  '7d': CardBlurbs
+  '30d': CardBlurbs
+  '60d': CardBlurbs
+}
+
+export interface DailyDigestCache {
+  general: string
+  cards: DailyDigestCards
+  dateKey: string
+  repoCount: number
+  commitCount: number
+  generatedAt: string
+}
+
 export interface BuildBriefData {
   text: string
+  general: string
+  cards: DailyDigestCards | null
   dateKey: string
   isToday: boolean
   repoCount: number
@@ -29,29 +64,45 @@ export interface BuildBriefData {
   generatedAt: string | null
 }
 
-function dateKeyUtc(d = new Date()): string {
-  return d.toISOString().slice(0, 10)
+export function dateKeyEastern(d = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: EASTERN_TZ }).format(d)
+}
+
+/** Eastern calendar date for the day before `now` (the day we summarize for morning visitors). */
+export function yesterdayEasternDateKey(now = new Date()): string {
+  const todayKey = dateKeyEastern(now)
+  let probe = new Date(now.getTime() - 25 * 3600000)
+  let key = dateKeyEastern(probe)
+  if (key >= todayKey) {
+    probe = new Date(probe.getTime() - 24 * 3600000)
+    key = dateKeyEastern(probe)
+  }
+  return key
+}
+
+function digestRedisKey(dateKey: string): string {
+  return `${DIGEST_KEY_PREFIX}${dateKey}`
 }
 
 function briefRedisKey(dateKey: string): string {
   return `${BRIEF_KEY_PREFIX}${dateKey}`
 }
 
-function isWithinHours(dateStr: string, hours: number): boolean {
-  const ms = Date.now() - new Date(dateStr).getTime()
-  return ms >= 0 && ms <= hours * 3600000
+function commitOnEasternDate(isoDate: string, easternDateKey: string): boolean {
+  return dateKeyEastern(new Date(isoDate)) === easternDateKey
 }
 
-export function collectBuildActivity(
+export function collectBuildActivityForEasternDay(
   stats: GitHubStats,
   repos: Repo[],
-  windowHours = WINDOW_HOURS,
+  easternDateKey: string,
 ): RepoBuildActivity[] {
   const tagBySlug = new Map(repos.map(r => [r.githubSlug, getEffectiveTag(r)]))
   const out: RepoBuildActivity[] = []
 
   for (const [slug, activity] of Object.entries(stats.repoActivity)) {
-    const recent = activity.recentCommits?.filter(c => isWithinHours(c.date, windowHours)) ?? []
+    const recent =
+      activity.recentCommits?.filter(c => commitOnEasternDate(c.date, easternDateKey)) ?? []
     if (!recent.length) continue
     out.push({
       slug,
@@ -63,8 +114,8 @@ export function collectBuildActivity(
   return out.sort((a, b) => b.commits.length - a.commits.length)
 }
 
-function formatActivityForPrompt(activity: RepoBuildActivity[]): string {
-  if (!activity.length) return 'No commits in scanned repos in the last 24 hours.'
+function formatActivityForPrompt(activity: RepoBuildActivity[], dayLabel: string): string {
+  if (!activity.length) return `No commits in scanned repos on ${dayLabel}.`
 
   return activity
     .map(row => {
@@ -76,42 +127,170 @@ function formatActivityForPrompt(activity: RepoBuildActivity[]): string {
     .join('\n\n')
 }
 
-const QUIET_BRIEF =
-  'Quiet day in the sampled repos — no commits in the last 24 hours among the ~40 actively scanned GitHub repos.'
+function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
+  const periods: Period[] = ['7d', '30d', '60d']
+  return periods
+    .map(period => {
+      const bg = calcBuilderGrade(stats, period)
+      const tg = calcTokenMechanicGrade(stats, period, repos)
+      const ig = calcIntegrityGrade(stats, period, repos)
+      const trend =
+        period === '60d'
+          ? 'no prior-window trend'
+          : `trend ${bg.trend}${bg.trendPct != null ? ` (${bg.trendPct > 0 ? '+' : ''}${bg.trendPct}% vs prior)` : ''}`
+      return [
+        `${period} window:`,
+        `  Builder activity: ${bg.letter} (${bg.pct}%), ${trend}`,
+        `  Burn apps (economic): ${tg.letter} (${tg.pct}%), ${tg.counts.repos} repos in sample`,
+        `  Builder integrity: ${ig.letter} (${ig.pct}%), ${ig.counts.commitWeight} commits weighted (${ig.counts.low} low / ${ig.counts.mid} mid / ${ig.counts.high} high)`,
+      ].join('\n')
+    })
+    .join('\n\n')
+}
 
-async function generateBuildBriefText(activity: RepoBuildActivity[]): Promise<string> {
-  if (!activity.length) return QUIET_BRIEF
+const QUIET_GENERAL =
+  'It was a quiet day across the sampled repos — no commits landed on the actively tracked GitHub projects. The grades above still reflect longer windows of activity and scoring. Check back tomorrow for a fresher picture of what shipped.'
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    const names = activity.slice(0, 5).map(a => `${a.slug} (${a.commits.length})`).join(', ')
-    return `Activity in the last 24h (sampled repos): ${names}${activity.length > 5 ? ` and ${activity.length - 5} more.` : '.'}`
+function buildFallbackDigest(
+  stats: GitHubStats,
+  repos: Repo[],
+  activity: RepoBuildActivity[],
+  easternDateKey: string,
+): Omit<DailyDigestCache, 'generatedAt'> {
+  const periods: Period[] = ['7d', '30d', '60d']
+  const cards = {} as DailyDigestCards
+
+  for (const period of periods) {
+    const bg = calcBuilderGrade(stats, period)
+    const tg = calcTokenMechanicGrade(stats, period, repos)
+    const ig = calcIntegrityGrade(stats, period, repos)
+    cards[period] = {
+      builder: builderCardLayman(bg, period),
+      economic: economicCardLayman(tg, period),
+      integrity: integrityCardLayman(ig, period),
+    }
   }
 
+  let general = QUIET_GENERAL
+  if (activity.length) {
+    const names = activity
+      .slice(0, 5)
+      .map(a => `${a.slug} (${a.commits.length} commit${a.commits.length === 1 ? '' : 's'})`)
+      .join(', ')
+    const extra = activity.length > 5 ? ` and ${activity.length - 5} more repos` : ''
+    general = `On ${easternDateKey}, work landed on ${names}${extra}. `
+    const burnCount = activity.filter(a => !hasShippingLeverageTag(a.tag as Repo['tag'])).length
+    const leverageCount = activity.length - burnCount
+    if (burnCount && leverageCount) {
+      general += `${burnCount} burn-app repo${burnCount === 1 ? '' : 's'} and ${leverageCount} infra/leverage repo${leverageCount === 1 ? '' : 's'} saw commits. `
+    }
+    general +=
+      'The grade cards below put that activity in context across the 7-day, 30-day, and 60-day windows.'
+  }
+
+  return {
+    general,
+    cards,
+    dateKey: easternDateKey,
+    repoCount: activity.length,
+    commitCount: activity.reduce((n, a) => n + a.commits.length, 0),
+  }
+}
+
+interface DigestAiPayload {
+  general: string
+  cards: DailyDigestCards
+}
+
+function parseDigestJson(raw: string): DigestAiPayload | null {
+  const trimmed = raw.trim()
+  const start = trimmed.indexOf('{')
+  const end = trimmed.lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+  try {
+    const parsed = JSON.parse(trimmed.slice(start, end + 1)) as DigestAiPayload
+    if (!parsed.general || !parsed.cards) return null
+    for (const period of ['7d', '30d', '60d'] as const) {
+      const row = parsed.cards[period]
+      if (!row?.builder || !row.economic || !row.integrity) return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+async function generateDigestWithAi(
+  activity: RepoBuildActivity[],
+  gradeContext: string,
+  easternDateKey: string,
+): Promise<DigestAiPayload | null> {
+  if (!process.env.ANTHROPIC_API_KEY) return null
+
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const prompt = `You are summarizing what clawdbotatg worked on across GitHub repos for $CLAWD holders.
+  const prompt = `You write copy for The Build Report — an independent dashboard that tracks clawdbotatg's GitHub repos for $CLAWD holders.
 
-Commits in the last 24 hours (sampled active repos only):
+Summarize ${easternDateKey} (America/New_York calendar day).
 
-${formatActivityForPrompt(activity)}
+COMMITS THAT DAY (sampled active repos only — do not invent repos or work):
+${formatActivityForPrompt(activity, easternDateKey)}
 
-Write 3–5 sentences of plain English. Cover:
-- Which repos moved and what kind of work (features, fixes, infra, UI)
-- Split between burn-app repos (direct/supply-lock) vs shipping-leverage repos (indirect/infrastructure/theoretical) when relevant
-- Do not invent repos or changes not listed above
+CURRENT GRADES (use for context; card copy should match the period label):
+${gradeContext}
 
-Rules: no bullet points, no markdown, direct tone.`
+Return ONLY valid JSON, no markdown fences:
+{
+  "general": "3-4 sentences. Plain English morning overview of what shipped yesterday. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.",
+  "cards": {
+    "7d": {
+      "builder": "Exactly 2 sentences about builder activity for the 7-day window.",
+      "economic": "Exactly 2 sentences about burn-app economics for the 7-day window.",
+      "integrity": "Exactly 2 sentences about builder integrity/trust for the 7-day window."
+    },
+    "30d": { "builder": "...", "economic": "...", "integrity": "..." },
+    "60d": { "builder": "...", "economic": "...", "integrity": "..." }
+  }
+}
+
+Rules:
+- Each card field: exactly 2 complete sentences.
+- general: exactly 3-4 complete sentences, meatier than any single card.
+- Reference letter grades or trends only when helpful; never fabricate numbers.
+- Say "burn apps" not "token mechanics" in economic copy.
+- Integrity copy = trust, transparency, safety — not moralizing.`
 
   try {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 220,
+      max_tokens: 1100,
       messages: [{ role: 'user', content: prompt }],
     })
     const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-    return text ? stripMarkdown(text) : QUIET_BRIEF
+    if (!text) return null
+    const parsed = parseDigestJson(text)
+    if (!parsed) return null
+    return {
+      general: stripMarkdown(parsed.general),
+      cards: {
+        '7d': {
+          builder: stripMarkdown(parsed.cards['7d'].builder),
+          economic: stripMarkdown(parsed.cards['7d'].economic),
+          integrity: stripMarkdown(parsed.cards['7d'].integrity),
+        },
+        '30d': {
+          builder: stripMarkdown(parsed.cards['30d'].builder),
+          economic: stripMarkdown(parsed.cards['30d'].economic),
+          integrity: stripMarkdown(parsed.cards['30d'].integrity),
+        },
+        '60d': {
+          builder: stripMarkdown(parsed.cards['60d'].builder),
+          economic: stripMarkdown(parsed.cards['60d'].economic),
+          integrity: stripMarkdown(parsed.cards['60d'].integrity),
+        },
+      },
+    }
   } catch {
-    const names = activity.slice(0, 6).map(a => a.slug).join(', ')
-    return `Recent commits landed on ${names}${activity.length > 6 ? ` and ${activity.length - 6} other repos` : ''} in the last 24 hours (sampled scan).`
+    return null
   }
 }
 
@@ -124,80 +303,122 @@ export async function loadReposForBrief(stats: GitHubStats): Promise<Repo[]> {
   return filterPublicRepos(applyExcludedToRepos(mergeRepoSources(REPOS, autoScored), excludedMap))
 }
 
-interface CachedBrief {
-  text: string
-  repoCount: number
-  commitCount: number
-  generatedAt: string
-}
-
-export async function cacheBuildBrief(
-  dateKey: string,
-  payload: CachedBrief,
-): Promise<void> {
+export async function cacheDailyDigest(dateKey: string, payload: DailyDigestCache): Promise<void> {
   try {
     const r = getRedis()
-    await r.set(briefRedisKey(dateKey), JSON.stringify(payload), { ex: BRIEF_TTL_SEC })
+    await r.set(digestRedisKey(dateKey), JSON.stringify(payload), { ex: DIGEST_TTL_SEC })
   } catch {
     // non-fatal
   }
 }
 
-export async function generateAndCacheBuildBrief(
+export async function generateAndCacheDailyDigest(
   stats: GitHubStats,
   repos: Repo[],
-): Promise<CachedBrief> {
-  const activity = collectBuildActivity(stats, repos)
+  easternDateKey = yesterdayEasternDateKey(),
+): Promise<DailyDigestCache> {
+  const activity = collectBuildActivityForEasternDay(stats, repos, easternDateKey)
   const commitCount = activity.reduce((n, a) => n + a.commits.length, 0)
-  const text = await generateBuildBriefText(activity)
-  const payload: CachedBrief = {
-    text,
+  const gradeContext = formatGradeContext(stats, repos)
+
+  const ai = await generateDigestWithAi(activity, gradeContext, easternDateKey)
+  const fallback = buildFallbackDigest(stats, repos, activity, easternDateKey)
+
+  const payload: DailyDigestCache = {
+    general: ai?.general ?? fallback.general,
+    cards: ai?.cards ?? fallback.cards,
+    dateKey: easternDateKey,
     repoCount: activity.length,
     commitCount,
     generatedAt: new Date().toISOString(),
   }
-  await cacheBuildBrief(dateKeyUtc(), payload)
+
+  await cacheDailyDigest(easternDateKey, payload)
   return payload
 }
 
-async function readCachedBrief(dateKey: string): Promise<CachedBrief | null> {
+export async function generateAndCacheBuildBrief(
+  stats: GitHubStats,
+  repos: Repo[],
+): Promise<{ text: string; repoCount: number; commitCount: number; generatedAt: string }> {
+  const digest = await generateAndCacheDailyDigest(stats, repos)
+  return {
+    text: digest.general,
+    repoCount: digest.repoCount,
+    commitCount: digest.commitCount,
+    generatedAt: digest.generatedAt,
+  }
+}
+
+async function readCachedDigest(dateKey: string): Promise<DailyDigestCache | null> {
   try {
     const r = getRedis()
-    const raw = await r.get<string>(briefRedisKey(dateKey))
+    const raw = await r.get<string>(digestRedisKey(dateKey))
     if (!raw) return null
-    if (typeof raw === 'string') return JSON.parse(raw) as CachedBrief
-    return raw as CachedBrief
+    if (typeof raw === 'string') return JSON.parse(raw) as DailyDigestCache
+    return raw as DailyDigestCache
   } catch {
     return null
   }
 }
 
-export async function getBuildBrief(): Promise<BuildBriefData | null> {
-  const today = dateKeyUtc()
-  const todayCached = await readCachedBrief(today)
-  if (todayCached) {
-    return {
-      text: todayCached.text,
-      dateKey: today,
-      isToday: true,
-      repoCount: todayCached.repoCount,
-      commitCount: todayCached.commitCount,
-      generatedAt: todayCached.generatedAt,
-    }
+async function readLegacyBrief(
+  dateKey: string,
+): Promise<{ text: string; repoCount: number; commitCount: number; generatedAt: string } | null> {
+  try {
+    const r = getRedis()
+    const raw = await r.get<string>(briefRedisKey(dateKey))
+    if (!raw) return null
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return parsed as { text: string; repoCount: number; commitCount: number; generatedAt: string }
+  } catch {
+    return null
   }
+}
 
-  const yesterday = dateKeyUtc(new Date(Date.now() - 86400000))
-  const yesterdayCached = await readCachedBrief(yesterday)
-  if (yesterdayCached) {
+function toBuildBriefData(digest: DailyDigestCache): BuildBriefData {
+  return {
+    text: digest.general,
+    general: digest.general,
+    cards: digest.cards,
+    dateKey: digest.dateKey,
+    isToday: false,
+    repoCount: digest.repoCount,
+    commitCount: digest.commitCount,
+    generatedAt: digest.generatedAt,
+  }
+}
+
+export async function getBuildBrief(): Promise<BuildBriefData | null> {
+  const targetKey = yesterdayEasternDateKey()
+  const digest = await readCachedDigest(targetKey)
+  if (digest) return toBuildBriefData(digest)
+
+  const priorKey = yesterdayEasternDateKey(new Date(Date.now() - 86400000))
+  const priorDigest = await readCachedDigest(priorKey)
+  if (priorDigest) return toBuildBriefData(priorDigest)
+
+  const legacy = await readLegacyBrief(targetKey)
+  if (legacy) {
     return {
-      text: yesterdayCached.text,
-      dateKey: yesterday,
+      text: legacy.text,
+      general: legacy.text,
+      cards: null,
+      dateKey: targetKey,
       isToday: false,
-      repoCount: yesterdayCached.repoCount,
-      commitCount: yesterdayCached.commitCount,
-      generatedAt: yesterdayCached.generatedAt,
+      repoCount: legacy.repoCount,
+      commitCount: legacy.commitCount,
+      generatedAt: legacy.generatedAt,
     }
   }
 
   return null
+}
+
+export function cardCopyForPeriod(
+  brief: BuildBriefData | null,
+  period: Period,
+  card: keyof CardBlurbs,
+): string | null {
+  return brief?.cards?.[period]?.[card] ?? null
 }
