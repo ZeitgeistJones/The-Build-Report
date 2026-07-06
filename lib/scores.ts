@@ -496,7 +496,7 @@ export const CHANGELOG = [
     note: 'Removed duplicate clawdlabs baseline — same GitHub repo as clawdviction. Larv.ai (gov forum, supply-lock) is the canonical score for that slug; the old burn-to-submit clawdlabs era is no longer a separate card.',
   },
   {
-    date: 'Jul 5, 2026',
-    note: 'Scoring accuracy pass: infrastructure repos now count toward the ecosystem builder-integrity average (they stay excluded from token mechanic only); builder-activity targets raised to reduce saturation; no single repo can dominate the commit-weighted economic/integrity blends; trend arrows now reflect absolute grade-point movement; and GitHub activity data self-heals when a snapshot goes stale.',
+    date: 'Jul 6, 2026',
+    note: 'Live AI scores now ground builder-integrity rows in GitHub repo evidence (README, root files, CI/tests flags). Paid rescores persist without cache TTL. Builder-activity signals reconciled: active days and longest dry spell now measure different things; rolling-baseline targets planned for a follow-up.',
   },
 ]

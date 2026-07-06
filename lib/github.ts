@@ -194,6 +194,24 @@ function isInHourRange(dateStr: string, minExclusive: number, maxInclusive: numb
   return h > minExclusive && h <= maxInclusive
 }
 
+/** Whether a commit timestamp falls in the builder-activity window (current or prior). */
+export function commitInActivityWindow(
+  dateStr: string,
+  period: '24h' | '7d' | '30d' | '60d',
+  window: 'current' | 'prior',
+): boolean {
+  if (period === '24h') {
+    return window === 'current' ? isWithinHours(dateStr, 24) : isInHourRange(dateStr, 24, 48)
+  }
+  if (period === '7d') {
+    return window === 'current' ? isWithinDays(dateStr, 7) : isInDayRange(dateStr, 7, 14)
+  }
+  if (period === '30d') {
+    return window === 'current' ? isWithinDays(dateStr, 30) : isInDayRange(dateStr, 30, 60)
+  }
+  return isWithinDays(dateStr, 60)
+}
+
 function isCreatedInDayRange(dateStr: string, minExclusive: number, maxInclusive: number) {
   return isInDayRange(dateStr, minExclusive, maxInclusive)
 }

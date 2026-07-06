@@ -122,7 +122,7 @@ export default function HowWeScoreContent({
             <li style={{ marginTop: '6px' }}>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Holder economics</strong> — commit-weighted token mechanic average for direct burn apps and supply-lock repos; infra excluded (
               <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>see rubric</a>
-              ).
+              ). When less than 20% of a window&apos;s commits land on holder-facing repos, the grade is scaled down (to a floor of 0.35×) to reflect thin holder attention — the unadjusted quality number is kept separately.
             </li>
             <li style={{ marginTop: '6px' }}>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Builder standards</strong> — commit-weighted rubric quality across all scored repos, including infrastructure (

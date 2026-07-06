@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     paidKey = `${PAID_TX_KEY_PREFIX}${txHash}`
-    const claimed = await redis.set(paidKey, 'pending', { nx: true })
+    const claimed = await redis.set(paidKey, 'pending', { nx: true, ex: 3600 })
     if (!claimed) {
       return NextResponse.json(
         { ok: false, error: 'Transaction already used or in progress' },
@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
       await redis.del(paidKey).catch(() => {})
     }
     const message = err instanceof Error ? err.message : 'Request failed'
-    return NextResponse.json({ ok: false, error: message }, { status: 400 })
+    console.error('[autoscore-single] rescore failed:', message)
+    return NextResponse.json({ ok: false, error: 'Rescore failed' }, { status: 400 })
   }
 }

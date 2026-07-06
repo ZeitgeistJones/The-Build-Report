@@ -1,10 +1,11 @@
 import { Repo } from './scores'
-import { GitHubStats } from './github'
+import { commitInActivityWindow, GitHubStats } from './github'
 import { pctToLetter } from './gradeLetters'
 import {
   BUILDER_ACTIVITY_SIGNALS,
   builderActivitySummary,
   computeBuilderActivityScore,
+  computeLongestInactiveGapDays,
   computeSignalRatio,
   periodToWindowKey,
   type BuilderActivityActuals,
@@ -263,27 +264,63 @@ function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'cur
   }
 }
 
-function builderActualsFromInputs(inputs: BuilderInputs): BuilderActivityActuals {
+function collectActiveDayDates(
+  stats: GitHubStats,
+  period: Period,
+  window: 'current' | 'prior',
+): string[] {
+  const days: string[] = []
+  for (const activity of Object.values(stats.repoActivity)) {
+    for (const ts of activity.commitTimestamps ?? []) {
+      if (commitInActivityWindow(ts, period, window)) {
+        days.push(ts.slice(0, 10))
+      }
+    }
+  }
+  return days
+}
+
+function builderActualsFromInputs(
+  inputs: BuilderInputs,
+  period: Period,
+  window: 'current' | 'prior',
+  activeDayDates: string[],
+): BuilderActivityActuals {
   return {
     totalCommits: inputs.commits,
     activeDays: inputs.activeDays,
     newRepos: inputs.newRepos,
     reposWithCommits: inputs.activeRepos,
+    longestInactiveGapDays: computeLongestInactiveGapDays(
+      activeDayDates,
+      windowLengthDays(period),
+    ),
   }
 }
 
-function calcBuilderPct(inputs: BuilderInputs, period: Period): number {
-  return computeBuilderActivityScore(period, builderActualsFromInputs(inputs))
+function calcBuilderPct(
+  inputs: BuilderInputs,
+  period: Period,
+  window: 'current' | 'prior',
+  stats: GitHubStats,
+): number {
+  const activeDayDates = collectActiveDayDates(stats, period, window)
+  return computeBuilderActivityScore(
+    period,
+    builderActualsFromInputs(inputs, period, window, activeDayDates),
+  )
 }
 
-function builderSignals(inputs: BuilderInputs, period: Period) {
-  const actuals = builderActualsFromInputs(inputs)
-  const window = periodToWindowKey(period)
+function builderSignals(inputs: BuilderInputs, period: Period, stats: GitHubStats) {
+  const activityWindow: 'current' | 'prior' = 'current'
+  const activeDayDates = collectActiveDayDates(stats, period, activityWindow)
+  const actuals = builderActualsFromInputs(inputs, period, activityWindow, activeDayDates)
+  const windowKey = periodToWindowKey(period)
   const windowDays = windowLengthDays(period)
 
   return BUILDER_ACTIVITY_SIGNALS.map(sig => {
-    const target = sig.targets[window]
-    const ratio = computeSignalRatio(sig.label, window, actuals, windowDays, target)
+    const target = sig.targets[windowKey]
+    const ratio = computeSignalRatio(sig.label, windowKey, actuals, windowDays, target)
     return {
       label: sig.displayLabel,
       level: toLevel(ratio),
@@ -294,7 +331,7 @@ function builderSignals(inputs: BuilderInputs, period: Period) {
 
 export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGrade {
   const current = builderInputsFromStats(stats, period, 'current')
-  const pct = calcBuilderPct(current, period)
+  const pct = calcBuilderPct(current, period, 'current', stats)
   const letter = pctToLetter(pct)
 
   if (period === '60d') {
@@ -305,12 +342,12 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
       trendPct: null,
       trend: 'flat',
       summary: builderActivitySummary(pct),
-      signals: builderSignals(current, period),
+      signals: builderSignals(current, period, stats),
     }
   }
 
   const prior = builderInputsFromStats(stats, period, 'prior')
-  const priorPct = calcBuilderPct(prior, period)
+  const priorPct = calcBuilderPct(prior, period, 'prior', stats)
   const trendPct = pctChange(pct, priorPct)
 
   return {
@@ -320,7 +357,7 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
     trendPct,
     trend: trendDirection(pct, priorPct),
     summary: builderActivitySummary(pct),
-    signals: builderSignals(current, period),
+    signals: builderSignals(current, period, stats),
   }
 }
 

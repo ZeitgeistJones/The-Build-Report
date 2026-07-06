@@ -13,6 +13,10 @@ export default function HowWeScoreRubrics() {
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
         Per-repo cards use token mechanic or shipping leverage plus builder standards. Expand each row for definitions and observable signal examples.
       </p>
+      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
+        <strong style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>Score floors:</strong>{' '}
+        A small set of critical-path repos (see role badges on repo cards) have display grades floored at C- (70) while functioning as designed — the floor and the repo list are fixed in code, not AI-inferred.
+      </p>
 
       <div
         id="bi-cross-cutting"

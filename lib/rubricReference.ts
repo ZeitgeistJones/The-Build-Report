@@ -24,7 +24,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
     id: 'token-mechanic',
     title: 'Token mechanic',
     appliesTo: 'direct burn apps and supply-lock repos',
-    note: 'Each row is low / mid / high (33 / 67 / 100). Score = weighted sum of row points. Supply-lock scores CLAWD lock impact — CV burns are not CLAWD burns.',
+    note: 'Each row is low / mid / high (33 / 67 / 100). Score = weighted sum of row points. Supply-lock scores CLAWD lock impact — CV burns are not CLAWD burns. Ecosystem Holder economics commit-weights these repos and may scale the headline grade when holder-facing commit share is thin (see Ecosystem grades).',
     scope: 'repo',
     rows: [
       {
@@ -133,20 +133,20 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
     id: 'builder-activity',
     title: 'Builder activity',
     appliesTo: 'ecosystem-wide grade only — not shown on repo cards',
-    note: 'Each signal contributes up to 20%. Targets scale by 7d / 30d / 60d window.',
+    note: 'Each signal contributes up to 20%. Targets scale by 7d / 30d / 60d window. Planned: rolling-baseline targets (median of trailing windows) stored in Redis with the daily snapshot.',
     scope: 'ecosystem',
     rows: [
       {
         label: 'Total commits in window',
         weight: '20%',
         teaser: 'Raw commit volume across the org.',
-        detail: 'Compared to window target (e.g. 60 commits in 30d). Capped at 100% of target.',
+        detail: 'Compared to window target (e.g. 500 commits in 30d). Capped at 100% of target.',
       },
       {
         label: 'Active days in window',
         weight: '20%',
         teaser: 'Days with at least one commit.',
-        detail: 'Rewards consistent presence, not single burst days.',
+        detail: 'Rewards showing up across the window — full marks at ~half the calendar days in 30d (15/30), aligned with the dry-spell signal below.',
       },
       {
         label: 'New repos created',
@@ -161,10 +161,11 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
         detail: 'Healthy ecosystems spread commits across many repos, not one hot project.',
       },
       {
-        label: 'Commit consistency ratio',
+        label: 'Longest dry spell',
         weight: '20%',
-        teaser: 'Active days ÷ window length.',
-        detail: 'Penalizes long dry spells relative to window size.',
+        teaser: 'Longest gap without commits ÷ window length.',
+        detail:
+          'Penalizes one long inactive stretch that active-day count alone cannot distinguish from evenly scattered rest days. Full marks when the longest gap is at most half the window (30d target: 15 days).',
       },
     ],
   },

@@ -9,9 +9,8 @@ export interface ActivitySignalConfig {
   targets: Record<ActivityWindowKey, number>
 }
 
-// Targets raised to match this agent's observed output (~480 commits/30d) so signals aren't
-// permanently pinned at max. Interim fix — the honest long-term solution is a rolling baseline
-// (target = median of trailing windows); tracked as a follow-up since it needs stored history.
+// Interim fixed targets — follow-up: rolling-baseline targets (median of trailing N windows)
+// stored in Redis alongside the daily snapshot.
 export const BUILDER_ACTIVITY_SIGNALS: ActivitySignalConfig[] = [
   {
     label: 'totalCommits',
@@ -23,7 +22,7 @@ export const BUILDER_ACTIVITY_SIGNALS: ActivitySignalConfig[] = [
     label: 'activeDays',
     displayLabel: 'Active days',
     weight: 20,
-    targets: { '24h': 1, '7d': 7, '30d': 30, '60d': 55 },
+    targets: { '24h': 1, '7d': 5, '30d': 15, '60d': 24 },
   },
   {
     label: 'newRepos',
@@ -39,7 +38,7 @@ export const BUILDER_ACTIVITY_SIGNALS: ActivitySignalConfig[] = [
   },
   {
     label: 'commitConsistency',
-    displayLabel: 'Commit consistency',
+    displayLabel: 'Longest dry spell',
     weight: 20,
     targets: { '24h': 1.0, '7d': 0.7, '30d': 0.5, '60d': 0.4 },
   },
@@ -50,6 +49,8 @@ export interface BuilderActivityActuals {
   activeDays: number
   newRepos: number
   reposWithCommits: number
+  /** Longest calendar-day gap without commits in the window (incl. edges). */
+  longestInactiveGapDays: number
 }
 
 export function periodToWindowKey(period: Period): ActivityWindowKey {
@@ -63,6 +64,36 @@ export function windowLengthDays(period: Period): number {
   return 7
 }
 
+function calendarDayDiff(startDay: string, endDay: string): number {
+  const start = new Date(`${startDay}T00:00:00Z`).getTime()
+  const end = new Date(`${endDay}T00:00:00Z`).getTime()
+  if (Number.isNaN(start) || Number.isNaN(end)) return 0
+  return Math.max(0, Math.round((end - start) / 86_400_000))
+}
+
+/** Longest inactive stretch in a rolling window (days without any commit). */
+export function computeLongestInactiveGapDays(activeDayDates: string[], windowDays: number): number {
+  if (windowDays <= 0) return 0
+  const windowEnd = new Date()
+  const windowStart = new Date(windowEnd.getTime() - windowDays * 86_400_000)
+  const windowStartDay = windowStart.toISOString().slice(0, 10)
+  const windowEndDay = windowEnd.toISOString().slice(0, 10)
+
+  const days = [...new Set(activeDayDates)]
+    .filter(d => d >= windowStartDay && d <= windowEndDay)
+    .sort()
+
+  if (!days.length) return windowDays
+
+  let maxGap = calendarDayDiff(windowStartDay, days[0]!)
+  for (let i = 1; i < days.length; i++) {
+    const between = calendarDayDiff(days[i - 1]!, days[i]!) - 1
+    if (between > maxGap) maxGap = between
+  }
+  const tailGap = calendarDayDiff(days[days.length - 1]!, windowEndDay)
+  return Math.max(maxGap, tailGap, 0)
+}
+
 export function computeSignalRatio(
   label: string,
   window: ActivityWindowKey,
@@ -71,8 +102,10 @@ export function computeSignalRatio(
   target: number,
 ): number {
   if (label === 'commitConsistency') {
-    const ratio = actuals.activeDays / windowDays
-    return Math.min(ratio / target, 1)
+    const gapRatio = actuals.longestInactiveGapDays / windowDays
+    if (gapRatio <= 0) return 1
+    if (target <= 0) return 0
+    return Math.min(target / gapRatio, 1)
   }
 
   const actualMap: Record<string, number> = {
