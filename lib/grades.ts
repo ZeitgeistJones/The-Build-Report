@@ -118,6 +118,10 @@ export interface BuilderGrade {
 export interface TokenMechanicGrade {
   counts: { high: number; mid: number; low: number; repos: number }
   tagCommits?: { direct: number; lock: number; indirect: number; infra: number }
+  /** Share of ecosystem commits on holder-facing repos (direct, lock, indirect). */
+  holderCoveragePct?: number | null
+  /** TM quality before holder-attention coverage adjustment. */
+  qualityPct?: number | null
   letter: string
   pct: number
   priorPct: number | null
@@ -128,8 +132,16 @@ export interface TokenMechanicGrade {
   trendExplanation?: TrendExplanation
 }
 
+export interface IntegrityDragRepo {
+  name: string
+  slug: string
+  pct: number
+  commits: number
+}
+
 export interface IntegrityGrade {
   counts: { active: number; high: number; mid: number; low: number; commitWeight: number }
+  dragRepos?: IntegrityDragRepo[]
   letter: string
   pct: number
   priorPct: number | null
@@ -441,6 +453,51 @@ function reposWithScoredTokenMechanic(repos: Repo[]): Repo[] {
   return repos.filter(r => isConsumerEconomicScored(r))
 }
 
+export function consumerEconomicRepos(repos: Repo[]): Repo[] {
+  return reposWithScoredTokenMechanic(repos)
+}
+
+/** Soft multiplier when holder-facing work is a small share of total commits. */
+function holderCoverageMultiplier(coverageRatio: number): number {
+  return 0.35 + 0.65 * Math.min(1, coverageRatio / 0.2)
+}
+
+function holderCoveragePctFromTags(
+  tagCommits: { direct: number; lock: number; indirect: number; infra: number } | undefined,
+): number | null {
+  if (!tagCommits) return null
+  const holder = tagCommits.direct + tagCommits.lock + tagCommits.indirect
+  const total = holder + tagCommits.infra
+  if (total <= 0) return null
+  return Math.round((holder / total) * 100)
+}
+
+function integrityDragRepos(
+  stats: GitHubStats,
+  repos: Repo[],
+  period: Period,
+  limit = 3,
+): IntegrityDragRepo[] {
+  return repos
+    .map(repo => {
+      if (repo.builderIntegrity.letter === '—') return null
+      const commits = commitsForRepo(stats, repo.githubSlug, period, 'current')
+      if (commits <= 0) return null
+      const drag = commits * (100 - repo.builderIntegrity.pct)
+      return {
+        name: repo.name,
+        slug: repo.githubSlug,
+        pct: repo.builderIntegrity.pct,
+        commits,
+        drag,
+      }
+    })
+    .filter((r): r is IntegrityDragRepo & { drag: number } => r != null)
+    .sort((a, b) => b.drag - a.drag)
+    .slice(0, limit)
+    .map(({ drag: _drag, ...rest }) => rest)
+}
+
 function tokenMechanicRubricCommitCounts(
   stats: GitHubStats,
   repos: Repo[],
@@ -511,11 +568,32 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
   // so a quiet prior period reads 'flat' (unchanged quality) instead of a phantom 'new'/collapse.
   const priorSample = priorActiveRepos.length ? priorActiveRepos : scored
 
-  const pct = weightedOrFlatAvg(stats, sample, period, 'current', r => getConsumerEconomicScorePct(r) ?? 0)
-  const priorPct =
+  const qualityPct = weightedOrFlatAvg(stats, sample, period, 'current', r => getConsumerEconomicScorePct(r) ?? 0)
+  const priorQualityPct =
     period === '60d' || !priorSample.length
       ? null
       : weightedOrFlatAvg(stats, priorSample, period, 'prior', r => getConsumerEconomicScorePct(r) ?? 0)
+
+  const ecosystemTags =
+    period === '60d' ? undefined : tokenMechanicTagCommitCounts(stats, repoSet, period, 'current')
+  const priorEcosystemTags =
+    period === '60d' ? undefined : tokenMechanicTagCommitCounts(stats, repoSet, period, 'prior')
+  const holderCoveragePct = holderCoveragePctFromTags(ecosystemTags)
+
+  let pct = qualityPct
+  let priorPct = priorQualityPct
+  if (holderCoveragePct != null && period !== '60d') {
+    const ratio = holderCoveragePct / 100
+    const mult = holderCoverageMultiplier(ratio)
+    pct = Math.round(qualityPct * mult)
+    if (priorQualityPct != null && priorEcosystemTags) {
+      const priorHolderPct = holderCoveragePctFromTags(priorEcosystemTags)
+      if (priorHolderPct != null) {
+        priorPct = Math.round(priorQualityPct * holderCoverageMultiplier(priorHolderPct / 100))
+      }
+    }
+  }
+
   const trendPct = period === '60d' ? null : pctChange(pct, priorPct ?? 0)
 
   const rubricCounts = tokenMechanicRubricCommitCounts(stats, sample, period)
@@ -544,6 +622,8 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
       repos: sample.length,
     },
     tagCommits,
+    holderCoveragePct,
+    qualityPct: period === '60d' ? null : qualityPct,
     letter: pctToLetter(pct),
     pct,
     priorPct,
@@ -618,6 +698,7 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
 
   const { high, mid, low, commitWeight } = commitCounts
   const weightBase = commitWeight || 1
+  const dragRepos = stats ? integrityDragRepos(stats, sample, period) : undefined
 
   // v5 integrity signals: average each of the 5 real rubric rows over ONLY the repos that
   // actually have that row (v5-scored). No positional fallback onto legacy 3-row labels —
@@ -651,6 +732,7 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
 
   return {
     counts: { active: sample.length, high, mid, low, commitWeight },
+    dragRepos,
     letter: pctToLetter(pct),
     pct,
     priorPct: priorPctValue,

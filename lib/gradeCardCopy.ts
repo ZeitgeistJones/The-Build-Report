@@ -482,6 +482,10 @@ export function economicCardLayman(
     base += ` ${holderLeaders[0].name} drove almost the entire sample here, so this grade tracks that project closely.`
   }
 
+  if (grade.holderCoveragePct != null && grade.holderCoveragePct < 20) {
+    base += ` Only about ${grade.holderCoveragePct}% of commits this window landed on holder-facing projects — most activity was elsewhere, so this grade reflects thin CLAWD value delivery as much as app quality.`
+  }
+
   return `${base} ${trendFlavor(grade.trend, 'holder economics', period)}`
 }
 
@@ -496,6 +500,12 @@ export function integrityCardLayman(
   if (grade.counts.commitWeight === 0 && grade.counts.active === 0) {
     return `Not enough scored project activity in ${window} to say much about trust and alignment. Integrity grades need commits on scored repos — try a longer window.`
   }
+
+  const lowShare =
+    grade.counts.commitWeight > 0
+      ? Math.round((grade.counts.low / grade.counts.commitWeight) * 100)
+      : 0
+  const weakGrade = grade.pct < 60
 
   const tier = letterTier(grade.letter)
   const drag = weakestIntegritySignal(grade)
@@ -537,6 +547,12 @@ export function integrityCardLayman(
           : tier === 'mixed'
             ? `This month, trust is a mixed bag — effort split between solid and shakier projects.`
             : `This month, a lot of work landed on projects that score lower on security, testing, and code quality — this is the card to watch.`
+  }
+
+  if (weakGrade && lowShare >= 40) {
+    base = `This window, a large share of commits landed on projects with weaker safety, testing, and transparency scores — that pulls the integrity grade down even when the work itself looks like routine polish. ${base}`
+  } else if (weakGrade) {
+    base = `Overall alignment scores are weak this window — the busiest projects do not score well on the builder-integrity rubric. ${base}`
   }
 
   if (drag && tier !== 'top') {

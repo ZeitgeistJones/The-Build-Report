@@ -179,7 +179,7 @@ function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
       return [
         `${period} window:`,
         `  Builder activity: ${bg.letter} (${bg.pct}%), ${trend}`,
-        `  Holder economics: ${tg.letter} (${tg.pct}%), ${tg.counts.repos} repos in sample`,
+        `  Holder economics: ${tg.letter} (${tg.pct}%), ${tg.counts.repos} repos in sample${tg.holderCoveragePct != null ? `, ${tg.holderCoveragePct}% holder-facing commit share` : ''}`,
         `  Builder integrity: ${ig.letter} (${ig.pct}%), ${ig.counts.commitWeight} commits weighted (${ig.counts.low} low / ${ig.counts.mid} mid / ${ig.counts.high} high)`,
       ].join('\n')
     })
@@ -308,6 +308,8 @@ Rules:
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
 - Say "holder economics" or "how apps and locks serve $CLAWD holders" instead of "token mechanics" or "burn apps" alone.
 - Integrity copy = whether projects keep their promises to holders — safety, testing, transparency, and whether the work matches what they tell holders. Use plain words; never say "trust signals". Not moralizing.
+- If integrity context shows below 60% or mostly low-integrity commits, the copy must acknowledge weak alignment — do not describe the window as steady, polished, or low-risk unless that matches the grade context.
+- Holder economics context may show low holder-facing commit share — if so, say plainly that most shipping was background tooling and holder value delivery was thin this window.
 - The general overview MAY name specific repos and describe what shipped; the card fields should stay high-level and plain.`
 
   try {

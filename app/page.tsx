@@ -14,7 +14,7 @@ import {
   githubSlugOrder,
   cacheLookupSlugs,
 } from '@/lib/repoOrder'
-import { calcBuilderGrade, calcTokenMechanicGrade, calcIntegrityGrade } from '@/lib/grades'
+import { calcBuilderGrade, calcTokenMechanicGrade, calcIntegrityGrade, consumerEconomicRepos } from '@/lib/grades'
 import {
   buildBuilderTrendExplanation,
   buildTokenMechanicTrendExplanation,
@@ -108,6 +108,8 @@ export default async function Home() {
 
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
 
+  const holderEconRepos = consumerEconomicRepos(allRepos)
+
   const builderGrade24Raw = stats ? calcBuilderGrade(stats, '24h') : null
   const builderGrade30Raw = stats ? calcBuilderGrade(stats, '30d') : null
   const builderGrade7Raw = stats ? calcBuilderGrade(stats, '7d') : null
@@ -132,13 +134,13 @@ export default async function Home() {
     ? { ...builderGrade7Raw, trendExplanation: buildBuilderTrendExplanation(stats, '7d', builderGrade7Raw.trendPct, builderGrade7Raw.trend, allRepos) }
     : builderGrade7Raw
   const tokenMechanicGrade24 = tokenMechanicGrade24Raw && stats
-    ? { ...tokenMechanicGrade24Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '24h', allRepos, tokenMechanicGrade24Raw.trendPct, tokenMechanicGrade24Raw.trend) }
+    ? { ...tokenMechanicGrade24Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '24h', holderEconRepos, tokenMechanicGrade24Raw.trendPct, tokenMechanicGrade24Raw.trend, allRepos) }
     : tokenMechanicGrade24Raw
   const tokenMechanicGrade30 = tokenMechanicGrade30Raw && stats
-    ? { ...tokenMechanicGrade30Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '30d', allRepos, tokenMechanicGrade30Raw.trendPct, tokenMechanicGrade30Raw.trend) }
+    ? { ...tokenMechanicGrade30Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '30d', holderEconRepos, tokenMechanicGrade30Raw.trendPct, tokenMechanicGrade30Raw.trend, allRepos) }
     : tokenMechanicGrade30Raw
   const tokenMechanicGrade7 = tokenMechanicGrade7Raw && stats
-    ? { ...tokenMechanicGrade7Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '7d', allRepos, tokenMechanicGrade7Raw.trendPct, tokenMechanicGrade7Raw.trend) }
+    ? { ...tokenMechanicGrade7Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '7d', holderEconRepos, tokenMechanicGrade7Raw.trendPct, tokenMechanicGrade7Raw.trend, allRepos) }
     : tokenMechanicGrade7Raw
   const integrityGrade24 = integrityGrade24Raw && stats
     ? { ...integrityGrade24Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '24h', allRepos, integrityGrade24Raw.trendPct, integrityGrade24Raw.trend) }

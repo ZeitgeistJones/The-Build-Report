@@ -194,15 +194,28 @@ export function buildBuilderTrendExplanation(
   return { headline, bullets: bullets.slice(0, 4) }
 }
 
+function totalCommitsInWindow(
+  stats: GitHubStats,
+  repos: Repo[],
+  period: Period,
+  window: 'current' | 'prior',
+): number {
+  return repos.reduce((sum, repo) => {
+    const live = stats.repoActivity[repo.githubSlug]
+    return sum + (live ? commitCount(live, period, window) : 0)
+  }, 0)
+}
+
 export function buildTokenMechanicTrendExplanation(
   stats: GitHubStats,
   period: Period,
-  repoSet: Repo[],
+  holderRepoSet: Repo[],
   trendPct: number | null,
   trend: TrendDirection,
+  allRepos?: Repo[],
 ): TrendExplanation {
-  const activeNow = reposActiveInWindow(stats, repoSet, period, 'current')
-  const activePrior = reposActiveInWindow(stats, repoSet, period, 'prior')
+  const activeNow = reposActiveInWindow(stats, holderRepoSet, period, 'current')
+  const activePrior = reposActiveInWindow(stats, holderRepoSet, period, 'prior')
   const nowSlugs = new Set(activeNow.map(r => r.githubSlug))
   const priorSlugs = new Set(activePrior.map(r => r.githubSlug))
 
@@ -211,17 +224,36 @@ export function buildTokenMechanicTrendExplanation(
 
   const bullets: string[] = []
 
+  const ecosystem = allRepos ?? holderRepoSet
+  const holderFacingNow = ecosystem.filter(r => holderFacingTag(r.tag))
+  const holderCommitsNow = totalCommitsInWindow(stats, holderFacingNow, period, 'current')
+  const totalCommitsNow = totalCommitsInWindow(stats, ecosystem, period, 'current')
+  if (totalCommitsNow > 0 && bullets.length < 4) {
+    const share = Math.round((holderCommitsNow / totalCommitsNow) * 100)
+    if (share < 20) {
+      bullets.push(
+        `Only ${share}% of commits this window landed on holder-facing apps and locks — most shipping was background tooling, which limits what this grade can say about CLAWD value delivery.`,
+      )
+    }
+  }
+
   if (newlyActive.length) {
-    bullets.push(...groupByTagSentence(newlyActive, stats, period, 'picked up').slice(0, 2))
+    if (newlyActive.length === 1) {
+      const name = formatRepoNames(newlyActive, stats, period, 1)
+      bullets.push(`${name} joined the holder-economics sample with new activity.`)
+    } else {
+      bullets.push(
+        `${newlyActive.length} holder-facing projects picked up activity${formatRepoNames(newlyActive, stats, period, 2) ? `, led by ${formatRepoNames(newlyActive, stats, period, 2)}` : ''}.`,
+      )
+    }
   }
 
   if (quietNow.length && bullets.length < 4) {
     const quietNames = formatRepoNames(quietNow, stats, period, 2)
-    const extra = quietNow.length > 2 ? ` and ${quietNow.length - 2} more` : ''
     bullets.push(
       quietNames
-        ? `Projects that were busy before went quiet, including ${quietNames}${extra}.`
-        : `${quietNow.length} projects that were active before went quiet this window.`,
+        ? `Holder-facing projects that were busy before went quiet, including ${quietNames}.`
+        : `${quietNow.length} holder-facing projects that were active before went quiet this window.`,
     )
   }
 
@@ -253,35 +285,13 @@ export function buildTokenMechanicTrendExplanation(
     )
   }
 
-  const holderNow = activeNow
-    .filter(r => holderFacingTag(r.tag))
-    .reduce((sum, r) => sum + repoCommits(r, 'current'), 0)
-  const holderPrior = activePrior
-    .filter(r => holderFacingTag(r.tag))
-    .reduce((sum, r) => sum + repoCommits(r, 'prior'), 0)
-  const infraNow = activeNow
-    .filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
-    .reduce((sum, r) => sum + repoCommits(r, 'current'), 0)
-  const infraPrior = activePrior
-    .filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
-    .reduce((sum, r) => sum + repoCommits(r, 'prior'), 0)
+  const holderNow = holderCommitsNow
+  const holderPrior = totalCommitsInWindow(stats, holderFacingNow, period, 'prior')
 
   if (holderNow > holderPrior && bullets.length < 4) {
-    bullets.push('More work landed on apps and locks that serve holders directly.')
-  } else if (infraNow > infraPrior && holderNow <= holderPrior && bullets.length < 4) {
-    const infraLeaders = formatRepoNames(
-      activeNow.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical'),
-      stats,
-      period,
-      2,
-    )
-    bullets.push(
-      infraLeaders
-        ? `Background infrastructure work picked up — led by ${infraLeaders}.`
-        : 'More background infrastructure work landed than holder-facing apps.',
-    )
+    bullets.push('More commits landed on holder-facing apps and locks than the prior window.')
   } else if (holderNow < holderPrior && bullets.length < 4) {
-    bullets.push('Less work landed on holder-facing apps and locks than the prior window.')
+    bullets.push('Fewer commits landed on holder-facing apps and locks than the prior window.')
   }
 
   if (!bullets.length) {
@@ -324,8 +334,7 @@ export function buildIntegrityTrendExplanation(
 
   if (added.length) {
     const names = formatRepoNames(added, stats, period, 2)
-    const extra = added.length > 2 ? ` and ${added.length - 2} more` : ''
-    bullets.push(`New projects entered the sample${names ? `, including ${names}${extra}` : ''}.`)
+    bullets.push(`New projects entered the sample${names ? `, including ${names}` : ''}.`)
   }
 
   if (lowAdded.length && bullets.length < 4) {

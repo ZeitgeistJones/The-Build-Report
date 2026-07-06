@@ -73,11 +73,13 @@ function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' | 'new' }) {
 function RubricBreakdownTray({
   cardId,
   statsNode,
+  extraBelowStats,
   onClose,
   isMobile,
 }: {
   cardId: CardId
   statsNode?: React.ReactNode
+  extraBelowStats?: React.ReactNode
   onClose: () => void
   isMobile: boolean
 }) {
@@ -136,12 +138,26 @@ function RubricBreakdownTray({
             display: 'flex',
             flexWrap: 'wrap',
             gap: '8px 14px',
-            marginBottom: '14px',
-            paddingBottom: '14px',
+            marginBottom: extraBelowStats ? '10px' : '14px',
+            paddingBottom: extraBelowStats ? '10px' : '14px',
             borderBottom: '1px solid var(--border)',
           }}
         >
           {statsNode}
+        </div>
+      )}
+      {extraBelowStats && (
+        <div
+          style={{
+            marginBottom: '14px',
+            paddingBottom: '14px',
+            borderBottom: '1px solid var(--border)',
+            fontSize: '12px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.55,
+          }}
+        >
+          {extraBelowStats}
         </div>
       )}
       <RubricBlockPanel block={block} defaultOpen compact />
@@ -503,7 +519,9 @@ export default function GradesPanel({
     ),
     economic: tg?.counts && (
       <>
-        {tg.counts.repos > 0 && statSpan(`${tg.counts.repos} repos in sample`)}
+        {tg.counts.repos > 0 && statSpan(`${tg.counts.repos} holder-facing repos scored`)}
+        {tg.holderCoveragePct != null && statSpan(`${tg.holderCoveragePct}% of commits holder-facing`)}
+        {tg.qualityPct != null && tg.qualityPct !== tg.pct && statSpan(`quality ${tg.qualityPct}% before coverage`)}
         {tg.counts.high > 0 && statSpan(`${tg.counts.high} high-TM commits`)}
         {tg.counts.mid > 0 && statSpan(`${tg.counts.mid} mid-TM commits`)}
         {tg.counts.low > 0 && statSpan(`${tg.counts.low} low-TM commits`)}
@@ -528,6 +546,22 @@ export default function GradesPanel({
       </>
     ),
   }
+
+  const integrityDragNode =
+    ig?.dragRepos && ig.dragRepos.length > 0 ? (
+      <div>
+        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Biggest drags on this grade
+        </div>
+        <ul style={{ margin: 0, paddingLeft: '16px' }}>
+          {ig.dragRepos.map(r => (
+            <li key={r.slug} style={{ marginBottom: '4px' }}>
+              {r.name} — {r.pct}% integrity, {r.commits} commit{r.commits === 1 ? '' : 's'} weighted
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null
 
   return (
     <div>
@@ -657,6 +691,7 @@ export default function GradesPanel({
         <RubricBreakdownTray
           cardId={rubricCard}
           statsNode={cardStats[rubricCard]}
+          extraBelowStats={rubricCard === 'integrity' ? integrityDragNode : undefined}
           onClose={() => setRubricCard(null)}
           isMobile={isMobile}
         />
