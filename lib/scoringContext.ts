@@ -1,5 +1,5 @@
-/** Bumped when DEFAULT_ECOSYSTEM_CONTEXT or scoring philosophy text meaningfully changes. Flush + regen after bump. */
-export const SCORING_CONTEXT_VERSION = 1
+/** Bumped when scoring inputs change (ecosystem context, evidence grounding, etc.). Stored on each score so stale rows are distinguishable; refresh via TTL/rescore — no mandatory cache flush. */
+export const SCORING_CONTEXT_VERSION = 2
 
 export function formatScoringContextLabel(version: number | null | undefined): string {
   if (version == null || version < 1) return 'legacy context'
