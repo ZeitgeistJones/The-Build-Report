@@ -21,7 +21,12 @@ import {
   slRubricLevelScore,
 } from './rubrics/shippingLeverage'
 import { getConsumerEconomicScorePct, isConsumerEconomicScored } from './economicGrade'
-import { getEffectiveTag } from './criticalPath'
+import {
+  commitsInWindow,
+  effectiveTag,
+  reposActiveInWindow,
+  selectSampleWithFallback,
+} from './scoringShared'
 import type { GradeNewArrival } from './gradeNewArrivals'
 import type { PathToCHint } from './gradePathToC'
 
@@ -361,28 +366,6 @@ export function calcBuilderGrade(stats: GitHubStats, period: Period): BuilderGra
   }
 }
 
-function commitsForRepo(
-  stats: GitHubStats,
-  slug: string,
-  period: Period,
-  window: 'current' | 'prior',
-): number {
-  const live = stats.repoActivity[slug]
-  if (!live) return 0
-  if (period === '60d') {
-    return window === 'current'
-      ? (live.commits30d ?? 0) + (live.commits30_60 ?? 0)
-      : 0
-  }
-  if (period === '30d') {
-    return window === 'current' ? (live.commits30d ?? 0) : (live.commits30_60 ?? 0)
-  }
-    if (period === '24h') {
-      return window === 'current' ? (live.commits24h ?? 0) : (live.commits24_48 ?? 0)
-    }
-  return window === 'current' ? (live.commits7d ?? 0) : (live.commits7_14 ?? 0)
-}
-
 function tokenMechanicTagCommitCounts(
   stats: GitHubStats,
   activeRepos: Repo[],
@@ -391,9 +374,10 @@ function tokenMechanicTagCommitCounts(
 ) {
   const counts = { direct: 0, lock: 0, indirect: 0, infra: 0 }
   for (const repo of activeRepos) {
-    const w = commitsForRepo(stats, repo.githubSlug, period, window)
+    const live = stats.repoActivity[repo.githubSlug]
+    const w = live ? commitsInWindow(live, period, window) : 0
     if (w <= 0) continue
-    const tag = getEffectiveTag(repo)
+    const tag = effectiveTag(repo)
     if (tag === 'direct') counts.direct += w
     else if (tag === 'supply-lock') counts.lock += w
     else if (tag === 'indirect') counts.indirect += w
@@ -417,7 +401,10 @@ function cappedCommitWeights(
   window: 'current' | 'prior',
 ): { repo: Repo; weight: number }[] {
   const raw = repos
-    .map(repo => ({ repo, weight: commitsForRepo(stats, repo.githubSlug, period, window) }))
+    .map(repo => {
+      const live = stats.repoActivity[repo.githubSlug]
+      return { repo, weight: live ? commitsInWindow(live, period, window) : 0 }
+    })
     .filter(r => r.weight > 0)
   if (raw.length <= 1) return raw
 
@@ -472,29 +459,6 @@ function integrityCommitCounts(
   return { active: repos.length, high, mid, low, commitWeight: total }
 }
 
-function reposActiveInWindow(stats: GitHubStats, repoSet: Repo[], period: Period, window: 'current' | 'prior') {
-  return repoSet.filter(repo => {
-    const live = stats.repoActivity[repo.githubSlug]
-    if (!live) return false
-    if (period === '60d') {
-      return window === 'current'
-        ? (live.commits30d ?? 0) + (live.commits30_60 ?? 0) > 0
-        : false
-    }
-    if (period === '30d') {
-      return window === 'current'
-        ? (live.commits30d ?? 0) > 0
-        : (live.commits30_60 ?? 0) > 0
-    }
-    if (period === '24h') {
-      return window === 'current' ? (live.commits24h ?? 0) > 0 : (live.commits24_48 ?? 0) > 0
-    }
-    return window === 'current'
-      ? (live.commits7d ?? 0) > 0
-      : (live.commits7_14 ?? 0) > 0
-  })
-}
-
 function reposWithScoredTokenMechanic(repos: Repo[]): Repo[] {
   return repos.filter(r => isConsumerEconomicScored(r))
 }
@@ -527,7 +491,8 @@ function integrityDragRepos(
   return repos
     .map(repo => {
       if (repo.builderIntegrity.letter === '—') return null
-      const commits = commitsForRepo(stats, repo.githubSlug, period, 'current')
+      const live = stats.repoActivity[repo.githubSlug]
+      const commits = live ? commitsInWindow(live, period, 'current') : 0
       if (commits <= 0) return null
       const drag = commits * (100 - repo.builderIntegrity.pct)
       return {
@@ -607,10 +572,10 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
   const scored = reposWithScoredTokenMechanic(repoSet)
   const activeRepos = reposActiveInWindow(stats, scored, period, 'current')
   const priorActiveRepos = reposActiveInWindow(stats, scored, period, 'prior')
-  const sample = activeRepos.length ? activeRepos : scored
+  const sample = selectSampleWithFallback(activeRepos, scored)
   // B3: prior window uses the same fallback sample + quiet-safe average as the current window,
   // so a quiet prior period reads 'flat' (unchanged quality) instead of a phantom 'new'/collapse.
-  const priorSample = priorActiveRepos.length ? priorActiveRepos : scored
+  const priorSample = selectSampleWithFallback(priorActiveRepos, scored)
 
   const qualityPct = weightedOrFlatAvg(stats, sample, period, 'current', r => getConsumerEconomicScorePct(r) ?? 0)
   const priorQualityPct =
@@ -713,10 +678,10 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
     ? integrityRepos
     : reposActiveInWindow(stats, integrityRepos, period, 'prior')
 
-  const sample = activeRepos.length ? activeRepos : integrityRepos
+  const sample = selectSampleWithFallback(activeRepos, integrityRepos)
   // B3: prior window uses the same fallback sample + quiet-safe average as the current window,
   // so a quiet prior period reads 'flat' (unchanged quality) instead of a phantom 'new'/collapse.
-  const priorSample = priorActiveRepos.length ? priorActiveRepos : integrityRepos
+  const priorSample = selectSampleWithFallback(priorActiveRepos, integrityRepos)
 
   const pct = !stats
     ? avg(sample.map(repo => repo.builderIntegrity.pct))

@@ -1,5 +1,6 @@
 import type { GitHubStats } from './github'
 import type { Period } from './grades'
+import { commitsInWindow } from './scoringShared'
 import { isConsumerEconomicScored } from './economicGrade'
 import type { Repo } from './scores'
 import type { GradeArrivalCategory } from './gradeArrivalSeen'
@@ -21,19 +22,6 @@ export function periodWindowMs(period: Period): number {
   if (period === '7d') return 7 * MS_DAY
   if (period === '30d') return 30 * MS_DAY
   return 60 * MS_DAY
-}
-
-function commitsForRepo(
-  stats: GitHubStats,
-  slug: string,
-  period: Period,
-): number {
-  const live = stats.repoActivity[slug]
-  if (!live) return 0
-  if (period === '60d') return (live.commits30d ?? 0) + (live.commits30_60 ?? 0)
-  if (period === '30d') return live.commits30d ?? 0
-  if (period === '24h') return live.commits24h ?? 0
-  return live.commits7d ?? 0
 }
 
 /** Earliest commit timestamp inside the current period window. */
@@ -83,10 +71,10 @@ export function buildGradeNewArrivals(
 
   for (const repo of sample) {
     if (seenThis.has(repo.githubSlug)) continue
-    const commits = commitsForRepo(stats, repo.githubSlug, period)
+    const activity = stats.repoActivity[repo.githubSlug]
+    const commits = activity ? commitsInWindow(activity, period, 'current') : 0
     if (commits <= 0) continue
 
-    const activity = stats.repoActivity[repo.githubSlug]
     arrivals.push({
       slug: repo.githubSlug,
       name: repo.name,

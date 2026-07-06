@@ -6,8 +6,9 @@ import type {
   TrendDirection,
   TrendExplanation,
 } from '@/lib/grades'
-import type { GitHubStats, RepoActivity } from '@/lib/github'
+import type { GitHubStats } from '@/lib/github'
 import type { Repo } from '@/lib/scores'
+import { commitsInWindow } from '@/lib/scoringShared'
 import { isConsumerEconomicScored } from '@/lib/economicGrade'
 
 export function humanizeRepoSlug(slug: string): string {
@@ -16,25 +17,6 @@ export function humanizeRepoSlug(slug: string): string {
 
 function repoDisplayName(slug: string, repos?: Repo[]): string {
   return repos?.find(r => r.githubSlug === slug)?.name ?? humanizeRepoSlug(slug)
-}
-
-function commitsForActivity(
-  activity: RepoActivity,
-  period: Period,
-  window: 'current' | 'prior',
-): number {
-  if (period === '30d') {
-    return window === 'current' ? (activity.commits30d ?? 0) : (activity.commits30_60 ?? 0)
-  }
-  if (period === '24h') {
-    return window === 'current' ? (activity.commits24h ?? 0) : (activity.commits24_48 ?? 0)
-  }
-  if (period === '60d') {
-    return window === 'current'
-      ? (activity.commits30d ?? 0) + (activity.commits30_60 ?? 0)
-      : 0
-  }
-  return window === 'current' ? (activity.commits7d ?? 0) : (activity.commits7_14 ?? 0)
 }
 
 export interface RepoCommitLeader {
@@ -54,7 +36,7 @@ export function topReposByCommits(
   const leaders: RepoCommitLeader[] = []
 
   for (const [slug, activity] of Object.entries(stats.repoActivity)) {
-    const commits = commitsForActivity(activity, period, window)
+    const commits = commitsInWindow(activity, period, window)
     if (commits <= 0) continue
     const repo = repos?.find(r => r.githubSlug === slug)
     if (filter && (!repo || !filter(repo))) continue

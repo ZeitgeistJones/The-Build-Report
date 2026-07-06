@@ -1,7 +1,13 @@
-import { Repo, Tag } from './scores'
-import { GitHubStats, RepoActivity } from './github'
+import { Repo } from './scores'
+import { GitHubStats } from './github'
 import { Period, formatTrendDelta, TrendExplanation, TrendDirection } from './grades'
-import { getEffectiveTag } from './criticalPath'
+import {
+  commitsInWindow,
+  effectiveTag,
+  isHolderFacingTag,
+  reposActiveInWindow,
+  selectSampleWithFallback,
+} from './scoringShared'
 import { getConsumerEconomicScorePct } from './economicGrade'
 import {
   formatRepoLeaders,
@@ -23,49 +29,17 @@ function currentWindowLabel(period: Period): string {
   return 'the last 7 days'
 }
 
-function commitCount(activity: RepoActivity, period: Period, window: 'current' | 'prior'): number {
-  if (period === '30d') {
-    return window === 'current' ? (activity.commits30d ?? 0) : (activity.commits30_60 ?? 0)
-  }
-  if (period === '24h') {
-    return window === 'current' ? (activity.commits24h ?? 0) : (activity.commits24_48 ?? 0)
-  }
-  if (period === '60d') {
-    return window === 'current'
-      ? (activity.commits30d ?? 0) + (activity.commits30_60 ?? 0)
-      : 0
-  }
-  return window === 'current' ? (activity.commits7d ?? 0) : (activity.commits7_14 ?? 0)
-}
-
-function reposActiveInWindow(
-  stats: GitHubStats,
-  repoSet: Repo[],
-  period: Period,
-  window: 'current' | 'prior',
-): Repo[] {
-  return repoSet.filter(repo => {
-    const live = stats.repoActivity[repo.githubSlug]
-    if (!live) return false
-    return commitCount(live, period, window) > 0
-  })
-}
-
-function tagLabel(tag: Tag): string {
+function tagLabel(tag: ReturnType<typeof effectiveTag>): string {
   if (tag === 'supply-lock') return 'supply lock'
   if (tag === 'infrastructure' || tag === 'theoretical') return 'infra/R&D'
   return tag
-}
-
-function holderFacingTag(tag: Tag): boolean {
-  return tag === 'direct' || tag === 'supply-lock' || tag === 'indirect'
 }
 
 function formatRepoNames(repos: Repo[], stats: GitHubStats, period: Period, max = 2): string {
   const leaders: RepoCommitLeader[] = repos
     .map(r => {
       const live = stats.repoActivity[r.githubSlug]
-      const commits = live ? commitCount(live, period, 'current') : 0
+      const commits = live ? commitsInWindow(live, period, 'current') : 0
       return { slug: r.githubSlug, name: r.name, commits }
     })
     .filter(r => r.commits > 0)
@@ -81,7 +55,7 @@ function groupByTagSentence(
 ): string[] {
   const byTag = new Map<string, Repo[]>()
   for (const repo of repos) {
-    const label = tagLabel(getEffectiveTag(repo))
+    const label = tagLabel(effectiveTag(repo))
     const list = byTag.get(label) ?? []
     list.push(repo)
     byTag.set(label, list)
@@ -104,10 +78,10 @@ function groupByTagSentence(
 
 function builderInputs(stats: GitHubStats, period: Period, window: 'current' | 'prior') {
   const activityCount = Object.keys(stats.repoActivity).length
+  const activeRepos = Object.values(stats.repoActivity).filter(r =>
+    commitsInWindow(r, period, window) > 0,
+  ).length
   if (period === '30d') {
-    const activeRepos = Object.values(stats.repoActivity).filter(r =>
-      window === 'current' ? (r.commits30d ?? 0) > 0 : (r.commits30_60 ?? 0) > 0,
-    ).length
     return {
       commits: window === 'current' ? stats.totalCommits30d : stats.totalCommits30_60,
       activeDays: window === 'current' ? stats.activeDays30d : stats.activeDays30_60,
@@ -117,9 +91,6 @@ function builderInputs(stats: GitHubStats, period: Period, window: 'current' | '
     }
   }
   if (period === '24h') {
-    const activeRepos = Object.values(stats.repoActivity).filter(r =>
-      window === 'current' ? (r.commits24h ?? 0) > 0 : (r.commits24_48 ?? 0) > 0,
-    ).length
     return {
       commits: window === 'current' ? (stats.totalCommits24h ?? 0) : (stats.totalCommits24_48 ?? 0),
       activeDays: window === 'current' ? (stats.activeDays24h ?? 0) : (stats.activeDays24_48 ?? 0),
@@ -128,9 +99,6 @@ function builderInputs(stats: GitHubStats, period: Period, window: 'current' | '
       scannedRepos: activityCount,
     }
   }
-  const activeRepos = Object.values(stats.repoActivity).filter(r =>
-    window === 'current' ? (r.commits7d ?? 0) > 0 : (r.commits7_14 ?? 0) > 0,
-  ).length
   return {
     commits: window === 'current' ? stats.totalCommits7d : stats.totalCommits7_14,
     activeDays: window === 'current' ? stats.activeDays7d : stats.activeDays7_14,
@@ -205,7 +173,7 @@ function totalCommitsInWindow(
 ): number {
   return repos.reduce((sum, repo) => {
     const live = stats.repoActivity[repo.githubSlug]
-    return sum + (live ? commitCount(live, period, window) : 0)
+    return sum + (live ? commitsInWindow(live, period, window) : 0)
   }, 0)
 }
 
@@ -230,7 +198,7 @@ export function buildTokenMechanicTrendExplanation(
   const bullets: string[] = []
 
   const ecosystem = allRepos ?? holderRepoSet
-  const holderFacingNow = ecosystem.filter(r => holderFacingTag(getEffectiveTag(r)))
+  const holderFacingNow = ecosystem.filter(r => isHolderFacingTag(effectiveTag(r)))
   const holderCommitsNow = totalCommitsInWindow(stats, holderFacingNow, period, 'current')
   const totalCommitsNow = totalCommitsInWindow(stats, ecosystem, period, 'current')
   if (totalCommitsNow > 0 && bullets.length < 4) {
@@ -268,7 +236,7 @@ export function buildTokenMechanicTrendExplanation(
 
   const repoCommits = (repo: Repo, window: 'current' | 'prior') => {
     const live = stats.repoActivity[repo.githubSlug]
-    return live ? commitCount(live, period, window) : 0
+    return live ? commitsInWindow(live, period, window) : 0
   }
 
   const rubricWeightedAvg = (repos: Repo[], window: 'current' | 'prior') => {
@@ -330,10 +298,10 @@ export function buildIntegrityTrendExplanation(
 ): TrendExplanation {
   const activeNow = reposActiveInWindow(stats, repoSet, period, 'current')
   const activePrior = reposActiveInWindow(stats, repoSet, period, 'prior')
-  const sample = activeNow.length ? activeNow : repoSet
+  const sample = selectSampleWithFallback(activeNow, repoSet)
   // B3: mirror grades.ts calcIntegrityGrade — quiet prior window falls back to the full set
   // so highPrior/lowPrior aren't trivially 0 and the bullets don't claim phantom improvement.
-  const priorSample = activePrior.length ? activePrior : repoSet
+  const priorSample = selectSampleWithFallback(activePrior, repoSet)
 
   const nowSlugs = new Set(sample.map(r => r.githubSlug))
   const priorSlugs = new Set(priorSample.map(r => r.githubSlug))

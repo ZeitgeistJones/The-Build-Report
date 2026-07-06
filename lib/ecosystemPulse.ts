@@ -1,4 +1,4 @@
-import { getEffectiveTag } from './criticalPath'
+import { commitsInWindow, effectiveTag } from './scoringShared'
 import { computeRepoLifecycle, type RepoLifecycle } from './repoLifecycle'
 import { hasShippingLeverageTag } from './rubrics/shippingLeverage'
 import { isUnscoredRecent } from './recentRepos'
@@ -14,19 +14,6 @@ export interface EcosystemPulse {
   consumerApps: number
   infraTools: number
   commitsInWindow: number
-}
-
-function commitsForRepo(
-  stats: GitHubStats,
-  slug: string,
-  period: Period,
-): number {
-  const live = stats.repoActivity[slug]
-  if (!live) return 0
-  if (period === '60d') return (live.commits30d ?? 0) + (live.commits30_60 ?? 0)
-  if (period === '30d') return live.commits30d ?? 0
-  if (period === '24h') return live.commits24h ?? 0
-  return live.commits7d ?? 0
 }
 
 function ecosystemCommits(stats: GitHubStats, period: Period): number {
@@ -51,11 +38,12 @@ export function calcEcosystemPulse(
   let infraTools = 0
 
   for (const repo of scored) {
-    const tag = getEffectiveTag(repo)
+    const tag = effectiveTag(repo)
     if (hasShippingLeverageTag(tag)) infraTools++
     else consumerApps++
 
-    const commits = stats ? commitsForRepo(stats, repo.githubSlug, period) : 0
+    const live = stats?.repoActivity[repo.githubSlug]
+    const commits = live ? commitsInWindow(live, period, 'current') : 0
     const lifecycle = computeRepoLifecycle(repo, commits)
     counts[lifecycle]++
   }

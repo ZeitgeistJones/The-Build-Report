@@ -1,7 +1,7 @@
 import { Repo, Tag } from './scores'
-import { getEffectiveTag } from './criticalPath'
+import { effectiveTag, commitsInWindow } from './scoringShared'
 import { getTokenMechanicForDisplay } from './economicGrade'
-import { GitHubStats, RepoActivity } from './github'
+import { GitHubStats } from './github'
 import { pctToLetter } from './gradeLetters'
 import { isUnscoredRecent } from './recentRepos'
 import { pctChange, trendDirection, Period, TrendDirection } from './grades'
@@ -135,13 +135,6 @@ function letterBucket(letter: string): 'A' | 'B' | 'C' | 'D' | 'F' {
   return 'D'
 }
 
-function commitsForActivity(activity: RepoActivity, period: Period): number {
-  if (period === '24h') return activity.commits24h ?? 0
-  if (period === '7d') return activity.commits7d ?? 0
-  if (period === '30d') return activity.commits30d ?? 0
-  return (activity.commits30d ?? 0) + (activity.commits30_60 ?? 0)
-}
-
 export function buildOverallGradeContext(
   overall: OverallGrade,
   tokenMechanic: { letter: string; pct: number } | null,
@@ -169,7 +162,7 @@ export function buildOverallGradeContext(
 
   const tagCounts = new Map<Tag, number>()
   for (const repo of scored) {
-    const tag = getEffectiveTag(repo)
+    const tag = effectiveTag(repo)
     tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1)
   }
   const dominantTags = Array.from(tagCounts.entries())
@@ -178,7 +171,7 @@ export function buildOverallGradeContext(
 
   const mostActiveRepos = stats
     ? Object.values(stats.repoActivity)
-        .map(a => ({ name: a.slug, commits: commitsForActivity(a, period) }))
+        .map(a => ({ name: a.slug, commits: commitsInWindow(a, period, 'current') }))
         .filter(r => r.commits > 0)
         .sort((a, b) => b.commits - a.commits)
         .slice(0, 5)
