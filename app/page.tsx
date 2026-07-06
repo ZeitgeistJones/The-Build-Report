@@ -30,7 +30,7 @@ import { GradePeriodProvider } from '@/components/GradePeriodContext'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 import { getRescoreSummaries } from '@/lib/rescoreSummaries'
 import { getBuildBrief } from '@/lib/buildBrief'
-import { isCommunityContextEnabled } from '@/lib/communityContext'
+import { isCommunityContextEnabled, getContextSummaryBySlug } from '@/lib/communityContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +38,7 @@ export default async function Home() {
   let stats
   let error = false
   const communityContextEnabled = isCommunityContextEnabled()
+  const contextSummary = communityContextEnabled ? await getContextSummaryBySlug().catch(() => ({})) : {}
 
   const [rescoreBurns, buildBrief] = await Promise.all([
     getRescoreBurnStats().catch(() => null),
@@ -243,6 +244,7 @@ export default async function Home() {
         initialRescoreSummaries={rescoreSummaries}
         repoCollections={collectionSlugs}
         communityContextEnabled={communityContextEnabled}
+        contextSummary={contextSummary}
       />
       </div>
     </>

@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { REPOS } from '@/lib/scores'
 import { BULK_REGEN_DEFAULT_BATCH } from '@/lib/bulkRegenConfig'
 import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
+import type { CommunityContextSubmission } from '@/lib/communityContextTypes'
+
+type AdminContextSubmission = CommunityContextSubmission
 
 export default function AdminPage() {
   const [password, setPassword] = useState('')
@@ -46,8 +49,10 @@ export default function AdminPage() {
   const [forceIncludeInput, setForceIncludeInput] = useState('')
   const [collectionBusy, setCollectionBusy] = useState<string | null>(null)
   const [contextModId, setContextModId] = useState('')
-  const [contextModBusy, setContextModBusy] = useState<'accept' | 'remove' | null>(null)
+  const [contextModBusy, setContextModBusy] = useState<string | null>(null)
   const [contextModResult, setContextModResult] = useState<string | null>(null)
+  const [contextList, setContextList] = useState<AdminContextSubmission[]>([])
+  const [contextListBusy, setContextListBusy] = useState(false)
 
   async function refreshGitHubData() {
     setRefreshRunning(true)
@@ -374,10 +379,27 @@ export default function AdminPage() {
     setBulkRunning(false)
   }
 
-  async function moderateCommunityContext(mode: 'accept' | 'remove') {
-    const submissionId = contextModId.trim()
+  async function loadContextList() {
+    setContextListBusy(true)
+    try {
+      const res = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'listContext', password }),
+      })
+      const data = await res.json()
+      if (data.ok) setContextList(Array.isArray(data.submissions) ? data.submissions : [])
+      else setContextModResult(data.error ?? 'Could not load submissions')
+    } catch {
+      setContextModResult('Could not load submissions')
+    }
+    setContextListBusy(false)
+  }
+
+  async function moderateCommunityContext(mode: 'accept' | 'remove', id?: string) {
+    const submissionId = (id ?? contextModId).trim()
     if (!submissionId) return
-    setContextModBusy(mode)
+    setContextModBusy(`${mode}:${submissionId}`)
     setContextModResult(null)
     try {
       const res = await fetch('/api/admin', {
@@ -396,7 +418,8 @@ export default function AdminPage() {
             ? 'Accepted — the next paid rescore on that repo will read it.'
             : 'Removed — hidden from the card and the AI.',
         )
-        setContextModId('')
+        if (!id) setContextModId('')
+        void loadContextList()
       } else {
         setContextModResult(data.error ?? 'Not found')
       }
@@ -612,10 +635,10 @@ export default function AdminPage() {
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Community context</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px', lineHeight: 1.6 }}>
-            Community votes normally decide acceptance. Two admin overrides by submission ID (visible in the public list),
-            both logged: <strong>Accept</strong> is a launch fast-track so context can ground a rescore before there are
-            enough voters; <strong>Force-remove</strong> is the emergency kill-switch that hides a submission from the card
-            and future AI rescores.
+            Community votes normally decide acceptance. Load the list below to moderate with one click, or paste a submission
+            ID. Both overrides are logged: <strong>Accept</strong> is a launch fast-track so context can ground a rescore
+            before there are enough voters; <strong>Force-remove</strong> is the emergency kill-switch that hides a submission
+            from the card and future AI rescores.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', maxWidth: '620px', flexWrap: 'wrap' }}>
@@ -648,7 +671,7 @@ export default function AdminPage() {
               border: '1px solid var(--accent-border)',
             }}
           >
-            {contextModBusy === 'accept' ? 'Accepting…' : 'Accept'}
+            {contextModBusy?.startsWith('accept') ? 'Accepting…' : 'Accept'}
           </button>
           <button
             type="button"
@@ -663,12 +686,98 @@ export default function AdminPage() {
               border: '1px solid var(--border-strong)',
             }}
           >
-            {contextModBusy === 'remove' ? 'Removing…' : 'Force-remove'}
+            {contextModBusy?.startsWith('remove') ? 'Removing…' : 'Force-remove'}
           </button>
         </div>
         {contextModResult && (
           <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>{contextModResult}</div>
         )}
+
+        <div style={{ marginTop: '16px' }}>
+          <button
+            type="button"
+            onClick={() => void loadContextList()}
+            disabled={contextListBusy}
+            style={{
+              fontSize: '12px',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-2)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            {contextListBusy ? 'Loading…' : contextList.length ? 'Reload submissions' : 'Load submissions'}
+          </button>
+
+          {contextList.length > 0 && (
+            <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {contextList.map(sub => {
+                const acceptKey = `accept:${sub.id}`
+                const removeKey = `remove:${sub.id}`
+                const stateColor =
+                  sub.state === 'accepted'
+                    ? 'var(--accent)'
+                    : sub.state === 'pending'
+                      ? 'var(--amber)'
+                      : 'var(--text-muted)'
+                return (
+                  <div
+                    key={sub.id}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 'var(--radius)',
+                      border: '1px solid var(--border)',
+                      background: 'var(--surface-2)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: stateColor, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                        {sub.state}
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{sub.slug}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>▲{sub.upvotes} ▼{sub.downvotes}</span>
+                    </div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '4px' }}>{sub.text}</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', marginBottom: '8px' }}>{sub.id}</div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => void moderateCommunityContext('accept', sub.id)}
+                        disabled={contextModBusy !== null || sub.state === 'accepted' || sub.state === 'removed'}
+                        style={{
+                          fontSize: '11px',
+                          padding: '4px 10px',
+                          borderRadius: 'var(--radius)',
+                          background: 'var(--accent-dim)',
+                          color: 'var(--accent)',
+                          border: '1px solid var(--accent-border)',
+                        }}
+                      >
+                        {contextModBusy === acceptKey ? 'Accepting…' : 'Accept'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void moderateCommunityContext('remove', sub.id)}
+                        disabled={contextModBusy !== null || sub.state === 'removed'}
+                        style={{
+                          fontSize: '11px',
+                          padding: '4px 10px',
+                          borderRadius: 'var(--radius)',
+                          background: 'var(--surface-3)',
+                          color: 'var(--red)',
+                          border: '1px solid var(--border-strong)',
+                        }}
+                      >
+                        {contextModBusy === removeKey ? 'Removing…' : 'Force-remove'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filter collections — homepage repo filters */}

@@ -40,6 +40,15 @@ export interface CommunityContextPublic {
 
 export type VoteDirection = 'up' | 'down'
 
+/** Compact per-repo indicator for the collapsed card + filter. */
+export interface RepoContextSummary {
+  state: 'accepted' | 'pending'
+  /** Upvotes on the accepted item, or the leading pending item. */
+  upvotes: number
+  /** Votes needed to accept (for the "X/N" progress pill). */
+  needed: number
+}
+
 export const TEXT_MAX = 500
 export const SOURCE_MAX = 200
 export const NO_SOURCE_LABEL = 'No source provided'

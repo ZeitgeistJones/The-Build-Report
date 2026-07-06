@@ -5,15 +5,18 @@ import { getConsumerEconomicScore, getShippingLeverage } from '@/lib/economicGra
 import type { Repo } from '@/lib/scores'
 import {
   evaluateState,
+  getVoteThresholds,
   maskWallet,
   type CommunityContextPublic,
   type CommunityContextSubmission,
+  type RepoContextSummary,
   type VoteDirection,
 } from '@/lib/communityContextTypes'
 
 const SUBMISSION_KEY = 'build-report:ctx:submission:'
 const BY_REPO_KEY = 'build-report:ctx:by-repo:'
 const VOTES_KEY = 'build-report:ctx:votes:'
+const REPOS_INDEX_KEY = 'build-report:ctx:repos'
 
 function submissionKey(id: string) {
   return `${SUBMISSION_KEY}${id}`
@@ -73,6 +76,10 @@ export async function createSubmission(params: {
 }): Promise<CommunityContextSubmission> {
   const r = params.client ?? getRedis()
   const now = new Date().toISOString()
+  const wallet = params.wallet.toLowerCase()
+  // Submitting counts as the submitter's own upvote — so one more holder upvote
+  // reaches the accept bar, matching the "two upvotes" mental model.
+  const initialState = evaluateState(1, 0, 'pending')
   const submission: CommunityContextSubmission = {
     id: randomUUID(),
     slug: params.slug,
@@ -81,20 +88,22 @@ export async function createSubmission(params: {
     wallet: params.wallet,
     burnTxHash: params.burnTxHash,
     createdAt: now,
-    state: 'pending',
+    state: initialState,
     stateChangedAt: now,
-    upvotes: 0,
+    upvotes: 1,
     downvotes: 0,
     scoreAtSubmit: {
       economicLabel: economicLabelForRepo(params.repo),
       builderIntegrity: params.repo?.builderIntegrity?.letter ?? '—',
     },
-    acceptedAt: null,
+    acceptedAt: initialState === 'accepted' ? now : null,
     consumedByRescoreAt: null,
   }
 
   await r.set(submissionKey(submission.id), submission)
+  await r.hset(votesKey(submission.id), { [wallet]: 'up' })
   await r.sadd(byRepoKey(params.slug), submission.id)
+  await r.sadd(REPOS_INDEX_KEY, params.slug)
   return submission
 }
 
@@ -137,6 +146,59 @@ export async function getPublicContextForRepo(
       visible.map(s => r.hget<VoteDirection>(votesKey(s.id), lower).catch(() => null)),
     )
     return visible.map((s, i) => toPublic(s, votes[i] === 'up' || votes[i] === 'down' ? votes[i] : null))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Compact per-repo indicators for the homepage (collapsed-card badge + filter).
+ * accepted wins over pending; pending reports the leading item's upvote progress.
+ */
+export async function getContextSummaryBySlug(): Promise<Record<string, RepoContextSummary>> {
+  try {
+    const r = getRedis()
+    const slugs = await r.smembers(REPOS_INDEX_KEY)
+    if (!slugs.length) return {}
+    const needed = getVoteThresholds().voteTotalMin
+    const out: Record<string, RepoContextSummary> = {}
+    await Promise.all(
+      slugs.map(async slug => {
+        const subs = await listSubmissionsForRepo(slug)
+        const accepted = subs.filter(s => s.state === 'accepted')
+        if (accepted.length) {
+          const top = Math.max(...accepted.map(s => s.upvotes))
+          out[slug] = { state: 'accepted', upvotes: top, needed }
+          return
+        }
+        const pending = subs.filter(s => s.state === 'pending')
+        if (pending.length) {
+          const top = Math.max(...pending.map(s => s.upvotes))
+          out[slug] = { state: 'pending', upvotes: top, needed }
+        }
+      }),
+    )
+    return out
+  } catch {
+    return {}
+  }
+}
+
+/** All submissions across all repos, for the admin moderation list. */
+export async function listAllSubmissions(): Promise<CommunityContextSubmission[]> {
+  try {
+    const r = getRedis()
+    const slugs = await r.smembers(REPOS_INDEX_KEY)
+    if (!slugs.length) return []
+    const lists = await Promise.all(slugs.map(slug => listSubmissionsForRepo(slug)))
+    const all = lists.flat()
+    const rank = (s: CommunityContextSubmission) =>
+      s.state === 'pending' ? 0 : s.state === 'accepted' ? 1 : 2
+    return all.sort((a, b) => {
+      const r0 = rank(a) - rank(b)
+      if (r0 !== 0) return r0
+      return b.createdAt.localeCompare(a.createdAt)
+    })
   } catch {
     return []
   }

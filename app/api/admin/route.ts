@@ -13,7 +13,7 @@ import {
   removeCollectionSlug,
   removeTrackableForceInclude,
 } from '@/lib/repoCollections'
-import { adminAcceptSubmission, adminRemoveSubmission } from '@/lib/communityContext'
+import { adminAcceptSubmission, adminRemoveSubmission, listAllSubmissions } from '@/lib/communityContext'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -112,6 +112,11 @@ export async function POST(req: NextRequest) {
     revalidatePath('/')
     const { forceInclude } = await getCollectionsAdminState()
     return NextResponse.json({ ok: true, forceInclude })
+  }
+
+  if (action === 'listContext') {
+    const submissions = await listAllSubmissions()
+    return NextResponse.json({ ok: true, submissions })
   }
 
   if (action === 'removeContext') {

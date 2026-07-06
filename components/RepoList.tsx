@@ -51,6 +51,7 @@ import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringC
 import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
 import CommunityContextSection from '@/components/CommunityContextSection'
+import type { RepoContextSummary } from '@/lib/communityContextTypes'
 import { BI_WEIGHTS_TOOLTIP_SHORT } from '@/lib/rubrics/builderIntegrity'
 import {
   REPO_COLLECTIONS,
@@ -87,7 +88,7 @@ const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
 
 type ActivityScope = 'active' | 'all'
 type RepoSort = 'recent' | 'commits' | 'grade'
-type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'cv-related' | 'clawd-gated' | Tag
+type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'cv-related' | 'clawd-gated' | 'community-context' | Tag
 
 const COLLECTION_BADGE: Record<RepoCollectionId, { label: string; color: string; bg: string }> = {
   'cv-related': { label: 'CV', color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
@@ -135,6 +136,7 @@ function repoMatchesFilter(
   repo: RepoWithLive,
   filter: RepoFilter,
   collectionSets: Record<RepoCollectionId, Set<string>>,
+  contextSummary: Record<string, RepoContextSummary>,
 ): boolean {
   const slug = repo.githubSlug
   const tag = getEffectiveTag(repo)
@@ -143,6 +145,7 @@ function repoMatchesFilter(
   if (filter === 'leverage') return hasShippingLeverageTag(tag)
   if (filter === 'cv-related') return collectionSets['cv-related'].has(slug)
   if (filter === 'clawd-gated') return collectionSets['clawd-gated'].has(slug)
+  if (filter === 'community-context') return Boolean(contextSummary[slug])
   return tag === filter
 }
 
@@ -492,6 +495,7 @@ interface Props {
   initialRescoreSummaries?: Record<string, RescoreSummaryRecord>
   repoCollections?: Record<RepoCollectionId, string[]>
   communityContextEnabled?: boolean
+  contextSummary?: Record<string, RepoContextSummary>
 }
 
 export default function RepoList({
@@ -500,6 +504,7 @@ export default function RepoList({
   initialRescoreSummaries = {},
   repoCollections,
   communityContextEnabled = false,
+  contextSummary = {},
 }: Props) {
   const [activeFilter, setActiveFilter] = useState<RepoFilter>('all')
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
@@ -559,7 +564,16 @@ export default function RepoList({
     { key: 'theoretical', label: 'Theoretical' },
   ]
 
-  const tagFiltered = repoItems.filter(r => repoMatchesFilter(r, activeFilter, collectionSets))
+  const contextRepoCount = Object.keys(contextSummary).length
+  if (communityContextEnabled && contextRepoCount > 0) {
+    filters.push({
+      key: 'community-context',
+      label: `Community context (${contextRepoCount})`,
+      title: 'Repos with holder-submitted context (accepted or gathering votes)',
+    })
+  }
+
+  const tagFiltered = repoItems.filter(r => repoMatchesFilter(r, activeFilter, collectionSets, contextSummary))
   const activeInPeriod = tagFiltered.filter(r => repoCommitsForPeriodKey(r, repoPeriod) > 0)
   const filtered = (activityScope === 'active' ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
@@ -799,6 +813,32 @@ export default function RepoList({
                     </RepoBadge>
                   )
                 })}
+                {communityContextEnabled && contextSummary[repo.githubSlug] && (() => {
+                  const ctx = contextSummary[repo.githubSlug]
+                  const accepted = ctx.state === 'accepted'
+                  return (
+                    <RepoBadge
+                      tooltip={
+                        accepted
+                          ? 'Holder context accepted — applied on the next rescore. Expand for details.'
+                          : `Holder context gathering votes (${ctx.upvotes}/${ctx.needed} to accept). Expand to vote.`
+                      }
+                      style={{
+                        fontSize: '10px',
+                        padding: '2px 7px',
+                        borderRadius: '99px',
+                        fontWeight: 500,
+                        color: accepted ? 'var(--accent)' : 'var(--amber)',
+                        background: accepted ? 'var(--accent-dim)' : 'rgba(212,148,58,0.1)',
+                        border: `1px solid ${accepted ? 'var(--accent-border)' : 'var(--border)'}`,
+                        letterSpacing: '0.02em',
+                        display: 'inline-block',
+                      }}
+                    >
+                      {accepted ? 'context ✓' : `context ${ctx.upvotes}/${ctx.needed}`}
+                    </RepoBadge>
+                  )
+                })()}
                 {!pending && (
                   <RepoBadge
                     tooltip={LIFECYCLE_TOOLTIPS[lifecycle]}

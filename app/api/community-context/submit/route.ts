@@ -78,7 +78,8 @@ export async function POST(req: NextRequest) {
 
     await redis.set(paidKey, `ctx:${submission.id}`)
 
-    return NextResponse.json({ ok: true, submission: toPublic(submission) })
+    // Submit auto-counts as the submitter's upvote, so surface it as their vote.
+    return NextResponse.json({ ok: true, submission: toPublic(submission, 'up') })
   } catch (err: unknown) {
     if (paidKey) {
       await redis.del(paidKey).catch(() => {})

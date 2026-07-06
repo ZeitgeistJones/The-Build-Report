@@ -51,6 +51,7 @@ export default function CommunityContextSection({ repoSlug, enabled }: Props) {
   const { signMessageAsync } = useSignMessage()
 
   const [items, setItems] = useState<CommunityContextPublic[]>([])
+  const [voteTotalMin, setVoteTotalMin] = useState(2)
   const [loaded, setLoaded] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [text, setText] = useState('')
@@ -66,7 +67,10 @@ export default function CommunityContextSection({ repoSlug, enabled }: Props) {
       if (address) q.set('wallet', address)
       const res = await fetch(`/api/community-context?${q.toString()}`)
       const data = await res.json()
-      if (data.ok) setItems(Array.isArray(data.submissions) ? data.submissions : [])
+      if (data.ok) {
+        setItems(Array.isArray(data.submissions) ? data.submissions : [])
+        if (typeof data.voteTotalMin === 'number') setVoteTotalMin(data.voteTotalMin)
+      }
     } catch {
       // best-effort; leave prior state
     } finally {
@@ -132,7 +136,11 @@ export default function CommunityContextSection({ repoSlug, enabled }: Props) {
       setText('')
       setSource('')
       setFormOpen(false)
-      setNotice('Context submitted — holders can now vote on it.')
+      setNotice(
+        voteTotalMin > 1
+          ? `Context submitted — that counts as your upvote (1/${voteTotalMin}). ${voteTotalMin - 1} more holder upvote${voteTotalMin - 1 === 1 ? '' : 's'} accepts it.`
+          : 'Context submitted and accepted — it applies on the next rescore.',
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -178,9 +186,13 @@ export default function CommunityContextSection({ repoSlug, enabled }: Props) {
         <InfoTooltip content={DISCLOSURE} ariaLabel="About community context" icon="question" width={260} compact />
       </div>
 
+      <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '0 0 8px', lineHeight: 1.4 }}>
+        How it works: submit context (counts as your upvote) → {voteTotalMin > 1 ? `${voteTotalMin} net upvotes accept it` : 'accepted on submit'} → the AI reads accepted context on the next paid rescore.
+      </p>
+
       {loaded && sorted.length === 0 && (
         <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '0 0 8px', lineHeight: 1.4 }}>
-          No community context yet. Holders can add real-world context (onchain state, utility, governance) the AI reads on the next rescore.
+          No community context yet. Holders can add real-world context the AI reads on the next rescore — e.g. &ldquo;Incinerator is live again as of Jul 4, burning daily.&rdquo;
         </p>
       )}
 
@@ -264,7 +276,18 @@ export default function CommunityContextSection({ repoSlug, enabled }: Props) {
                 >
                   ▼ {item.downvotes}
                 </button>
+                {item.state === 'pending' && voteTotalMin > 1 && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                    {Math.min(item.upvotes, voteTotalMin)}/{voteTotalMin} upvotes to accept
+                  </span>
+                )}
               </div>
+
+              {isAccepted && !item.consumedByRescoreAt && (
+                <div style={{ fontSize: '10px', marginTop: '6px', color: 'var(--accent)', lineHeight: 1.4, fontWeight: 500 }}>
+                  ↑ Accepted — rescore this repo to apply it to the grade.
+                </div>
+              )}
             </div>
           )
         })}
@@ -369,6 +392,9 @@ export default function CommunityContextSection({ repoSlug, enabled }: Props) {
             >
               Cancel
             </button>
+          </div>
+          <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px', lineHeight: 1.4 }}>
+            Submitting counts as your upvote. {voteTotalMin > 1 ? `${voteTotalMin - 1} more holder upvote${voteTotalMin - 1 === 1 ? '' : 's'} accepts it.` : 'It is accepted immediately.'} Your submission and its votes are public and permanently logged.
           </div>
         </div>
       )}
