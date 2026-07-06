@@ -270,16 +270,20 @@ export default function AllTimeStats(props: Props) {
           isMobile={isMobile}
           label="Repos scored"
           value={pulse.reposScored.toString()}
-          sub={`hand-scored · ${periodLabel}`}
-          tooltip="Repos with rubric grades on this site (excludes awaiting-score placeholders)."
+          sub="graded on site"
+          tooltip="Repos with rubric grades here — launch baseline snapshots, Live AI inference, or Rescore refreshes. Not a count of human eyeball reviews."
           gated={gated}
         />
         <StatCard
           isMobile={isMobile}
-          label="Lifecycle"
-          value={`${pulse.shipping} · ${pulse.stable}`}
-          sub={pulse.done > 0 ? `${pulse.done} done · ${periodLabel}` : periodLabel}
-          tooltip="How many scored repos had commits this window (shipping), were quiet (stable), or completed a supply-lock promise (done)."
+          label="Shipping repos"
+          value={pulse.shipping.toString()}
+          sub={
+            pulse.done > 0
+              ? `${pulse.stable.toLocaleString()} quiet · ${pulse.done} Done`
+              : `${pulse.stable.toLocaleString()} quiet`
+          }
+          tooltip="Shipping = at least one commit this window. Quiet = stable (no commits — normal for infra and locks). Done = completed supply-lock with strong builder standards and no commits — quiet is success, not abandonment."
           gated={gated}
         />
         <StatCard
