@@ -541,7 +541,8 @@ export default function AdminPage() {
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Chronicle context</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px' }}>
-            Paste a condensed Chronicle summary here. It is prepended to paid rescore prompts so new scores can reference the same grounding as launch baseline repos.
+            Optional dated addendum only — timeline and Chronicle facts belong in Ecosystem context. When non-empty, this
+            is prepended to autoscore and rescore prompts; leave blank to avoid duplicating the ecosystem paste.
           </p>
         </div>
         <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>

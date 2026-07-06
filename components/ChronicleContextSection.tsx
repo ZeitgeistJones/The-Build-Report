@@ -20,8 +20,9 @@ export default function ChronicleContextSection({ activeText }: { activeText: st
         Chronicle context
       </h3>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.55, margin: '0 0 12px' }}>
-        Condensed Chronicle summary maintained in admin. Prepended to live AI autoscore and rescore prompts so scores can
-        reference the same grounding as launch-baseline repos.
+        Optional admin addendum for dated Chronicle updates. Timeline anchors and repo history already live in{' '}
+        <a href="#context" style={{ color: 'var(--accent)' }}>ecosystem context</a> above; this box is only prepended
+        when non-empty (e.g. post-launch facts verified after the ecosystem paste was written).
       </p>
       {configured ? (
         <pre style={PRE_STYLE}>{activeText}</pre>
@@ -33,7 +34,7 @@ export default function ChronicleContextSection({ activeText }: { activeText: st
             fontStyle: 'italic',
           }}
         >
-          Not configured yet — live AI scores run without Chronicle grounding paste.
+          No addendum — live AI still uses Chronicle timeline and repo facts from ecosystem context.
         </p>
       )}
     </section>

@@ -100,8 +100,10 @@ export default function HowWeScoreContent({
         (fixed Jun 15 snapshot) or{' '}
         <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>live AI</strong>{' '}
         (auto-inferred or paid Rescore). Live AI reads{' '}
-        <a href="#chronicle-context" style={{ color: 'var(--accent)' }}>Chronicle context</a> (optional admin paste) and{' '}
-        <a href="#context" style={{ color: 'var(--accent)' }}>ecosystem context</a> before scoring each repo. See{' '}
+        <a href="#context" style={{ color: 'var(--accent)' }}>ecosystem context</a> (rules, repo cheat sheet, Chronicle
+        timeline) plus each repo&apos;s GitHub files;{' '}
+        <a href="#chronicle-context" style={{ color: 'var(--accent)' }}>Chronicle context</a> is an optional dated addendum
+        when configured. See{' '}
         <Link href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</Link>.
       </p>
 
