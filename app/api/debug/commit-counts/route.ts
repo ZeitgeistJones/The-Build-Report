@@ -75,6 +75,16 @@ export async function GET() {
         scoredMs != null && pushedAt
           ? new Date(pushedAt).getTime() > scoredMs
           : null,
+      lastCommitAfterScored:
+        scoredMs != null && activity?.lastCommitAt
+          ? new Date(activity.lastCommitAt).getTime() > scoredMs
+          : null,
+      hasCommitAfterScoreWouldUse:
+        scoredMs != null
+          ? [activity?.lastCommitAt, pushedAt].some(
+              raw => raw && new Date(raw).getTime() > scoredMs!,
+            )
+          : null,
     }
   })
 

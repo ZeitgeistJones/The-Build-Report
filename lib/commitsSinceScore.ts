@@ -13,10 +13,14 @@ export function hasCommitAfterScore(
 ): boolean {
   const scoredMs = parseScoredAtMs(scoredAt)
   if (scoredMs === null) return false
-  const last = lastCommitAt ?? pushedAt
-  if (!last) return false
-  const lastMs = new Date(last).getTime()
-  return !Number.isNaN(lastMs) && lastMs > scoredMs
+
+  // Either signal counts — push can move without a new commit author date in the snapshot.
+  for (const raw of [lastCommitAt, pushedAt]) {
+    if (!raw) continue
+    const ms = new Date(raw).getTime()
+    if (!Number.isNaN(ms) && ms > scoredMs) return true
+  }
+  return false
 }
 
 export function countCommitsSinceScore(
@@ -62,7 +66,7 @@ export function countCommitsSinceScore(
             },
             timestamp: Date.now(),
             hypothesisId: 'H1',
-            runId: 'pre-fix',
+            runId: 'post-fix',
           }),
         }).catch(() => {})
         // #endregion
