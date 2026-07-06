@@ -761,7 +761,7 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
             : 'Most commits this window landed on repos with weaker builder-values scores.',
     signals: [
       ...v5Signals,
-      { label: 'High-integrity share', level: toLevel(high / weightBase), pct: Math.round((high / weightBase) * 100) },
+      { label: 'High-standards share', level: toLevel(high / weightBase), pct: Math.round((high / weightBase) * 100) },
     ],
   }
 }

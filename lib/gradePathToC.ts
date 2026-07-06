@@ -21,7 +21,7 @@ export function buildPathToC(grade: IntegrityGrade): PathToCHint | null {
   if (grade.pct >= C_THRESHOLD_PCT) return null
 
   const candidates = grade.signals.filter(
-    s => s.label !== 'High-integrity share' && SIGNAL_ANCHOR[s.label],
+    s => s.label !== 'High-standards share' && SIGNAL_ANCHOR[s.label],
   )
   if (!candidates.length) return null
 

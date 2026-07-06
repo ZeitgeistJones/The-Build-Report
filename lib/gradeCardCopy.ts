@@ -77,7 +77,7 @@ export function formatRepoLeaders(leaders: RepoCommitLeader[], maxNames = 2): st
 export function dominantRepoSentence(
   leaders: RepoCommitLeader[],
   totalCommits: number,
-  kind: 'shipping' | 'holder' | 'trust',
+  kind: 'shipping' | 'holder' | 'standards',
 ): string | null {
   if (!leaders.length || totalCommits <= 0) return null
   const top = leaders[0]
@@ -88,7 +88,7 @@ export function dominantRepoSentence(
     if (kind === 'holder') {
       return `${top.name} drove most of the holder-facing work we could score this window.`
     }
-    if (kind === 'trust') {
+    if (kind === 'standards') {
       return `Most of the visible work landed on ${top.name}.`
     }
     return `${top.name} carried most of the shipping this window.`
@@ -97,7 +97,7 @@ export function dominantRepoSentence(
   if (kind === 'holder') {
     return `Holder-facing work was spread across several projects, led by ${names}.`
   }
-  if (kind === 'trust') {
+  if (kind === 'standards') {
     return `Work was spread across several projects, led by ${names}.`
   }
   return `Shipping was led by ${names}.`
@@ -183,20 +183,20 @@ function economicHook(pct: number, letter: string, trend: TrendDirection): strin
 function integrityHook(pct: number, letter: string, trend: TrendDirection): string {
   const tier = letterTier(letter)
   if (tier === 'top') {
-    if (trend === 'up') return 'Trust is climbing — work landed on aligned repos.'
-    return 'Heavy commits mostly hit repos that walk the talk.'
+    if (trend === 'up') return 'Standards are climbing — commits landed on higher-scoring repos.'
+    return 'Heavy commits mostly hit repos with strong rubric scores.'
   }
   if (tier === 'solid') {
-    if (trend === 'down') return 'Mostly aligned, but more weight on mid-tier repos lately.'
-    return 'Values mostly match the work — a few soft spots.'
+    if (trend === 'down') return 'Mostly solid scores, but more weight on mid-tier repos lately.'
+    return 'Rubric scores mostly match the work — a few soft spots.'
   }
   if (tier === 'mixed') {
-    if (trend === 'down') return 'Integrity is split — commit volume didn’t follow the strongest repos.'
-    return 'Trust is mixed across where commits landed.'
+    if (trend === 'down') return 'Standards are split — commit volume didn’t follow the strongest repos.'
+    return 'Rubric scores are mixed across where commits landed.'
   }
-  if (trend === 'down') return 'Trust gap — most commit weight landed on shakier repos.'
-  if (pct < 45) return 'Low-integrity commits dominated this window.'
-  return 'Builder-values alignment needs attention where work happened.'
+  if (trend === 'down') return 'Most commit weight landed on lower-scoring repos this window.'
+  if (pct < 45) return 'Commits on weaker rubric scores dominated this window.'
+  return 'Builder standards need attention where work happened.'
 }
 
 function signalInsights(signals: Signal[], max = 2): string[] {
@@ -321,7 +321,7 @@ function economicCommitWeight(grade: TokenMechanicGrade): number {
 }
 
 function weakestIntegritySignal(grade: IntegrityGrade): string | null {
-  const candidates = grade.signals.filter(s => s.label !== 'High-integrity share')
+  const candidates = grade.signals.filter(s => s.label !== 'High-standards share')
   if (!candidates.length) return null
   const weakest = [...candidates].sort((a, b) => a.pct - b.pct)[0]
   if (!weakest || weakest.pct >= 55) return null
@@ -498,7 +498,7 @@ export function integrityCardLayman(
   const window = periodPhrase(period)
 
   if (grade.counts.commitWeight === 0 && grade.counts.active === 0) {
-    return `Not enough scored project activity in ${window} to say much about trust and alignment. Integrity grades need commits on scored repos — try a longer window.`
+    return `Not enough scored project activity in ${window} to read builder standards. This grade needs commits on scored repos — try a longer window.`
   }
 
   const lowShare =
@@ -514,45 +514,45 @@ export function integrityCardLayman(
   if (period === '60d') {
     base =
       tier === 'top'
-        ? `Over two months, the busiest projects are generally the ones that keep promises to holders — transparency and alignment look strong.`
+        ? `Over two months, the busiest projects generally score well on safety, testing, and transparency.`
         : tier === 'solid'
-          ? `Across two months, most work landed on projects that broadly match their stated values, with a few softer spots.`
+          ? `Across two months, most work landed on repos with solid rubric scores, with a few softer spots.`
           : tier === 'mixed'
-            ? `The two-month trust picture is mixed — solid projects and shakier ones both saw attention.`
-            : `Over two months, a lot of visible work landed on projects that score lower on security, testing, and code quality.`
+            ? `The two-month standards picture is mixed — stronger and weaker repos both saw attention.`
+            : `Over two months, a lot of visible work landed on projects that score lower on security, testing, and transparency.`
   } else if (period === '24h') {
     base =
       tier === 'top'
-        ? `In the last day, the projects that moved look aligned with what they tell holders — a good sign for holder confidence.`
+        ? `In the last day, the projects that moved score reasonably well on the builder-standards rubric.`
         : tier === 'solid'
-          ? `Yesterday's updates mostly landed on reasonably trustworthy projects, with minor weak spots.`
+          ? `Yesterday's updates mostly landed on mid-to-high rubric scores, with minor weak spots.`
           : tier === 'mixed'
-            ? `The last day does not give a clean integrity read — a little activity, mixed quality.`
-            : `In the last 24 hours, the work we could see leaned toward projects with weaker security and testing scores.`
+            ? `The last day does not give a clean standards read — a little activity, mixed rubric scores.`
+            : `In the last 24 hours, the work we could see leaned toward repos with weaker safety and testing scores.`
   } else if (period === '7d') {
     base =
       tier === 'top'
-        ? `This week, commits concentrated on projects that walk the talk with holders.`
+        ? `This week, commits concentrated on repos with stronger safety and transparency scores.`
         : tier === 'solid'
-          ? `This week, trust and alignment are mostly in good shape, with a few repos worth watching.`
+          ? `This week, rubric scores are mostly in good shape, with a few repos worth watching.`
           : tier === 'mixed'
-            ? `This week, integrity is split — some trustworthy projects moved, others less so.`
-            : `This week, much of the work landed on repos with weaker security, testing, and code-quality scores.`
+            ? `This week, standards are split — some higher-scoring repos moved, others less so.`
+            : `This week, much of the work landed on repos with weaker security, testing, and transparency scores.`
   } else {
     base =
       tier === 'top'
-        ? `This month, the projects getting attention are the ones that keep their promises to holders.`
+        ? `This month, the projects getting attention score well on the builder-standards rubric.`
         : tier === 'solid'
-          ? `This month, most work aligns with trustworthy projects, though not perfectly everywhere.`
+          ? `This month, most work landed on solid-scoring repos, though not perfectly everywhere.`
           : tier === 'mixed'
-            ? `This month, trust is a mixed bag — effort split between solid and shakier projects.`
-            : `This month, a lot of work landed on projects that score lower on security, testing, and code quality — this is the card to watch.`
+            ? `This month, standards are a mixed bag — effort split between stronger and weaker rubric scores.`
+            : `This month, a lot of work landed on projects that score lower on security, testing, and transparency — this is the card to watch.`
   }
 
   if (weakGrade && lowShare >= 40) {
-    base = `This window, a large share of commits landed on projects with weaker safety, testing, and transparency scores — that pulls the integrity grade down even when the work itself looks like routine polish. ${base}`
+    base = `This window, a large share of commits landed on projects with weaker safety, testing, and transparency scores — that pulls the standards grade down even when the work itself looks like routine polish. ${base}`
   } else if (weakGrade) {
-    base = `Overall alignment scores are weak this window — the busiest projects do not score well on the builder-integrity rubric. ${base}`
+    base = `Overall rubric scores are weak this window — the busiest projects do not score well on builder standards. ${base}`
   }
 
   if (drag && tier !== 'top') {
@@ -562,10 +562,10 @@ export function integrityCardLayman(
   const leaders = githubStats ? topReposByCommits(githubStats, repos, period, 'current', 3) : []
   const dominant =
     leaders.length && grade.counts.commitWeight > 0
-      ? dominantRepoSentence(leaders, grade.counts.commitWeight, 'trust')
+      ? dominantRepoSentence(leaders, grade.counts.commitWeight, 'standards')
       : null
 
-  return `${base}${dominant ? ` ${dominant}` : ''} ${trendFlavor(grade.trend, 'trust', period)}`
+  return `${base}${dominant ? ` ${dominant}` : ''} ${trendFlavor(grade.trend, 'builder standards', period)}`
 }
 
 /** True when digest exists but this period's card blurbs are missing (old cache shape). */
@@ -629,7 +629,7 @@ export function integrityCardFace(grade: IntegrityGrade, period: Period): GradeC
   insights.push(...signalInsights(grade.signals))
 
   const weakest = [...grade.signals]
-    .filter(s => s.label !== 'High-integrity share')
+    .filter(s => s.label !== 'High-standards share')
     .sort((a, b) => a.pct - b.pct)[0]
   if (weakest && weakest.pct < 50 && insights.length < 2) {
     insights.push(`${weakest.label} is the drag — ${weakest.pct}% avg across active repos.`)

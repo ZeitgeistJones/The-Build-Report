@@ -91,7 +91,7 @@ export default function HowWeScoreContent({
     <>
       <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '12px' }}>
         Three ecosystem letter grades at the top, plus per-repo scores on each card. Together they answer: is the builder
-        shipping, does value flow to holders, and can you trust the work?
+        shipping, does value flow to holders, and how do repos score on safety and transparency?
       </p>
 
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.55, marginBottom: '16px' }}>
@@ -226,7 +226,7 @@ export default function HowWeScoreContent({
           Repo tags
         </h3>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>
-          Tag picks which economic rubric applies — direct/supply-lock use token mechanic; infra/indirect/theoretical use shipping leverage. Every repo gets builder integrity.{' '}
+          Tag picks which economic rubric applies — direct/supply-lock use token mechanic; infra/indirect/theoretical use shipping leverage. Every repo gets builder standards.{' '}
           <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>Row definitions →</a>
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>

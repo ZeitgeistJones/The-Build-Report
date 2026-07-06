@@ -285,12 +285,12 @@ Return ONLY valid JSON, no markdown fences:
     "24h": {
       "builder": "2-3 sentences about builder activity for the last 24 hours.",
       "economic": "2-3 sentences about holder economics for the last 24 hours.",
-      "integrity": "2-3 sentences about builder integrity/trust for the last 24 hours."
+      "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the last 24 hours."
     },
     "7d": {
       "builder": "2-3 sentences about builder activity for the 7-day window.",
       "economic": "2-3 sentences about holder economics (burn apps and supply locks) for the 7-day window.",
-      "integrity": "2-3 sentences about builder integrity/trust for the 7-day window."
+      "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the 7-day window."
     },
     "30d": { "builder": "...", "economic": "...", "integrity": "..." },
     "60d": { "builder": "...", "economic": "...", "integrity": "..." }
@@ -307,8 +307,8 @@ Rules:
 - CARD COPY MUST BE PLAIN WORDS — no percentages, letter grades, or raw stats dumps in the card fields. You MAY name specific projects when PER-PERIOD TOP PROJECTS shows one repo dominated that window.
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
 - Say "holder economics" or "how apps and locks serve $CLAWD holders" instead of "token mechanics" or "burn apps" alone.
-- Integrity copy = whether projects keep their promises to holders — safety, testing, transparency, and whether the work matches what they tell holders. Use plain words; never say "trust signals". Not moralizing.
-- If integrity context shows below 60% or mostly low-integrity commits, the copy must acknowledge weak alignment — do not describe the window as steady, polished, or low-risk unless that matches the grade context.
+- Builder standards copy = observable rubric quality where commits landed — safety, testing, transparency. Not a moral verdict on the builder. Never say "trust" without context (e.g. trust in documented safety practices). Not moralizing.
+- If standards context shows below 60% or mostly low-scoring commits, the copy must acknowledge weak rubric scores — do not describe the window as steady, polished, or low-risk unless that matches the grade context.
 - Holder economics context may show low holder-facing commit share — if so, say plainly that most shipping was background tooling and holder value delivery was thin this window.
 - The general overview MAY name specific repos and describe what shipped; the card fields should stay high-level and plain.`
 

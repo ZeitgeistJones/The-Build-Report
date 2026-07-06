@@ -355,7 +355,7 @@ export function buildIntegrityTrendExplanation(
 
   if (highDropped.length && bullets.length < 4) {
     bullets.push(
-      `Trustworthy projects that were busy before went quiet (${formatRepoNames(highDropped, stats, period, 2)}).`,
+      `Higher-scoring projects that were busy before went quiet (${formatRepoNames(highDropped, stats, period, 2)}).`,
     )
   }
 
@@ -380,16 +380,16 @@ export function buildIntegrityTrendExplanation(
   }
 
   if (!bullets.length) {
-    bullets.push('Trust and alignment look about the same as the prior window.')
+    bullets.push('Rubric scores look about the same as the prior window.')
   }
 
   const trendLabel = formatTrendPct(trendPct, period)
   const headline =
     trend === 'up'
-      ? `Trust rose (${trendLabel}) — the busiest projects better match what they tell holders.`
+      ? `Standards rose (${trendLabel}) — the busiest repos scored higher on safety, testing, and transparency.`
       : trend === 'down'
-        ? `Trust fell (${trendLabel}) — work shifted toward projects with weaker safety and alignment scores.`
-        : `Trust held steady (${trendLabel}) — similar alignment where work happened.`
+        ? `Standards dipped (${trendLabel}) — more commit weight landed on repos with weaker rubric scores.`
+        : `Standards held steady (${trendLabel}) — similar rubric quality where commits landed.`
 
   return { headline, bullets: bullets.slice(0, 4) }
 }

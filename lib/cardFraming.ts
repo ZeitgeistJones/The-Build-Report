@@ -4,7 +4,7 @@ import type { Repo } from './scores'
 /** One-line framing under expanded rubric sections — quick glance vs detail rows. */
 export function integritySectionFraming(repo: Repo): string | null {
   if (showsEconomicNa(repo)) {
-    return 'Trust and safety for this repo type — not scored like a burn app or on-chain product. Expand rows for detail.'
+    return 'Safety and transparency for this repo type — not scored like a burn app or on-chain product. Expand rows for detail.'
   }
   if (repo.tag === 'supply-lock') {
     return 'Did the lock hold and stay verifiable? Quiet after launch can be success.'
@@ -23,5 +23,5 @@ export function economicSectionFraming(repo: Repo): string | null {
 }
 
 export function integrityGradeFootnote(): string {
-  return 'All tracked repos, commit-weighted — infra scored on infra-appropriate integrity criteria.'
+  return 'All tracked repos, commit-weighted — infra scored on infra-appropriate standards criteria.'
 }
