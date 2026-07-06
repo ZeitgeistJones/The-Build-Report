@@ -165,40 +165,15 @@ function buildCollectionSets(
   }
 }
 
-function truncate120(text: string): string {
-  return text.length > 120 ? `${text.slice(0, 119)}…` : text
-}
-
-function twoSentencesMax(text: string): string {
-  const trimmed = text.trim()
-  if (!trimmed) return ''
-
-  const firstPeriod = trimmed.indexOf('.')
-  if (firstPeriod === -1) return trimmed
-
-  const secondPeriod = trimmed.indexOf('.', firstPeriod + 1)
-  if (secondPeriod === -1) {
-    return trimmed.slice(0, firstPeriod + 1).trim()
-  }
-
-  const throughSecond = trimmed.slice(0, secondPeriod + 1).trim()
-  const hasMore = trimmed.slice(secondPeriod + 1).trim().length > 0
-  return hasMore ? `${throughSecond}…` : throughSecond
-}
-
-function formatPreviewLine(
+function pickRepoBlurb(
   description: string | null | undefined,
   verdict: string | undefined,
   pending: boolean,
-): string | null {
+): { text: string | null; source: 'description' | 'verdict' | null } {
   const gh = description?.trim()
-  if (gh) {
-    const preview = truncate120(twoSentencesMax(gh))
-    return preview || null
-  }
-  if (pending || !verdict?.trim()) return null
-  const preview = truncate120(twoSentencesMax(verdict.trim()))
-  return preview || null
+  if (gh) return { text: gh, source: 'description' }
+  if (pending || !verdict?.trim()) return { text: null, source: null }
+  return { text: verdict.trim(), source: 'verdict' }
 }
 
 const PILL_TOOLTIP_DELAY_MS = 400
@@ -365,31 +340,6 @@ function RubricSectionTitle({ children, hint }: { children: ReactNode; hint?: st
           width={240}
           compact
         />
-      )}
-    </div>
-  )
-}
-
-function VerdictBlock({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false)
-  const long = text.length > 220
-
-  return (
-    <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px' }}>
-      <p
-        className={!expanded && long ? 'verdict-clamp' : undefined}
-        style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.55 }}
-      >
-        {text}
-      </p>
-      {long && !expanded && (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          style={{ marginTop: '6px', fontSize: '11px', color: 'var(--accent)', padding: 0 }}
-        >
-          Read full verdict
-        </button>
       )}
     </div>
   )
@@ -734,7 +684,13 @@ export default function RepoList({
     const borderColor = TAG_BORDER_COLORS[getEffectiveTag(repo)]
     const auto = isAutoInferred(repo)
     const pending = isUnscoredRecent(repo)
-    const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
+    const blurb = pickRepoBlurb(repo.description, repo.verdict, pending)
+    const verdictText = repo.verdict?.trim() ?? ''
+    const showSeparateVerdict =
+      isExpanded &&
+      blurb.source === 'description' &&
+      verdictText.length > 0 &&
+      verdictText !== blurb.text
     const periodCommits = repoCommitsForPeriod(repo, repoPeriod)
     const commitsHitCap = Boolean(
       periodCommits != null &&
@@ -990,25 +946,18 @@ export default function RepoList({
                 {repo.name}
               </div>
 
-              {previewLine && (
-                <div style={{
-                  fontSize: `${d.preview}px`,
-                  color: 'var(--text-muted)',
-                  marginTop: '2px',
-                  overflow: 'hidden',
-                  ...(isMobile
-                    ? {
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical' as const,
-                        whiteSpace: 'normal',
-                      }
-                    : {
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }),
-                }}>
-                  {previewLine}
+              {blurb.text && (
+                <div
+                  className={!isExpanded ? 'repo-preview-clamp' : undefined}
+                  style={{
+                    fontSize: `${d.preview}px`,
+                    color: 'var(--text-muted)',
+                    marginTop: '2px',
+                    lineHeight: 1.45,
+                    whiteSpace: 'normal',
+                  }}
+                >
+                  {blurb.text}
                 </div>
               )}
 
@@ -1340,7 +1289,25 @@ export default function RepoList({
 
             {rescoreMeta && <RescoreSummaryBlock meta={rescoreMeta} />}
 
-            <VerdictBlock text={repo.verdict} />
+            {showSeparateVerdict && (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', marginBottom: '10px' }}>
+                <div
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 500,
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Score summary
+                </div>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.55 }}>
+                  {verdictText}
+                </p>
+              </div>
+            )}
 
             {repo.adminNote && !auto && (
               <div style={{

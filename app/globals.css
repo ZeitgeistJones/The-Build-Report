@@ -193,6 +193,13 @@ button {
   overflow: hidden;
 }
 
+.repo-preview-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .hw-rubric-block summary::-webkit-details-marker,
 .hw-rubric-row summary::-webkit-details-marker {
   display: none;
