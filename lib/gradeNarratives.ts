@@ -1,6 +1,6 @@
 import { Repo, Tag } from './scores'
 import { GitHubStats, RepoActivity } from './github'
-import { Period, formatTrendPct, TrendExplanation, TrendDirection } from './grades'
+import { Period, formatTrendDelta, TrendExplanation, TrendDirection } from './grades'
 import {
   formatRepoLeaders,
   topReposByCommits,
@@ -141,7 +141,8 @@ function builderInputs(stats: GitHubStats, period: Period, window: 'current' | '
 export function buildBuilderTrendExplanation(
   stats: GitHubStats,
   period: Period,
-  trendPct: number | null,
+  pct: number,
+  priorPct: number | null,
   trend: TrendDirection,
   repos?: Repo[],
 ): TrendExplanation {
@@ -183,7 +184,7 @@ export function buildBuilderTrendExplanation(
     bullets.push('Activity looks about the same as the prior window across tracked projects.')
   }
 
-  const trendLabel = formatTrendPct(trendPct, period)
+  const trendLabel = formatTrendDelta(pct, priorPct, period)
   const headline =
     trend === 'up'
       ? `Shipping pace rose (${trendLabel}) — ${currentWindowLabel(period)} was busier than ${priorWindowLabel(period)}.`
@@ -210,7 +211,8 @@ export function buildTokenMechanicTrendExplanation(
   stats: GitHubStats,
   period: Period,
   holderRepoSet: Repo[],
-  trendPct: number | null,
+  pct: number,
+  priorPct: number | null,
   trend: TrendDirection,
   allRepos?: Repo[],
   newArrivalCount?: number,
@@ -303,7 +305,7 @@ export function buildTokenMechanicTrendExplanation(
     bullets.push('The mix of active projects looks similar to the prior window.')
   }
 
-  const trendLabel = formatTrendPct(trendPct, period)
+  const trendLabel = formatTrendDelta(pct, priorPct, period)
   const headline =
     trend === 'up'
       ? `Holder economics improved (${trendLabel}) — the busiest projects score better on how they serve holders.`
@@ -318,7 +320,8 @@ export function buildIntegrityTrendExplanation(
   stats: GitHubStats,
   period: Period,
   repoSet: Repo[],
-  trendPct: number | null,
+  pct: number,
+  priorPct: number | null,
   trend: TrendDirection,
   newArrivalCount?: number,
 ): TrendExplanation {
@@ -383,7 +386,7 @@ export function buildIntegrityTrendExplanation(
     bullets.push('Rubric scores look about the same as the prior window.')
   }
 
-  const trendLabel = formatTrendPct(trendPct, period)
+  const trendLabel = formatTrendDelta(pct, priorPct, period)
   const headline =
     trend === 'up'
       ? `Standards rose (${trendLabel}) — the busiest repos scored higher on safety, testing, and transparency.`

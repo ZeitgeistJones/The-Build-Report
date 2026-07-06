@@ -1,7 +1,7 @@
 'use client'
 
 import { gradeColor } from '@/lib/gradeLetters'
-import { formatTrendPct } from '@/lib/grades'
+import { formatTrendDelta } from '@/lib/grades'
 import { OverallGradeWithTrend } from '@/lib/overallGrade'
 import { useGradePeriod } from './GradePeriodContext'
 
@@ -90,7 +90,7 @@ export default function OverallGrade({
           }}
         >
           <TrendArrow trend={overall.trend} />
-          {formatTrendPct(overall.trendPct, period)}
+          {formatTrendDelta(overall.pct, overall.priorPct, period)}
         </span>
         )}
       </div>

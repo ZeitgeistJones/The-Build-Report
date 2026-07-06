@@ -13,6 +13,7 @@ export interface OverallGrade {
 }
 
 export interface OverallGradeWithTrend extends OverallGrade {
+  priorPct: number | null
   trendPct: number | null
   trend: TrendDirection
 }
@@ -86,7 +87,7 @@ export function calcOverallGradeWithTrend(
 
   // 60d has no prior window by design — never show a trend.
   if (period === '60d') {
-    return { ...overall, trendPct: null, trend: 'flat' }
+    return { ...overall, priorPct: null, trendPct: null, trend: 'flat' }
   }
 
   // Build the prior blend from only the axes that actually have a prior value, renormalizing
@@ -103,7 +104,7 @@ export function calcOverallGradeWithTrend(
   }
 
   if (!priorAxes.length) {
-    return { ...overall, trendPct: null, trend: 'new' }
+    return { ...overall, priorPct: null, trendPct: null, trend: 'new' }
   }
 
   const totalWeight = priorAxes.reduce((s, a) => s + a.weight, 0)
@@ -115,6 +116,7 @@ export function calcOverallGradeWithTrend(
 
   return {
     ...overall,
+    priorPct,
     trendPct,
     trend: trendDirection(overall.pct, priorPct),
   }

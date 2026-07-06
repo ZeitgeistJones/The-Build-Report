@@ -2,14 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendPct, TrendExplanation, Period } from '@/lib/grades'
+import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendDelta, TrendExplanation, Period } from '@/lib/grades'
 import type { GradeNewArrival } from '@/lib/gradeNewArrivals'
 import { timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { rubricBlockById } from '@/lib/rubricReference'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
-import { PulseMicrostats } from './EcosystemPulse'
-import { EcosystemPulse } from '@/lib/ecosystemPulse'
 import { integrityGradeFootnote } from '@/lib/cardFraming'
 import type { DailyDigestCards } from '@/lib/buildBrief'
 import type { Repo } from '@/lib/scores'
@@ -27,10 +25,6 @@ import RubricBlockPanel from '@/components/RubricBlockPanel'
 type CardId = GradeCardId
 
 interface Props {
-  pulse24: EcosystemPulse | null
-  pulse30: EcosystemPulse | null
-  pulse7: EcosystemPulse | null
-  pulse60: EcosystemPulse | null
   builderGrade24: BuilderGrade | null
   builderGrade30: BuilderGrade | null
   builderGrade7: BuilderGrade | null
@@ -359,6 +353,7 @@ function GradeCard({
   grade: {
     letter: string
     pct: number
+    priorPct: number | null
     trend: 'up' | 'flat' | 'down' | 'new'
     trendPct: number | null
   } | null
@@ -453,7 +448,7 @@ function GradeCard({
               }}
             >
               <TrendArrow trend={grade.trend} />
-              {formatTrendPct(grade.trendPct, period)}
+              {formatTrendDelta(grade.pct, grade.priorPct, period)}
             </span>
           )}
         </div>
@@ -527,10 +522,6 @@ function GradeCard({
 }
 
 export default function GradesPanel({
-  pulse24,
-  pulse30,
-  pulse7,
-  pulse60,
   builderGrade24,
   builderGrade30,
   builderGrade7,
@@ -762,15 +753,6 @@ export default function GradesPanel({
             >
               Think we&apos;re missing something? Add context →
             </Link>
-          )}
-          {!isMobile && pulse24 && pulse30 && pulse7 && pulse60 && (
-            <PulseMicrostats
-              pulse24={pulse24}
-              pulse30={pulse30}
-              pulse7={pulse7}
-              pulse60={pulse60}
-              commits={stats?.commits}
-            />
           )}
         </div>
         <div style={isMobile ? { width: '100%', display: 'flex' } : undefined}>

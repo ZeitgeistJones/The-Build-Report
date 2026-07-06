@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { pctChange } from '@/lib/grades'
+import { pctChange, periodKeyLabel, type Period } from '@/lib/grades'
+import type { EcosystemPulse } from '@/lib/ecosystemPulse'
 import GateBlur from '@/components/wallet/GateBlur'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import { useGradePeriod } from '@/components/GradePeriodContext'
@@ -11,10 +12,18 @@ import { timeAgo } from '@/lib/github'
 
 interface Props {
   totalRepos: number
+  pulse24: EcosystemPulse
+  pulse30: EcosystemPulse
+  pulse7: EcosystemPulse
+  pulse60: EcosystemPulse
+  totalCommits24h: number
+  totalCommits24_48: number
   totalCommits30d: number
   totalCommits7d: number
   totalCommits30_60: number
   totalCommits7_14: number
+  activeDays24h: number
+  activeDays24_48: number
   activeDays30d: number
   activeDays7d: number
   activeDays30_60: number
@@ -29,6 +38,80 @@ function formatStatTrend(curr: number, prev: number, windowLabel: string): strin
   if (change > 0) return `+${change}% vs ${windowLabel}`
   if (change < 0) return `${change}% vs ${windowLabel}`
   return `0% vs ${windowLabel}`
+}
+
+function pulseForPeriod(
+  period: Period,
+  pulse24: EcosystemPulse,
+  pulse7: EcosystemPulse,
+  pulse30: EcosystemPulse,
+  pulse60: EcosystemPulse,
+): EcosystemPulse {
+  if (period === '24h') return pulse24
+  if (period === '7d') return pulse7
+  if (period === '60d') return pulse60
+  return pulse30
+}
+
+function windowMetrics(
+  period: Period,
+  props: Props,
+): {
+  commits: number
+  priorCommits: number
+  activeDays: number
+  priorActiveDays: number
+  commitsLabel: string
+  activeDaysLabel: string
+  priorLabel: string
+  showTrend: boolean
+} {
+  switch (period) {
+    case '24h':
+      return {
+        commits: props.totalCommits24h,
+        priorCommits: props.totalCommits24_48,
+        activeDays: props.activeDays24h,
+        priorActiveDays: props.activeDays24_48,
+        commitsLabel: 'Commits (24h)',
+        activeDaysLabel: 'Active days (24h)',
+        priorLabel: 'prior 24h',
+        showTrend: true,
+      }
+    case '7d':
+      return {
+        commits: props.totalCommits7d,
+        priorCommits: props.totalCommits7_14,
+        activeDays: props.activeDays7d,
+        priorActiveDays: props.activeDays7_14,
+        commitsLabel: 'Commits (7d)',
+        activeDaysLabel: 'Active days (7d)',
+        priorLabel: 'prior 7d',
+        showTrend: true,
+      }
+    case '60d':
+      return {
+        commits: props.totalCommits30d + props.totalCommits30_60,
+        priorCommits: 0,
+        activeDays: Math.min(props.activeDays30d + props.activeDays30_60, 60),
+        priorActiveDays: 0,
+        commitsLabel: 'Commits (60d)',
+        activeDaysLabel: 'Active days (60d)',
+        priorLabel: 'prior 60d',
+        showTrend: false,
+      }
+    default:
+      return {
+        commits: props.totalCommits30d,
+        priorCommits: props.totalCommits30_60,
+        activeDays: props.activeDays30d,
+        priorActiveDays: props.activeDays30_60,
+        commitsLabel: 'Commits (30d)',
+        activeDaysLabel: 'Active days (30d)',
+        priorLabel: 'prior 30d',
+        showTrend: true,
+      }
+  }
 }
 
 interface StatCardProps {
@@ -76,6 +159,7 @@ function StatCard({ label, value, sub, trend, tooltip, gated, isMobile }: StatCa
         </div>
         {tooltip && (
           <button
+            type="button"
             onMouseEnter={() => setShow(true)}
             onMouseLeave={() => setShow(false)}
             onClick={() => setShow(s => !s)}
@@ -122,23 +206,15 @@ function StatCard({ label, value, sub, trend, tooltip, gated, isMobile }: StatCa
   )
 }
 
-export default function AllTimeStats({
-  totalRepos,
-  totalCommits30d,
-  totalCommits7d,
-  totalCommits30_60,
-  totalCommits7_14,
-  activeDays30d,
-  activeDays7d,
-  activeDays30_60,
-  activeDays7_14,
-  lastCommitAt,
-  lastCommitRepo,
-}: Props) {
+export default function AllTimeStats(props: Props) {
   const { unlocked } = useClawdAccess()
   const { period } = useGradePeriod()
   const isMobile = useIsMobile()
   const gated = !unlocked
+
+  const pulse = pulseForPeriod(period, props.pulse24, props.pulse7, props.pulse30, props.pulse60)
+  const window = windowMetrics(period, props)
+  const periodLabel = periodKeyLabel(period).toLowerCase()
 
   return (
     <div style={{ marginBottom: '40px' }}>
@@ -148,21 +224,18 @@ export default function AllTimeStats({
         color: 'var(--text-muted)',
         textTransform: 'uppercase',
         letterSpacing: '0.1em',
-        marginBottom: '10px',
+        marginBottom: '4px',
       }}>
         Activity snapshot
       </div>
-      {period === '60d' && (
-        <p style={{
-          fontSize: '12px',
-          color: 'var(--text-muted)',
-          lineHeight: 1.5,
-          marginBottom: '10px',
-          fontStyle: 'italic',
-        }}>
-          Activity snapshot shows 30d data — switch to 30d or 7d to align windows.
-        </p>
-      )}
+      <p style={{
+        fontSize: '12px',
+        color: 'var(--text-muted)',
+        lineHeight: 1.5,
+        marginBottom: '10px',
+      }}>
+        Showing {periodLabel} — matches the grade window above.
+      </p>
       <div style={{
         display: 'grid',
         gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
@@ -171,50 +244,49 @@ export default function AllTimeStats({
         <StatCard
           isMobile={isMobile}
           label="Total repos"
-          value={totalRepos.toString()}
+          value={props.totalRepos.toString()}
           sub="all public on GitHub"
           tooltip="Total number of public repositories on the clawdbotatg GitHub account."
         />
         <StatCard
           isMobile={isMobile}
-          label="Commits (30d)"
-          value={totalCommits30d.toLocaleString()}
-          sub="last 30 days"
-          trend={formatStatTrend(totalCommits30d, totalCommits30_60, 'prior 30d')}
-          tooltip="Commits across up to 40 repos pushed in the last 30 days (scored repos prioritized). Compared to days 31–60."
-        />
-        <StatCard
-          isMobile={isMobile}
-          label="Commits (7d)"
-          value={totalCommits7d.toLocaleString()}
-          sub="last 7 days"
-          trend={formatStatTrend(totalCommits7d, totalCommits7_14, 'prior 7d')}
-          tooltip="Commits across up to 40 repos pushed in the last 30 days (scored repos prioritized). Compared to days 8–14."
+          label={window.commitsLabel}
+          value={window.commits.toLocaleString()}
+          sub={periodLabel}
+          trend={window.showTrend ? formatStatTrend(window.commits, window.priorCommits, window.priorLabel) : undefined}
+          tooltip="Commits across the sampled repo set for this window. Compared to the prior window of the same length."
           gated={gated}
         />
         <StatCard
           isMobile={isMobile}
-          label="Active days (30d)"
-          value={activeDays30d.toString()}
-          sub="last 30 days"
-          trend={formatStatTrend(activeDays30d, activeDays30_60, 'prior 30d')}
-          tooltip="Calendar days with at least one commit in the sampled repo set. Compared to days 31–60."
+          label={window.activeDaysLabel}
+          value={window.activeDays.toString()}
+          sub={periodLabel}
+          trend={window.showTrend ? formatStatTrend(window.activeDays, window.priorActiveDays, window.priorLabel) : undefined}
+          tooltip="Calendar days with at least one commit in the sampled repo set."
           gated={gated}
         />
         <StatCard
           isMobile={isMobile}
-          label="Active days (7d)"
-          value={activeDays7d.toString()}
-          sub="last 7 days"
-          trend={formatStatTrend(activeDays7d, activeDays7_14, 'prior 7d')}
-          tooltip="Calendar days with at least one commit in the sampled repo set. Compared to days 8–14."
+          label="Repos scored"
+          value={pulse.reposScored.toString()}
+          sub={`hand-scored · ${periodLabel}`}
+          tooltip="Repos with rubric grades on this site (excludes awaiting-score placeholders)."
+          gated={gated}
+        />
+        <StatCard
+          isMobile={isMobile}
+          label="Lifecycle"
+          value={`${pulse.shipping} · ${pulse.stable}`}
+          sub={pulse.done > 0 ? `${pulse.done} done · ${periodLabel}` : periodLabel}
+          tooltip="How many scored repos had commits this window (shipping), were quiet (stable), or completed a supply-lock promise (done)."
           gated={gated}
         />
         <StatCard
           isMobile={isMobile}
           label="Last commit"
-          value={lastCommitAt ? timeAgo(lastCommitAt) : '—'}
-          sub={lastCommitRepo ?? ''}
+          value={props.lastCommitAt ? timeAgo(props.lastCommitAt) : '—'}
+          sub={props.lastCommitRepo ?? ''}
           tooltip="Most recent commit found while scanning the sampled repo set."
           gated={gated}
         />

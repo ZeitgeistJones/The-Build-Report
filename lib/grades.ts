@@ -775,3 +775,15 @@ export function formatTrendPct(trendPct: number | null, period: Period): string 
   if (trendPct < 0) return `${trendPct}% vs ${windowLabel}`
   return `steady vs ${windowLabel}`
 }
+
+/** Absolute point change for grade cards (+19 pts vs prior 24h). Matches {@link trendDirection} ±3 band. */
+export function formatTrendDelta(pct: number, priorPct: number | null, period: Period): string {
+  if (period === '60d') return ''
+  const windowLabel =
+    period === '30d' ? 'prior 30d' : period === '24h' ? 'prior 24h' : 'prior 7d'
+  if (priorPct === null) return `new vs ${windowLabel}`
+  const delta = pct - priorPct
+  if (delta > 3) return `+${delta} pts vs ${windowLabel}`
+  if (delta < -3) return `${delta} pts vs ${windowLabel}`
+  return `steady vs ${windowLabel}`
+}

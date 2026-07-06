@@ -185,13 +185,13 @@ export default async function Home() {
   }
 
   const builderGrade24 = builderGrade24Raw && stats
-    ? { ...builderGrade24Raw, trendExplanation: buildBuilderTrendExplanation(stats, '24h', builderGrade24Raw.trendPct, builderGrade24Raw.trend, allRepos) }
+    ? { ...builderGrade24Raw, trendExplanation: buildBuilderTrendExplanation(stats, '24h', builderGrade24Raw.pct, builderGrade24Raw.priorPct, builderGrade24Raw.trend, allRepos) }
     : builderGrade24Raw
   const builderGrade30 = builderGrade30Raw && stats
-    ? { ...builderGrade30Raw, trendExplanation: buildBuilderTrendExplanation(stats, '30d', builderGrade30Raw.trendPct, builderGrade30Raw.trend, allRepos) }
+    ? { ...builderGrade30Raw, trendExplanation: buildBuilderTrendExplanation(stats, '30d', builderGrade30Raw.pct, builderGrade30Raw.priorPct, builderGrade30Raw.trend, allRepos) }
     : builderGrade30Raw
   const builderGrade7 = builderGrade7Raw && stats
-    ? { ...builderGrade7Raw, trendExplanation: buildBuilderTrendExplanation(stats, '7d', builderGrade7Raw.trendPct, builderGrade7Raw.trend, allRepos) }
+    ? { ...builderGrade7Raw, trendExplanation: buildBuilderTrendExplanation(stats, '7d', builderGrade7Raw.pct, builderGrade7Raw.priorPct, builderGrade7Raw.trend, allRepos) }
     : builderGrade7Raw
   const tokenMechanicGrade24 = tokenMechanicGrade24Raw && stats
     ? {
@@ -200,7 +200,8 @@ export default async function Home() {
           stats,
           '24h',
           holderEconRepos,
-          tokenMechanicGrade24Raw.trendPct,
+          tokenMechanicGrade24Raw.pct,
+          tokenMechanicGrade24Raw.priorPct,
           tokenMechanicGrade24Raw.trend,
           allRepos,
           tokenMechanicGrade24Raw.newArrivals?.length,
@@ -214,7 +215,8 @@ export default async function Home() {
           stats,
           '30d',
           holderEconRepos,
-          tokenMechanicGrade30Raw.trendPct,
+          tokenMechanicGrade30Raw.pct,
+          tokenMechanicGrade30Raw.priorPct,
           tokenMechanicGrade30Raw.trend,
           allRepos,
           tokenMechanicGrade30Raw.newArrivals?.length,
@@ -228,7 +230,8 @@ export default async function Home() {
           stats,
           '7d',
           holderEconRepos,
-          tokenMechanicGrade7Raw.trendPct,
+          tokenMechanicGrade7Raw.pct,
+          tokenMechanicGrade7Raw.priorPct,
           tokenMechanicGrade7Raw.trend,
           allRepos,
           tokenMechanicGrade7Raw.newArrivals?.length,
@@ -242,7 +245,8 @@ export default async function Home() {
           stats,
           '24h',
           allRepos,
-          integrityGrade24Raw.trendPct,
+          integrityGrade24Raw.pct,
+          integrityGrade24Raw.priorPct,
           integrityGrade24Raw.trend,
           integrityGrade24Raw.newArrivals?.length,
         ),
@@ -255,7 +259,8 @@ export default async function Home() {
           stats,
           '30d',
           allRepos,
-          integrityGrade30Raw.trendPct,
+          integrityGrade30Raw.pct,
+          integrityGrade30Raw.priorPct,
           integrityGrade30Raw.trend,
           integrityGrade30Raw.newArrivals?.length,
         ),
@@ -268,7 +273,8 @@ export default async function Home() {
           stats,
           '7d',
           allRepos,
-          integrityGrade7Raw.trendPct,
+          integrityGrade7Raw.pct,
+          integrityGrade7Raw.priorPct,
           integrityGrade7Raw.trend,
           integrityGrade7Raw.newArrivals?.length,
         ),
@@ -320,10 +326,6 @@ export default async function Home() {
 
       <div style={{ marginBottom: '32px' }}>
       <GradesPanel
-        pulse24={pulse24}
-        pulse30={pulse30}
-        pulse7={pulse7}
-        pulse60={pulse60}
         builderGrade24={builderGrade24}
         builderGrade30={builderGrade30}
         builderGrade7={builderGrade7}
@@ -383,10 +385,18 @@ export default async function Home() {
       <div style={{ marginBottom: '32px' }}>
         <AllTimeStats
           totalRepos={stats.totalRepos}
+          pulse24={pulse24!}
+          pulse30={pulse30!}
+          pulse7={pulse7!}
+          pulse60={pulse60!}
+          totalCommits24h={stats.totalCommits24h ?? 0}
+          totalCommits24_48={stats.totalCommits24_48 ?? 0}
           totalCommits30d={stats.totalCommits30d}
           totalCommits7d={stats.totalCommits7d}
           totalCommits30_60={stats.totalCommits30_60}
           totalCommits7_14={stats.totalCommits7_14}
+          activeDays24h={stats.activeDays24h ?? 0}
+          activeDays24_48={stats.activeDays24_48 ?? 0}
           activeDays30d={stats.activeDays30d}
           activeDays7d={stats.activeDays7d}
           activeDays30_60={stats.activeDays30_60}
