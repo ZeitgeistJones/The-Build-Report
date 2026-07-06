@@ -5,7 +5,11 @@ import { REPOS } from '@/lib/scores'
 import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
 import { cacheLookupSlugs } from '@/lib/repoOrder'
 import { getExcludedSlugs } from '@/lib/repoExclude'
-import { countCommitsSinceScore, parseScoredAtMs } from '@/lib/commitsSinceScore'
+import {
+  countCommitsSinceScore,
+  isScoredAfterLastKnownActivity,
+  parseScoredAtMs,
+} from '@/lib/commitsSinceScore'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,6 +89,10 @@ export async function GET() {
               raw => raw && new Date(raw).getTime() > scoredMs!,
             )
           : null,
+      scoredAfterLastKnownActivity: isScoredAfterLastKnownActivity(scoredAt, ts, {
+        lastCommitAt: activity?.lastCommitAt ?? null,
+        pushedAt,
+      }),
     }
   })
 

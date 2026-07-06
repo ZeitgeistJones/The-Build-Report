@@ -593,6 +593,6 @@ export function timeAgo(dateStr: string | null): string {
   const days = Math.floor(diff / 86400000)
 
   if (mins < 60) return `${mins}m ago`
-  if (hours < 24) return `${hours}h ago`
+  if (hours < 48) return `${hours}h ago`
   return `${days}d ago`
 }

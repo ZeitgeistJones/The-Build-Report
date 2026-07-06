@@ -48,7 +48,7 @@ import {
 import { diffRubricRows, rowDeltaByLabel } from '@/lib/rescoreDeltas'
 import { integritySectionFraming, economicSectionFraming } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
-import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
+import { commitsSinceScoreLabel, countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
 import CommunityContextSection from '@/components/CommunityContextSection'
 import type { RepoContextSummary } from '@/lib/communityContextTypes'
@@ -130,7 +130,7 @@ function cardLayout(isMobile: boolean) {
 type ScoreAgeDisplay =
   | { kind: 'hidden' }
   | { kind: 'baseline'; label: string }
-  | { kind: 'auto_count'; count: number; capped: boolean }
+  | { kind: 'auto_count'; count: number; capped: boolean; label: string }
   | { kind: 'auto_new' }
   | { kind: 'auto_age'; days: number }
 
@@ -455,8 +455,11 @@ function getScoreAgeDisplay(repo: RepoWithLive, pending: boolean): ScoreAgeDispl
     { lastCommitAt: repo.lastCommitAt, pushedAt: repo.pushedAt },
   )
 
+  const activityFallback = { lastCommitAt: repo.lastCommitAt, pushedAt: repo.pushedAt }
+  const sinceLabel = commitsSinceScoreLabel(repo.scoredAt, repo.commitTimestamps, activityFallback)
+
   if (result.exact) {
-    return { kind: 'auto_count', count: result.count, capped: result.capped }
+    return { kind: 'auto_count', count: result.count, capped: result.capped, label: sinceLabel }
   }
 
   if (result.hasNew) {
@@ -468,7 +471,7 @@ function getScoreAgeDisplay(repo: RepoWithLive, pending: boolean): ScoreAgeDispl
     return { kind: 'auto_age', days: Math.floor(days) }
   }
 
-  return { kind: 'auto_count', count: 0, capped: false }
+  return { kind: 'auto_count', count: 0, capped: false, label: sinceLabel }
 }
 
 function commitsSinceScoredColor(count: number): string {
@@ -951,11 +954,11 @@ export default function RepoList({
                       style={{ color: commitsSinceScoredColor(sinceScored.capped ? GITHUB_COMMITS_CAP : sinceScored.count) }}
                       title={
                         sinceScored.count === 0 && periodCommits != null && periodCommits > 0
-                          ? 'Counts commits after the last score date, not total recent activity in this window.'
+                          ? `${periodCommits} commit${periodCommits === 1 ? '' : 's'} in this window landed before the last score — only post-score commits count here.`
                           : undefined
                       }
                     >
-                      {sinceScored.capped ? '100+' : sinceScored.count} commits since scored
+                      {sinceScored.label}
                     </span>
                   </>
                 )}

@@ -6,6 +6,35 @@ export function parseScoredAtMs(scoredAt: string | null | undefined): number | n
   return Number.isNaN(ms) ? null : ms
 }
 
+export function newestKnownActivityMs(
+  commitTimestamps: string[] | null | undefined,
+  fallback?: { lastCommitAt: string | null; pushedAt: string | null },
+): number | null {
+  let max: number | null = null
+  for (const ts of commitTimestamps ?? []) {
+    const ms = new Date(ts).getTime()
+    if (!Number.isNaN(ms)) max = max === null ? ms : Math.max(max, ms)
+  }
+  for (const raw of [fallback?.lastCommitAt, fallback?.pushedAt]) {
+    if (!raw) continue
+    const ms = new Date(raw).getTime()
+    if (!Number.isNaN(ms)) max = max === null ? ms : Math.max(max, ms)
+  }
+  return max
+}
+
+/** True when the score timestamp is newer than every indexed commit/push (e.g. bulk regen after last activity). */
+export function isScoredAfterLastKnownActivity(
+  scoredAt: string | null | undefined,
+  commitTimestamps: string[] | null | undefined,
+  fallback?: { lastCommitAt: string | null; pushedAt: string | null },
+): boolean {
+  const scoredMs = parseScoredAtMs(scoredAt)
+  const newestMs = newestKnownActivityMs(commitTimestamps, fallback)
+  if (scoredMs === null || newestMs === null) return false
+  return scoredMs > newestMs
+}
+
 export function hasCommitAfterScore(
   scoredAt: string | null | undefined,
   lastCommitAt: string | null | undefined,
@@ -102,11 +131,21 @@ export function commitsSinceScoreLabel(
   )
 
   if (exact) {
-    if (count === 0) return '0 commits since scored'
+    if (count === 0) {
+      if (isScoredAfterLastKnownActivity(scoredAt, commitTimestamps, fallback)) {
+        return 'Up to date at last score'
+      }
+      return '0 commits since scored'
+    }
     if (capped) return '100+ commits since scored'
     return `${count} commit${count === 1 ? '' : 's'} since scored`
   }
 
-  if (!hasNew) return '0 commits since scored'
+  if (!hasNew) {
+    if (isScoredAfterLastKnownActivity(scoredAt, commitTimestamps, fallback)) {
+      return 'Up to date at last score'
+    }
+    return '0 commits since scored'
+  }
   return 'New commits since scored'
 }
