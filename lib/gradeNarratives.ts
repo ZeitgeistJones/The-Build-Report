@@ -18,12 +18,12 @@ function currentWindowLabel(period: Period): string {
 
 function commitCount(activity: RepoActivity, period: Period, window: 'current' | 'prior'): number {
   if (period === '30d') {
-    return window === 'current' ? activity.commits30d : activity.commits30_60
+    return window === 'current' ? (activity.commits30d ?? 0) : (activity.commits30_60 ?? 0)
   }
   if (period === '24h') {
     return window === 'current' ? (activity.commits24h ?? 0) : (activity.commits24_48 ?? 0)
   }
-  return window === 'current' ? activity.commits7d : activity.commits7_14
+  return window === 'current' ? (activity.commits7d ?? 0) : (activity.commits7_14 ?? 0)
 }
 
 function reposActiveInWindow(
@@ -87,7 +87,7 @@ function builderInputs(stats: GitHubStats, period: Period, window: 'current' | '
   const activityCount = Object.keys(stats.repoActivity).length
   if (period === '30d') {
     const activeRepos = Object.values(stats.repoActivity).filter(r =>
-      window === 'current' ? r.commits30d > 0 : r.commits30_60 > 0,
+      window === 'current' ? (r.commits30d ?? 0) > 0 : (r.commits30_60 ?? 0) > 0,
     ).length
     return {
       commits: window === 'current' ? stats.totalCommits30d : stats.totalCommits30_60,
@@ -110,7 +110,7 @@ function builderInputs(stats: GitHubStats, period: Period, window: 'current' | '
     }
   }
   const activeRepos = Object.values(stats.repoActivity).filter(r =>
-    window === 'current' ? r.commits7d > 0 : r.commits7_14 > 0,
+    window === 'current' ? (r.commits7d ?? 0) > 0 : (r.commits7_14 ?? 0) > 0,
   ).length
   return {
     commits: window === 'current' ? stats.totalCommits7d : stats.totalCommits7_14,

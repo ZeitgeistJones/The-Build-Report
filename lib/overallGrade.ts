@@ -134,9 +134,9 @@ function letterBucket(letter: string): 'A' | 'B' | 'C' | 'D' | 'F' {
 
 function commitsForActivity(activity: RepoActivity, period: Period): number {
   if (period === '24h') return activity.commits24h ?? 0
-  if (period === '7d') return activity.commits7d
-  if (period === '30d') return activity.commits30d
-  return activity.commits30d + activity.commits30_60
+  if (period === '7d') return activity.commits7d ?? 0
+  if (period === '30d') return activity.commits30d ?? 0
+  return (activity.commits30d ?? 0) + (activity.commits30_60 ?? 0)
 }
 
 export function buildOverallGradeContext(

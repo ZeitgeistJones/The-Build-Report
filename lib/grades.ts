@@ -192,7 +192,7 @@ function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'cur
 
   if (period === '60d') {
     const activeRepos = Object.values(stats.repoActivity).filter(
-      r => r.commits30d + r.commits30_60 > 0,
+      r => (r.commits30d ?? 0) + (r.commits30_60 ?? 0) > 0,
     ).length
     return {
       commits: stats.totalCommits30d + stats.totalCommits30_60,
@@ -206,7 +206,7 @@ function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'cur
 
   if (period === '30d') {
     const activeRepos = Object.values(stats.repoActivity).filter(r =>
-      window === 'current' ? r.commits30d > 0 : r.commits30_60 > 0,
+      window === 'current' ? (r.commits30d ?? 0) > 0 : (r.commits30_60 ?? 0) > 0,
     ).length
     return {
       commits: window === 'current' ? stats.totalCommits30d : stats.totalCommits30_60,
@@ -233,7 +233,7 @@ function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'cur
   }
 
   const activeRepos = Object.values(stats.repoActivity).filter(r =>
-    window === 'current' ? r.commits7d > 0 : r.commits7_14 > 0,
+    window === 'current' ? (r.commits7d ?? 0) > 0 : (r.commits7_14 ?? 0) > 0,
   ).length
   return {
     commits: window === 'current' ? stats.totalCommits7d : stats.totalCommits7_14,
@@ -315,15 +315,17 @@ function commitsForRepo(
   const live = stats.repoActivity[slug]
   if (!live) return 0
   if (period === '60d') {
-    return window === 'current' ? live.commits30d + live.commits30_60 : 0
+    return window === 'current'
+      ? (live.commits30d ?? 0) + (live.commits30_60 ?? 0)
+      : 0
   }
   if (period === '30d') {
-    return window === 'current' ? live.commits30d : live.commits30_60
+    return window === 'current' ? (live.commits30d ?? 0) : (live.commits30_60 ?? 0)
   }
     if (period === '24h') {
       return window === 'current' ? (live.commits24h ?? 0) : (live.commits24_48 ?? 0)
     }
-  return window === 'current' ? live.commits7d : live.commits7_14
+  return window === 'current' ? (live.commits7d ?? 0) : (live.commits7_14 ?? 0)
 }
 
 function tokenMechanicTagCommitCounts(
@@ -417,15 +419,21 @@ function reposActiveInWindow(stats: GitHubStats, repoSet: Repo[], period: Period
     const live = stats.repoActivity[repo.githubSlug]
     if (!live) return false
     if (period === '60d') {
-      return window === 'current' ? live.commits30d + live.commits30_60 > 0 : false
+      return window === 'current'
+        ? (live.commits30d ?? 0) + (live.commits30_60 ?? 0) > 0
+        : false
     }
     if (period === '30d') {
-      return window === 'current' ? live.commits30d > 0 : live.commits30_60 > 0
+      return window === 'current'
+        ? (live.commits30d ?? 0) > 0
+        : (live.commits30_60 ?? 0) > 0
     }
     if (period === '24h') {
       return window === 'current' ? (live.commits24h ?? 0) > 0 : (live.commits24_48 ?? 0) > 0
     }
-    return window === 'current' ? live.commits7d > 0 : live.commits7_14 > 0
+    return window === 'current'
+      ? (live.commits7d ?? 0) > 0
+      : (live.commits7_14 ?? 0) > 0
   })
 }
 

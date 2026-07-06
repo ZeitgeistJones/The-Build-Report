@@ -23,10 +23,10 @@ function commitsForRepo(
 ): number {
   const live = stats.repoActivity[slug]
   if (!live) return 0
-  if (period === '60d') return live.commits30d + live.commits30_60
-  if (period === '30d') return live.commits30d
+  if (period === '60d') return (live.commits30d ?? 0) + (live.commits30_60 ?? 0)
+  if (period === '30d') return live.commits30d ?? 0
   if (period === '24h') return live.commits24h ?? 0
-  return live.commits7d
+  return live.commits7d ?? 0
 }
 
 function ecosystemCommits(stats: GitHubStats, period: Period): number {
