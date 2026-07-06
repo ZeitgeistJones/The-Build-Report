@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Repo, Tag, Confidence } from '@/lib/scores'
 import {
@@ -200,37 +201,107 @@ function formatPreviewLine(
   return preview || null
 }
 
+const PILL_TOOLTIP_DELAY_MS = 400
+
 function PillButton({
   active,
   onClick,
   children,
   isMobile,
+  tooltip,
 }: {
   active: boolean
   onClick: () => void
   children: ReactNode
   isMobile: boolean
+  tooltip?: string
 }) {
+  const [showTip, setShowTip] = useState(false)
+  const [tipPos, setTipPos] = useState<{ top: number; left: number } | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function clearHoverTimer() {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current)
+      hoverTimerRef.current = null
+    }
+  }
+
+  function handleMouseEnter() {
+    if (!tooltip || isMobile) return
+    clearHoverTimer()
+    hoverTimerRef.current = setTimeout(() => setShowTip(true), PILL_TOOLTIP_DELAY_MS)
+  }
+
+  function handleMouseLeave() {
+    clearHoverTimer()
+    setShowTip(false)
+  }
+
+  useLayoutEffect(() => {
+    if (!showTip || !btnRef.current) {
+      setTipPos(null)
+      return
+    }
+    const rect = btnRef.current.getBoundingClientRect()
+    const panelWidth = 260
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - panelWidth - 8))
+    setTipPos({ top: rect.bottom + 6, left })
+  }, [showTip])
+
+  useEffect(() => () => clearHoverTimer(), [])
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        fontSize: '12px',
-        padding: isMobile ? '8px 14px' : '4px 11px',
-        minHeight: isMobile ? MIN_TAP : undefined,
-        borderRadius: '99px',
-        border: `1px solid ${active ? 'var(--accent-border)' : 'var(--border)'}`,
-        background: active ? 'var(--accent-dim)' : 'transparent',
-        color: active ? 'var(--accent)' : 'var(--text-muted)',
-        transition: 'all 0.15s',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      {children}
-    </button>
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={onClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        aria-label={tooltip ? `${String(children)}. ${tooltip}` : undefined}
+        style={{
+          fontSize: '12px',
+          padding: isMobile ? '8px 14px' : '4px 11px',
+          minHeight: isMobile ? MIN_TAP : undefined,
+          borderRadius: '99px',
+          border: `1px solid ${active ? 'var(--accent-border)' : 'var(--border)'}`,
+          background: active ? 'var(--accent-dim)' : 'transparent',
+          color: active ? 'var(--accent)' : 'var(--text-muted)',
+          transition: 'all 0.15s',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {children}
+      </button>
+      {showTip && tipPos && tooltip && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: tipPos.top,
+            left: tipPos.left,
+            zIndex: 9999,
+            pointerEvents: 'none',
+            width: 260,
+            background: 'var(--surface-3)',
+            border: '1px solid var(--border-strong)',
+            borderRadius: 'var(--radius)',
+            padding: '8px 10px',
+            fontSize: '12px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.5,
+            textAlign: 'left',
+            boxShadow: 'var(--card-elevated)',
+          }}
+        >
+          {tooltip}
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }
 
@@ -1314,62 +1385,62 @@ export default function RepoList({
         {isMobile && <div style={{ width: '100%', height: 0 }} />}
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginLeft: isMobile ? 0 : 'auto', ...(isMobile ? { width: '100%' } : {}) }}>
           {filters.map(f => (
-            <span
+            <PillButton
               key={f.key}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}
+              active={activeFilter === f.key}
+              onClick={() => setActiveFilter(f.key)}
+              isMobile={isMobile}
+              tooltip={f.tooltip}
             >
-              <PillButton
-                active={activeFilter === f.key}
-                onClick={() => setActiveFilter(f.key)}
-                isMobile={isMobile}
-              >
-                {f.label}
-              </PillButton>
-              {f.tooltip && (
-                <InfoTooltip
-                  content={f.tooltip}
-                  ariaLabel={`About ${f.label}`}
-                  compact
-                />
-              )}
-            </span>
+              {f.label}
+            </PillButton>
           ))}
           {!isMobile && <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />}
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
-            <PillButton active={sortBy === 'recent'} onClick={() => setSortBy('recent')} isMobile={isMobile}>
-              Recent
-            </PillButton>
-            <InfoTooltip content={REPO_SORT_TOOLTIPS.recent} ariaLabel="About Recent sort" compact />
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
-            <PillButton active={sortBy === 'commits'} onClick={() => setSortBy('commits')} isMobile={isMobile}>
-              Most active
-            </PillButton>
-            <InfoTooltip content={REPO_SORT_TOOLTIPS.commits} ariaLabel="About Most active sort" compact />
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
-            <PillButton active={sortBy === 'grade'} onClick={() => setSortBy('grade')} isMobile={isMobile}>
-              Grades
-            </PillButton>
-            <InfoTooltip content={REPO_SORT_TOOLTIPS.grade} ariaLabel="About Grades sort" compact />
-          </span>
+          <PillButton
+            active={sortBy === 'recent'}
+            onClick={() => setSortBy('recent')}
+            isMobile={isMobile}
+            tooltip={REPO_SORT_TOOLTIPS.recent}
+          >
+            Recent
+          </PillButton>
+          <PillButton
+            active={sortBy === 'commits'}
+            onClick={() => setSortBy('commits')}
+            isMobile={isMobile}
+            tooltip={REPO_SORT_TOOLTIPS.commits}
+          >
+            Most active
+          </PillButton>
+          <PillButton
+            active={sortBy === 'grade'}
+            onClick={() => setSortBy('grade')}
+            isMobile={isMobile}
+            tooltip={REPO_SORT_TOOLTIPS.grade}
+          >
+            Grades
+          </PillButton>
           {isMobile && <div style={{ width: '100%', height: 0 }} />}
           <div style={isMobile ? { width: '100%', display: 'flex' } : undefined}>
             <RepoWindowToggle period={repoPeriod} onChange={setRepoPeriod} stretchMobile={isMobile} />
           </div>
           {!isMobile && <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />}
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
-            <PillButton active={activityScope === 'active'} onClick={() => setActivityScope('active')} isMobile={isMobile}>
-              Active
-            </PillButton>
-            <InfoTooltip content={REPO_SCOPE_TOOLTIPS.active} ariaLabel="About Active scope" compact />
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
-            <PillButton active={activityScope === 'all'} onClick={() => setActivityScope('all')} isMobile={isMobile}>
-              All
-            </PillButton>
-            <InfoTooltip content={REPO_SCOPE_TOOLTIPS.all} ariaLabel="About All scope" compact />
-          </span>
+          <PillButton
+            active={activityScope === 'active'}
+            onClick={() => setActivityScope('active')}
+            isMobile={isMobile}
+            tooltip={REPO_SCOPE_TOOLTIPS.active}
+          >
+            Active
+          </PillButton>
+          <PillButton
+            active={activityScope === 'all'}
+            onClick={() => setActivityScope('all')}
+            isMobile={isMobile}
+            tooltip={REPO_SCOPE_TOOLTIPS.all}
+          >
+            All
+          </PillButton>
         </div>
       </div>
 
