@@ -1,4 +1,4 @@
-import { timeAgo } from '@/lib/github'
+import { timeAgo, inferCommitsScanned } from '@/lib/github'
 import { loadGitHubStatsForPage, getGitHubStatsSnapshotUpdatedAt } from '@/lib/githubStatsSnapshot'
 import { getTrackableLastCommit } from '@/lib/github'
 import { REPOS } from '@/lib/scores'
@@ -82,17 +82,19 @@ export default async function Home() {
     const activity = stats?.repoActivity[r.githubSlug]
     const githubRepo = trackableGithub.find(gr => gr.name === r.githubSlug)
       ?? stats?.repos.find(gr => gr.name === r.githubSlug)
+    const scanned = activity ? inferCommitsScanned(activity) : false
     return {
       ...r,
       adminNote: adminNotes[r.id] ?? r.adminNote ?? null,
       description: githubRepo?.description?.trim() || null,
       lastCommitAt: activity?.lastCommitAt ?? null,
       pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
-      commits24h: activity?.commits24h ?? null,
-      commits30d: activity?.commits30d ?? null,
-      commits7d: activity?.commits7d ?? null,
-      commits7_14: activity?.commits7_14 ?? null,
-      commits30_60: activity?.commits30_60 ?? null,
+      commitsScanned: activity ? scanned : null,
+      commits24h: activity && scanned ? (activity.commits24h ?? 0) : null,
+      commits30d: activity && scanned ? (activity.commits30d ?? 0) : null,
+      commits7d: activity && scanned ? (activity.commits7d ?? 0) : null,
+      commits7_14: activity && scanned ? (activity.commits7_14 ?? 0) : null,
+      commits30_60: activity && scanned ? (activity.commits30_60 ?? 0) : null,
       commitTimestamps: activity?.commitTimestamps ?? null,
       commitsCapped: activity?.commitsCapped ?? null,
     }

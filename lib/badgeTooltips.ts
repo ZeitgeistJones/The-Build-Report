@@ -34,7 +34,10 @@ export function criticalPathTooltip(roleBadge: string): string {
   return `${roleBadge} — locked tag on the builder critical path. Floor grades at C when functioning as designed.`
 }
 
-export function commitsColumnTooltip(windowLabel: string, count: number, capped = false): string {
+export function commitsColumnTooltip(windowLabel: string, count: number | null, capped = false): string {
+  if (count === null) {
+    return `Commit count not scanned yet for the ${windowLabel}. Data refreshes on the daily cron or admin scan.`
+  }
   const displayCount = capped && count >= 100 ? '100+' : String(count)
   const activity =
     count === 0
@@ -44,10 +47,11 @@ export function commitsColumnTooltip(windowLabel: string, count: number, capped 
     capped && count >= 100
       ? ' GitHub scan caps at 100 commits per repo per refresh — actual count may be higher.'
       : ''
-  return `${activity}${capNote} Sampled GitHub scan — may show 0 if the repo was not in the scan batch.`
+  return `${activity}${capNote}`
 }
 
-export function formatPeriodCommitDisplay(count: number, commitsCapped?: boolean | null): string {
+export function formatPeriodCommitDisplay(count: number | null, commitsCapped?: boolean | null): string {
+  if (count === null) return '—'
   if (commitsCapped && count >= 100) return '100+'
   return String(count)
 }

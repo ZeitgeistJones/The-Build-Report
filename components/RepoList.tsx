@@ -110,7 +110,8 @@ const PERIOD_WINDOW_LABEL: Record<Period, string> = {
   '60d': 'last 60 days',
 }
 
-function commitCountColor(count: number): string {
+function commitCountColor(count: number | null): string {
+  if (count === null) return 'var(--text-muted)'
   if (count === 0) return 'var(--text-muted)'
   if (count < 5) return '#7aab82'
   return '#5cb87a'
@@ -421,7 +422,7 @@ function repoGradeSortKey(repo: RepoWithLive): number {
   return tm != null ? (bi + tm) / 2 : bi
 }
 
-function repoCommitsForPeriod(repo: RepoWithLive, period: Period): number {
+function repoCommitsForPeriod(repo: RepoWithLive, period: Period): number | null {
   return repoCommitsForPeriodKey(repo, period)
 }
 
@@ -480,6 +481,7 @@ interface RepoWithLive extends Repo {
   description: string | null
   lastCommitAt: string | null
   pushedAt: string | null
+  commitsScanned?: boolean | null
   commits24h: number | null
   commits30d: number | null
   commits7d: number | null
@@ -586,7 +588,10 @@ export default function RepoList({
   }
 
   const tagFiltered = repoItems.filter(r => repoMatchesFilter(r, activeFilter, collectionSets, contextSummary))
-  const activeInPeriod = tagFiltered.filter(r => repoCommitsForPeriodKey(r, repoPeriod) > 0)
+  const activeInPeriod = tagFiltered.filter(r => {
+    const c = repoCommitsForPeriodKey(r, repoPeriod)
+    return c != null && c > 0
+  })
   const filtered = (activityScope === 'active' ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
       if (sortBy === 'grade') {
@@ -596,7 +601,9 @@ export default function RepoList({
       }
 
       if (sortBy === 'commits') {
-        const diff = repoCommitsForPeriodKey(b, repoPeriod) - repoCommitsForPeriodKey(a, repoPeriod)
+        const bCommits = repoCommitsForPeriodKey(b, repoPeriod) ?? -1
+        const aCommits = repoCommitsForPeriodKey(a, repoPeriod) ?? -1
+        const diff = bCommits - aCommits
         if (diff !== 0) return diff
         return repoRecentTimestamp(b) - repoRecentTimestamp(a)
       }
@@ -649,11 +656,12 @@ export default function RepoList({
     const previewLine = formatPreviewLine(repo.description, repo.verdict, pending)
     const periodCommits = repoCommitsForPeriod(repo, repoPeriod)
     const commitsHitCap = Boolean(
-      repo.commitsCapped ?? ((repo.commitTimestamps?.length ?? 0) >= GITHUB_COMMITS_CAP),
+      periodCommits != null &&
+        (repo.commitsCapped ?? ((repo.commitTimestamps?.length ?? 0) >= GITHUB_COMMITS_CAP)),
     )
-    const periodCommitsCapped = commitsHitCap && periodCommits >= GITHUB_COMMITS_CAP
+    const periodCommitsCapped = commitsHitCap && (periodCommits ?? 0) >= GITHUB_COMMITS_CAP
     const periodCommitsLabel = formatPeriodCommitDisplay(periodCommits, commitsHitCap)
-    const lifecycle = computeRepoLifecycle(repo, periodCommits)
+    const lifecycle = computeRepoLifecycle(repo, periodCommits ?? 0)
     const sinceScored = getScoreAgeDisplay(repo, pending)
     const criticalPath = getCriticalPathRole(repo.githubSlug)
     const lcStyle = LIFECYCLE_STYLES[lifecycle]
@@ -942,7 +950,7 @@ export default function RepoList({
                     <span
                       style={{ color: commitsSinceScoredColor(sinceScored.capped ? GITHUB_COMMITS_CAP : sinceScored.count) }}
                       title={
-                        sinceScored.count === 0 && periodCommits > 0
+                        sinceScored.count === 0 && periodCommits != null && periodCommits > 0
                           ? 'Counts commits after the last score date, not total recent activity in this window.'
                           : undefined
                       }

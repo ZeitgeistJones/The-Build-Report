@@ -74,21 +74,25 @@ export function repoCommitsForPeriodKey(
     commits7_14?: number | null
     commits30d?: number | null
     commits30_60?: number | null
+    commitsScanned?: boolean | null
   },
   pk: PeriodKey,
-): number {
+): number | null {
+  if (repo.commitsScanned === false) return null
+
   switch (pk) {
     case '24h':
-      return repo.commits24h ?? 0
+      return repo.commits24h ?? null
     case '7d':
-      return repo.commits7d ?? 0
+      return repo.commits7d ?? null
     case '7d-prior':
-      return repo.commits7_14 ?? 0
+      return repo.commits7_14 ?? null
     case '30d':
-      return repo.commits30d ?? 0
+      return repo.commits30d ?? null
     case '30d-prior':
-      return repo.commits30_60 ?? 0
+      return repo.commits30_60 ?? null
     case '60d':
+      if (repo.commits30d == null && repo.commits30_60 == null) return null
       return (repo.commits30d ?? 0) + (repo.commits30_60 ?? 0)
   }
 }

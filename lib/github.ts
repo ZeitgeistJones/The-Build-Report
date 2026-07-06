@@ -37,12 +37,12 @@ export interface RecentCommit {
 
 export interface RepoActivity {
   slug: string
-  commits24h: number
-  commits24_48: number
-  commits30d: number
-  commits7d: number
-  commits7_14: number
-  commits30_60: number
+  commits24h?: number
+  commits24_48?: number
+  commits30d?: number
+  commits7d?: number
+  commits7_14?: number
+  commits30_60?: number
   /** ISO timestamps from the 60d commit scan (newest first, capped at 100). */
   commitTimestamps: string[]
   /** Newest first, capped at 20 per repo — used for build brief. */
@@ -50,6 +50,8 @@ export interface RepoActivity {
   lastCommitAt: string | null
   pushedAt: string
   isActive: boolean
+  /** False for stub entries that were never fetched from the commits API. */
+  commitsScanned?: boolean
   /** True when the GitHub commits fetch returned the per-repo cap (100). */
   commitsCapped?: boolean
 }
@@ -133,21 +135,50 @@ function countCommitsInHourRange(
   return timestamps.filter(ts => isInHourRange(ts, minExclusive, maxInclusive)).length
 }
 
-/** Backfill period counts from commitTimestamps when snapshot predates 24h fields. */
+/** True when commit data came from a real GitHub commits fetch (not a listing stub). */
+export function inferCommitsScanned(activity: RepoActivity): boolean {
+  if (activity.commitsScanned === true) return true
+  if (activity.commitsScanned === false) return false
+  return (activity.commitTimestamps?.length ?? 0) > 0 || activity.lastCommitAt != null
+}
+
+/** Backfill rolling hour windows from commitTimestamps on every read — stored counts go stale. */
 export function enrichRepoActivityFromTimestamps(activity: RepoActivity): RepoActivity {
   const ts = activity.commitTimestamps
-  if (!ts?.length) return activity
-  return {
-    ...activity,
-    commits24h:
-      typeof activity.commits24h === 'number'
-        ? activity.commits24h
-        : countCommitsWithinHours(ts, 24),
-    commits24_48:
-      typeof activity.commits24_48 === 'number'
-        ? activity.commits24_48
-        : countCommitsInHourRange(ts, 24, 48),
+  if (ts?.length) {
+    return {
+      ...activity,
+      commitsScanned: true,
+      commits24h: countCommitsWithinHours(ts, 24),
+      commits24_48: countCommitsInHourRange(ts, 24, 48),
+    }
   }
+  if (!inferCommitsScanned(activity)) {
+    const { commits24h: _a, commits24_48: _b, ...rest } = activity
+    return { ...rest, commitsScanned: false }
+  }
+  return activity
+}
+
+/** Recent push with no scanned commit data — snapshot self-heal should refresh. */
+export function repoActivityNeedsRescan(
+  activity: RepoActivity | undefined,
+  pushedAt: string,
+): boolean {
+  if (!isWithinDays(pushedAt, 7)) return false
+  if (!activity) return true
+  if (inferCommitsScanned(activity)) return false
+  return (activity.commitTimestamps?.length ?? 0) === 0
+}
+
+export function githubStatsNeedsActivityRescan(stats: GitHubStats): boolean {
+  const repos = stats.trackableRepos?.length ? stats.trackableRepos : stats.repos
+  for (const repo of repos) {
+    if (repoActivityNeedsRescan(stats.repoActivity[repo.name], repo.pushedAt)) return true
+  }
+  return Object.values(stats.repoActivity).some(
+    a => (a.commitTimestamps?.length ?? 0) > 0 && typeof a.commits24h !== 'number',
+  )
 }
 
 export function enrichGitHubStatsPeriodCounts(stats: GitHubStats): GitHubStats {
@@ -344,6 +375,11 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
 
   const repoActivity: Record<string, RepoActivity> = {}
 
+  // Rate limits stop the loop early — scan newest pushes first.
+  reposToScan.sort(
+    (a, b) => new Date(b.pushed_at).getTime() - new Date(a.pushed_at).getTime(),
+  )
+
   for (const repo of reposToScan) {
     try {
       const commits = await ghFetch(`/repos/${GITHUB_ORG}/${repo.name}/commits?since=${since60}&per_page=100`, { fresh })
@@ -408,6 +444,7 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
         lastCommitAt: commits[0]?.commit?.author?.date ?? null,
         pushedAt: repo.pushed_at,
         isActive: c30.length > 0,
+        commitsScanned: true,
         commitsCapped: commits.length >= COMMIT_CAP,
       }
     } catch (err: any) {
@@ -421,6 +458,8 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
   for (const repo of repos) {
     if (repoActivity[repo.name]) continue
     if (!PRIORITY_SLUGS.includes(repo.name) && !isWithinDays(repo.pushed_at, 14)) continue
+    // Recently pushed repos must be scanned — omit stub so UI shows unknown, not 0.
+    if (isWithinDays(repo.pushed_at, 7)) continue
     repoActivity[repo.name] = {
       slug: repo.name,
       commits24h: 0,
@@ -434,6 +473,7 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
       lastCommitAt: null,
       pushedAt: repo.pushed_at,
       isActive: isWithinDays(repo.pushed_at, 30),
+      commitsScanned: false,
     }
   }
 

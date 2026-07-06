@@ -89,7 +89,11 @@ export async function GET() {
     ? Object.entries(stats.repoActivity)
         .filter(([, a]) => a.commitsCapped)
         .slice(0, 5)
-        .map(([slug, a]) => ({ slug, commits30d: a.commits30d, commits60d: a.commits30d + a.commits30_60 }))
+        .map(([slug, a]) => ({
+          slug,
+          commits30d: a.commits30d ?? 0,
+          commits60d: (a.commits30d ?? 0) + (a.commits30_60 ?? 0),
+        }))
     : []
 
   // #region agent log

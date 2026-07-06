@@ -1,6 +1,6 @@
 import { getRedis } from '@/lib/redis'
 import type { GitHubStats } from '@/lib/github'
-import { getGitHubStats, enrichGitHubStatsPeriodCounts } from '@/lib/github'
+import { getGitHubStats, enrichGitHubStatsPeriodCounts, githubStatsNeedsActivityRescan } from '@/lib/github'
 
 const SNAPSHOT_KEY = 'build-report:github-stats:snapshot'
 const SNAPSHOT_UPDATED_AT_KEY = 'build-report:github-stats:snapshot:updatedAt'
@@ -145,7 +145,7 @@ export async function loadGitHubStatsForPage(): Promise<{
   const cached = await getGitHubStatsForDisplay()
   if (cached) {
     const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
-    if (isSnapshotStale(updatedAt) || snapshotMissing24hCounts(cached)) scheduleStaleSnapshotRefresh()
+    if (isSnapshotStale(updatedAt) || githubStatsNeedsActivityRescan(cached)) scheduleStaleSnapshotRefresh()
     return { stats: enrichGitHubStatsPeriodCounts(cached), source: 'snapshot' }
   }
 
@@ -172,12 +172,6 @@ function snapshotMissingRecentCommits(stats: GitHubStats): boolean {
   return withCommits.some(a => !a.recentCommits?.length)
 }
 
-function snapshotMissing24hCounts(stats: GitHubStats): boolean {
-  return Object.values(stats.repoActivity).some(
-    a => (a.commitTimestamps?.length ?? 0) > 0 && typeof a.commits24h !== 'number',
-  )
-}
-
 /** Cron path — prefer snapshot; refresh when stale or missing recentCommits for active repos. */
 export async function loadGitHubStatsForCron(): Promise<GitHubStats | null> {
   const cached = await getGitHubStatsForDisplay()
@@ -186,7 +180,7 @@ export async function loadGitHubStatsForCron(): Promise<GitHubStats | null> {
     !cached ||
     isSnapshotStale(updatedAt) ||
     snapshotMissingRecentCommits(cached) ||
-    snapshotMissing24hCounts(cached)
+    githubStatsNeedsActivityRescan(cached)
 
   if (cached && !needsRefresh) return enrichGitHubStatsPeriodCounts(cached)
 
