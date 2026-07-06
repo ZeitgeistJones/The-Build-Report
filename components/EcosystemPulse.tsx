@@ -4,15 +4,16 @@ import { useGradePeriod } from './GradePeriodContext'
 import { EcosystemPulse } from '@/lib/ecosystemPulse'
 
 interface Props {
+  pulse24: EcosystemPulse
   pulse30: EcosystemPulse
   pulse7: EcosystemPulse
   pulse60: EcosystemPulse
   commits?: number
 }
 
-export function PulseMicrostats({ pulse30, pulse7, pulse60, commits }: Props) {
+export function PulseMicrostats({ pulse24, pulse30, pulse7, pulse60, commits }: Props) {
   const { period } = useGradePeriod()
-  const pulse = period === '30d' ? pulse30 : period === '7d' ? pulse7 : pulse60
+  const pulse = period === '30d' ? pulse30 : period === '7d' ? pulse7 : period === '24h' ? pulse24 : pulse60
 
   const parts = [
     `${pulse.reposScored} scored`,

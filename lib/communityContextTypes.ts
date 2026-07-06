@@ -49,6 +49,20 @@ export interface RepoContextSummary {
   needed: number
 }
 
+export interface CommunityContextHighlight {
+  slug: string
+  state: 'accepted' | 'pending'
+  upvotes: number
+  needed: number
+}
+
+export interface CommunityPulse {
+  repoCount: number
+  pendingCount: number
+  acceptedCount: number
+  highlights: CommunityContextHighlight[]
+}
+
 export const TEXT_MAX = 500
 export const SOURCE_MAX = 200
 export const NO_SOURCE_LABEL = 'No source provided'

@@ -479,6 +479,7 @@ interface RepoWithLive extends Repo {
   description: string | null
   lastCommitAt: string | null
   pushedAt: string | null
+  commits24h: number | null
   commits30d: number | null
   commits7d: number | null
   commits7_14: number | null
@@ -496,6 +497,7 @@ interface Props {
   repoCollections?: Record<RepoCollectionId, string[]>
   communityContextEnabled?: boolean
   contextSummary?: Record<string, RepoContextSummary>
+  filterControl?: { filter: RepoFilter; expandSlugs: string[] } | null
 }
 
 export default function RepoList({
@@ -505,6 +507,7 @@ export default function RepoList({
   repoCollections,
   communityContextEnabled = false,
   contextSummary = {},
+  filterControl = null,
 }: Props) {
   const [activeFilter, setActiveFilter] = useState<RepoFilter>('all')
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
@@ -517,6 +520,14 @@ export default function RepoList({
   const isMobile = useIsMobile()
   const d = cardLayout(isMobile)
   const collectionSets = buildCollectionSets(repoCollections)
+
+  useEffect(() => {
+    if (!filterControl) return
+    setActiveFilter(filterControl.filter)
+    if (filterControl.expandSlugs.length) {
+      setExpandedSlugs(new Set(filterControl.expandSlugs))
+    }
+  }, [filterControl])
 
   useEffect(() => {
     setRepoItems(repos)
@@ -921,7 +932,14 @@ export default function RepoList({
                 {sinceScored.kind === 'auto_count' && (
                   <>
                     {' · '}
-                    <span style={{ color: commitsSinceScoredColor(sinceScored.capped ? GITHUB_COMMITS_CAP : sinceScored.count) }}>
+                    <span
+                      style={{ color: commitsSinceScoredColor(sinceScored.capped ? GITHUB_COMMITS_CAP : sinceScored.count) }}
+                      title={
+                        sinceScored.count === 0 && periodCommits > 0
+                          ? 'Counts commits after the last score date, not total recent activity in this window.'
+                          : undefined
+                      }
+                    >
                       {sinceScored.capped ? '100+' : sinceScored.count} commits since scored
                     </span>
                   </>

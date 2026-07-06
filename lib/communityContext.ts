@@ -11,6 +11,8 @@ import {
   type CommunityContextSubmission,
   type RepoContextSummary,
   type VoteDirection,
+  type CommunityPulse,
+  type CommunityContextHighlight,
 } from '@/lib/communityContextTypes'
 
 const SUBMISSION_KEY = 'build-report:ctx:submission:'
@@ -182,6 +184,45 @@ export async function getContextSummaryBySlug(): Promise<Record<string, RepoCont
   } catch {
     return {}
   }
+}
+
+/** Homepage banner — urgency-sorted highlights from context summary. */
+export function buildCommunityPulse(summary: Record<string, RepoContextSummary>): CommunityPulse {
+  const entries = Object.entries(summary)
+  const highlights: CommunityContextHighlight[] = entries
+    .map(([slug, row]) => ({ slug, ...row }))
+    .sort((a, b) => {
+      if (a.state === 'pending' && b.state === 'pending') {
+        return a.needed - a.upvotes - (b.needed - b.upvotes)
+      }
+      if (a.state === 'pending') return -1
+      if (b.state === 'pending') return 1
+      return b.upvotes - a.upvotes
+    })
+    .slice(0, 3)
+
+  return {
+    repoCount: entries.length,
+    pendingCount: entries.filter(([, s]) => s.state === 'pending').length,
+    acceptedCount: entries.filter(([, s]) => s.state === 'accepted').length,
+    highlights,
+  }
+}
+
+export function communityPulseMessage(pulse: CommunityPulse): string {
+  if (!pulse.highlights.length) {
+    return `Community context on ${pulse.repoCount} repo${pulse.repoCount === 1 ? '' : 's'}.`
+  }
+  const top = pulse.highlights[0]
+  const name = top.slug.replace(/-/g, ' ')
+  if (top.state === 'pending') {
+    const need = Math.max(0, top.needed - top.upvotes)
+    if (need === 0) {
+      return `Community context on ${pulse.repoCount} repo${pulse.repoCount === 1 ? '' : 's'} — ${name} is close to acceptance.`
+    }
+    return `Community context on ${pulse.repoCount} repo${pulse.repoCount === 1 ? '' : 's'} — ${name} needs ${need} more vote${need === 1 ? '' : 's'} to accept.`
+  }
+  return `Community context on ${pulse.repoCount} repo${pulse.repoCount === 1 ? '' : 's'} — ${name} has accepted context waiting on the next rescore.`
 }
 
 /** All submissions across all repos, for the admin moderation list. */

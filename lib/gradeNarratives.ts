@@ -5,16 +5,23 @@ import { Period, formatTrendPct, TrendExplanation, TrendDirection } from './grad
 export type { TrendExplanation }
 
 function priorWindowLabel(period: Period): string {
-  return period === '30d' ? 'prior 30d (days 31–60)' : 'prior 7d (days 8–14)'
+  if (period === '30d') return 'prior 30d (days 31–60)'
+  if (period === '24h') return 'prior 24h (24–48h ago)'
+  return 'prior 7d (days 8–14)'
 }
 
 function currentWindowLabel(period: Period): string {
-  return period === '30d' ? 'last 30 days' : 'last 7 days'
+  if (period === '30d') return 'last 30 days'
+  if (period === '24h') return 'last 24 hours'
+  return 'last 7 days'
 }
 
 function commitCount(activity: RepoActivity, period: Period, window: 'current' | 'prior'): number {
   if (period === '30d') {
     return window === 'current' ? activity.commits30d : activity.commits30_60
+  }
+  if (period === '24h') {
+    return window === 'current' ? (activity.commits24h ?? 0) : (activity.commits24_48 ?? 0)
   }
   return window === 'current' ? activity.commits7d : activity.commits7_14
 }
@@ -86,6 +93,18 @@ function builderInputs(stats: GitHubStats, period: Period, window: 'current' | '
       commits: window === 'current' ? stats.totalCommits30d : stats.totalCommits30_60,
       activeDays: window === 'current' ? stats.activeDays30d : stats.activeDays30_60,
       newRepos: window === 'current' ? stats.newRepos30d : stats.newRepos30_60,
+      activeRepos,
+      scannedRepos: activityCount,
+    }
+  }
+  if (period === '24h') {
+    const activeRepos = Object.values(stats.repoActivity).filter(r =>
+      window === 'current' ? (r.commits24h ?? 0) > 0 : (r.commits24_48 ?? 0) > 0,
+    ).length
+    return {
+      commits: window === 'current' ? (stats.totalCommits24h ?? 0) : (stats.totalCommits24_48 ?? 0),
+      activeDays: window === 'current' ? (stats.activeDays24h ?? 0) : (stats.activeDays24_48 ?? 0),
+      newRepos: window === 'current' ? (stats.newRepos24h ?? 0) : (stats.newRepos24_48 ?? 0),
       activeRepos,
       scannedRepos: activityCount,
     }

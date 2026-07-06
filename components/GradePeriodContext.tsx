@@ -120,7 +120,7 @@ export function RepoWindowToggle({
     <PeriodButtonRow
       period={period}
       onChange={p => {
-        if (p === '7d' || p === '30d' || p === '60d') onChange(p)
+        if (p === '24h' || p === '7d' || p === '30d' || p === '60d') onChange(p)
       }}
       options={REPO_WINDOW_OPTIONS}
       stretchMobile={stretchMobile}

@@ -25,12 +25,14 @@ function commitsForRepo(
   if (!live) return 0
   if (period === '60d') return live.commits30d + live.commits30_60
   if (period === '30d') return live.commits30d
+  if (period === '24h') return live.commits24h ?? 0
   return live.commits7d
 }
 
 function ecosystemCommits(stats: GitHubStats, period: Period): number {
   if (period === '60d') return stats.totalCommits30d + stats.totalCommits30_60
   if (period === '30d') return stats.totalCommits30d
+  if (period === '24h') return stats.totalCommits24h ?? 0
   return stats.totalCommits7d
 }
 
@@ -71,7 +73,13 @@ export function calcEcosystemPulse(
 
 export function ecosystemPulseSummary(pulse: EcosystemPulse, period: Period): string {
   const window =
-    period === '60d' ? 'the last 60 days' : period === '30d' ? 'the last 30 days' : 'the last 7 days'
+    period === '60d'
+      ? 'the last 60 days'
+      : period === '30d'
+        ? 'the last 30 days'
+        : period === '24h'
+          ? 'the last 24 hours'
+          : 'the last 7 days'
   const parts: string[] = []
   if (pulse.shipping > 0) parts.push(`${pulse.shipping} shipping`)
   if (pulse.stable > 0) parts.push(`${pulse.stable} stable`)

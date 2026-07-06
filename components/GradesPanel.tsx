@@ -22,18 +22,23 @@ import RubricBlockPanel from '@/components/RubricBlockPanel'
 type CardId = GradeCardId
 
 interface Props {
+  pulse24: EcosystemPulse | null
   pulse30: EcosystemPulse | null
   pulse7: EcosystemPulse | null
   pulse60: EcosystemPulse | null
+  builderGrade24: BuilderGrade | null
   builderGrade30: BuilderGrade | null
   builderGrade7: BuilderGrade | null
   builderGrade60: BuilderGrade | null
+  tokenMechanicGrade24: TokenMechanicGrade | null
   tokenMechanicGrade30: TokenMechanicGrade | null
   tokenMechanicGrade7: TokenMechanicGrade | null
   tokenMechanicGrade60: TokenMechanicGrade | null
+  integrityGrade24: IntegrityGrade | null
   integrityGrade30: IntegrityGrade | null
   integrityGrade7: IntegrityGrade | null
   integrityGrade60: IntegrityGrade | null
+  stats24h: { commits: number; activeDays: number; newRepos: number } | null
   stats30d: { commits: number; activeDays: number; newRepos: number } | null
   stats7d: { commits: number; activeDays: number; newRepos: number } | null
   stats60d: { commits: number; activeDays: number; newRepos: number } | null
@@ -44,7 +49,7 @@ const TREND_UNAVAILABLE_60D = 'Trend requires 120d scan history'
 
 const CARD_LABELS: Record<CardId, string> = {
   builder: 'Builder activity',
-  economic: 'Burn apps (economic)',
+  economic: 'Holder economics',
   integrity: 'Builder integrity',
 }
 
@@ -388,18 +393,23 @@ function GradeCard({
 }
 
 export default function GradesPanel({
+  pulse24,
   pulse30,
   pulse7,
   pulse60,
+  builderGrade24,
   builderGrade30,
   builderGrade7,
   builderGrade60,
+  tokenMechanicGrade24,
   tokenMechanicGrade30,
   tokenMechanicGrade7,
   tokenMechanicGrade60,
+  integrityGrade24,
   integrityGrade30,
   integrityGrade7,
   integrityGrade60,
+  stats24h,
   stats30d,
   stats7d,
   stats60d,
@@ -421,10 +431,34 @@ export default function GradesPanel({
     if (id) setSelectedCard(null)
   }
 
-  const bg = period === '30d' ? builderGrade30 : period === '7d' ? builderGrade7 : builderGrade60
-  const tg = period === '30d' ? tokenMechanicGrade30 : period === '7d' ? tokenMechanicGrade7 : tokenMechanicGrade60
-  const ig = period === '30d' ? integrityGrade30 : period === '7d' ? integrityGrade7 : integrityGrade60
-  const stats = period === '30d' ? stats30d : period === '7d' ? stats7d : stats60d
+  const periodGrades = {
+    '24h': {
+      bg: builderGrade24,
+      tg: tokenMechanicGrade24,
+      ig: integrityGrade24,
+      stats: stats24h,
+    },
+    '7d': {
+      bg: builderGrade7,
+      tg: tokenMechanicGrade7,
+      ig: integrityGrade7,
+      stats: stats7d,
+    },
+    '30d': {
+      bg: builderGrade30,
+      tg: tokenMechanicGrade30,
+      ig: integrityGrade30,
+      stats: stats30d,
+    },
+    '60d': {
+      bg: builderGrade60,
+      tg: tokenMechanicGrade60,
+      ig: integrityGrade60,
+      stats: stats60d,
+    },
+  } as const
+
+  const { bg, tg, ig, stats } = periodGrades[period]
 
   const selectedExplanation =
     selectedCard === 'builder'
@@ -515,8 +549,9 @@ export default function GradesPanel({
           <Link href="/how-we-score" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none' }}>
             How we score →
           </Link>
-          {!isMobile && pulse30 && pulse7 && pulse60 && (
+          {!isMobile && pulse24 && pulse30 && pulse7 && pulse60 && (
             <PulseMicrostats
+              pulse24={pulse24}
               pulse30={pulse30}
               pulse7={pulse7}
               pulse60={pulse60}
@@ -555,7 +590,7 @@ export default function GradesPanel({
           cardId="economic"
           isMobile={isMobile}
           grade={tg}
-          label="burn apps (economic)"
+          label="Holder economics"
           period={period}
           laymanCopy={economicCopy}
           trendExplanation={tg?.trendExplanation}

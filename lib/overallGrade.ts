@@ -133,6 +133,7 @@ function letterBucket(letter: string): 'A' | 'B' | 'C' | 'D' | 'F' {
 }
 
 function commitsForActivity(activity: RepoActivity, period: Period): number {
+  if (period === '24h') return activity.commits24h ?? 0
   if (period === '7d') return activity.commits7d
   if (period === '30d') return activity.commits30d
   return activity.commits30d + activity.commits30_60
@@ -180,7 +181,13 @@ export function buildOverallGradeContext(
     : []
 
   const builderStats = stats
-    ? period === '7d'
+    ? period === '24h'
+      ? {
+          commits: stats.totalCommits24h ?? 0,
+          activeDays: stats.activeDays24h ?? 0,
+          newRepos: stats.newRepos24h ?? 0,
+        }
+      : period === '7d'
       ? {
           commits: stats.totalCommits7d,
           activeDays: stats.activeDays7d,

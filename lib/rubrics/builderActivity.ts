@@ -1,6 +1,6 @@
 import type { Period } from '@/lib/grades'
 
-export type ActivityWindowKey = '7d' | '30d' | '60d'
+export type ActivityWindowKey = '24h' | '7d' | '30d' | '60d'
 
 export interface ActivitySignalConfig {
   label: string
@@ -17,31 +17,31 @@ export const BUILDER_ACTIVITY_SIGNALS: ActivitySignalConfig[] = [
     label: 'totalCommits',
     displayLabel: 'Total commits',
     weight: 20,
-    targets: { '7d': 120, '30d': 500, '60d': 900 },
+    targets: { '24h': 17, '7d': 120, '30d': 500, '60d': 900 },
   },
   {
     label: 'activeDays',
     displayLabel: 'Active days',
     weight: 20,
-    targets: { '7d': 7, '30d': 30, '60d': 55 },
+    targets: { '24h': 1, '7d': 7, '30d': 30, '60d': 55 },
   },
   {
     label: 'newRepos',
     displayLabel: 'New repos created',
     weight: 20,
-    targets: { '7d': 1, '30d': 4, '60d': 8 },
+    targets: { '24h': 1, '7d': 1, '30d': 4, '60d': 8 },
   },
   {
     label: 'reposWithCommits',
     displayLabel: 'Repos with commits',
     weight: 20,
-    targets: { '7d': 14, '30d': 34, '60d': 40 },
+    targets: { '24h': 2, '7d': 14, '30d': 34, '60d': 40 },
   },
   {
     label: 'commitConsistency',
     displayLabel: 'Commit consistency',
     weight: 20,
-    targets: { '7d': 0.7, '30d': 0.5, '60d': 0.4 },
+    targets: { '24h': 1.0, '7d': 0.7, '30d': 0.5, '60d': 0.4 },
   },
 ]
 
@@ -57,7 +57,10 @@ export function periodToWindowKey(period: Period): ActivityWindowKey {
 }
 
 export function windowLengthDays(period: Period): number {
-  return period === '60d' ? 60 : period === '30d' ? 30 : 7
+  if (period === '60d') return 60
+  if (period === '30d') return 30
+  if (period === '24h') return 1
+  return 7
 }
 
 export function computeSignalRatio(

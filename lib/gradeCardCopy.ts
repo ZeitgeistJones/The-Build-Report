@@ -148,7 +148,7 @@ export function builderCardFace(
   if (stats && stats.newRepos >= 3 && insights.length < 2) {
     insights.push(`${stats.newRepos} new repos spun up — ecosystem footprint is expanding.`)
   } else if (stats && stats.activeDays >= 25 && insights.length < 2) {
-    insights.push(`Active ${stats.activeDays} of ${period === '7d' ? 7 : period === '30d' ? 30 : 60} days in this window.`)
+    insights.push(`Active ${stats.activeDays} of ${period === '24h' ? 1 : period === '7d' ? 7 : period === '30d' ? 30 : 60} days in this window.`)
   }
 
   return { hook, insights: insights.slice(0, 2) }
@@ -219,13 +219,13 @@ export function economicCardLayman(grade: TokenMechanicGrade, period: Period): s
   const tier = letterTier(grade.letter)
   const base =
     tier === 'top'
-      ? 'The apps tied to how $CLAWD gets bought and burned are in good shape where the work is happening. The economic side looks healthy right now.'
+      ? 'The apps and locks that serve $CLAWD holders are in good shape where the work is happening. Holder economics look healthy right now.'
       : tier === 'solid'
-        ? 'The burn-focused apps are holding up well, with a little room to sharpen how they serve holders. Solid overall, not spectacular.'
+        ? 'Holder-facing projects are holding up well, with a little room to sharpen how they serve the community. Solid overall, not spectacular.'
         : tier === 'mixed'
-          ? 'The picture for burn apps is mixed — some look strong while others still need work. Effort is landing unevenly across them.'
-          : 'Most of the quality work this window did not land on the burn-focused apps. This side needs some attention.'
-  const flavor = period === '60d' ? '' : trendFlavor(grade.trend, 'the economic side')
+          ? 'The holder-economics picture is mixed — some projects look strong while others still need work. Effort is landing unevenly.'
+          : 'Most of the quality work this window did not land on holder-facing projects. This area needs some attention.'
+  const flavor = period === '60d' ? '' : trendFlavor(grade.trend, 'holder economics')
   return flavor ? `${base} ${flavor}` : base
 }
 

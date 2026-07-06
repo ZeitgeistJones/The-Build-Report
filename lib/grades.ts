@@ -28,13 +28,14 @@ export function letterGrade(pct: number): string {
   return pctToLetter(pct)
 }
 
-export type Period = '30d' | '7d' | '60d'
+export type Period = '24h' | '7d' | '30d' | '60d'
 
 /** Extended period for repo list filtering — includes prior comparison windows. */
 export type PeriodKey = Period | '7d-prior' | '30d-prior'
 
 /** Grades panel — current windows only. */
 export const GRADES_PERIOD_TOGGLE_OPTIONS: { key: Period; label: string; short: string }[] = [
+  { key: '24h', label: 'Last 24 hours', short: '24h' },
   { key: '7d', label: 'Last 7 days', short: '7d' },
   { key: '30d', label: 'Last 30 days', short: '30d' },
   { key: '60d', label: 'Last 60 days', short: '60d' },
@@ -68,6 +69,7 @@ export function periodKeyWindowHint(pk: PeriodKey): string | null {
 
 export function repoCommitsForPeriodKey(
   repo: {
+    commits24h?: number | null
     commits7d?: number | null
     commits7_14?: number | null
     commits30d?: number | null
@@ -76,6 +78,8 @@ export function repoCommitsForPeriodKey(
   pk: PeriodKey,
 ): number {
   switch (pk) {
+    case '24h':
+      return repo.commits24h ?? 0
     case '7d':
       return repo.commits7d ?? 0
     case '7d-prior':
@@ -196,8 +200,6 @@ function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'cur
     }
   }
 
-  const periodDays = period === '30d' ? 30 : 7
-
   if (period === '30d') {
     const activeRepos = Object.values(stats.repoActivity).filter(r =>
       window === 'current' ? r.commits30d > 0 : r.commits30_60 > 0,
@@ -208,7 +210,21 @@ function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'cur
       newRepos: window === 'current' ? stats.newRepos30d : stats.newRepos30_60,
       activeRepos,
       scannedRepos: activityCount,
-      periodDays,
+      periodDays: 30,
+    }
+  }
+
+  if (period === '24h') {
+    const activeRepos = Object.values(stats.repoActivity).filter(r =>
+      window === 'current' ? (r.commits24h ?? 0) > 0 : (r.commits24_48 ?? 0) > 0,
+    ).length
+    return {
+      commits: window === 'current' ? (stats.totalCommits24h ?? 0) : (stats.totalCommits24_48 ?? 0),
+      activeDays: window === 'current' ? (stats.activeDays24h ?? 0) : (stats.activeDays24_48 ?? 0),
+      newRepos: window === 'current' ? (stats.newRepos24h ?? 0) : (stats.newRepos24_48 ?? 0),
+      activeRepos,
+      scannedRepos: activityCount,
+      periodDays: 1,
     }
   }
 
@@ -221,7 +237,7 @@ function builderInputsFromStats(stats: GitHubStats, period: Period, window: 'cur
     newRepos: window === 'current' ? stats.newRepos7d : stats.newRepos7_14,
     activeRepos,
     scannedRepos: activityCount,
-    periodDays,
+    periodDays: 7,
   }
 }
 
@@ -300,6 +316,9 @@ function commitsForRepo(
   if (period === '30d') {
     return window === 'current' ? live.commits30d : live.commits30_60
   }
+    if (period === '24h') {
+      return window === 'current' ? (live.commits24h ?? 0) : (live.commits24_48 ?? 0)
+    }
   return window === 'current' ? live.commits7d : live.commits7_14
 }
 
@@ -399,6 +418,9 @@ function reposActiveInWindow(stats: GitHubStats, repoSet: Repo[], period: Period
     if (period === '30d') {
       return window === 'current' ? live.commits30d > 0 : live.commits30_60 > 0
     }
+    if (period === '24h') {
+      return window === 'current' ? (live.commits24h ?? 0) > 0 : (live.commits24_48 ?? 0) > 0
+    }
     return window === 'current' ? live.commits7d > 0 : live.commits7_14 > 0
   })
 }
@@ -445,7 +467,9 @@ function tokenMechanicSummary(pct: number, period: Period): string {
       ? 'over 60 days'
       : period === '30d'
         ? 'in this window'
-        : 'this week'
+        : period === '24h'
+          ? 'in the last 24 hours'
+          : 'this week'
   if (pct >= 80) {
     return period === '60d'
       ? 'Burn-app repos with the most commits over 60 days score strongly on token mechanic rubrics.'
@@ -645,7 +669,8 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
 
 export function formatTrendPct(trendPct: number | null, period: Period): string {
   if (period === '60d') return ''
-  const windowLabel = period === '30d' ? 'prior 30d' : 'prior 7d'
+  const windowLabel =
+    period === '30d' ? 'prior 30d' : period === '24h' ? 'prior 24h' : 'prior 7d'
   if (trendPct === null) return `new vs ${windowLabel}`
   if (trendPct > 0) return `+${trendPct}% vs ${windowLabel}`
   if (trendPct < 0) return `${trendPct}% vs ${windowLabel}`

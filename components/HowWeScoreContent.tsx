@@ -109,7 +109,7 @@ export default function HowWeScoreContent({
               ). Not on repo cards.
             </li>
             <li style={{ marginTop: '6px' }}>
-              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Burn apps (economic)</strong> — commit-weighted token mechanic average; infra excluded (
+              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Holder economics</strong> — commit-weighted token mechanic average for direct burn apps and supply-lock repos; infra excluded (
               <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>see rubric</a>
               ).
             </li>

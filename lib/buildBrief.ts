@@ -39,6 +39,7 @@ export interface CardBlurbs {
 }
 
 export interface DailyDigestCards {
+  '24h': CardBlurbs
   '7d': CardBlurbs
   '30d': CardBlurbs
   '60d': CardBlurbs
@@ -101,13 +102,22 @@ export function collectBuildActivityForEasternDay(
   const out: RepoBuildActivity[] = []
 
   for (const [slug, activity] of Object.entries(stats.repoActivity)) {
-    const recent =
+    const fromRecent =
       activity.recentCommits?.filter(c => commitOnEasternDate(c.date, easternDateKey)) ?? []
-    if (!recent.length) continue
+    let commits: string[] = fromRecent.map(c => c.message)
+
+    if (!commits.length && activity.commitTimestamps?.length) {
+      const onDay = activity.commitTimestamps.filter(ts => commitOnEasternDate(ts, easternDateKey))
+      if (onDay.length) {
+        commits = onDay.map(() => 'Commit activity recorded')
+      }
+    }
+
+    if (!commits.length) continue
     out.push({
       slug,
       tag: tagBySlug.get(slug) ?? 'theoretical',
-      commits: recent.map(c => c.message),
+      commits,
     })
   }
 
@@ -128,7 +138,7 @@ function formatActivityForPrompt(activity: RepoBuildActivity[], dayLabel: string
 }
 
 function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
-  const periods: Period[] = ['7d', '30d', '60d']
+  const periods: Period[] = ['24h', '7d', '30d', '60d']
   return periods
     .map(period => {
       const bg = calcBuilderGrade(stats, period)
@@ -141,7 +151,7 @@ function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
       return [
         `${period} window:`,
         `  Builder activity: ${bg.letter} (${bg.pct}%), ${trend}`,
-        `  Burn apps (economic): ${tg.letter} (${tg.pct}%), ${tg.counts.repos} repos in sample`,
+        `  Holder economics: ${tg.letter} (${tg.pct}%), ${tg.counts.repos} repos in sample`,
         `  Builder integrity: ${ig.letter} (${ig.pct}%), ${ig.counts.commitWeight} commits weighted (${ig.counts.low} low / ${ig.counts.mid} mid / ${ig.counts.high} high)`,
       ].join('\n')
     })
@@ -157,7 +167,7 @@ function buildFallbackDigest(
   activity: RepoBuildActivity[],
   easternDateKey: string,
 ): Omit<DailyDigestCache, 'generatedAt'> {
-  const periods: Period[] = ['7d', '30d', '60d']
+  const periods: Period[] = ['24h', '7d', '30d', '60d']
   const cards = {} as DailyDigestCards
 
   for (const period of periods) {
@@ -185,7 +195,7 @@ function buildFallbackDigest(
       general += `${burnCount} burn-app repo${burnCount === 1 ? '' : 's'} and ${leverageCount} infra/leverage repo${leverageCount === 1 ? '' : 's'} saw commits. `
     }
     general +=
-      'The grade cards below put that activity in context across the 7-day, 30-day, and 60-day windows.'
+      'The grade cards below put that activity in context across the 24-hour, 7-day, 30-day, and 60-day windows.'
   }
 
   return {
@@ -210,7 +220,7 @@ function parseDigestJson(raw: string): DigestAiPayload | null {
   try {
     const parsed = JSON.parse(trimmed.slice(start, end + 1)) as DigestAiPayload
     if (!parsed.general || !parsed.cards) return null
-    for (const period of ['7d', '30d', '60d'] as const) {
+    for (const period of ['24h', '7d', '30d', '60d'] as const) {
       const row = parsed.cards[period]
       if (!row?.builder || !row.economic || !row.integrity) return null
     }
@@ -242,9 +252,14 @@ Return ONLY valid JSON, no markdown fences:
 {
   "general": "3-4 sentences. Plain English morning overview of what shipped yesterday. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.",
   "cards": {
+    "24h": {
+      "builder": "2-3 sentences about builder activity for the last 24 hours.",
+      "economic": "2-3 sentences about holder economics for the last 24 hours.",
+      "integrity": "2-3 sentences about builder integrity/trust for the last 24 hours."
+    },
     "7d": {
       "builder": "2-3 sentences about builder activity for the 7-day window.",
-      "economic": "2-3 sentences about burn-app economics for the 7-day window.",
+      "economic": "2-3 sentences about holder economics (burn apps and supply locks) for the 7-day window.",
       "integrity": "2-3 sentences about builder integrity/trust for the 7-day window."
     },
     "30d": { "builder": "...", "economic": "...", "integrity": "..." },
@@ -257,7 +272,7 @@ Rules:
 - general: 3-4 complete sentences, meatier than any single card.
 - CARD COPY MUST BE PLAIN WORDS ONLY — absolutely no numbers, percentages, letter grades, or counts in the card fields. The numbers live elsewhere in the UI.
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
-- Say "burn apps" or "the apps that buy and burn $CLAWD" instead of "token mechanics".
+- Say "holder economics" or "how apps and locks serve $CLAWD holders" instead of "token mechanics" or "burn apps" alone.
 - Integrity copy = whether projects keep their promises to holders (trust, transparency, safety) — not moralizing.
 - The general overview MAY name specific repos and describe what shipped; the card fields should stay high-level and plain.`
 
@@ -274,6 +289,11 @@ Rules:
     return {
       general: stripMarkdown(parsed.general),
       cards: {
+        '24h': {
+          builder: stripMarkdown(parsed.cards['24h'].builder),
+          economic: stripMarkdown(parsed.cards['24h'].economic),
+          integrity: stripMarkdown(parsed.cards['24h'].integrity),
+        },
         '7d': {
           builder: stripMarkdown(parsed.cards['7d'].builder),
           economic: stripMarkdown(parsed.cards['7d'].economic),

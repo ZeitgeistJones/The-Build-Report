@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
+import { loadGitHubStatsForCron } from '@/lib/githubStatsSnapshot'
 import { generateAndCacheDailyDigest, loadReposForBrief } from '@/lib/buildBrief'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const stats = await getGitHubStatsForDisplay()
+    const stats = await loadGitHubStatsForCron()
     if (!stats) {
       return NextResponse.json({ ok: false, error: 'No GitHub stats snapshot available' }, { status: 503 })
     }

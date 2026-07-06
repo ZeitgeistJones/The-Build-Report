@@ -21,7 +21,8 @@ import {
   buildIntegrityTrendExplanation,
 } from '@/lib/gradeNarratives'
 import { calcEcosystemPulse } from '@/lib/ecosystemPulse'
-import RepoList, { type RepoWithLive } from '@/components/RepoList'
+import { type RepoWithLive } from '@/components/RepoList'
+import HomeRepoSection from '@/components/HomeRepoSection'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 import HomeHeader from '@/components/HomeHeader'
@@ -30,7 +31,7 @@ import { GradePeriodProvider } from '@/components/GradePeriodContext'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 import { getRescoreSummaries } from '@/lib/rescoreSummaries'
 import { getBuildBrief } from '@/lib/buildBrief'
-import { isCommunityContextEnabled, getContextSummaryBySlug } from '@/lib/communityContext'
+import { isCommunityContextEnabled, getContextSummaryBySlug, buildCommunityPulse } from '@/lib/communityContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,7 @@ export default async function Home() {
   let error = false
   const communityContextEnabled = isCommunityContextEnabled()
   const contextSummary = communityContextEnabled ? await getContextSummaryBySlug().catch(() => ({})) : {}
+  const communityPulse = communityContextEnabled ? buildCommunityPulse(contextSummary) : null
 
   const [rescoreBurns, buildBrief] = await Promise.all([
     getRescoreBurnStats().catch(() => null),
@@ -86,6 +88,7 @@ export default async function Home() {
       description: githubRepo?.description?.trim() || null,
       lastCommitAt: activity?.lastCommitAt ?? null,
       pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
+      commits24h: activity?.commits24h ?? null,
       commits30d: activity?.commits30d ?? null,
       commits7d: activity?.commits7d ?? null,
       commits7_14: activity?.commits7_14 ?? null,
@@ -103,10 +106,13 @@ export default async function Home() {
 
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
 
+  const builderGrade24Raw = stats ? calcBuilderGrade(stats, '24h') : null
   const builderGrade30Raw = stats ? calcBuilderGrade(stats, '30d') : null
   const builderGrade7Raw = stats ? calcBuilderGrade(stats, '7d') : null
+  const tokenMechanicGrade24Raw = stats ? calcTokenMechanicGrade(stats, '24h', allRepos) : null
   const tokenMechanicGrade30Raw = stats ? calcTokenMechanicGrade(stats, '30d', allRepos) : null
   const tokenMechanicGrade7Raw = stats ? calcTokenMechanicGrade(stats, '7d', allRepos) : null
+  const integrityGrade24Raw = stats ? calcIntegrityGrade(stats, '24h', allRepos) : calcIntegrityGrade(null, '24h', allRepos)
   const integrityGrade30Raw = stats ? calcIntegrityGrade(stats, '30d', allRepos) : calcIntegrityGrade(null, '30d', allRepos)
   const integrityGrade7Raw = stats ? calcIntegrityGrade(stats, '7d', allRepos) : calcIntegrityGrade(null, '7d', allRepos)
 
@@ -114,18 +120,27 @@ export default async function Home() {
   const tokenMechanicGrade60Raw = stats ? calcTokenMechanicGrade(stats, '60d', allRepos) : null
   const integrityGrade60Raw = stats ? calcIntegrityGrade(stats, '60d', allRepos) : calcIntegrityGrade(null, '60d', allRepos)
 
+  const builderGrade24 = builderGrade24Raw && stats
+    ? { ...builderGrade24Raw, trendExplanation: buildBuilderTrendExplanation(stats, '24h', builderGrade24Raw.trendPct, builderGrade24Raw.trend) }
+    : builderGrade24Raw
   const builderGrade30 = builderGrade30Raw && stats
     ? { ...builderGrade30Raw, trendExplanation: buildBuilderTrendExplanation(stats, '30d', builderGrade30Raw.trendPct, builderGrade30Raw.trend) }
     : builderGrade30Raw
   const builderGrade7 = builderGrade7Raw && stats
     ? { ...builderGrade7Raw, trendExplanation: buildBuilderTrendExplanation(stats, '7d', builderGrade7Raw.trendPct, builderGrade7Raw.trend) }
     : builderGrade7Raw
+  const tokenMechanicGrade24 = tokenMechanicGrade24Raw && stats
+    ? { ...tokenMechanicGrade24Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '24h', allRepos, tokenMechanicGrade24Raw.trendPct, tokenMechanicGrade24Raw.trend) }
+    : tokenMechanicGrade24Raw
   const tokenMechanicGrade30 = tokenMechanicGrade30Raw && stats
     ? { ...tokenMechanicGrade30Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '30d', allRepos, tokenMechanicGrade30Raw.trendPct, tokenMechanicGrade30Raw.trend) }
     : tokenMechanicGrade30Raw
   const tokenMechanicGrade7 = tokenMechanicGrade7Raw && stats
     ? { ...tokenMechanicGrade7Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '7d', allRepos, tokenMechanicGrade7Raw.trendPct, tokenMechanicGrade7Raw.trend) }
     : tokenMechanicGrade7Raw
+  const integrityGrade24 = integrityGrade24Raw && stats
+    ? { ...integrityGrade24Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '24h', allRepos, integrityGrade24Raw.trendPct, integrityGrade24Raw.trend) }
+    : integrityGrade24Raw
   const integrityGrade30 = integrityGrade30Raw && stats
     ? { ...integrityGrade30Raw, trendExplanation: buildIntegrityTrendExplanation(stats, '30d', allRepos, integrityGrade30Raw.trendPct, integrityGrade30Raw.trend) }
     : integrityGrade30Raw
@@ -136,6 +151,7 @@ export default async function Home() {
   const tokenMechanicGrade60 = tokenMechanicGrade60Raw
   const integrityGrade60 = integrityGrade60Raw
 
+  const pulse24 = stats ? calcEcosystemPulse(allRepos, stats, '24h') : null
   const pulse30 = stats ? calcEcosystemPulse(allRepos, stats, '30d') : null
   const pulse7 = stats ? calcEcosystemPulse(allRepos, stats, '7d') : null
   const pulse60 = stats ? calcEcosystemPulse(allRepos, stats, '60d') : null
@@ -177,18 +193,31 @@ export default async function Home() {
 
       <div style={{ marginBottom: '32px' }}>
       <GradesPanel
+        pulse24={pulse24}
         pulse30={pulse30}
         pulse7={pulse7}
         pulse60={pulse60}
+        builderGrade24={builderGrade24}
         builderGrade30={builderGrade30}
         builderGrade7={builderGrade7}
         builderGrade60={builderGrade60}
+        tokenMechanicGrade24={tokenMechanicGrade24}
         tokenMechanicGrade30={tokenMechanicGrade30}
         tokenMechanicGrade7={tokenMechanicGrade7}
         tokenMechanicGrade60={tokenMechanicGrade60}
+        integrityGrade24={integrityGrade24}
         integrityGrade30={integrityGrade30}
         integrityGrade7={integrityGrade7}
         integrityGrade60={integrityGrade60}
+        stats24h={
+          stats
+            ? {
+                commits: stats.totalCommits24h ?? 0,
+                activeDays: stats.activeDays24h ?? 0,
+                newRepos: stats.newRepos24h ?? 0,
+              }
+            : null
+        }
         stats30d={
           stats
             ? {
@@ -239,13 +268,14 @@ export default async function Home() {
       )}
 
       <div style={{ marginTop: '40px' }}>
-      <RepoList
+      <HomeRepoSection
         repos={repos}
         githubSlugOrder={githubOrder}
         initialRescoreSummaries={rescoreSummaries}
         repoCollections={collectionSlugs}
         communityContextEnabled={communityContextEnabled}
         contextSummary={contextSummary}
+        communityPulse={communityPulse}
       />
       </div>
     </>

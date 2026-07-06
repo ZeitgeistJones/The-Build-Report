@@ -37,6 +37,8 @@ export interface RecentCommit {
 
 export interface RepoActivity {
   slug: string
+  commits24h: number
+  commits24_48: number
   commits30d: number
   commits7d: number
   commits7_14: number
@@ -63,14 +65,20 @@ export interface GitHubRepo {
 
 export interface GitHubStats {
   totalRepos: number
+  totalCommits24h: number
+  totalCommits24_48: number
   totalCommits30d: number
   totalCommits7d: number
   totalCommits7_14: number
   totalCommits30_60: number
+  activeDays24h: number
+  activeDays24_48: number
   activeDays30d: number
   activeDays7d: number
   activeDays7_14: number
   activeDays30_60: number
+  newRepos24h: number
+  newRepos24_48: number
   newRepos30d: number
   newRepos7d: number
   newRepos7_14: number
@@ -99,8 +107,25 @@ function isInDayRange(dateStr: string, minExclusive: number, maxInclusive: numbe
   return days > minExclusive && days <= maxInclusive
 }
 
+function hoursAgo(dateStr: string): number {
+  return (Date.now() - new Date(dateStr).getTime()) / 3600000
+}
+
+function isWithinHours(dateStr: string, hours: number) {
+  return hoursAgo(dateStr) <= hours
+}
+
+function isInHourRange(dateStr: string, minExclusive: number, maxInclusive: number) {
+  const h = hoursAgo(dateStr)
+  return h > minExclusive && h <= maxInclusive
+}
+
 function isCreatedInDayRange(dateStr: string, minExclusive: number, maxInclusive: number) {
   return isInDayRange(dateStr, minExclusive, maxInclusive)
+}
+
+function isCreatedInHourRange(dateStr: string, minExclusive: number, maxInclusive: number) {
+  return isInHourRange(dateStr, minExclusive, maxInclusive)
 }
 
 /** Rolling N-day window can span N+1 unique calendar dates; cap for display and grades. */
@@ -223,6 +248,8 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
   const totalRepos = repos.length
   const newRepos30d = repos.filter(r => isWithinDays(r.created_at, 30)).length
   const newRepos7d = repos.filter(r => isWithinDays(r.created_at, 7)).length
+  const newRepos24h = repos.filter(r => isWithinHours(r.created_at, 24)).length
+  const newRepos24_48 = repos.filter(r => isCreatedInHourRange(r.created_at, 24, 48)).length
   const newRepos7_14 = repos.filter(r => isCreatedInDayRange(r.created_at, 7, 14)).length
   const newRepos30_60 = repos.filter(r => isCreatedInDayRange(r.created_at, 30, 60)).length
 
@@ -244,10 +271,14 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
     }
   }
 
+  const activeDaySet24 = new Set<string>()
+  const activeDaySet24_48 = new Set<string>()
   const activeDaySet30 = new Set<string>()
   const activeDaySet7 = new Set<string>()
   const activeDaySet7_14 = new Set<string>()
   const activeDaySet30_60 = new Set<string>()
+  let totalCommits24h = 0
+  let totalCommits24_48 = 0
   let totalCommits30d = 0
   let totalCommits7d = 0
   let totalCommits7_14 = 0
@@ -262,6 +293,8 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
     try {
       const commits = await ghFetch(`/repos/${GITHUB_ORG}/${repo.name}/commits?since=${since60}&per_page=100`, { fresh })
 
+      const c24 = commits.filter((c: any) => isWithinHours(c.commit.author.date, 24))
+      const c24_48 = commits.filter((c: any) => isInHourRange(c.commit.author.date, 24, 48))
       const c30 = commits.filter((c: any) => isWithinDays(c.commit.author.date, 30))
       const c7 = commits.filter((c: any) => isWithinDays(c.commit.author.date, 7))
       const c7_14 = commits.filter((c: any) => isInDayRange(c.commit.author.date, 7, 14))
@@ -271,10 +304,20 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
       const countsTowardEcosystem = includeInActivityScan(repo.name)
 
       if (countsTowardEcosystem) {
+        totalCommits24h += c24.length
+        totalCommits24_48 += c24_48.length
         totalCommits30d += c30.length
         totalCommits7d += c7.length
         totalCommits7_14 += c7_14.length
         totalCommits30_60 += c30_60.length
+
+        c24.forEach((c: any) => {
+          activeDaySet24.add(c.commit.author.date.slice(0, 10))
+        })
+
+        c24_48.forEach((c: any) => {
+          activeDaySet24_48.add(c.commit.author.date.slice(0, 10))
+        })
 
         c30.forEach((c: any) => {
           activeDaySet30.add(c.commit.author.date.slice(0, 10))
@@ -299,6 +342,8 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
 
       repoActivity[repo.name] = {
         slug: repo.name,
+        commits24h: c24.length,
+        commits24_48: c24_48.length,
         commits30d: c30.length,
         commits7d: c7.length,
         commits7_14: c7_14.length,
@@ -323,6 +368,8 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
     if (!PRIORITY_SLUGS.includes(repo.name) && !isWithinDays(repo.pushed_at, 14)) continue
     repoActivity[repo.name] = {
       slug: repo.name,
+      commits24h: 0,
+      commits24_48: 0,
       commits30d: 0,
       commits7d: 0,
       commits7_14: 0,
@@ -335,6 +382,8 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
     }
   }
 
+  const activeDays24h = capActiveDays(activeDaySet24.size, 1)
+  const activeDays24_48 = capActiveDays(activeDaySet24_48.size, 1)
   const rawActiveDays7 = activeDaySet7.size
   const rawActiveDays30 = activeDaySet30.size
   const activeDays7d = capActiveDays(rawActiveDays7, 7)
@@ -360,14 +409,20 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
 
   const baseStats: GitHubStats = {
     totalRepos,
+    totalCommits24h,
+    totalCommits24_48,
     totalCommits30d,
     totalCommits7d,
     totalCommits7_14,
     totalCommits30_60,
+    activeDays24h,
+    activeDays24_48,
     activeDays30d,
     activeDays7d,
     activeDays7_14,
     activeDays30_60,
+    newRepos24h,
+    newRepos24_48,
     newRepos30d,
     newRepos7d,
     newRepos7_14,

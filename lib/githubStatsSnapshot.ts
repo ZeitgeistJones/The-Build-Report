@@ -109,10 +109,10 @@ export async function getGitHubStatsSnapshotDiagnostics(): Promise<{
 }
 
 /** Just past the daily cron cadence — a snapshot older than this means a cron likely failed. */
-const SNAPSHOT_STALE_MS = 26 * 60 * 60 * 1000
+export const SNAPSHOT_STALE_MS = 26 * 60 * 60 * 1000
 let staleRefreshInFlight = false
 
-function isSnapshotStale(updatedAt: string | null): boolean {
+export function isSnapshotStale(updatedAt: string | null): boolean {
   if (!updatedAt) return true
   const age = Date.now() - new Date(updatedAt).getTime()
   return !Number.isFinite(age) || age > SNAPSHOT_STALE_MS
@@ -160,5 +160,32 @@ export async function loadGitHubStatsForPage(): Promise<{
   } catch (err) {
     console.error('[github-snapshot] live fetch failed', err)
     return { stats: null, source: 'none' }
+  }
+}
+
+function snapshotMissingRecentCommits(stats: GitHubStats): boolean {
+  const activities = Object.values(stats.repoActivity)
+  if (!activities.length) return true
+  const withCommits = activities.filter(a => (a.commits30d ?? 0) > 0 || (a.commitTimestamps?.length ?? 0) > 0)
+  if (!withCommits.length) return false
+  return withCommits.some(a => !a.recentCommits?.length)
+}
+
+/** Cron path — prefer snapshot; refresh when stale or missing recentCommits for active repos. */
+export async function loadGitHubStatsForCron(): Promise<GitHubStats | null> {
+  const cached = await getGitHubStatsForDisplay()
+  const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
+  const needsRefresh =
+    !cached || isSnapshotStale(updatedAt) || snapshotMissingRecentCommits(cached)
+
+  if (cached && !needsRefresh) return cached
+
+  try {
+    const fresh = await getGitHubStats({ fresh: true })
+    await syncGitHubStatsSnapshot(fresh)
+    return fresh
+  } catch (err) {
+    console.error('[github-snapshot] cron refresh failed', err)
+    return cached
   }
 }
