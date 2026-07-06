@@ -1,6 +1,6 @@
 import { getRedis } from '@/lib/redis'
 import type { GitHubStats } from '@/lib/github'
-import { getGitHubStats } from '@/lib/github'
+import { getGitHubStats, enrichGitHubStatsPeriodCounts } from '@/lib/github'
 
 const SNAPSHOT_KEY = 'build-report:github-stats:snapshot'
 const SNAPSHOT_UPDATED_AT_KEY = 'build-report:github-stats:snapshot:updatedAt'
@@ -145,18 +145,19 @@ export async function loadGitHubStatsForPage(): Promise<{
   const cached = await getGitHubStatsForDisplay()
   if (cached) {
     const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
-    if (isSnapshotStale(updatedAt)) scheduleStaleSnapshotRefresh()
-    return { stats: cached, source: 'snapshot' }
+    if (isSnapshotStale(updatedAt) || snapshotMissing24hCounts(cached)) scheduleStaleSnapshotRefresh()
+    return { stats: enrichGitHubStatsPeriodCounts(cached), source: 'snapshot' }
   }
 
   try {
     const live = await getGitHubStats()
+    const enriched = enrichGitHubStatsPeriodCounts(live)
     try {
-      await syncGitHubStatsSnapshot(live)
+      await syncGitHubStatsSnapshot(enriched)
     } catch (err) {
       console.error('[github-snapshot] sync after live fetch failed', err)
     }
-    return { stats: live, source: 'live' }
+    return { stats: enriched, source: 'live' }
   } catch (err) {
     console.error('[github-snapshot] live fetch failed', err)
     return { stats: null, source: 'none' }
@@ -171,19 +172,29 @@ function snapshotMissingRecentCommits(stats: GitHubStats): boolean {
   return withCommits.some(a => !a.recentCommits?.length)
 }
 
+function snapshotMissing24hCounts(stats: GitHubStats): boolean {
+  return Object.values(stats.repoActivity).some(
+    a => (a.commitTimestamps?.length ?? 0) > 0 && typeof a.commits24h !== 'number',
+  )
+}
+
 /** Cron path — prefer snapshot; refresh when stale or missing recentCommits for active repos. */
 export async function loadGitHubStatsForCron(): Promise<GitHubStats | null> {
   const cached = await getGitHubStatsForDisplay()
   const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
   const needsRefresh =
-    !cached || isSnapshotStale(updatedAt) || snapshotMissingRecentCommits(cached)
+    !cached ||
+    isSnapshotStale(updatedAt) ||
+    snapshotMissingRecentCommits(cached) ||
+    snapshotMissing24hCounts(cached)
 
-  if (cached && !needsRefresh) return cached
+  if (cached && !needsRefresh) return enrichGitHubStatsPeriodCounts(cached)
 
   try {
     const fresh = await getGitHubStats({ fresh: true })
-    await syncGitHubStatsSnapshot(fresh)
-    return fresh
+    const enriched = enrichGitHubStatsPeriodCounts(fresh)
+    await syncGitHubStatsSnapshot(enriched)
+    return enriched
   } catch (err) {
     console.error('[github-snapshot] cron refresh failed', err)
     return cached

@@ -115,6 +115,49 @@ function isWithinHours(dateStr: string, hours: number) {
   return hoursAgo(dateStr) <= hours
 }
 
+/** Count commit timestamps in a rolling hour window (for snapshot backfill). */
+export function countCommitsWithinHours(
+  timestamps: string[] | null | undefined,
+  hours: number,
+): number {
+  if (!timestamps?.length) return 0
+  return timestamps.filter(ts => isWithinHours(ts, hours)).length
+}
+
+function countCommitsInHourRange(
+  timestamps: string[] | null | undefined,
+  minExclusive: number,
+  maxInclusive: number,
+): number {
+  if (!timestamps?.length) return 0
+  return timestamps.filter(ts => isInHourRange(ts, minExclusive, maxInclusive)).length
+}
+
+/** Backfill period counts from commitTimestamps when snapshot predates 24h fields. */
+export function enrichRepoActivityFromTimestamps(activity: RepoActivity): RepoActivity {
+  const ts = activity.commitTimestamps
+  if (!ts?.length) return activity
+  return {
+    ...activity,
+    commits24h:
+      typeof activity.commits24h === 'number'
+        ? activity.commits24h
+        : countCommitsWithinHours(ts, 24),
+    commits24_48:
+      typeof activity.commits24_48 === 'number'
+        ? activity.commits24_48
+        : countCommitsInHourRange(ts, 24, 48),
+  }
+}
+
+export function enrichGitHubStatsPeriodCounts(stats: GitHubStats): GitHubStats {
+  const repoActivity: Record<string, RepoActivity> = {}
+  for (const [slug, activity] of Object.entries(stats.repoActivity)) {
+    repoActivity[slug] = enrichRepoActivityFromTimestamps(activity)
+  }
+  return { ...stats, repoActivity }
+}
+
 function isInHourRange(dateStr: string, minExclusive: number, maxInclusive: number) {
   const h = hoursAgo(dateStr)
   return h > minExclusive && h <= maxInclusive
@@ -268,6 +311,18 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
         reposToScan.push(repo)
         alreadyScanning.add(repo.name)
       }
+    }
+  }
+
+  // Per-repo listing needs real counts for recently pushed repos — not stub zeros.
+  {
+    const scanning = new Set(reposToScan.map(r => r.name))
+    for (const repo of repos) {
+      if (scanning.has(repo.name)) continue
+      if (!isWithinDays(repo.pushed_at, 7)) continue
+      if (shouldSkipRepo(repo.name, { forceInclude })) continue
+      reposToScan.push(repo)
+      scanning.add(repo.name)
     }
   }
 
