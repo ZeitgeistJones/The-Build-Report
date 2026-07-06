@@ -674,5 +674,5 @@ export function formatTrendPct(trendPct: number | null, period: Period): string 
   if (trendPct === null) return `new vs ${windowLabel}`
   if (trendPct > 0) return `+${trendPct}% vs ${windowLabel}`
   if (trendPct < 0) return `${trendPct}% vs ${windowLabel}`
-  return `0% vs ${windowLabel}`
+  return `steady vs ${windowLabel}`
 }

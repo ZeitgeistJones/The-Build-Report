@@ -19,6 +19,7 @@ import {
   builderCardLayman,
   economicCardLayman,
   integrityCardLayman,
+  builderWindowStatsFromGitHub,
 } from '@/lib/gradeCardCopy'
 
 const DIGEST_KEY_PREFIX = 'build-report:daily-digest:'
@@ -137,9 +138,18 @@ function formatActivityForPrompt(activity: RepoBuildActivity[], dayLabel: string
     .join('\n\n')
 }
 
+function formatPeriodActivityContext(stats: GitHubStats): string {
+  const lines = (['24h', '7d', '30d', '60d'] as const).map(period => {
+    const ws = builderWindowStatsFromGitHub(stats, period)
+    const quiet = ws.commits === 0 ? 'QUIET — no commits in this window' : `${ws.commits} commits`
+    return `  ${period}: ${quiet}`
+  })
+  return `PER-PERIOD ACTIVITY (use to decide what each card may honestly claim):\n${lines.join('\n')}`
+}
+
 function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
   const periods: Period[] = ['24h', '7d', '30d', '60d']
-  return periods
+  const periodGrades = periods
     .map(period => {
       const bg = calcBuilderGrade(stats, period)
       const tg = calcTokenMechanicGrade(stats, period, repos)
@@ -156,6 +166,7 @@ function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
       ].join('\n')
     })
     .join('\n\n')
+  return `${formatPeriodActivityContext(stats)}\n\n${periodGrades}`
 }
 
 const QUIET_GENERAL =
@@ -174,9 +185,10 @@ function buildFallbackDigest(
     const bg = calcBuilderGrade(stats, period)
     const tg = calcTokenMechanicGrade(stats, period, repos)
     const ig = calcIntegrityGrade(stats, period, repos)
+    const windowStats = builderWindowStatsFromGitHub(stats, period)
     cards[period] = {
-      builder: builderCardLayman(bg, period),
-      economic: economicCardLayman(tg, period),
+      builder: builderCardLayman(bg, period, windowStats),
+      economic: economicCardLayman(tg, period, { commits: windowStats.commits }),
       integrity: integrityCardLayman(ig, period),
     }
   }
@@ -268,7 +280,11 @@ Return ONLY valid JSON, no markdown fences:
 }
 
 Rules:
-- Each card field: 2-3 complete sentences.
+- Each card field: 2-3 complete sentences. Each period must sound DISTINCT from the others — a holder toggling 24h vs 30d should read different stories.
+- If a period shows QUIET (zero commits) in PER-PERIOD ACTIVITY, say so plainly in that period's cards. Do not write motivational filler or imply work happened.
+- If holder economics or integrity have zero commit weight / empty sample, say we cannot draw a strong read for that window yet.
+- 60d cards: describe the two-month arc. Do not imply week-over-week trend or compare to a prior 60d window.
+- 24h with no activity: one short honest sentence per card beats three padded ones.
 - general: 3-4 complete sentences, meatier than any single card.
 - CARD COPY MUST BE PLAIN WORDS ONLY — absolutely no numbers, percentages, letter grades, or counts in the card fields. The numbers live elsewhere in the UI.
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
@@ -279,7 +295,7 @@ Rules:
   try {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1100,
+      max_tokens: 1400,
       messages: [{ role: 'user', content: prompt }],
     })
     const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''

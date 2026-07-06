@@ -6,6 +6,7 @@ import type {
   TrendDirection,
   TrendExplanation,
 } from '@/lib/grades'
+import type { GitHubStats } from '@/lib/github'
 
 export type GradeCardId = 'builder' | 'economic' | 'integrity'
 
@@ -22,6 +23,20 @@ function letterTier(letter: string): 'top' | 'solid' | 'mixed' | 'weak' {
   if (head === 'B') return 'solid'
   if (head === 'C') return 'mixed'
   return 'weak'
+}
+
+function periodPhrase(period: Period): string {
+  if (period === '24h') return 'the last 24 hours'
+  if (period === '7d') return 'the last 7 days'
+  if (period === '30d') return 'the last 30 days'
+  return 'the last 60 days'
+}
+
+function priorPhrase(period: Period): string {
+  if (period === '24h') return '24 hours'
+  if (period === '7d') return '7 days'
+  if (period === '30d') return '30 days'
+  return '60 days'
 }
 
 function trendWord(trend: TrendDirection): string {
@@ -190,57 +205,263 @@ export function economicCardFace(grade: TokenMechanicGrade, period: Period): Gra
   return { hook, insights: insights.slice(0, 2) }
 }
 
-function trendFlavor(trend: TrendDirection, subject: string): string {
-  if (trend === 'up') return `It's picked up compared to the last stretch, so ${subject} is trending the right way.`
-  if (trend === 'down') return `It's eased off a bit versus the last stretch, so ${subject} is worth keeping an eye on.`
-  return ''
+function trendFlavor(trend: TrendDirection, subject: string, period: Period): string {
+  if (period === '60d') {
+    return 'This is the two-month picture — we do not compare it to an earlier 60-day window yet.'
+  }
+  if (trend === 'up') {
+    return `Compared with the prior ${priorPhrase(period)}, ${subject} has picked up.`
+  }
+  if (trend === 'down') {
+    return `Compared with the prior ${priorPhrase(period)}, ${subject} has eased off a bit.`
+  }
+  if (trend === 'new') {
+    return `This is a fresh burst of activity versus the prior ${priorPhrase(period)}.`
+  }
+  return `Holding about steady versus the prior ${priorPhrase(period)}.`
 }
 
-/** 2-3 plain-English sentences (no numbers/jargon) for the card face when AI digest is unavailable. */
+function economicCommitWeight(grade: TokenMechanicGrade): number {
+  return grade.counts.high + grade.counts.mid + grade.counts.low
+}
+
+function weakestIntegritySignal(grade: IntegrityGrade): string | null {
+  const candidates = grade.signals.filter(s => s.label !== 'High-integrity share')
+  if (!candidates.length) return null
+  const weakest = [...candidates].sort((a, b) => a.pct - b.pct)[0]
+  if (!weakest || weakest.pct >= 55) return null
+  return weakest.label.toLowerCase()
+}
+
+/** 2-3 plain-English sentences for the card face when AI digest is unavailable. */
 export function builderCardLayman(
   grade: BuilderGrade,
   period: Period,
-  _stats?: { commits: number; activeDays: number; newRepos: number } | null,
+  stats?: { commits: number; activeDays: number; newRepos: number } | null,
 ): string {
+  const window = periodPhrase(period)
+
+  if (stats && stats.commits === 0) {
+    if (period === '24h') {
+      return `Nothing landed on tracked projects in the last 24 hours — there is no today story yet. Switch to 7d or 30d for the fuller picture of what has been shipping.`
+    }
+    return `No tracked GitHub activity in ${window}. The letter grade reflects an empty window, not a verdict on the ecosystem — try a longer period for context.`
+  }
+
   const tier = letterTier(grade.letter)
-  const base =
-    tier === 'top'
-      ? 'clawdbotatg is shipping code almost every day across a healthy spread of projects. Momentum like this usually means new features and fixes are landing quickly.'
-      : tier === 'solid'
-        ? 'Work is landing regularly across several projects, just not at a full sprint. It reads as a dependable, steady pace rather than a burst.'
-        : tier === 'mixed'
-          ? 'Some days see real work and others are quiet, so the overall pace is moderate. There is activity, but it is not consistent across the board.'
-          : 'Not much landed on the tracked projects in this window. Things are on the quiet side for now.'
-  const flavor = period === '60d' ? '' : trendFlavor(grade.trend, 'the pace')
-  return flavor ? `${base} ${flavor}` : base
+  let base: string
+
+  if (period === '60d') {
+    base =
+      tier === 'top'
+        ? `Over the last two months, clawdbotatg has kept a strong shipping rhythm across many projects. Sustained output like this is what holders usually want to see.`
+        : tier === 'solid'
+          ? `Across the last two months, work has landed steadily — not a single sprint, but a dependable build cadence.`
+          : tier === 'mixed'
+            ? `The two-month view is uneven: some stretches were busy and others quiet, so the overall pace reads as moderate.`
+            : `The last two months were light on tracked GitHub activity relative to what this dashboard usually sees.`
+    return `${base} ${trendFlavor(grade.trend, 'builder pace', period)}`
+  }
+
+  if (period === '24h' && stats && stats.commits > 0) {
+    base =
+      tier === 'top'
+        ? `In the last day, fresh work showed up on multiple tracked projects — a live pulse, not just background noise.`
+        : tier === 'solid'
+          ? `The last 24 hours saw real commits land, even if it was not a flood. Short windows are noisy; this one looks active.`
+          : `There was some activity in the last day, but it was thin — enough to register, not enough to call a hot streak.`
+    return `${base} ${trendFlavor(grade.trend, 'the pace', period)}`
+  }
+
+  if (period === '7d') {
+    base =
+      tier === 'top'
+        ? `This week, clawdbotatg has been shipping across a healthy spread of projects — the kind of rhythm that usually means fixes and features are landing in real time.`
+        : tier === 'solid'
+          ? `This week shows dependable output: several projects moved, just not at an all-out sprint.`
+          : tier === 'mixed'
+            ? `This week was hit-or-miss — some days and projects saw work, others did not.`
+            : `This week was quiet on the tracked repos we follow.`
+  } else {
+    base =
+      tier === 'top'
+        ? `This month, clawdbotatg has been shipping almost daily across a wide set of projects — momentum like this usually means holders are seeing real movement.`
+        : tier === 'solid'
+          ? `This month, work has landed regularly across several projects — steady and reliable, if not a peak burst.`
+          : tier === 'mixed'
+            ? `This month has been uneven: real work showed up, but not every day and not everywhere.`
+            : `This month was light on tracked activity — fewer projects saw meaningful updates.`
+  }
+
+  return `${base} ${trendFlavor(grade.trend, 'the pace', period)}`
 }
 
-export function economicCardLayman(grade: TokenMechanicGrade, period: Period): string {
+export function economicCardLayman(
+  grade: TokenMechanicGrade,
+  period: Period,
+  stats?: { commits: number } | null,
+): string {
+  const window = periodPhrase(period)
+  const weight = economicCommitWeight(grade)
+  const holderFacing =
+    (grade.tagCommits?.direct ?? 0) +
+    (grade.tagCommits?.lock ?? 0) +
+    (grade.tagCommits?.indirect ?? 0)
+
+  if (weight === 0 && grade.counts.repos === 0) {
+    if (stats?.commits === 0 || (period === '24h' && !holderFacing)) {
+      return `There was not enough holder-facing work in ${window} to say much about economics. The grade is mostly reflecting quiet data, not a clean read on apps and locks.`
+    }
+    return `We do not have enough holder-facing project activity in ${window} to draw a strong economics read. Check a longer window once more work lands on those projects.`
+  }
+
   const tier = letterTier(grade.letter)
-  const base =
-    tier === 'top'
-      ? 'The apps and locks that serve $CLAWD holders are in good shape where the work is happening. Holder economics look healthy right now.'
-      : tier === 'solid'
-        ? 'Holder-facing projects are holding up well, with a little room to sharpen how they serve the community. Solid overall, not spectacular.'
-        : tier === 'mixed'
-          ? 'The holder-economics picture is mixed — some projects look strong while others still need work. Effort is landing unevenly.'
-          : 'Most of the quality work this window did not land on holder-facing projects. This area needs some attention.'
-  const flavor = period === '60d' ? '' : trendFlavor(grade.trend, 'holder economics')
-  return flavor ? `${base} ${flavor}` : base
+  let base: string
+
+  if (period === '60d') {
+    base =
+      tier === 'top'
+        ? `Over two months, the projects that serve holders directly have looked economically sound where the work actually happened.`
+        : tier === 'solid'
+          ? `Across two months, holder-facing projects are holding up — solid mechanics, with room to sharpen the story.`
+          : tier === 'mixed'
+            ? `The two-month holder-economics picture is mixed: strong spots and weak spots, depending on where commits landed.`
+            : `Over two months, much of the meaningful work did not concentrate on the holder-facing projects we score hardest.`
+    return `${base} ${trendFlavor(grade.trend, 'holder economics', period)}`
+  }
+
+  if (period === '24h') {
+    base =
+      tier === 'top'
+        ? `In the last day, the holder-facing work that did ship scored well on how it serves the community.`
+        : tier === 'solid'
+          ? `Yesterday's holder-facing updates look reasonably sound — not perfect, but aligned with what holders expect.`
+          : tier === 'mixed'
+            ? `The last day did not give a clean holder-economics story — a little activity, but not a clear win.`
+            : `In the last 24 hours, holder-facing projects did not put their best foot forward where we could see it.`
+  } else if (period === '7d') {
+    base =
+      tier === 'top'
+        ? `This week, apps and locks that serve holders look healthy where commits actually landed.`
+        : tier === 'solid'
+          ? `This week, holder economics are in decent shape — good enough to trust, with polish still available.`
+          : tier === 'mixed'
+            ? `This week, holder economics are split: some projects look strong, others still need work.`
+            : `This week, most visible work did not land on the holder-facing projects scored here.`
+  } else {
+    base =
+      tier === 'top'
+        ? `This month, holder-facing projects look strong where the builder spent time — economics align with what holders are told.`
+        : tier === 'solid'
+          ? `This month, holder economics are holding up well, with a little room to sharpen how projects serve the community.`
+          : tier === 'mixed'
+            ? `This month, the holder-economics picture is uneven — effort landed in different quality buckets.`
+            : `This month, much of the work we can see did not concentrate on holder-facing projects.`
+  }
+
+  if (grade.counts.repos === 1) {
+    base += ` One project drove almost the entire sample here, so this grade tracks that repo closely.`
+  }
+
+  return `${base} ${trendFlavor(grade.trend, 'holder economics', period)}`
 }
 
 export function integrityCardLayman(grade: IntegrityGrade, period: Period): string {
+  const window = periodPhrase(period)
+
+  if (grade.counts.commitWeight === 0 && grade.counts.active === 0) {
+    return `Not enough scored project activity in ${window} to say much about trust and alignment. Integrity grades need commits on scored repos — try a longer window.`
+  }
+
   const tier = letterTier(grade.letter)
-  const base =
-    tier === 'top'
-      ? 'The projects getting the most attention are the ones that keep their promises to holders. Trust and transparency are looking strong.'
-      : tier === 'solid'
-        ? 'Most of the work is landing on trustworthy projects, with a few weaker spots. Broadly, it lines up with what holders are told.'
-        : tier === 'mixed'
-          ? 'Trust is a mixed bag — effort is split between solid projects and shakier ones. It is worth keeping an eye on.'
-          : 'A lot of the work landed on projects with weaker trust signals. This is the area to watch most closely.'
-  const flavor = period === '60d' ? '' : trendFlavor(grade.trend, 'trust')
-  return flavor ? `${base} ${flavor}` : base
+  const drag = weakestIntegritySignal(grade)
+  let base: string
+
+  if (period === '60d') {
+    base =
+      tier === 'top'
+        ? `Over two months, the busiest projects are generally the ones that keep promises to holders — transparency and alignment look strong.`
+        : tier === 'solid'
+          ? `Across two months, most work landed on projects that broadly match their stated values, with a few softer spots.`
+          : tier === 'mixed'
+            ? `The two-month trust picture is mixed — solid projects and shakier ones both saw attention.`
+            : `Over two months, a lot of visible work concentrated on projects with weaker trust signals.`
+  } else if (period === '24h') {
+    base =
+      tier === 'top'
+        ? `In the last day, the projects that moved look aligned with what they tell holders — a good short-term trust signal.`
+        : tier === 'solid'
+          ? `Yesterday's updates mostly landed on reasonably trustworthy projects, with minor weak spots.`
+          : tier === 'mixed'
+            ? `The last day does not give a clean integrity read — a little activity, mixed quality.`
+            : `In the last 24 hours, the work we could see leaned toward projects with weaker trust signals.`
+  } else if (period === '7d') {
+    base =
+      tier === 'top'
+        ? `This week, commits concentrated on projects that walk the talk with holders.`
+        : tier === 'solid'
+          ? `This week, trust and alignment are mostly in good shape, with a few repos worth watching.`
+          : tier === 'mixed'
+            ? `This week, integrity is split — some trustworthy projects moved, others less so.`
+            : `This week, much of the work landed on projects with weaker trust signals.`
+  } else {
+    base =
+      tier === 'top'
+        ? `This month, the projects getting attention are the ones that keep their promises to holders.`
+        : tier === 'solid'
+          ? `This month, most work aligns with trustworthy projects, though not perfectly everywhere.`
+          : tier === 'mixed'
+            ? `This month, trust is a mixed bag — effort split between solid and shakier projects.`
+            : `This month, a lot of work landed on projects with weaker trust signals — this is the card to watch.`
+  }
+
+  if (drag && tier !== 'top') {
+    base += ` The weakest area in the rubric right now is ${drag}.`
+  }
+
+  return `${base} ${trendFlavor(grade.trend, 'trust', period)}`
+}
+
+/** True when digest exists but this period's card blurbs are missing (old cache shape). */
+export function digestMissingPeriodCards(
+  cards: Partial<Record<Period, { builder?: string; economic?: string; integrity?: string }>> | null,
+  period: Period,
+): boolean {
+  if (!cards) return false
+  const row = cards[period]
+  return !row?.builder || !row?.economic || !row?.integrity
+}
+
+export function builderWindowStatsFromGitHub(
+  stats: GitHubStats,
+  period: Period,
+): { commits: number; activeDays: number; newRepos: number } {
+  if (period === '24h') {
+    return {
+      commits: stats.totalCommits24h ?? 0,
+      activeDays: stats.activeDays24h ?? 0,
+      newRepos: stats.newRepos24h ?? 0,
+    }
+  }
+  if (period === '7d') {
+    return {
+      commits: stats.totalCommits7d,
+      activeDays: stats.activeDays7d,
+      newRepos: stats.newRepos7d,
+    }
+  }
+  if (period === '30d') {
+    return {
+      commits: stats.totalCommits30d,
+      activeDays: stats.activeDays30d,
+      newRepos: stats.newRepos30d,
+    }
+  }
+  return {
+    commits: stats.totalCommits30d + stats.totalCommits30_60,
+    activeDays: stats.activeDays30d + stats.activeDays30_60,
+    newRepos: stats.newRepos30d + stats.newRepos30_60,
+  }
 }
 
 export function integrityCardFace(grade: IntegrityGrade, period: Period): GradeCardFace {

@@ -14,6 +14,7 @@ import {
   builderCardLayman,
   economicCardLayman,
   integrityCardLayman,
+  digestMissingPeriodCards,
   type GradeCardId,
 } from '@/lib/gradeCardCopy'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -44,8 +45,6 @@ interface Props {
   stats60d: { commits: number; activeDays: number; newRepos: number } | null
   digestCards: DailyDigestCards | null
 }
-
-const TREND_UNAVAILABLE_60D = 'Trend requires 120d scan history'
 
 const CARD_LABELS: Record<CardId, string> = {
   builder: 'Builder activity',
@@ -326,19 +325,6 @@ function GradeCard({
               {formatTrendPct(grade.trendPct, period)}
             </span>
           )}
-
-          {grade && period === '60d' && (
-            <span
-              style={{
-                fontSize: '11px',
-                color: 'var(--text-muted)',
-                lineHeight: 1.3,
-                maxWidth: isMobile ? undefined : 140,
-              }}
-            >
-              {TREND_UNAVAILABLE_60D}
-            </span>
-          )}
         </div>
       </div>
 
@@ -469,15 +455,29 @@ export default function GradesPanel({
           ? ig?.trendExplanation
           : undefined
 
-  const builderCopy =
-    digestCards?.[period]?.builder ??
-    (bg ? builderCardLayman(bg, period, stats) : 'GitHub data unavailable')
-  const economicCopy =
-    digestCards?.[period]?.economic ??
-    (tg ? economicCardLayman(tg, period) : 'Token mechanic score unavailable')
-  const integrityCopy =
-    digestCards?.[period]?.integrity ??
-    (ig ? integrityCardLayman(ig, period) : 'Integrity score unavailable')
+  const digestHasPeriod =
+    Boolean(digestCards?.[period]?.builder) &&
+    Boolean(digestCards?.[period]?.economic) &&
+    Boolean(digestCards?.[period]?.integrity)
+
+  const builderCopy = digestHasPeriod
+    ? digestCards![period].builder
+    : bg
+      ? builderCardLayman(bg, period, stats)
+      : 'GitHub data unavailable'
+  const economicCopy = digestHasPeriod
+    ? digestCards![period].economic
+    : tg
+      ? economicCardLayman(tg, period, stats ? { commits: stats.commits } : null)
+      : 'Token mechanic score unavailable'
+  const integrityCopy = digestHasPeriod
+    ? digestCards![period].integrity
+    : ig
+      ? integrityCardLayman(ig, period)
+      : 'Integrity score unavailable'
+
+  const digestPeriodMissing =
+    digestCards != null && digestMissingPeriodCards(digestCards, period)
 
   const statSpan = (text: string, fullWidth = false) => (
     <span style={{ fontSize: footerSize, color: 'var(--text-muted)', ...(fullWidth ? { flexBasis: '100%' } : {}) }}>
@@ -614,6 +614,19 @@ export default function GradesPanel({
           onSelectRubric={handleSelectRubric}
         />
       </div>
+
+      {digestPeriodMissing && (
+        <p
+          style={{
+            marginTop: '10px',
+            fontSize: '11px',
+            color: 'var(--text-muted)',
+            lineHeight: 1.45,
+          }}
+        >
+          Daily digest not cached for this window yet — card copy is from live scores.
+        </p>
+      )}
 
       {selectedCard && selectedExplanation && period !== '60d' && (
         <TrendDetailTray
