@@ -20,6 +20,7 @@ import {
   slRubricLevelScore,
 } from './rubrics/shippingLeverage'
 import { getConsumerEconomicScorePct, isConsumerEconomicScored } from './economicGrade'
+import { getEffectiveTag } from './criticalPath'
 import type { GradeNewArrival } from './gradeNewArrivals'
 import type { PathToCHint } from './gradePathToC'
 
@@ -355,9 +356,10 @@ function tokenMechanicTagCommitCounts(
   for (const repo of activeRepos) {
     const w = commitsForRepo(stats, repo.githubSlug, period, window)
     if (w <= 0) continue
-    if (repo.tag === 'direct') counts.direct += w
-    else if (repo.tag === 'supply-lock') counts.lock += w
-    else if (repo.tag === 'indirect') counts.indirect += w
+    const tag = getEffectiveTag(repo)
+    if (tag === 'direct') counts.direct += w
+    else if (tag === 'supply-lock') counts.lock += w
+    else if (tag === 'indirect') counts.indirect += w
     else counts.infra += w
   }
   return counts

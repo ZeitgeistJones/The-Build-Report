@@ -1,6 +1,8 @@
 import { Repo, Tag } from './scores'
 import { GitHubStats, RepoActivity } from './github'
 import { Period, formatTrendDelta, TrendExplanation, TrendDirection } from './grades'
+import { getEffectiveTag } from './criticalPath'
+import { getConsumerEconomicScorePct } from './economicGrade'
 import {
   formatRepoLeaders,
   topReposByCommits,
@@ -79,7 +81,7 @@ function groupByTagSentence(
 ): string[] {
   const byTag = new Map<string, Repo[]>()
   for (const repo of repos) {
-    const label = tagLabel(repo.tag)
+    const label = tagLabel(getEffectiveTag(repo))
     const list = byTag.get(label) ?? []
     list.push(repo)
     byTag.set(label, list)
@@ -228,7 +230,7 @@ export function buildTokenMechanicTrendExplanation(
   const bullets: string[] = []
 
   const ecosystem = allRepos ?? holderRepoSet
-  const holderFacingNow = ecosystem.filter(r => holderFacingTag(r.tag))
+  const holderFacingNow = ecosystem.filter(r => holderFacingTag(getEffectiveTag(r)))
   const holderCommitsNow = totalCommitsInWindow(stats, holderFacingNow, period, 'current')
   const totalCommitsNow = totalCommitsInWindow(stats, ecosystem, period, 'current')
   if (totalCommitsNow > 0 && bullets.length < 4) {
@@ -273,10 +275,11 @@ export function buildTokenMechanicTrendExplanation(
     let sum = 0
     let weight = 0
     for (const repo of repos) {
-      if (!repo.tokenMechanic || repo.tokenMechanic.letter === '—') continue
+      const pct = getConsumerEconomicScorePct(repo)
+      if (pct == null) continue
       const w = repoCommits(repo, window)
       if (w <= 0) continue
-      sum += repo.tokenMechanic.pct * w
+      sum += pct * w
       weight += w
     }
     return weight ? Math.round(sum / weight) : null
@@ -328,7 +331,9 @@ export function buildIntegrityTrendExplanation(
   const activeNow = reposActiveInWindow(stats, repoSet, period, 'current')
   const activePrior = reposActiveInWindow(stats, repoSet, period, 'prior')
   const sample = activeNow.length ? activeNow : repoSet
-  const priorSample = activePrior
+  // B3: mirror grades.ts calcIntegrityGrade — quiet prior window falls back to the full set
+  // so highPrior/lowPrior aren't trivially 0 and the bullets don't claim phantom improvement.
+  const priorSample = activePrior.length ? activePrior : repoSet
 
   const nowSlugs = new Set(sample.map(r => r.githubSlug))
   const priorSlugs = new Set(priorSample.map(r => r.githubSlug))

@@ -1,4 +1,5 @@
 import { Repo, Tag } from './scores'
+import { getEffectiveTag } from './criticalPath'
 import { getTokenMechanicForDisplay } from './economicGrade'
 import { GitHubStats, RepoActivity } from './github'
 import { pctToLetter } from './gradeLetters'
@@ -168,7 +169,8 @@ export function buildOverallGradeContext(
 
   const tagCounts = new Map<Tag, number>()
   for (const repo of scored) {
-    tagCounts.set(repo.tag, (tagCounts.get(repo.tag) ?? 0) + 1)
+    const tag = getEffectiveTag(repo)
+    tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1)
   }
   const dominantTags = Array.from(tagCounts.entries())
     .map(([tag, count]) => ({ tag, count }))
