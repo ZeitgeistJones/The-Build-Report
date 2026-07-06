@@ -140,10 +140,10 @@ export function formatRescoreDeltaHeader(deltas: RescoreAggregateDelta): string 
   }
 
   if (deltas.builderIntegrity.oldPct == null) {
-    parts.push(`Builder integrity: first score (${deltas.builderIntegrity.newPct}%)`)
+    parts.push(`Builder standards: first score (${deltas.builderIntegrity.newPct}%)`)
   } else {
     parts.push(
-      `Builder integrity ${deltas.builderIntegrity.label} (${deltas.builderIntegrity.oldPct}% → ${deltas.builderIntegrity.newPct}%)`,
+      `Builder standards ${deltas.builderIntegrity.label} (${deltas.builderIntegrity.oldPct}% → ${deltas.builderIntegrity.newPct}%)`,
     )
   }
 
@@ -170,7 +170,7 @@ export function formatChangedRowsForPrompt(deltas: RescoreAggregateDelta): strin
 
   appendSection('Shipping leverage rows', deltas.rowDeltas.shippingLeverage)
   appendSection('Token mechanic rows', deltas.rowDeltas.tokenMechanic)
-  appendSection('Builder integrity rows', deltas.rowDeltas.builderIntegrity)
+  appendSection('Builder standards rows', deltas.rowDeltas.builderIntegrity)
 
   return sections.length ? sections.join('\n\n') : 'No rubric row level changes.'
 }

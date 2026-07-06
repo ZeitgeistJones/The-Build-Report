@@ -180,7 +180,7 @@ function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
         `${period} window:`,
         `  Builder activity: ${bg.letter} (${bg.pct}%), ${trend}`,
         `  Holder economics: ${tg.letter} (${tg.pct}%), ${tg.counts.repos} repos in sample${tg.holderCoveragePct != null ? `, ${tg.holderCoveragePct}% holder-facing commit share` : ''}`,
-        `  Builder integrity: ${ig.letter} (${ig.pct}%), ${ig.counts.commitWeight} commits weighted (${ig.counts.low} low / ${ig.counts.mid} mid / ${ig.counts.high} high)`,
+        `  Builder standards: ${ig.letter} (${ig.pct}%), ${ig.counts.commitWeight} commits weighted (${ig.counts.low} low / ${ig.counts.mid} mid / ${ig.counts.high} high)`,
       ].join('\n')
     })
     .join('\n\n')
@@ -300,7 +300,7 @@ Return ONLY valid JSON, no markdown fences:
 Rules:
 - Each card field: 2-3 complete sentences. Each period must sound DISTINCT from the others — a holder toggling 24h vs 30d should read different stories.
 - If a period shows QUIET (zero commits) in PER-PERIOD ACTIVITY, say so plainly in that period's cards. Do not write motivational filler or imply work happened.
-- If holder economics or integrity have zero commit weight / empty sample, say we cannot draw a strong read for that window yet.
+- If holder economics or builder standards have zero commit weight / empty sample, say we cannot draw a strong read for that window yet.
 - 60d cards: describe the two-month arc. Do not imply week-over-week trend or compare to a prior 60d window.
 - 24h with no activity: one short honest sentence per card beats three padded ones.
 - general: 3-4 complete sentences, meatier than any single card.

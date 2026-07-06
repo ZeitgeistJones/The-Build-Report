@@ -40,7 +40,7 @@ function formatContext(ctx: OverallGradeContext): string {
   const builder = ctx.builder
     ? `Builder activity: ${ctx.builder.letter} (${ctx.builder.pct}%)`
     : 'Builder activity: unavailable (GitHub data missing — weight redistributed)'
-  const integrity = `Builder integrity: ${ctx.integrity.letter} (${ctx.integrity.pct}%)`
+  const integrity = `Builder standards: ${ctx.integrity.letter} (${ctx.integrity.pct}%)`
   const overall = `Overall (${PERIOD_LABELS[ctx.period]} window): ${ctx.overall.letter} (${ctx.overall.pct}%)`
   const reposScored = `Repos scored: ${ctx.overall.reposScored}`
 
@@ -65,7 +65,7 @@ function formatContext(ctx: OverallGradeContext): string {
     integrity,
     `Repos with token mechanic grade: ${ctx.reposWithTokenMechanicGrade}`,
     `Token mechanic grade distribution (${ctx.reposWithTokenMechanicGrade} grades): ${formatDistribution(ctx.tokenMechanicDistribution)}`,
-    `Builder integrity grade distribution (${ctx.overall.reposScored} grades): ${formatDistribution(ctx.builderIntegrityDistribution)}`,
+    `Builder standards grade distribution (${ctx.overall.reposScored} grades): ${formatDistribution(ctx.builderIntegrityDistribution)}`,
     `Dominant tags: ${tags}`,
     `Most active repos (${ctx.period}): ${active || 'none'}`,
     activity,

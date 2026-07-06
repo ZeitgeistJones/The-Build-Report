@@ -288,7 +288,7 @@ function RubricSectionTitle({ children, hint }: { children: ReactNode; hint?: st
       {hint && (
         <InfoTooltip
           content={hint}
-          ariaLabel="Builder integrity weight explanation"
+          ariaLabel="Builder standards weight explanation"
           icon="question"
           width={240}
           compact
@@ -368,7 +368,7 @@ function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
           {oldEconomic} → {newEconomic}
         </div>
         <div>
-          <span style={{ color: 'var(--text-muted)' }}>Builder integrity: </span>
+          <span style={{ color: 'var(--text-muted)' }}>Builder standards: </span>
           {formatRescoreOldGrade(meta.oldBuilderIntegrity)} → {meta.newBuilderIntegrity}
         </div>
         <div>
@@ -1083,7 +1083,7 @@ export default function RepoList({
                   {repo.builderIntegrity.letter}
                 </div>
                 <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
-                <div style={{ fontSize: `${d.pctLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>builder<br />integrity</div>
+                <div style={{ fontSize: `${d.pctLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>builder<br />standards</div>
               </div>
 
               <MetricDivider show={!isMobile} />
@@ -1217,7 +1217,7 @@ export default function RepoList({
                   )}
 
                   <div style={rubricSectionGridStyle('bi', hasSL, hasTM, isMobile)}>
-                    <RubricSectionTitle hint={BI_WEIGHTS_TOOLTIP_SHORT}>Builder integrity</RubricSectionTitle>
+                    <RubricSectionTitle hint={BI_WEIGHTS_TOOLTIP_SHORT}>Builder standards</RubricSectionTitle>
                     {integritySectionFraming(repo) && (
                       <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.35 }}>
                         {integritySectionFraming(repo)}

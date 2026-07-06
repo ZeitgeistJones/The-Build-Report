@@ -27,7 +27,7 @@ function formatRepoScores(repo: Repo): string {
   return [
     `Tag: ${repo.tag} · Status: ${repo.status}`,
     formatEconomicBlock(repo),
-    formatScoreBlock('Builder integrity', repo.builderIntegrity),
+    formatScoreBlock('Builder standards', repo.builderIntegrity),
     `Verdict: ${repo.verdict}`,
   ].join('\n')
 }

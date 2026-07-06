@@ -9,7 +9,7 @@ export default function AboutPage() {
   const sections = [
     {
       heading: 'What this is',
-      body: `The Build Report is an independent community project tracking what clawdbotatg is building on GitHub and scoring each repo on three axes: token mechanic or shipping leverage (holder economic impact), builder integrity (trust and alignment), and ecosystem-wide builder activity from GitHub signals.
+      body: `The Build Report is an independent community project tracking what clawdbotatg is building on GitHub and scoring each repo on three axes: token mechanic or shipping leverage (holder economic impact), builder standards (observable safety, testing, and transparency rubrics), and ecosystem-wide builder activity from GitHub signals.
 
 It is not affiliated with clawdbotatg, Austin Griffith, or any core team. It was built by a community member who holds $CLAWD and wanted a clearer picture of what was being built and why.`,
     },
@@ -59,7 +59,7 @@ Accepted context is grounding the AI weighs, not a direct score override. Every 
 
 Supply lock is not a burn. Locking CLAWD in a staking or vesting contract removes it from circulation temporarily — it can return. A burn permanently destroys tokens. Both are meaningful but they are not the same thing.
 
-Infrastructure repos are not expected to have direct burn or revenue mechanics. They may still receive adapted token mechanic scores on the launch baseline; live AI infrastructure often shows N/A. All repos are scored on builder integrity.`,
+Infrastructure repos are not expected to have direct burn or revenue mechanics. They may still receive adapted token mechanic scores on the launch baseline; live AI infrastructure often shows N/A. All repos are scored on builder standards.`,
     },
     {
       heading: 'Sources',
@@ -71,7 +71,7 @@ The Chronicle is the primary grounding document. Where a score references a twee
       heading: 'Corrections and disagreements',
       body: `If you think a score is wrong, that conversation should happen in the open. The scoring methodology is fully documented on the main page. Admin notes can be added to any card for context — scores themselves are not changed quietly.
 
-One known v1 limitation: the 'Agent-authored build' criterion under Builder Integrity infers autonomous coding patterns from repo metadata alone. The human collaborator's role is infrastructure and multisig signing, not code authorship — low scores here reflect inference uncertainty from limited metadata, not evidence of human coding involvement.
+One known v1 limitation: the 'Agent-authored build' criterion under Builder standards (legacy 3-row rubric) infers autonomous coding patterns from repo metadata alone. The human collaborator's role is infrastructure and multisig signing, not code authorship — low scores here reflect inference uncertainty from limited metadata, not evidence of human coding involvement.
 
 This is a speculative, experimental community project. It will have errors. The goal is to be honest about the limits of what it knows.`,
     },

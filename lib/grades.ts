@@ -746,19 +746,19 @@ export function calcIntegrityGrade(stats: GitHubStats | null, period: Period, re
     summary:
       period === '60d'
         ? pct >= 80
-          ? 'Repos seeing the most commits over 60 days score strongly on the builder-values rubric.'
+          ? 'Repos seeing the most commits over 60 days score strongly on the builder-standards rubric.'
           : pct >= 60
-            ? 'Heavy 60-day commit repos mostly fit the stated builder-values frame.'
+            ? 'Heavy 60-day commit repos mostly fit the builder-standards frame.'
             : pct >= 40
-              ? 'Integrity is mixed across where commit volume landed over 60 days.'
-              : 'Most 60-day commits landed on repos with weaker builder-values scores.'
+              ? 'Standards scores are mixed across where commit volume landed over 60 days.'
+              : 'Most 60-day commits landed on repos with weaker builder-standards scores.'
         : pct >= 80
-        ? 'Repos seeing the most commits score strongly on the builder-values rubric.'
+        ? 'Repos seeing the most commits score strongly on the builder-standards rubric.'
         : pct >= 60
-          ? 'Heavy commit repos mostly fit the stated builder-values frame, with some weaker alignment.'
+          ? 'Heavy commit repos mostly fit the builder-standards frame, with some weaker rubric rows.'
           : pct >= 40
-            ? 'Integrity is mixed across where commit volume landed this window.'
-            : 'Most commits this window landed on repos with weaker builder-values scores.',
+            ? 'Standards scores are mixed across where commit volume landed this window.'
+            : 'Most commits this window landed on repos with weaker builder-standards scores.',
     signals: [
       ...v5Signals,
       { label: 'High-standards share', level: toLevel(high / weightBase), pct: Math.round((high / weightBase) * 100) },

@@ -131,7 +131,7 @@ export default function HowWeScoreContent({
             </li>
           </ul>
           <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-            Use the period toggle (7d / 30d / 60d) on the Grades panel. Repos with more commits in the window weigh more in economic and integrity blends.
+            Use the period toggle (7d / 30d / 60d) on the Grades panel. Repos with more commits in the window weigh more in economic and builder-standards blends.
           </p>
         </div>
       </section>

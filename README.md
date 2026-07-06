@@ -6,7 +6,7 @@ A plain English look at the clawdbotatg repos, scored and sourced.
 
 - Tracks GitHub activity for clawdbotatg in real time (commits, active days, new repos)
 - Shows rolling builder activity grade, token mechanic grade, and overall composite grade (30d / 7d toggle with trend)
-- Scores every major repo on two axes: token mechanic and builder integrity
+- Scores every major repo on token mechanic (or shipping leverage) and builder standards
 - Each score is broken into three weighted components, each cited to a public source
 - Wallet connect on Base mainnet — CLAWDGate tier 1 (10M+ $CLAWD) unlocks the full report
 - Per-repo Score/Rescore via paid autoscore (0.000008 ETH to receiver-buy-and-burn)
