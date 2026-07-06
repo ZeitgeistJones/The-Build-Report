@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useSendTransaction } from 'wagmi'
 import { waitForTransactionReceipt } from '@wagmi/core'
 import { base } from 'wagmi/chains'
@@ -40,6 +41,7 @@ function RescoreTooltipContent() {
 }
 
 export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onScored }: Props) {
+  const router = useRouter()
   const isMobile = useIsMobile()
   const { isConnected, hasAccess, connectWallet, address, isWrongChain, switchToBase } = useClawdAccess()
   const [inlineMsg, setInlineMsg] = useState<string | null>(null)
@@ -93,6 +95,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       }
       const rescoreMeta = data.rescoreMeta as RescoreSummaryRecord | undefined
       onScored(data.repo as Repo, rescoreMeta ?? null)
+      router.refresh()
       setInlineMsg('Rescore saved — expand card to see what changed.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')

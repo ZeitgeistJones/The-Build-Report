@@ -86,3 +86,14 @@ export async function getBurnSnapshotForDisplay(): Promise<BurnSnapshot> {
 export function scheduleBurnSnapshotSync(): void {
   void syncBurnSnapshot().catch(() => {})
 }
+
+/** Optimistic bump until the next on-chain sync overwrites ETH_PENDING_KEY. */
+export async function incrementEthPendingOptimistic(ethAmount: number): Promise<void> {
+  if (ethAmount <= 0) return
+  try {
+    const r = getRedis()
+    await r.incrbyfloat(ETH_PENDING_KEY, ethAmount)
+  } catch {
+    // non-blocking — live balance read on display is authoritative
+  }
+}

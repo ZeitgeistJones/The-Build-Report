@@ -385,16 +385,16 @@ export function integrityCardLayman(grade: IntegrityGrade, period: Period): stri
           ? `Across two months, most work landed on projects that broadly match their stated values, with a few softer spots.`
           : tier === 'mixed'
             ? `The two-month trust picture is mixed — solid projects and shakier ones both saw attention.`
-            : `Over two months, a lot of visible work concentrated on projects with weaker trust signals.`
+            : `Over two months, a lot of visible work landed on projects that score lower on security, testing, and code quality.`
   } else if (period === '24h') {
     base =
       tier === 'top'
-        ? `In the last day, the projects that moved look aligned with what they tell holders — a good short-term trust signal.`
+        ? `In the last day, the projects that moved look aligned with what they tell holders — a good sign for holder confidence.`
         : tier === 'solid'
           ? `Yesterday's updates mostly landed on reasonably trustworthy projects, with minor weak spots.`
           : tier === 'mixed'
             ? `The last day does not give a clean integrity read — a little activity, mixed quality.`
-            : `In the last 24 hours, the work we could see leaned toward projects with weaker trust signals.`
+            : `In the last 24 hours, the work we could see leaned toward projects with weaker security and testing scores.`
   } else if (period === '7d') {
     base =
       tier === 'top'
@@ -403,7 +403,7 @@ export function integrityCardLayman(grade: IntegrityGrade, period: Period): stri
           ? `This week, trust and alignment are mostly in good shape, with a few repos worth watching.`
           : tier === 'mixed'
             ? `This week, integrity is split — some trustworthy projects moved, others less so.`
-            : `This week, much of the work landed on projects with weaker trust signals.`
+            : `This week, much of the work landed on repos with weaker security, testing, and code-quality scores.`
   } else {
     base =
       tier === 'top'
@@ -412,7 +412,7 @@ export function integrityCardLayman(grade: IntegrityGrade, period: Period): stri
           ? `This month, most work aligns with trustworthy projects, though not perfectly everywhere.`
           : tier === 'mixed'
             ? `This month, trust is a mixed bag — effort split between solid and shakier projects.`
-            : `This month, a lot of work landed on projects with weaker trust signals — this is the card to watch.`
+            : `This month, a lot of work landed on projects that score lower on security, testing, and code quality — this is the card to watch.`
   }
 
   if (drag && tier !== 'top') {

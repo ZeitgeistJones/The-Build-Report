@@ -44,6 +44,7 @@ interface Props {
   stats7d: { commits: number; activeDays: number; newRepos: number } | null
   stats60d: { commits: number; activeDays: number; newRepos: number } | null
   digestCards: DailyDigestCards | null
+  communityContextEnabled?: boolean
 }
 
 const CARD_LABELS: Record<CardId, string> = {
@@ -400,6 +401,7 @@ export default function GradesPanel({
   stats7d,
   stats60d,
   digestCards,
+  communityContextEnabled = false,
 }: Props) {
   const { period } = useGradePeriod()
   const isMobile = useIsMobile()
@@ -549,6 +551,14 @@ export default function GradesPanel({
           <Link href="/how-we-score" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none' }}>
             How we score →
           </Link>
+          {communityContextEnabled && (
+            <Link
+              href="/how-we-score#hw-score-community"
+              style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none' }}
+            >
+              Think we&apos;re missing something? Add context →
+            </Link>
+          )}
           {!isMobile && pulse24 && pulse30 && pulse7 && pulse60 && (
             <PulseMicrostats
               pulse24={pulse24}

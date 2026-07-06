@@ -15,7 +15,7 @@ const CARD_STYLE = {
   padding: '14px 16px',
 } as const
 
-const TOC_LINKS = [
+const BASE_TOC_LINKS = [
   { href: '#hw-score-rubrics', label: 'Rubrics' },
   { href: '#hw-score-grades', label: 'Ecosystem grades' },
   { href: '#chronicle', label: 'Latest Chronicle' },
@@ -26,17 +26,20 @@ const TOC_LINKS = [
   { href: '#hw-score-scale', label: 'Letter scale' },
   { href: '#hw-score-tags', label: 'Tags' },
   { href: '#hw-score-changelog', label: 'Changelog' },
-]
+] as const
 
-const TAG_PILLS: { tag: string; label: string; color: string; bg: string }[] = [
-  { tag: 'direct', label: 'direct', color: '#5cb87a', bg: 'rgba(92,184,122,0.1)' },
-  { tag: 'supply-lock', label: 'supply lock', color: '#5b9bd5', bg: 'rgba(91,155,213,0.1)' },
-  { tag: 'indirect', label: 'indirect', color: '#a07cd5', bg: 'rgba(160,124,213,0.1)' },
-  { tag: 'infrastructure', label: 'infrastructure', color: 'var(--text-secondary)', bg: 'var(--surface-3)' },
-  { tag: 'theoretical', label: 'theoretical', color: '#d4943a', bg: 'rgba(212,148,58,0.1)' },
-]
+type TocLink = { href: string; label: string }
 
-function TocNav() {
+function buildTocLinks(communityContextEnabled: boolean): TocLink[] {
+  if (!communityContextEnabled) return [...BASE_TOC_LINKS]
+  const links: TocLink[] = [...BASE_TOC_LINKS]
+  const ecosystemIdx = links.findIndex(l => l.href === '#context')
+  links.splice(ecosystemIdx, 0, { href: '#hw-score-community', label: 'Community context' })
+  return links
+}
+
+function TocNav({ communityContextEnabled }: { communityContextEnabled: boolean }) {
+  const links = buildTocLinks(communityContextEnabled)
   return (
     <nav
       aria-label="How we score sections"
@@ -48,7 +51,7 @@ function TocNav() {
         fontSize: '12px',
       }}
     >
-      {TOC_LINKS.map(link => (
+      {links.map(link => (
         <a
           key={link.href}
           href={link.href}
@@ -60,6 +63,14 @@ function TocNav() {
     </nav>
   )
 }
+
+const TAG_PILLS: { tag: string; label: string; color: string; bg: string }[] = [
+  { tag: 'direct', label: 'direct', color: '#5cb87a', bg: 'rgba(92,184,122,0.1)' },
+  { tag: 'supply-lock', label: 'supply lock', color: '#5b9bd5', bg: 'rgba(91,155,213,0.1)' },
+  { tag: 'indirect', label: 'indirect', color: '#a07cd5', bg: 'rgba(160,124,213,0.1)' },
+  { tag: 'infrastructure', label: 'infrastructure', color: 'var(--text-secondary)', bg: 'var(--surface-3)' },
+  { tag: 'theoretical', label: 'theoretical', color: '#d4943a', bg: 'rgba(212,148,58,0.1)' },
+]
 
 interface Props {
   chronicle: ChronicleBannerData | null
@@ -94,7 +105,7 @@ export default function HowWeScoreContent({
         <Link href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</Link>.
       </p>
 
-      <TocNav />
+      <TocNav communityContextEnabled={communityContextEnabled} />
       <HowWeScoreRubrics />
 
       <section id="hw-score-grades" style={{ marginBottom: '20px' }}>
@@ -136,6 +147,15 @@ export default function HowWeScoreContent({
               cannot show. Submitting burns a small amount of CLAWD; voting is free for holders. Enough net upvotes
               auto-accepts context, which the AI then reads on the next paid rescore.
             </p>
+            <p style={{ margin: '10px 0 0', fontWeight: 500, color: 'var(--text-primary)', fontSize: '12px' }}>
+              How to add context
+            </p>
+            <ol style={{ margin: '6px 0 0', paddingLeft: '18px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+              <li style={{ marginBottom: '4px' }}>Find the repo on the homepage.</li>
+              <li style={{ marginBottom: '4px' }}>Expand the card.</li>
+              <li style={{ marginBottom: '4px' }}>Submit context (small CLAWD burn) — voting is free for holders.</li>
+              <li>Accepted context is read on the next paid rescore.</li>
+            </ol>
             <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
               Sources are encouraged — context with no source is labeled &quot;No source provided.&quot; Accepted context is
               grounding the AI weighs, not a direct score override. Every submission, its votes, and its acceptance are

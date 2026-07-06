@@ -3,9 +3,10 @@
 import InfoTooltip from '@/components/InfoTooltip'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
-  APPROX_PENDING_LABEL,
   CLAWD_BURNED_TOOLTIP,
   ETH_PENDING_TOOLTIP,
+  formatEthPendingLabel,
+  RESCORE_COUNT_TOOLTIP,
 } from '@/lib/burnTrackerCopy'
 import {
   formatClawdAmount,
@@ -28,11 +29,10 @@ export default function RescoreBurnTracker({
 }: Props) {
   const isMobile = useIsMobile()
   const lastBurnLabel = formatLastBurnLabel(lastBurnAt)
+  const ethPendingLabel = formatEthPendingLabel(ethPendingInReceiver)
+  const showMeta = count > 0 || Boolean(lastBurnLabel) || Boolean(ethPendingLabel)
 
   if (count <= 0 && clawdBurnedOnChain <= 0 && ethPendingInReceiver <= 0) return null
-
-  const metaParts: string[] = []
-  if (lastBurnLabel) metaParts.push(lastBurnLabel)
 
   return (
     <div style={{ textAlign: isMobile ? 'left' : 'right', maxWidth: isMobile ? undefined : '200px' }}>
@@ -63,7 +63,7 @@ export default function RescoreBurnTracker({
         />
       </div>
 
-      {(metaParts.length > 0 || ethPendingInReceiver > 0) && (
+      {showMeta && (
         <div
           style={{
             fontSize: '10px',
@@ -77,19 +77,34 @@ export default function RescoreBurnTracker({
             flexWrap: 'wrap',
           }}
         >
-          {metaParts.length > 0 && <span>{metaParts.join(' · ')}</span>}
-          {metaParts.length > 0 && ethPendingInReceiver > 0 && <span>·</span>}
-          {ethPendingInReceiver > 0 && (
-            <>
-              <span>{APPROX_PENDING_LABEL}</span>
+          {count > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span>
+                {count.toLocaleString('en-US')} rescore{count === 1 ? '' : 's'} funded
+              </span>
+              <InfoTooltip
+                content={RESCORE_COUNT_TOOLTIP}
+                ariaLabel="About rescore count"
+                icon="question"
+                compact
+                width={240}
+              />
+            </span>
+          )}
+          {count > 0 && (lastBurnLabel || ethPendingLabel) && <span aria-hidden>·</span>}
+          {lastBurnLabel && <span>{lastBurnLabel}</span>}
+          {lastBurnLabel && ethPendingLabel && <span aria-hidden>·</span>}
+          {ethPendingLabel && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span>{ethPendingLabel}</span>
               <InfoTooltip
                 content={ETH_PENDING_TOOLTIP}
-                ariaLabel="About approximate burn pending"
+                ariaLabel="About ETH queued for burn"
                 icon="question"
                 compact
                 width={260}
               />
-            </>
+            </span>
           )}
         </div>
       )}

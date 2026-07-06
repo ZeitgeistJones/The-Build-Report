@@ -829,26 +829,32 @@ export default function RepoList({
                   const ctx = contextSummary[repo.githubSlug]
                   const accepted = ctx.state === 'accepted'
                   return (
-                    <RepoBadge
-                      tooltip={
-                        accepted
-                          ? 'Holder context accepted — applied on the next rescore. Expand for details.'
-                          : `Holder context gathering votes (${ctx.upvotes}/${ctx.needed} to accept). Expand to vote.`
-                      }
-                      style={{
-                        fontSize: '10px',
-                        padding: '2px 7px',
-                        borderRadius: '99px',
-                        fontWeight: 500,
-                        color: accepted ? 'var(--accent)' : 'var(--amber)',
-                        background: accepted ? 'var(--accent-dim)' : 'rgba(212,148,58,0.1)',
-                        border: `1px solid ${accepted ? 'var(--accent-border)' : 'var(--border)'}`,
-                        letterSpacing: '0.02em',
-                        display: 'inline-block',
-                      }}
+                    <Link
+                      href="/how-we-score#hw-score-community"
+                      onClick={e => e.stopPropagation()}
+                      style={{ textDecoration: 'none' }}
                     >
-                      {accepted ? 'context ✓' : `context ${ctx.upvotes}/${ctx.needed}`}
-                    </RepoBadge>
+                      <RepoBadge
+                        tooltip={
+                          accepted
+                            ? 'Holder context accepted — applied on the next rescore. Expand for details.'
+                            : `Holder context gathering votes (${ctx.upvotes}/${ctx.needed} to accept). Expand to vote.`
+                        }
+                        style={{
+                          fontSize: '10px',
+                          padding: '2px 7px',
+                          borderRadius: '99px',
+                          fontWeight: 500,
+                          color: accepted ? 'var(--accent)' : 'var(--amber)',
+                          background: accepted ? 'var(--accent-dim)' : 'rgba(212,148,58,0.1)',
+                          border: `1px solid ${accepted ? 'var(--accent-border)' : 'var(--border)'}`,
+                          letterSpacing: '0.02em',
+                          display: 'inline-block',
+                        }}
+                      >
+                        {accepted ? 'context ✓' : `context ${ctx.upvotes}/${ctx.needed}`}
+                      </RepoBadge>
+                    </Link>
                   )
                 })()}
                 {!pending && (

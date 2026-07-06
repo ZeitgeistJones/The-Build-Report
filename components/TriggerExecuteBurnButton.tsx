@@ -9,6 +9,8 @@ import {
 } from '@/lib/web3/constants'
 import { MIN_TAP } from '@/lib/responsive'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import InfoTooltip from '@/components/InfoTooltip'
+import { NOTHING_PENDING_TOOLTIP } from '@/lib/burnTrackerCopy'
 
 interface Props {
   ethPending: number
@@ -91,28 +93,39 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={busy || (isConnected && !isWrongChain && !canBurn && !isSuccess)}
-        style={{
-          fontSize: compact ? '10px' : '13px',
-          fontWeight: 600,
-          padding: compact ? '4px 10px' : isMobile ? '12px 18px' : '10px 18px',
-          minHeight: isMobile && !compact ? MIN_TAP : undefined,
-          borderRadius: '99px',
-          border: '1px solid var(--accent-border)',
-          background: canBurn || !isConnected || isSuccess ? 'var(--accent-dim)' : 'var(--surface-2)',
-          color: canBurn || !isConnected || isSuccess ? 'var(--accent)' : 'var(--text-muted)',
-          cursor: busy ? 'wait' : 'pointer',
-          whiteSpace: 'nowrap',
-          maxWidth: '100%',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {label}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: compact ? 'flex-end' : 'flex-start' }}>
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={busy || (isConnected && !isWrongChain && !canBurn && !isSuccess)}
+          style={{
+            fontSize: compact ? '10px' : '13px',
+            fontWeight: 600,
+            padding: compact ? '4px 10px' : isMobile ? '12px 18px' : '10px 18px',
+            minHeight: isMobile && !compact ? MIN_TAP : undefined,
+            borderRadius: '99px',
+            border: '1px solid var(--accent-border)',
+            background: canBurn || !isConnected || isSuccess ? 'var(--accent-dim)' : 'var(--surface-2)',
+            color: canBurn || !isConnected || isSuccess ? 'var(--accent)' : 'var(--text-muted)',
+            cursor: busy ? 'wait' : 'pointer',
+            whiteSpace: 'nowrap',
+            maxWidth: '100%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {label}
+        </button>
+        {compact && !canBurn && isConnected && !isWrongChain && !busy && !isSuccess && (
+          <InfoTooltip
+            content={NOTHING_PENDING_TOOLTIP}
+            ariaLabel="Why nothing is pending"
+            icon="question"
+            compact
+            width={260}
+          />
+        )}
+      </div>
 
       {isSuccess && hash && !compact && (
         <a

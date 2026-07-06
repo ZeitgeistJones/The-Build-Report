@@ -246,6 +246,7 @@ export default async function Home() {
             : null
         }
         digestCards={buildBrief?.cards ?? null}
+        communityContextEnabled={communityContextEnabled}
       />
       </div>
 

@@ -289,7 +289,7 @@ Rules:
 - CARD COPY MUST BE PLAIN WORDS ONLY — absolutely no numbers, percentages, letter grades, or counts in the card fields. The numbers live elsewhere in the UI.
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
 - Say "holder economics" or "how apps and locks serve $CLAWD holders" instead of "token mechanics" or "burn apps" alone.
-- Integrity copy = whether projects keep their promises to holders (trust, transparency, safety) — not moralizing.
+- Integrity copy = whether projects keep their promises to holders — safety, testing, transparency, and whether the work matches what they tell holders. Use plain words; never say "trust signals". Not moralizing.
 - The general overview MAY name specific repos and describe what shipped; the card fields should stay high-level and plain.`
 
   try {
