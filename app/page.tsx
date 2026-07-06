@@ -123,13 +123,13 @@ export default async function Home() {
   const integrityGrade60Raw = stats ? calcIntegrityGrade(stats, '60d', allRepos) : calcIntegrityGrade(null, '60d', allRepos)
 
   const builderGrade24 = builderGrade24Raw && stats
-    ? { ...builderGrade24Raw, trendExplanation: buildBuilderTrendExplanation(stats, '24h', builderGrade24Raw.trendPct, builderGrade24Raw.trend) }
+    ? { ...builderGrade24Raw, trendExplanation: buildBuilderTrendExplanation(stats, '24h', builderGrade24Raw.trendPct, builderGrade24Raw.trend, allRepos) }
     : builderGrade24Raw
   const builderGrade30 = builderGrade30Raw && stats
-    ? { ...builderGrade30Raw, trendExplanation: buildBuilderTrendExplanation(stats, '30d', builderGrade30Raw.trendPct, builderGrade30Raw.trend) }
+    ? { ...builderGrade30Raw, trendExplanation: buildBuilderTrendExplanation(stats, '30d', builderGrade30Raw.trendPct, builderGrade30Raw.trend, allRepos) }
     : builderGrade30Raw
   const builderGrade7 = builderGrade7Raw && stats
-    ? { ...builderGrade7Raw, trendExplanation: buildBuilderTrendExplanation(stats, '7d', builderGrade7Raw.trendPct, builderGrade7Raw.trend) }
+    ? { ...builderGrade7Raw, trendExplanation: buildBuilderTrendExplanation(stats, '7d', builderGrade7Raw.trendPct, builderGrade7Raw.trend, allRepos) }
     : builderGrade7Raw
   const tokenMechanicGrade24 = tokenMechanicGrade24Raw && stats
     ? { ...tokenMechanicGrade24Raw, trendExplanation: buildTokenMechanicTrendExplanation(stats, '24h', allRepos, tokenMechanicGrade24Raw.trendPct, tokenMechanicGrade24Raw.trend) }
@@ -248,6 +248,8 @@ export default async function Home() {
             : null
         }
         digestCards={buildBrief?.cards ?? null}
+        githubStats={stats}
+        repos={repos}
         communityContextEnabled={communityContextEnabled}
       />
       </div>

@@ -1,19 +1,24 @@
 import { Repo, Tag } from './scores'
 import { GitHubStats, RepoActivity } from './github'
 import { Period, formatTrendPct, TrendExplanation, TrendDirection } from './grades'
+import {
+  formatRepoLeaders,
+  topReposByCommits,
+  type RepoCommitLeader,
+} from './gradeCardCopy'
 
 export type { TrendExplanation }
 
 function priorWindowLabel(period: Period): string {
-  if (period === '30d') return 'prior 30d (days 31–60)'
-  if (period === '24h') return 'prior 24h (24–48h ago)'
-  return 'prior 7d (days 8–14)'
+  if (period === '30d') return 'the month before'
+  if (period === '24h') return 'the day before'
+  return 'the week before'
 }
 
 function currentWindowLabel(period: Period): string {
-  if (period === '30d') return 'last 30 days'
-  if (period === '24h') return 'last 24 hours'
-  return 'last 7 days'
+  if (period === '30d') return 'the last 30 days'
+  if (period === '24h') return 'the last 24 hours'
+  return 'the last 7 days'
 }
 
 function commitCount(activity: RepoActivity, period: Period, window: 'current' | 'prior'): number {
@@ -22,6 +27,11 @@ function commitCount(activity: RepoActivity, period: Period, window: 'current' |
   }
   if (period === '24h') {
     return window === 'current' ? (activity.commits24h ?? 0) : (activity.commits24_48 ?? 0)
+  }
+  if (period === '60d') {
+    return window === 'current'
+      ? (activity.commits30d ?? 0) + (activity.commits30_60 ?? 0)
+      : 0
   }
   return window === 'current' ? (activity.commits7d ?? 0) : (activity.commits7_14 ?? 0)
 }
@@ -39,48 +49,55 @@ function reposActiveInWindow(
   })
 }
 
-function topReposByCommits(
-  stats: GitHubStats,
-  period: Period,
-  window: 'current' | 'prior',
-  limit = 5,
-): { name: string; commits: number }[] {
-  return Object.values(stats.repoActivity)
-    .map(a => ({ name: a.slug, commits: commitCount(a, period, window) }))
-    .filter(r => r.commits > 0)
-    .sort((a, b) => b.commits - a.commits)
-    .slice(0, limit)
-}
-
-function formatRepoList(repos: Repo[], max = 4): string {
-  if (!repos.length) return 'none'
-  const names = repos.slice(0, max).map(r => r.name)
-  const extra = repos.length > max ? ` +${repos.length - max} more` : ''
-  return names.join(', ') + extra
-}
-
 function tagLabel(tag: Tag): string {
   if (tag === 'supply-lock') return 'supply lock'
   if (tag === 'infrastructure' || tag === 'theoretical') return 'infra/R&D'
   return tag
 }
 
-function tokenMechanicWeight(tag: Tag): string {
-  if (tag === 'direct') return 'direct burn'
-  if (tag === 'supply-lock') return 'supply lock'
-  if (tag === 'indirect') return 'indirect'
-  return 'infra/R&D'
+function holderFacingTag(tag: Tag): boolean {
+  return tag === 'direct' || tag === 'supply-lock' || tag === 'indirect'
 }
 
-function diffMetricForPeriod(
-  label: string,
-  current: number,
-  prior: number,
+function formatRepoNames(repos: Repo[], stats: GitHubStats, period: Period, max = 2): string {
+  const leaders: RepoCommitLeader[] = repos
+    .map(r => {
+      const live = stats.repoActivity[r.githubSlug]
+      const commits = live ? commitCount(live, period, 'current') : 0
+      return { slug: r.githubSlug, name: r.name, commits }
+    })
+    .filter(r => r.commits > 0)
+    .sort((a, b) => b.commits - a.commits)
+  return formatRepoLeaders(leaders, max)
+}
+
+function groupByTagSentence(
+  repos: Repo[],
+  stats: GitHubStats,
   period: Period,
-): string | null {
-  if (current === prior) return null
-  const dir = current > prior ? 'up' : 'down'
-  return `${label} ${dir}: ${current} this window vs ${prior} ${priorWindowLabel(period).split('(')[0].trim()}`
+  verb: 'picked up' | 'went quiet',
+): string[] {
+  const byTag = new Map<string, Repo[]>()
+  for (const repo of repos) {
+    const label = tagLabel(repo.tag)
+    const list = byTag.get(label) ?? []
+    list.push(repo)
+    byTag.set(label, list)
+  }
+
+  const lines: string[] = []
+  for (const [label, tagRepos] of byTag) {
+    const count = tagRepos.length
+    const leaders = formatRepoNames(tagRepos, stats, period, 2)
+    if (count === 1) {
+      lines.push(`${leaders} (${label}) ${verb} activity.`)
+    } else {
+      lines.push(
+        `${count} ${label} projects ${verb} activity${leaders ? `, led by ${leaders}` : ''}.`,
+      )
+    }
+  }
+  return lines
 }
 
 function builderInputs(stats: GitHubStats, period: Period, window: 'current' | 'prior') {
@@ -126,49 +143,55 @@ export function buildBuilderTrendExplanation(
   period: Period,
   trendPct: number | null,
   trend: TrendDirection,
+  repos?: Repo[],
 ): TrendExplanation {
   const current = builderInputs(stats, period, 'current')
   const prior = builderInputs(stats, period, 'prior')
   const bullets: string[] = []
 
-  for (const line of [
-    diffMetricForPeriod('Commits', current.commits, prior.commits, period),
-    diffMetricForPeriod('Active days', current.activeDays, prior.activeDays, period),
-    diffMetricForPeriod('New repos', current.newRepos, prior.newRepos, period),
-    diffMetricForPeriod('Repos with commits', current.activeRepos, prior.activeRepos, period),
-  ]) {
-    if (line) bullets.push(line)
-  }
+  const commitShift =
+    current.commits !== prior.commits
+      ? current.commits > prior.commits
+        ? `Shipping picked up — more work landed in ${currentWindowLabel(period)} than ${priorWindowLabel(period)}.`
+        : `Shipping eased — less work landed than ${priorWindowLabel(period)}.`
+      : null
+  if (commitShift) bullets.push(commitShift)
 
-  const topNow = topReposByCommits(stats, period, 'current', 5)
+  const dayShift =
+    current.activeDays !== prior.activeDays
+      ? current.activeDays > prior.activeDays
+        ? 'Activity spread across more days this window.'
+        : 'Activity was more concentrated on fewer days.'
+      : null
+  if (dayShift && bullets.length < 3) bullets.push(dayShift)
+
+  const topNow = topReposByCommits(stats, repos, period, 'current', 3)
   if (topNow.length) {
-    bullets.push(
-      `Most commits this window: ${topNow.map(r => `${r.name} (${r.commits})`).join(', ')}.`,
-    )
+    bullets.push(`Most visible work came from ${formatRepoLeaders(topNow, 2)}.`)
   }
 
-  bullets.push('List order still follows GitHub last-pushed; grades weight by commit volume.')
-
-  const topPrior = topReposByCommits(stats, period, 'prior', 3)
-  if (topPrior.length && trend === 'down') {
-    bullets.push(
-      `Prior window was led by ${topPrior.map(r => `${r.name} (${r.commits})`).join(', ')}.`,
-    )
+  if (current.newRepos > prior.newRepos && current.newRepos > 0 && bullets.length < 4) {
+    bullets.push('New projects joined the active set — the footprint is widening.')
+  } else if (trend === 'down' && bullets.length < 4) {
+    const topPrior = topReposByCommits(stats, repos, period, 'prior', 2)
+    if (topPrior.length) {
+      bullets.push(`The prior window was busier around ${formatRepoLeaders(topPrior, 2)}.`)
+    }
   }
 
   if (!bullets.length) {
-    bullets.push('Activity levels are similar to the prior window across tracked repos.')
+    bullets.push('Activity looks about the same as the prior window across tracked projects.')
   }
 
   const trendLabel = formatTrendPct(trendPct, period)
   const headline =
     trend === 'up'
-      ? `Shipping pace rose (${trendLabel}) — more GitHub activity in the ${currentWindowLabel(period)} than ${priorWindowLabel(period)}.`
+      ? `Shipping pace rose (${trendLabel}) — ${currentWindowLabel(period)} was busier than ${priorWindowLabel(period)}.`
       : trend === 'down'
-        ? `Shipping pace softened (${trendLabel}) — less activity in the ${currentWindowLabel(period)} than ${priorWindowLabel(period)}.`
+        ? `Shipping pace softened (${trendLabel}) — ${currentWindowLabel(period)} was quieter than ${priorWindowLabel(period)}.`
         : `Shipping pace held steady (${trendLabel}) compared with ${priorWindowLabel(period)}.`
 
-  return { headline, bullets: bullets.slice(0, 5) }
+  return { headline, bullets: bullets.slice(0, 4) }
 }
 
 export function buildTokenMechanicTrendExplanation(
@@ -189,14 +212,16 @@ export function buildTokenMechanicTrendExplanation(
   const bullets: string[] = []
 
   if (newlyActive.length) {
-    bullets.push(
-      `Newly active this window: ${formatRepoList(newlyActive)} (${newlyActive.map(r => tagLabel(r.tag)).join(', ')}).`,
-    )
+    bullets.push(...groupByTagSentence(newlyActive, stats, period, 'picked up').slice(0, 2))
   }
 
-  if (quietNow.length) {
+  if (quietNow.length && bullets.length < 4) {
+    const quietNames = formatRepoNames(quietNow, stats, period, 2)
+    const extra = quietNow.length > 2 ? ` and ${quietNow.length - 2} more` : ''
     bullets.push(
-      `Quiet this window (active prior): ${formatRepoList(quietNow)} (${quietNow.map(r => tokenMechanicWeight(r.tag)).join(', ')}).`,
+      quietNames
+        ? `Projects that were busy before went quiet, including ${quietNames}${extra}.`
+        : `${quietNow.length} projects that were active before went quiet this window.`,
     )
   }
 
@@ -221,61 +246,57 @@ export function buildTokenMechanicTrendExplanation(
   const rubricNow = rubricWeightedAvg(activeNow, 'current')
   const rubricPrior = rubricWeightedAvg(activePrior, 'prior')
 
-  if (rubricNow != null && rubricPrior != null && rubricNow !== rubricPrior) {
+  if (rubricNow != null && rubricPrior != null && rubricNow !== rubricPrior && bullets.length < 4) {
     const dir = rubricNow > rubricPrior ? 'stronger' : 'weaker'
     bullets.push(
-      `Repos that drove commits this window carried ${dir} token mechanic rubric scores (${rubricNow}% vs ${rubricPrior}% prior, commit-weighted).`,
+      `The projects that moved this window score ${dir} on how well they serve holders than the ones that moved before.`,
     )
   }
 
-  const directNowCommits = activeNow
-    .filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
+  const holderNow = activeNow
+    .filter(r => holderFacingTag(r.tag))
     .reduce((sum, r) => sum + repoCommits(r, 'current'), 0)
-  const directPriorCommits = activePrior
-    .filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
+  const holderPrior = activePrior
+    .filter(r => holderFacingTag(r.tag))
     .reduce((sum, r) => sum + repoCommits(r, 'prior'), 0)
-  const infraNowCommits = activeNow
+  const infraNow = activeNow
     .filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
     .reduce((sum, r) => sum + repoCommits(r, 'current'), 0)
-  const infraPriorCommits = activePrior
+  const infraPrior = activePrior
     .filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
     .reduce((sum, r) => sum + repoCommits(r, 'prior'), 0)
 
-  if (directNowCommits !== directPriorCommits || infraNowCommits !== infraPriorCommits) {
-    bullets.push(
-      `Tag mix (display only): ${directNowCommits} commits on holder-facing repos vs ${directPriorCommits} prior; ${infraNowCommits} on infra/R&D vs ${infraPriorCommits} prior.`,
+  if (holderNow > holderPrior && bullets.length < 4) {
+    bullets.push('More work landed on apps and locks that serve holders directly.')
+  } else if (infraNow > infraPrior && holderNow <= holderPrior && bullets.length < 4) {
+    const infraLeaders = formatRepoNames(
+      activeNow.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical'),
+      stats,
+      period,
+      2,
     )
-  }
-
-  const directNow = activeNow.filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
-  const directPrior = activePrior.filter(r => r.tag === 'direct' || r.tag === 'supply-lock' || r.tag === 'indirect')
-  if (directNow.length !== directPrior.length) {
     bullets.push(
-      `Holder-facing repos with any commits: ${directNow.length} now vs ${directPrior.length} prior${directNow.length ? ` (${formatRepoList(directNow, 3)})` : ''}.`,
+      infraLeaders
+        ? `Background infrastructure work picked up — led by ${infraLeaders}.`
+        : 'More background infrastructure work landed than holder-facing apps.',
     )
-  }
-
-  const infraNow = activeNow.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
-  const infraPrior = activePrior.filter(r => r.tag === 'infrastructure' || r.tag === 'theoretical')
-  if (infraNowCommits > infraPriorCommits && trend === 'down') {
-    bullets.push(
-      `Infra/R&D commit share grew — ${infraNowCommits} commits now vs ${infraPriorCommits} prior (e.g. ${formatRepoList(infraNow, 3)}).`,
-    )
+  } else if (holderNow < holderPrior && bullets.length < 4) {
+    bullets.push('Less work landed on holder-facing apps and locks than the prior window.')
   }
 
   if (!bullets.length) {
-    bullets.push('The mix of active repo tags is similar to the prior window.')
+    bullets.push('The mix of active projects looks similar to the prior window.')
   }
 
   const trendLabel = formatTrendPct(trendPct, period)
   const headline =
     trend === 'up'
-      ? `Token mechanic grade improved (${trendLabel}) — repos with the most commits score stronger on the rubric this window.`
+      ? `Holder economics improved (${trendLabel}) — the busiest projects score better on how they serve holders.`
       : trend === 'down'
-        ? `Token mechanic grade dipped (${trendLabel}) — commit volume landed on repos with weaker rubric scores vs the prior window.`
-        : `Token mechanic grade stable (${trendLabel}) — similar commit-weighted rubric average.`
+        ? `Holder economics dipped (${trendLabel}) — more of the visible work landed on weaker holder-facing projects.`
+        : `Holder economics held steady (${trendLabel}) — similar quality where work happened.`
 
-  return { headline, bullets: bullets.slice(0, 5) }
+  return { headline, bullets: bullets.slice(0, 4) }
 }
 
 export function buildIntegrityTrendExplanation(
@@ -299,50 +320,57 @@ export function buildIntegrityTrendExplanation(
   const lowAdded = added.filter(r => r.builderIntegrity.pct < 60 && r.builderIntegrity.letter !== '—')
   const highDropped = dropped.filter(r => r.builderIntegrity.pct >= 80)
 
-  const highNow = sample.filter(r => r.builderIntegrity.pct >= 80).length
-  const highPrior = priorSample.filter(r => r.builderIntegrity.pct >= 80).length
-  const lowNow = sample.filter(r => r.builderIntegrity.pct < 60 && r.builderIntegrity.letter !== '—').length
-  const lowPrior = priorSample.filter(r => r.builderIntegrity.pct < 60 && r.builderIntegrity.letter !== '—').length
-
   const bullets: string[] = []
 
   if (added.length) {
-    bullets.push(`Repos newly active: ${formatRepoList(added)}.`)
+    const names = formatRepoNames(added, stats, period, 2)
+    const extra = added.length > 2 ? ` and ${added.length - 2} more` : ''
+    bullets.push(`New projects entered the sample${names ? `, including ${names}${extra}` : ''}.`)
   }
-  if (lowAdded.length) {
+
+  if (lowAdded.length && bullets.length < 4) {
     bullets.push(
-      `Lower-integrity repos entering the sample: ${formatRepoList(lowAdded)} (auto-inferred or weaker rubric scores).`,
-    )
-  }
-  if (highDropped.length) {
-    bullets.push(
-      `High-integrity repos quiet this window: ${formatRepoList(highDropped)}.`,
-    )
-  }
-  const topByCommits = topReposByCommits(stats, period, 'current', 5)
-  if (topByCommits.length) {
-    bullets.push(
-      `Where commits landed: ${topByCommits.map(r => `${r.name} (${r.commits})`).join(', ')}.`,
+      `Some newly active projects score lower on safety and transparency (${formatRepoNames(lowAdded, stats, period, 2)}).`,
     )
   }
 
-  if (highNow !== highPrior || lowNow !== lowPrior) {
+  if (highDropped.length && bullets.length < 4) {
     bullets.push(
-      `Repos with high/low integrity scores: ${highNow} high / ${lowNow} low now vs ${highPrior} high / ${lowPrior} low prior (unweighted repo count).`,
+      `Trustworthy projects that were busy before went quiet (${formatRepoNames(highDropped, stats, period, 2)}).`,
     )
+  }
+
+  const topByCommits = topReposByCommits(stats, repoSet, period, 'current', 3)
+  if (topByCommits.length && bullets.length < 4) {
+    bullets.push(`Most work landed on ${formatRepoLeaders(topByCommits, 2)}.`)
+  }
+
+  const highNow = sample.filter(r => r.builderIntegrity.pct >= 80).length
+  const highPrior = priorSample.filter(r => r.builderIntegrity.pct >= 80).length
+  const lowNow = sample.filter(
+    r => r.builderIntegrity.pct < 60 && r.builderIntegrity.letter !== '—',
+  ).length
+  const lowPrior = priorSample.filter(
+    r => r.builderIntegrity.pct < 60 && r.builderIntegrity.letter !== '—',
+  ).length
+
+  if ((highNow > highPrior || lowNow < lowPrior) && bullets.length < 4) {
+    bullets.push('More of the active set is landing on projects that keep their promises to holders.')
+  } else if ((lowNow > lowPrior || highNow < highPrior) && bullets.length < 4) {
+    bullets.push('More of the visible work shifted toward projects with weaker safety and testing scores.')
   }
 
   if (!bullets.length) {
-    bullets.push('The active repo sample and integrity mix are similar to the prior window.')
+    bullets.push('Trust and alignment look about the same as the prior window.')
   }
 
   const trendLabel = formatTrendPct(trendPct, period)
   const headline =
     trend === 'up'
-      ? `Integrity rose (${trendLabel}) — repos with the most commits score stronger on vision, autonomy, and walkaway.`
+      ? `Trust rose (${trendLabel}) — the busiest projects better match what they tell holders.`
       : trend === 'down'
-        ? `Integrity fell (${trendLabel}) — commit volume shifted toward lower-scoring or auto-inferred repos.`
-        : `Integrity steady (${trendLabel}) — similar commit-weighted rubric average.`
+        ? `Trust fell (${trendLabel}) — work shifted toward projects with weaker safety and alignment scores.`
+        : `Trust held steady (${trendLabel}) — similar alignment where work happened.`
 
-  return { headline, bullets: bullets.slice(0, 5) }
+  return { headline, bullets: bullets.slice(0, 4) }
 }

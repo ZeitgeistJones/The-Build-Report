@@ -6,7 +6,102 @@ import type {
   TrendDirection,
   TrendExplanation,
 } from '@/lib/grades'
-import type { GitHubStats } from '@/lib/github'
+import type { GitHubStats, RepoActivity } from '@/lib/github'
+import type { Repo } from '@/lib/scores'
+import { isConsumerEconomicScored } from '@/lib/economicGrade'
+
+export function humanizeRepoSlug(slug: string): string {
+  return slug.replace(/-/g, ' ')
+}
+
+function repoDisplayName(slug: string, repos?: Repo[]): string {
+  return repos?.find(r => r.githubSlug === slug)?.name ?? humanizeRepoSlug(slug)
+}
+
+function commitsForActivity(
+  activity: RepoActivity,
+  period: Period,
+  window: 'current' | 'prior',
+): number {
+  if (period === '30d') {
+    return window === 'current' ? (activity.commits30d ?? 0) : (activity.commits30_60 ?? 0)
+  }
+  if (period === '24h') {
+    return window === 'current' ? (activity.commits24h ?? 0) : (activity.commits24_48 ?? 0)
+  }
+  if (period === '60d') {
+    return window === 'current'
+      ? (activity.commits30d ?? 0) + (activity.commits30_60 ?? 0)
+      : 0
+  }
+  return window === 'current' ? (activity.commits7d ?? 0) : (activity.commits7_14 ?? 0)
+}
+
+export interface RepoCommitLeader {
+  slug: string
+  name: string
+  commits: number
+}
+
+export function topReposByCommits(
+  stats: GitHubStats,
+  repos: Repo[] | undefined,
+  period: Period,
+  window: 'current' | 'prior' = 'current',
+  limit = 3,
+  filter?: (repo: Repo) => boolean,
+): RepoCommitLeader[] {
+  const leaders: RepoCommitLeader[] = []
+
+  for (const [slug, activity] of Object.entries(stats.repoActivity)) {
+    const commits = commitsForActivity(activity, period, window)
+    if (commits <= 0) continue
+    const repo = repos?.find(r => r.githubSlug === slug)
+    if (filter && (!repo || !filter(repo))) continue
+    leaders.push({ slug, name: repoDisplayName(slug, repos), commits })
+  }
+
+  return leaders.sort((a, b) => b.commits - a.commits).slice(0, limit)
+}
+
+export function formatRepoLeaders(leaders: RepoCommitLeader[], maxNames = 2): string {
+  if (!leaders.length) return ''
+  const names = leaders.slice(0, maxNames).map(l => l.name)
+  const extraCount = leaders.length - maxNames
+  const extra = extraCount > 0 ? ` and ${extraCount} more` : ''
+  if (names.length === 1) return names[0] + extra
+  if (names.length === 2) return `${names[0]} and ${names[1]}${extra}`
+  return `${names.join(', ')}${extra}`
+}
+
+export function dominantRepoSentence(
+  leaders: RepoCommitLeader[],
+  totalCommits: number,
+  kind: 'shipping' | 'holder' | 'trust',
+): string | null {
+  if (!leaders.length || totalCommits <= 0) return null
+  const top = leaders[0]
+  const topShare = top.commits / totalCommits
+  const names = formatRepoLeaders(leaders, 2)
+
+  if (leaders.length === 1 || topShare >= 0.55) {
+    if (kind === 'holder') {
+      return `${top.name} drove most of the holder-facing work we could score this window.`
+    }
+    if (kind === 'trust') {
+      return `Most of the visible work landed on ${top.name}.`
+    }
+    return `${top.name} carried most of the shipping this window.`
+  }
+
+  if (kind === 'holder') {
+    return `Holder-facing work was spread across several projects, led by ${names}.`
+  }
+  if (kind === 'trust') {
+    return `Work was spread across several projects, led by ${names}.`
+  }
+  return `Shipping was led by ${names}.`
+}
 
 export type GradeCardId = 'builder' | 'economic' | 'integrity'
 
@@ -238,6 +333,8 @@ export function builderCardLayman(
   grade: BuilderGrade,
   period: Period,
   stats?: { commits: number; activeDays: number; newRepos: number } | null,
+  githubStats?: GitHubStats | null,
+  repos?: Repo[],
 ): string {
   const window = periodPhrase(period)
 
@@ -260,7 +357,11 @@ export function builderCardLayman(
           : tier === 'mixed'
             ? `The two-month view is uneven: some stretches were busy and others quiet, so the overall pace reads as moderate.`
             : `The last two months were light on tracked GitHub activity relative to what this dashboard usually sees.`
-    return `${base} ${trendFlavor(grade.trend, 'builder pace', period)}`
+    const leaders = githubStats ? topReposByCommits(githubStats, repos, period, 'current', 3) : []
+    const dominant = leaders.length && stats
+      ? dominantRepoSentence(leaders, stats.commits, 'shipping')
+      : null
+    return `${base}${dominant ? ` ${dominant}` : ''} ${trendFlavor(grade.trend, 'builder pace', period)}`
   }
 
   if (period === '24h' && stats && stats.commits > 0) {
@@ -293,13 +394,20 @@ export function builderCardLayman(
             : `This month was light on tracked activity — fewer projects saw meaningful updates.`
   }
 
-  return `${base} ${trendFlavor(grade.trend, 'the pace', period)}`
+  const leaders = githubStats ? topReposByCommits(githubStats, repos, period, 'current', 3) : []
+  const dominant =
+    leaders.length && stats?.commits
+      ? dominantRepoSentence(leaders, stats.commits, 'shipping')
+      : null
+  return `${base}${dominant ? ` ${dominant}` : ''} ${trendFlavor(grade.trend, 'the pace', period)}`
 }
 
 export function economicCardLayman(
   grade: TokenMechanicGrade,
   period: Period,
   stats?: { commits: number } | null,
+  githubStats?: GitHubStats | null,
+  repos?: Repo[],
 ): string {
   const window = periodPhrase(period)
   const weight = economicCommitWeight(grade)
@@ -359,14 +467,30 @@ export function economicCardLayman(
             : `This month, much of the work we can see did not concentrate on holder-facing projects.`
   }
 
-  if (grade.counts.repos === 1) {
-    base += ` One project drove almost the entire sample here, so this grade tracks that repo closely.`
+  const holderLeaders = githubStats
+    ? topReposByCommits(githubStats, repos, period, 'current', 3, isConsumerEconomicScored)
+    : []
+  const holderWeight = grade.counts.high + grade.counts.mid + grade.counts.low
+  const dominant =
+    holderLeaders.length && holderWeight > 0
+      ? dominantRepoSentence(holderLeaders, holderWeight, 'holder')
+      : null
+
+  if (dominant) {
+    base += ` ${dominant}`
+  } else if (grade.counts.repos === 1 && holderLeaders[0]) {
+    base += ` ${holderLeaders[0].name} drove almost the entire sample here, so this grade tracks that project closely.`
   }
 
   return `${base} ${trendFlavor(grade.trend, 'holder economics', period)}`
 }
 
-export function integrityCardLayman(grade: IntegrityGrade, period: Period): string {
+export function integrityCardLayman(
+  grade: IntegrityGrade,
+  period: Period,
+  githubStats?: GitHubStats | null,
+  repos?: Repo[],
+): string {
   const window = periodPhrase(period)
 
   if (grade.counts.commitWeight === 0 && grade.counts.active === 0) {
@@ -419,7 +543,13 @@ export function integrityCardLayman(grade: IntegrityGrade, period: Period): stri
     base += ` The weakest area in the rubric right now is ${drag}.`
   }
 
-  return `${base} ${trendFlavor(grade.trend, 'trust', period)}`
+  const leaders = githubStats ? topReposByCommits(githubStats, repos, period, 'current', 3) : []
+  const dominant =
+    leaders.length && grade.counts.commitWeight > 0
+      ? dominantRepoSentence(leaders, grade.counts.commitWeight, 'trust')
+      : null
+
+  return `${base}${dominant ? ` ${dominant}` : ''} ${trendFlavor(grade.trend, 'trust', period)}`
 }
 
 /** True when digest exists but this period's card blurbs are missing (old cache shape). */

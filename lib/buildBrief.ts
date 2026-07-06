@@ -20,7 +20,9 @@ import {
   economicCardLayman,
   integrityCardLayman,
   builderWindowStatsFromGitHub,
+  topReposByCommits,
 } from '@/lib/gradeCardCopy'
+import { isConsumerEconomicScored } from '@/lib/economicGrade'
 
 const DIGEST_KEY_PREFIX = 'build-report:daily-digest:'
 const BRIEF_KEY_PREFIX = 'build-report:build-brief:'
@@ -147,6 +149,22 @@ function formatPeriodActivityContext(stats: GitHubStats): string {
   return `PER-PERIOD ACTIVITY (use to decide what each card may honestly claim):\n${lines.join('\n')}`
 }
 
+function formatTopReposContext(stats: GitHubStats, repos: Repo[]): string {
+  const periods: Period[] = ['24h', '7d', '30d', '60d']
+  const lines = periods.map(period => {
+    const shipping = topReposByCommits(stats, repos, period, 'current', 3)
+    const holder = topReposByCommits(stats, repos, period, 'current', 3, isConsumerEconomicScored)
+    const shipLabel = shipping.length
+      ? shipping.map(r => `${r.name} (${r.commits})`).join(', ')
+      : 'none'
+    const holderLabel = holder.length
+      ? holder.map(r => `${r.name} (${r.commits})`).join(', ')
+      : 'none'
+    return `  ${period}: top shipping — ${shipLabel}; top holder-facing — ${holderLabel}`
+  })
+  return `PER-PERIOD TOP PROJECTS (you may name 1-2 when one dominates a card):\n${lines.join('\n')}`
+}
+
 function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
   const periods: Period[] = ['24h', '7d', '30d', '60d']
   const periodGrades = periods
@@ -166,7 +184,7 @@ function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
       ].join('\n')
     })
     .join('\n\n')
-  return `${formatPeriodActivityContext(stats)}\n\n${periodGrades}`
+  return `${formatPeriodActivityContext(stats)}\n\n${formatTopReposContext(stats, repos)}\n\n${periodGrades}`
 }
 
 const QUIET_GENERAL =
@@ -187,9 +205,9 @@ function buildFallbackDigest(
     const ig = calcIntegrityGrade(stats, period, repos)
     const windowStats = builderWindowStatsFromGitHub(stats, period)
     cards[period] = {
-      builder: builderCardLayman(bg, period, windowStats),
-      economic: economicCardLayman(tg, period, { commits: windowStats.commits }),
-      integrity: integrityCardLayman(ig, period),
+      builder: builderCardLayman(bg, period, windowStats, stats, repos),
+      economic: economicCardLayman(tg, period, { commits: windowStats.commits }, stats, repos),
+      integrity: integrityCardLayman(ig, period, stats, repos),
     }
   }
 
@@ -286,7 +304,7 @@ Rules:
 - 60d cards: describe the two-month arc. Do not imply week-over-week trend or compare to a prior 60d window.
 - 24h with no activity: one short honest sentence per card beats three padded ones.
 - general: 3-4 complete sentences, meatier than any single card.
-- CARD COPY MUST BE PLAIN WORDS ONLY — absolutely no numbers, percentages, letter grades, or counts in the card fields. The numbers live elsewhere in the UI.
+- CARD COPY MUST BE PLAIN WORDS — no percentages, letter grades, or raw stats dumps in the card fields. You MAY name specific projects when PER-PERIOD TOP PROJECTS shows one repo dominated that window.
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
 - Say "holder economics" or "how apps and locks serve $CLAWD holders" instead of "token mechanics" or "burn apps" alone.
 - Integrity copy = whether projects keep their promises to holders — safety, testing, transparency, and whether the work matches what they tell holders. Use plain words; never say "trust signals". Not moralizing.

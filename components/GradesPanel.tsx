@@ -10,6 +10,8 @@ import { PulseMicrostats } from './EcosystemPulse'
 import { EcosystemPulse } from '@/lib/ecosystemPulse'
 import { integrityGradeFootnote } from '@/lib/cardFraming'
 import type { DailyDigestCards } from '@/lib/buildBrief'
+import type { Repo } from '@/lib/scores'
+import type { GitHubStats } from '@/lib/github'
 import {
   builderCardLayman,
   economicCardLayman,
@@ -44,6 +46,8 @@ interface Props {
   stats7d: { commits: number; activeDays: number; newRepos: number } | null
   stats60d: { commits: number; activeDays: number; newRepos: number } | null
   digestCards: DailyDigestCards | null
+  githubStats?: GitHubStats | null
+  repos?: Repo[]
   communityContextEnabled?: boolean
 }
 
@@ -401,6 +405,8 @@ export default function GradesPanel({
   stats7d,
   stats60d,
   digestCards,
+  githubStats = null,
+  repos = [],
   communityContextEnabled = false,
 }: Props) {
   const { period } = useGradePeriod()
@@ -465,17 +471,17 @@ export default function GradesPanel({
   const builderCopy = digestHasPeriod
     ? digestCards![period].builder
     : bg
-      ? builderCardLayman(bg, period, stats)
+      ? builderCardLayman(bg, period, stats, githubStats, repos)
       : 'GitHub data unavailable'
   const economicCopy = digestHasPeriod
     ? digestCards![period].economic
     : tg
-      ? economicCardLayman(tg, period, stats ? { commits: stats.commits } : null)
+      ? economicCardLayman(tg, period, stats ? { commits: stats.commits } : null, githubStats, repos)
       : 'Token mechanic score unavailable'
   const integrityCopy = digestHasPeriod
     ? digestCards![period].integrity
     : ig
-      ? integrityCardLayman(ig, period)
+      ? integrityCardLayman(ig, period, githubStats, repos)
       : 'Integrity score unavailable'
 
   const digestPeriodMissing =
