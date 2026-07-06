@@ -1,6 +1,12 @@
 import { getRedis } from '@/lib/redis'
 import type { GitHubStats } from '@/lib/github'
-import { getGitHubStats, enrichGitHubStatsPeriodCounts, githubStatsNeedsActivityRescan } from '@/lib/github'
+import {
+  getGitHubStats,
+  enrichGitHubStatsPeriodCounts,
+  githubStatsNeedsActivityRescan,
+  fetchTrackableRepoPushes,
+  snapshotPushesBehindLive,
+} from '@/lib/github'
 
 const SNAPSHOT_KEY = 'build-report:github-stats:snapshot'
 const SNAPSHOT_UPDATED_AT_KEY = 'build-report:github-stats:snapshot:updatedAt'
@@ -108,14 +114,58 @@ export async function getGitHubStatsSnapshotDiagnostics(): Promise<{
   }
 }
 
-/** Just past the daily cron cadence — a snapshot older than this means a cron likely failed. */
-export const SNAPSHOT_STALE_MS = 26 * 60 * 60 * 1000
+/** Age after which a page load probes live GitHub pushed_at (cheap) before serving snapshot. */
+export const SNAPSHOT_PROBE_MS = 60 * 60 * 1000
+
+/** Fallback when probe is unavailable — refresh if snapshot is older than daily cron + buffer. */
+export const SNAPSHOT_STALE_MS = 6 * 60 * 60 * 1000
 let staleRefreshInFlight = false
 
-export function isSnapshotStale(updatedAt: string | null): boolean {
-  if (!updatedAt) return true
+export function snapshotAgeMs(updatedAt: string | null): number | null {
+  if (!updatedAt) return null
   const age = Date.now() - new Date(updatedAt).getTime()
-  return !Number.isFinite(age) || age > SNAPSHOT_STALE_MS
+  return Number.isFinite(age) ? age : null
+}
+
+export function isSnapshotStale(updatedAt: string | null): boolean {
+  const age = snapshotAgeMs(updatedAt)
+  return age === null || age > SNAPSHOT_STALE_MS
+}
+
+async function snapshotNeedsLiveRefresh(
+  cached: GitHubStats,
+  updatedAt: string | null,
+): Promise<{ needsRefresh: boolean; behindSlugs: string[]; reason: string }> {
+  if (isSnapshotStale(updatedAt)) {
+    return { needsRefresh: true, behindSlugs: [], reason: 'snapshot_stale' }
+  }
+  if (githubStatsNeedsActivityRescan(cached)) {
+    return { needsRefresh: true, behindSlugs: [], reason: 'activity_rescan' }
+  }
+
+  const age = snapshotAgeMs(updatedAt)
+  if (age === null || age <= SNAPSHOT_PROBE_MS) {
+    return { needsRefresh: false, behindSlugs: [], reason: 'snapshot_fresh' }
+  }
+
+  try {
+    const livePushes = await fetchTrackableRepoPushes()
+    const behindSlugs = snapshotPushesBehindLive(cached, livePushes)
+    if (behindSlugs.length > 0) {
+      return { needsRefresh: true, behindSlugs, reason: 'live_push_ahead' }
+    }
+    return { needsRefresh: false, behindSlugs: [], reason: 'probe_ok' }
+  } catch (err) {
+    console.error('[github-snapshot] live push probe failed', err)
+    return { needsRefresh: false, behindSlugs: [], reason: 'probe_failed' }
+  }
+}
+
+async function refreshGitHubStatsSnapshot(): Promise<GitHubStats | null> {
+  const fresh = await getGitHubStats({ fresh: true })
+  const enriched = enrichGitHubStatsPeriodCounts(fresh)
+  await syncGitHubStatsSnapshot(enriched)
+  return enriched
 }
 
 /**
@@ -127,8 +177,7 @@ function scheduleStaleSnapshotRefresh(): void {
   staleRefreshInFlight = true
   void (async () => {
     try {
-      const fresh = await getGitHubStats({ fresh: true })
-      await syncGitHubStatsSnapshot(fresh)
+      await refreshGitHubStatsSnapshot()
     } catch (err) {
       console.error('[github-snapshot] stale self-heal refresh failed', err)
     } finally {
@@ -137,7 +186,7 @@ function scheduleStaleSnapshotRefresh(): void {
   })()
 }
 
-/** Snapshot first; on miss fetch live GitHub once and persist for subsequent visits. */
+/** Snapshot first; refresh when stale, incomplete, or live GitHub is ahead of cached pushes. */
 export async function loadGitHubStatsForPage(): Promise<{
   stats: GitHubStats | null
   source: 'snapshot' | 'live' | 'none'
@@ -145,7 +194,43 @@ export async function loadGitHubStatsForPage(): Promise<{
   const cached = await getGitHubStatsForDisplay()
   if (cached) {
     const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
-    if (isSnapshotStale(updatedAt) || githubStatsNeedsActivityRescan(cached)) scheduleStaleSnapshotRefresh()
+    const { needsRefresh, behindSlugs, reason } = await snapshotNeedsLiveRefresh(cached, updatedAt)
+
+    // #region agent log
+    fetch('http://127.0.0.1:7800/ingest/fa4fae29-c280-4441-b40c-b48d21260f18', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'a33a7a' },
+      body: JSON.stringify({
+        sessionId: 'a33a7a',
+        location: 'lib/githubStatsSnapshot.ts:loadGitHubStatsForPage',
+        message: 'snapshot refresh decision',
+        data: {
+          needsRefresh,
+          reason,
+          behindSlugs,
+          snapshotUpdatedAt: updatedAt,
+          snapshotAgeHours:
+            updatedAt != null
+              ? Math.round(((Date.now() - new Date(updatedAt).getTime()) / 3600000) * 10) / 10
+              : null,
+        },
+        timestamp: Date.now(),
+        hypothesisId: 'H5',
+        runId: 'post-fix',
+      }),
+    }).catch(() => {})
+    // #endregion
+
+    if (needsRefresh) {
+      try {
+        const refreshed = await refreshGitHubStatsSnapshot()
+        return { stats: refreshed, source: 'live' }
+      } catch (err) {
+        console.error('[github-snapshot] page refresh failed, using cached snapshot', err)
+        scheduleStaleSnapshotRefresh()
+      }
+    }
+
     return { stats: enrichGitHubStatsPeriodCounts(cached), source: 'snapshot' }
   }
 
@@ -176,19 +261,17 @@ function snapshotMissingRecentCommits(stats: GitHubStats): boolean {
 export async function loadGitHubStatsForCron(): Promise<GitHubStats | null> {
   const cached = await getGitHubStatsForDisplay()
   const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
-  const needsRefresh =
-    !cached ||
-    isSnapshotStale(updatedAt) ||
-    snapshotMissingRecentCommits(cached) ||
-    githubStatsNeedsActivityRescan(cached)
+
+  let needsRefresh = !cached
+  if (cached) {
+    const check = await snapshotNeedsLiveRefresh(cached, updatedAt)
+    needsRefresh = needsRefresh || check.needsRefresh || snapshotMissingRecentCommits(cached)
+  }
 
   if (cached && !needsRefresh) return enrichGitHubStatsPeriodCounts(cached)
 
   try {
-    const fresh = await getGitHubStats({ fresh: true })
-    const enriched = enrichGitHubStatsPeriodCounts(fresh)
-    await syncGitHubStatsSnapshot(enriched)
-    return enriched
+    return await refreshGitHubStatsSnapshot()
   } catch (err) {
     console.error('[github-snapshot] cron refresh failed', err)
     return cached

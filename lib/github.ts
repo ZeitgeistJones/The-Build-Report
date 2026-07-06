@@ -583,6 +583,47 @@ export async function fetchRecentCommitMessages(slug: string, limit = 10): Promi
   }
 }
 
+/** Lightweight live probe — repo list pushed_at only (no per-repo commit scan). */
+export async function fetchTrackableRepoPushes(): Promise<Map<string, string>> {
+  const forceInclude = await getTrackableForceIncludeSet()
+  const map = new Map<string, string>()
+  let page = 1
+
+  while (true) {
+    const batch = await ghFetch(
+      `/users/${GITHUB_ORG}/repos?per_page=100&page=${page}&sort=pushed`,
+      { fresh: true },
+    )
+    if (!Array.isArray(batch) || !batch.length) break
+    for (const repo of batch) {
+      if (!shouldSkipRepo(repo.name, { forceInclude })) {
+        map.set(repo.name, repo.pushed_at)
+      }
+    }
+    if (batch.length < 100) break
+    page++
+  }
+
+  return map
+}
+
+/** Slugs whose live GitHub pushed_at moved after the snapshot was written. */
+export function snapshotPushesBehindLive(
+  stats: GitHubStats,
+  livePushes: Map<string, string>,
+): string[] {
+  const behind: string[] = []
+  for (const repo of stats.trackableRepos ?? []) {
+    const live = livePushes.get(repo.name)
+    if (!live) continue
+    const snapshotMs = new Date(repo.pushedAt).getTime()
+    const liveMs = new Date(live).getTime()
+    if (Number.isNaN(snapshotMs) || Number.isNaN(liveMs)) continue
+    if (liveMs > snapshotMs + 60_000) behind.push(repo.name)
+  }
+  return behind
+}
+
 export function timeAgo(dateStr: string | null): string {
   if (!dateStr) return 'unknown'
   const d = new Date(dateStr)

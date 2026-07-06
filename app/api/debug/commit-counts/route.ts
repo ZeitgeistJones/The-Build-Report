@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { loadGitHubStatsForPage, getGitHubStatsSnapshotUpdatedAt } from '@/lib/githubStatsSnapshot'
-import { inferCommitsScanned, countCommitsWithinHours } from '@/lib/github'
+import { inferCommitsScanned, countCommitsWithinHours, fetchTrackableRepoPushes } from '@/lib/github'
 import { REPOS } from '@/lib/scores'
 import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
 import { cacheLookupSlugs } from '@/lib/repoOrder'
@@ -37,6 +37,8 @@ export async function GET() {
   const autoScored = cacheSlugs.length > 0 ? await getCachedAutoScoresForSlugs(cacheSlugs) : []
   const scoredBySlug = new Map(autoScored.map(r => [r.githubSlug, r]))
   for (const r of REPOS) scoredBySlug.set(r.githubSlug, r)
+
+  const livePushes = await fetchTrackableRepoPushes().catch(() => new Map<string, string>())
 
   const samples = SAMPLE_SLUGS.map(slug => {
     const activity = stats?.repoActivity[slug]
@@ -93,6 +95,11 @@ export async function GET() {
         lastCommitAt: activity?.lastCommitAt ?? null,
         pushedAt,
       }),
+      livePushedAt: livePushes.get(slug) ?? null,
+      livePushedAfterSnapshot:
+        pushedAt && livePushes.get(slug)
+          ? new Date(livePushes.get(slug)!).getTime() > new Date(pushedAt).getTime()
+          : null,
     }
   })
 
