@@ -18,6 +18,8 @@ export interface CommunityContextSubmission {
   acceptedAt?: string | null
   /** Set when a paid rescore first read this accepted context (links to the "after"). */
   consumedByRescoreAt?: string | null
+  /** Last submit, vote, or state change — used for discussion recency sorting. */
+  lastActivityAt?: string | null
 }
 
 /** Client-safe projection — no raw wallet, optional viewer's own vote. */
@@ -47,6 +49,8 @@ export interface RepoContextSummary {
   upvotes: number
   /** Votes needed to accept (for the "X/N" progress pill). */
   needed: number
+  /** Newest holder note or vote on this repo. */
+  lastActivityAt: string
 }
 
 export interface CommunityContextHighlight {

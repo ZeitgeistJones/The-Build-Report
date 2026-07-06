@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import { Period, GRADES_PERIOD_TOGGLE_OPTIONS, REPO_WINDOW_OPTIONS } from '@/lib/grades'
+import { PERIOD_TOOLTIPS } from '@/lib/badgeTooltips'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
@@ -13,7 +14,7 @@ interface GradePeriodContextValue {
 const GradePeriodContext = createContext<GradePeriodContextValue | null>(null)
 
 export function GradePeriodProvider({ children }: { children: ReactNode }) {
-  const [period, setPeriod] = useState<Period>('30d')
+  const [period, setPeriod] = useState<Period>('24h')
   return (
     <GradePeriodContext.Provider value={{ period, setPeriod }}>
       {children}
@@ -60,7 +61,7 @@ function PeriodButtonRow({
         <button
           key={key}
           type="button"
-          title={label}
+          title={PERIOD_TOOLTIPS[key] ?? label}
           onClick={() => onChange(key)}
           style={{
             fontSize: '11px',

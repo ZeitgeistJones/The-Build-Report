@@ -65,6 +65,9 @@ import {
   LIFECYCLE_TOOLTIPS,
   commitsColumnTooltip,
   formatPeriodCommitDisplay,
+  REPO_FILTER_TOOLTIPS,
+  REPO_SCOPE_TOOLTIPS,
+  REPO_SORT_TOOLTIPS,
   SHIPPING_LEVERAGE_COLUMN_TOOLTIP,
   SUPPLY_LOCK_TM_COLUMN_TOOLTIP,
   DIRECT_TM_COLUMN_TOOLTIP,
@@ -88,7 +91,7 @@ const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
 
 type ActivityScope = 'active' | 'all'
 type RepoSort = 'recent' | 'commits' | 'grade'
-export type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'cv-related' | 'clawd-gated' | 'community-context' | Tag
+export type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'clawd-cv-perks' | 'community-context' | Tag
 
 const COLLECTION_BADGE: Record<RepoCollectionId, { label: string; color: string; bg: string }> = {
   'cv-related': { label: 'CV', color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
@@ -145,8 +148,9 @@ function repoMatchesFilter(
   if (filter === 'all') return true
   if (filter === 'burn-apps') return tag === 'direct' || tag === 'supply-lock'
   if (filter === 'leverage') return hasShippingLeverageTag(tag)
-  if (filter === 'cv-related') return collectionSets['cv-related'].has(slug)
-  if (filter === 'clawd-gated') return collectionSets['clawd-gated'].has(slug)
+  if (filter === 'clawd-cv-perks') {
+    return collectionSets['cv-related'].has(slug) || collectionSets['clawd-gated'].has(slug)
+  }
   if (filter === 'community-context') return Boolean(contextSummary[slug])
   return tag === filter
 }
@@ -201,19 +205,16 @@ function PillButton({
   onClick,
   children,
   isMobile,
-  title,
 }: {
   active: boolean
   onClick: () => void
   children: ReactNode
   isMobile: boolean
-  title?: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title={title}
       style={{
         fontSize: '12px',
         padding: isMobile ? '8px 14px' : '4px 11px',
@@ -518,7 +519,7 @@ export default function RepoList({
   const [activeFilter, setActiveFilter] = useState<RepoFilter>('all')
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
   const [sortBy, setSortBy] = useState<RepoSort>('commits')
-  const [repoPeriod, setRepoPeriod] = useState<Period>('30d')
+  const [repoPeriod, setRepoPeriod] = useState<Period>('24h')
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
   const [rescoreSummaries, setRescoreSummaries] = useState(initialRescoreSummaries)
@@ -568,25 +569,24 @@ export default function RepoList({
     )
   }
 
-  const filters: { key: RepoFilter; label: string; title?: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'burn-apps', label: 'Burn apps' },
-    { key: 'cv-related', label: 'CV & gov', title: REPO_COLLECTIONS.find(c => c.id === 'cv-related')?.tooltip },
-    { key: 'clawd-gated', label: 'CLAWD-gated', title: REPO_COLLECTIONS.find(c => c.id === 'clawd-gated')?.tooltip },
-    { key: 'leverage', label: 'Leverage' },
-    { key: 'direct', label: 'Direct' },
-    { key: 'supply-lock', label: 'Supply lock' },
-    { key: 'indirect', label: 'Indirect' },
-    { key: 'infrastructure', label: 'Infrastructure' },
-    { key: 'theoretical', label: 'Theoretical' },
+  const filters: { key: RepoFilter; label: string; tooltip?: string }[] = [
+    { key: 'all', label: 'All', tooltip: REPO_FILTER_TOOLTIPS.all },
+    { key: 'burn-apps', label: 'Burn apps', tooltip: REPO_FILTER_TOOLTIPS['burn-apps'] },
+    { key: 'clawd-cv-perks', label: 'Clawd/CV perks', tooltip: REPO_FILTER_TOOLTIPS['clawd-cv-perks'] },
+    { key: 'leverage', label: 'Leverage', tooltip: REPO_FILTER_TOOLTIPS.leverage },
+    { key: 'direct', label: 'Direct', tooltip: TAG_TOOLTIPS.direct },
+    { key: 'supply-lock', label: 'Supply lock', tooltip: TAG_TOOLTIPS['supply-lock'] },
+    { key: 'indirect', label: 'Indirect', tooltip: TAG_TOOLTIPS.indirect },
+    { key: 'infrastructure', label: 'Infrastructure', tooltip: TAG_TOOLTIPS.infrastructure },
+    { key: 'theoretical', label: 'Theoretical', tooltip: TAG_TOOLTIPS.theoretical },
   ]
 
   const contextRepoCount = Object.keys(contextSummary).length
-  if (communityContextEnabled && contextRepoCount > 0) {
-    filters.push({
+  if (communityContextEnabled) {
+    filters.splice(3, 0, {
       key: 'community-context',
-      label: `Community context (${contextRepoCount})`,
-      title: 'Repos with holder-submitted context (accepted or gathering votes)',
+      label: contextRepoCount > 0 ? `Discussion (${contextRepoCount})` : 'Discussion',
+      tooltip: REPO_FILTER_TOOLTIPS['community-context'],
     })
   }
 
@@ -597,6 +597,13 @@ export default function RepoList({
   })
   const filtered = (activityScope === 'active' ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
+      if (activeFilter === 'community-context') {
+        const aTalk = contextSummary[a.githubSlug]?.lastActivityAt ?? ''
+        const bTalk = contextSummary[b.githubSlug]?.lastActivityAt ?? ''
+        const talkDiff = bTalk.localeCompare(aTalk)
+        if (talkDiff !== 0) return talkDiff
+      }
+
       if (sortBy === 'grade') {
         const diff = repoGradeSortKey(b) - repoGradeSortKey(a)
         if (diff !== 0) return diff
@@ -1307,37 +1314,62 @@ export default function RepoList({
         {isMobile && <div style={{ width: '100%', height: 0 }} />}
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center', marginLeft: isMobile ? 0 : 'auto', ...(isMobile ? { width: '100%' } : {}) }}>
           {filters.map(f => (
-            <PillButton
+            <span
               key={f.key}
-              active={activeFilter === f.key}
-              onClick={() => setActiveFilter(f.key)}
-              isMobile={isMobile}
-              title={f.title}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}
             >
-              {f.label}
-            </PillButton>
+              <PillButton
+                active={activeFilter === f.key}
+                onClick={() => setActiveFilter(f.key)}
+                isMobile={isMobile}
+              >
+                {f.label}
+              </PillButton>
+              {f.tooltip && (
+                <InfoTooltip
+                  content={f.tooltip}
+                  ariaLabel={`About ${f.label}`}
+                  compact
+                />
+              )}
+            </span>
           ))}
           {!isMobile && <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />}
-          <PillButton active={sortBy === 'recent'} onClick={() => setSortBy('recent')} isMobile={isMobile}>
-            Recent
-          </PillButton>
-          <PillButton active={sortBy === 'commits'} onClick={() => setSortBy('commits')} isMobile={isMobile}>
-            Most active
-          </PillButton>
-          <PillButton active={sortBy === 'grade'} onClick={() => setSortBy('grade')} isMobile={isMobile}>
-            Grades
-          </PillButton>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
+            <PillButton active={sortBy === 'recent'} onClick={() => setSortBy('recent')} isMobile={isMobile}>
+              Recent
+            </PillButton>
+            <InfoTooltip content={REPO_SORT_TOOLTIPS.recent} ariaLabel="About Recent sort" compact />
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
+            <PillButton active={sortBy === 'commits'} onClick={() => setSortBy('commits')} isMobile={isMobile}>
+              Most active
+            </PillButton>
+            <InfoTooltip content={REPO_SORT_TOOLTIPS.commits} ariaLabel="About Most active sort" compact />
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
+            <PillButton active={sortBy === 'grade'} onClick={() => setSortBy('grade')} isMobile={isMobile}>
+              Grades
+            </PillButton>
+            <InfoTooltip content={REPO_SORT_TOOLTIPS.grade} ariaLabel="About Grades sort" compact />
+          </span>
           {isMobile && <div style={{ width: '100%', height: 0 }} />}
           <div style={isMobile ? { width: '100%', display: 'flex' } : undefined}>
             <RepoWindowToggle period={repoPeriod} onChange={setRepoPeriod} stretchMobile={isMobile} />
           </div>
           {!isMobile && <div style={{ width: '1px', height: '18px', background: 'var(--border)', margin: '0 2px' }} />}
-          <PillButton active={activityScope === 'active'} onClick={() => setActivityScope('active')} isMobile={isMobile}>
-            Active
-          </PillButton>
-          <PillButton active={activityScope === 'all'} onClick={() => setActivityScope('all')} isMobile={isMobile}>
-            All
-          </PillButton>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
+            <PillButton active={activityScope === 'active'} onClick={() => setActivityScope('active')} isMobile={isMobile}>
+              Active
+            </PillButton>
+            <InfoTooltip content={REPO_SCOPE_TOOLTIPS.active} ariaLabel="About Active scope" compact />
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '1px' }}>
+            <PillButton active={activityScope === 'all'} onClick={() => setActivityScope('all')} isMobile={isMobile}>
+              All
+            </PillButton>
+            <InfoTooltip content={REPO_SCOPE_TOOLTIPS.all} ariaLabel="About All scope" compact />
+          </span>
         </div>
       </div>
 

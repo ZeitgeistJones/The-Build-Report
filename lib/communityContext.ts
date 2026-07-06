@@ -30,6 +30,14 @@ function votesKey(id: string) {
   return `${VOTES_KEY}${id}`
 }
 
+function submissionLastActivityAt(s: CommunityContextSubmission): string {
+  return s.lastActivityAt ?? s.stateChangedAt ?? s.acceptedAt ?? s.createdAt
+}
+
+function maxIsoTimestamp(...values: (string | null | undefined)[]): string {
+  return values.filter((v): v is string => Boolean(v)).sort().reverse()[0] ?? ''
+}
+
 /** Dark-launch flag: the whole feature is off unless explicitly enabled. */
 export function isCommunityContextEnabled(): boolean {
   return process.env.COMMUNITY_CONTEXT_ENABLED === 'true'
@@ -100,6 +108,7 @@ export async function createSubmission(params: {
     },
     acceptedAt: initialState === 'accepted' ? now : null,
     consumedByRescoreAt: null,
+    lastActivityAt: now,
   }
 
   await r.set(submissionKey(submission.id), submission)
@@ -170,13 +179,15 @@ export async function getContextSummaryBySlug(): Promise<Record<string, RepoCont
         const accepted = subs.filter(s => s.state === 'accepted')
         if (accepted.length) {
           const top = Math.max(...accepted.map(s => s.upvotes))
-          out[slug] = { state: 'accepted', upvotes: top, needed }
+          const lastActivityAt = maxIsoTimestamp(...accepted.map(submissionLastActivityAt))
+          out[slug] = { state: 'accepted', upvotes: top, needed, lastActivityAt }
           return
         }
         const pending = subs.filter(s => s.state === 'pending')
         if (pending.length) {
           const top = Math.max(...pending.map(s => s.upvotes))
-          out[slug] = { state: 'pending', upvotes: top, needed }
+          const lastActivityAt = maxIsoTimestamp(...pending.map(submissionLastActivityAt))
+          out[slug] = { state: 'pending', upvotes: top, needed, lastActivityAt }
         }
       }),
     )
@@ -299,6 +310,7 @@ export async function recordVote(
     downvotes,
     state: nextState,
     stateChangedAt: stateChanged ? now : submission.stateChangedAt,
+    lastActivityAt: now,
     acceptedAt:
       nextState === 'accepted'
         ? submission.acceptedAt ?? now
@@ -334,6 +346,7 @@ export async function adminRemoveSubmission(id: string): Promise<boolean> {
     ...submission,
     state: 'removed',
     stateChangedAt: now,
+    lastActivityAt: now,
   })
   return true
 }
@@ -352,6 +365,7 @@ export async function adminAcceptSubmission(id: string): Promise<boolean> {
     state: 'accepted',
     stateChangedAt: now,
     acceptedAt: submission.acceptedAt ?? now,
+    lastActivityAt: now,
   })
   return true
 }

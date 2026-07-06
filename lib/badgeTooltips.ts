@@ -1,6 +1,38 @@
 import type { Tag } from './scores'
 import type { RepoLifecycle } from './repoLifecycle'
 
+export const CLAWD_CV_PERKS_TOOLTIP =
+  'Repos where holders need CLAWD or CV to unlock perks — staking, governance, gated apps, and access flows.'
+
+export const DISCUSSION_FILTER_TOOLTIP =
+  'Repos where holders left a note or voted on context. Newest talk rises to the top.'
+
+export const REPO_FILTER_TOOLTIPS = {
+  all: 'Every tracked repo in the ecosystem.',
+  'burn-apps': 'Apps that burn or lock CLAWD when you use them.',
+  leverage: 'Indirect repos scored on how much they help other burn apps ship.',
+  'clawd-cv-perks': CLAWD_CV_PERKS_TOOLTIP,
+  'community-context': DISCUSSION_FILTER_TOOLTIP,
+} as const
+
+export const REPO_SORT_TOOLTIPS = {
+  recent: 'Sorted by last GitHub push — newest activity first.',
+  commits: 'Sorted by commit count in the selected window.',
+  grade: 'Sorted by overall rubric grades — highest first.',
+} as const
+
+export const REPO_SCOPE_TOOLTIPS = {
+  active: 'Only repos with at least one commit in the selected window.',
+  all: 'Every repo in this filter, including quiet ones with zero commits.',
+} as const
+
+export const PERIOD_TOOLTIPS: Record<'24h' | '7d' | '30d' | '60d', string> = {
+  '24h': 'Activity in the last 24 hours.',
+  '7d': 'Activity in the last 7 days.',
+  '30d': 'Activity in the last 30 days.',
+  '60d': 'Activity in the last 60 days.',
+}
+
 export const TAG_TOOLTIPS: Record<Tag, string> = {
   direct: 'Consumer app with a direct CLAWD burn or lock mechanic on use.',
   'supply-lock': 'Removes CLAWD from circulation temporarily (staking, vesting, locks).',
