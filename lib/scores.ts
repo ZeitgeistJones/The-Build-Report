@@ -37,6 +37,8 @@ export interface Repo {
   adminNote?: string
   /** Ecosystem context version the AI read at score time. Omitted on legacy cached scores. */
   scoringContextVersion?: number
+  /** How this score was written to cache — paid rescores persist without TTL. */
+  scoreOrigin?: 'paid' | 'cron' | 'bulk'
   excluded?: boolean
 }
 

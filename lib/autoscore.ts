@@ -35,6 +35,9 @@ const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
 const CACHE_KEY_PREFIX_V2 = 'build-report:autoscore:v2:'
 const CACHE_KEY_PREFIX_V1 = 'build-report:autoscore:'
 
+const CRON_CACHE_TTL_SEC = 60 * 60 * 24 * 7
+const STALE_PERSISTENT_MS = 30 * 24 * 60 * 60 * 1000
+
 function maxNewPerRun(): number {
   const raw = process.env.AUTOSCORE_MAX_PER_RUN
   const n = raw ? parseInt(raw, 10) : 15
@@ -70,6 +73,23 @@ async function readCachedScore(r: Redis, repoName: string): Promise<Repo | null>
   } catch {
     return null
   }
+}
+
+export async function getCachedScore(repoName: string): Promise<Repo | null> {
+  try {
+    return await readCachedScore(getRedis(), repoName)
+  } catch {
+    return null
+  }
+}
+
+function shouldRefreshStalePersistent(cached: Repo, raw: RawRepo): boolean {
+  if (cached.scoreOrigin !== 'paid') return false
+  const scoredMs = new Date(cached.scoredAt).getTime()
+  if (Number.isNaN(scoredMs) || Date.now() - scoredMs < STALE_PERSISTENT_MS) return false
+  const pushedMs = new Date(raw.pushedAt).getTime()
+  if (Number.isNaN(pushedMs)) return false
+  return pushedMs > scoredMs
 }
 
 export interface RawRepo {
@@ -328,12 +348,21 @@ Respond ONLY with valid JSON, no markdown:
   }
 }
 
-async function cacheScoredRepo(repo: Repo): Promise<void> {
+async function cacheScoredRepo(
+  repo: Repo,
+  opts?: { persistent?: boolean; scoreOrigin?: Repo['scoreOrigin'] },
+): Promise<void> {
   try {
     const r = getRedis()
-    await r.set(`${CACHE_KEY_PREFIX}${repo.githubSlug}`, repo, {
-      ex: 60 * 60 * 24 * 7,
-    })
+    const toStore: Repo = {
+      ...repo,
+      ...(opts?.scoreOrigin ? { scoreOrigin: opts.scoreOrigin } : {}),
+    }
+    if (opts?.persistent) {
+      await r.set(`${CACHE_KEY_PREFIX}${repo.githubSlug}`, toStore)
+    } else {
+      await r.set(`${CACHE_KEY_PREFIX}${repo.githubSlug}`, toStore, { ex: CRON_CACHE_TTL_SEC })
+    }
   } catch {
     // non-fatal
   }
@@ -342,7 +371,13 @@ async function cacheScoredRepo(repo: Repo): Promise<void> {
 /** Infer (optional cache bypass) and write to Redis. Used by bulk regen and singles. */
 export async function inferAndCacheRepo(
   raw: RawRepo,
-  options?: { chronicleContext?: string; communityContext?: string; skipCache?: boolean },
+  options?: {
+    chronicleContext?: string
+    communityContext?: string
+    skipCache?: boolean
+    persistent?: boolean
+    scoreOrigin?: Repo['scoreOrigin']
+  },
 ): Promise<Repo | null> {
   const r = getRedis()
 
@@ -357,8 +392,11 @@ export async function inferAndCacheRepo(
   const scored = await inferScore(raw, { chronicleContext, communityContext: options?.communityContext })
   if (!scored) return null
 
-  await cacheScoredRepo(scored)
-  return scored
+  await cacheScoredRepo(scored, {
+    persistent: options?.persistent,
+    scoreOrigin: options?.scoreOrigin,
+  })
+  return { ...scored, ...(options?.scoreOrigin ? { scoreOrigin: options.scoreOrigin } : {}) }
 }
 
 // HOMEPAGE-SAFE: cache only, no Anthropic calls
@@ -449,8 +487,13 @@ export async function runAutoScores(
     newRepos.map(async (repo) => {
       const cached = await readCachedScore(r, repo.name)
       if (cached) {
-        console.log(`[autoscore] cache hit: ${repo.name}`)
-        results.push(cached)
+        if (shouldRefreshStalePersistent(cached, repo)) {
+          console.log(`[autoscore] stale persistent score, re-inferring: ${repo.name}`)
+          toInfer.push(repo)
+        } else {
+          console.log(`[autoscore] cache hit: ${repo.name}`)
+          results.push(cached)
+        }
       } else {
         toInfer.push(repo)
       }
@@ -482,8 +525,8 @@ export async function runAutoScores(
     if (excludedSlugs.has(repo.name)) continue
     const scored = await inferScore(repo, { chronicleContext })
     if (scored) {
-      await cacheScoredRepo(scored)
-      results.push(scored)
+      await cacheScoredRepo(scored, { scoreOrigin: 'cron' })
+      results.push({ ...scored, scoreOrigin: 'cron' })
       inferred.push(repo.name)
     }
   }
@@ -526,7 +569,15 @@ export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null>
     chronicleContext: chronicleContext ?? undefined,
     communityContext,
     skipCache: true,
+    persistent: true,
+    scoreOrigin: 'paid',
   })
+}
+
+export async function flushLegacyAutoScore(repoName: string): Promise<void> {
+  const r = getRedis()
+  await r.del(`${CACHE_KEY_PREFIX_V2}${repoName}`)
+  await r.del(`${CACHE_KEY_PREFIX_V1}${repoName}`)
 }
 
 export async function flushAutoScore(repoName: string): Promise<void> {

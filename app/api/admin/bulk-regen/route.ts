@@ -44,13 +44,14 @@ export async function POST(req: NextRequest) {
     }
 
     const offset = typeof body?.offset === 'number' ? body.offset : 0
+    const overwritePaid = body?.overwritePaid === true
     const limit =
       typeof body?.limit === 'number'
         ? Math.min(Math.max(1, body.limit), BULK_REGEN_MAX_BATCH)
         : BULK_REGEN_DEFAULT_BATCH
 
     try {
-      const result = await runBulkRegenerateBatch({ flushFirst, offset, limit })
+      const result = await runBulkRegenerateBatch({ flushFirst, offset, limit, overwritePaid })
       if (result.nextOffset === null) {
         const { getGitHubStats } = await import('@/lib/github')
         const { syncGitHubStatsSnapshot } = await import('@/lib/githubStatsSnapshot')
