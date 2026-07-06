@@ -15,7 +15,8 @@ function formatDigestDate(dateKey: string): string {
 }
 
 export default function BuildBriefCard({ brief }: Props) {
-  const text = brief?.general ?? brief?.text
+  if (!brief) return null
+  const text = brief.general ?? brief.text
   if (!text) return null
 
   const dayLabel = brief.dateKey ? formatDigestDate(brief.dateKey) : 'yesterday'
