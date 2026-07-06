@@ -243,9 +243,9 @@ Return ONLY valid JSON, no markdown fences:
   "general": "3-4 sentences. Plain English morning overview of what shipped yesterday. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.",
   "cards": {
     "7d": {
-      "builder": "Exactly 2 sentences about builder activity for the 7-day window.",
-      "economic": "Exactly 2 sentences about burn-app economics for the 7-day window.",
-      "integrity": "Exactly 2 sentences about builder integrity/trust for the 7-day window."
+      "builder": "2-3 sentences about builder activity for the 7-day window.",
+      "economic": "2-3 sentences about burn-app economics for the 7-day window.",
+      "integrity": "2-3 sentences about builder integrity/trust for the 7-day window."
     },
     "30d": { "builder": "...", "economic": "...", "integrity": "..." },
     "60d": { "builder": "...", "economic": "...", "integrity": "..." }
@@ -253,11 +253,13 @@ Return ONLY valid JSON, no markdown fences:
 }
 
 Rules:
-- Each card field: exactly 2 complete sentences.
-- general: exactly 3-4 complete sentences, meatier than any single card.
-- Reference letter grades or trends only when helpful; never fabricate numbers.
-- Say "burn apps" not "token mechanics" in economic copy.
-- Integrity copy = trust, transparency, safety — not moralizing.`
+- Each card field: 2-3 complete sentences.
+- general: 3-4 complete sentences, meatier than any single card.
+- CARD COPY MUST BE PLAIN WORDS ONLY — absolutely no numbers, percentages, letter grades, or counts in the card fields. The numbers live elsewhere in the UI.
+- Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
+- Say "burn apps" or "the apps that buy and burn $CLAWD" instead of "token mechanics".
+- Integrity copy = whether projects keep their promises to holders (trust, transparency, safety) — not moralizing.
+- The general overview MAY name specific repos and describe what shipped; the card fields should stay high-level and plain.`
 
   try {
     const message = await client.messages.create({

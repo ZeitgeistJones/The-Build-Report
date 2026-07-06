@@ -190,27 +190,57 @@ export function economicCardFace(grade: TokenMechanicGrade, period: Period): Gra
   return { hook, insights: insights.slice(0, 2) }
 }
 
-/** Two layman sentences for card face when AI digest is unavailable. */
+function trendFlavor(trend: TrendDirection, subject: string): string {
+  if (trend === 'up') return `It's picked up compared to the last stretch, so ${subject} is trending the right way.`
+  if (trend === 'down') return `It's eased off a bit versus the last stretch, so ${subject} is worth keeping an eye on.`
+  return ''
+}
+
+/** 2-3 plain-English sentences (no numbers/jargon) for the card face when AI digest is unavailable. */
 export function builderCardLayman(
   grade: BuilderGrade,
   period: Period,
-  stats?: { commits: number; activeDays: number; newRepos: number } | null,
+  _stats?: { commits: number; activeDays: number; newRepos: number } | null,
 ): string {
-  const { hook, insights } = builderCardFace(grade, period, stats)
-  const second = insights[0] ?? `The overall activity grade is ${grade.letter} (${grade.pct}%).`
-  return `${hook} ${second}`
+  const tier = letterTier(grade.letter)
+  const base =
+    tier === 'top'
+      ? 'clawdbotatg is shipping code almost every day across a healthy spread of projects. Momentum like this usually means new features and fixes are landing quickly.'
+      : tier === 'solid'
+        ? 'Work is landing regularly across several projects, just not at a full sprint. It reads as a dependable, steady pace rather than a burst.'
+        : tier === 'mixed'
+          ? 'Some days see real work and others are quiet, so the overall pace is moderate. There is activity, but it is not consistent across the board.'
+          : 'Not much landed on the tracked projects in this window. Things are on the quiet side for now.'
+  const flavor = period === '60d' ? '' : trendFlavor(grade.trend, 'the pace')
+  return flavor ? `${base} ${flavor}` : base
 }
 
 export function economicCardLayman(grade: TokenMechanicGrade, period: Period): string {
-  const { hook, insights } = economicCardFace(grade, period)
-  const second = insights[0] ?? `The burn-apps grade is ${grade.letter} (${grade.pct}%).`
-  return `${hook} ${second}`
+  const tier = letterTier(grade.letter)
+  const base =
+    tier === 'top'
+      ? 'The apps tied to how $CLAWD gets bought and burned are in good shape where the work is happening. The economic side looks healthy right now.'
+      : tier === 'solid'
+        ? 'The burn-focused apps are holding up well, with a little room to sharpen how they serve holders. Solid overall, not spectacular.'
+        : tier === 'mixed'
+          ? 'The picture for burn apps is mixed — some look strong while others still need work. Effort is landing unevenly across them.'
+          : 'Most of the quality work this window did not land on the burn-focused apps. This side needs some attention.'
+  const flavor = period === '60d' ? '' : trendFlavor(grade.trend, 'the economic side')
+  return flavor ? `${base} ${flavor}` : base
 }
 
 export function integrityCardLayman(grade: IntegrityGrade, period: Period): string {
-  const { hook, insights } = integrityCardFace(grade, period)
-  const second = insights[0] ?? `The integrity grade is ${grade.letter} (${grade.pct}%).`
-  return `${hook} ${second}`
+  const tier = letterTier(grade.letter)
+  const base =
+    tier === 'top'
+      ? 'The projects getting the most attention are the ones that keep their promises to holders. Trust and transparency are looking strong.'
+      : tier === 'solid'
+        ? 'Most of the work is landing on trustworthy projects, with a few weaker spots. Broadly, it lines up with what holders are told.'
+        : tier === 'mixed'
+          ? 'Trust is a mixed bag — effort is split between solid projects and shakier ones. It is worth keeping an eye on.'
+          : 'A lot of the work landed on projects with weaker trust signals. This is the area to watch most closely.'
+  const flavor = period === '60d' ? '' : trendFlavor(grade.trend, 'trust')
+  return flavor ? `${base} ${flavor}` : base
 }
 
 export function integrityCardFace(grade: IntegrityGrade, period: Period): GradeCardFace {

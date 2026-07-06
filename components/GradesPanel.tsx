@@ -63,10 +63,12 @@ function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' | 'new' }) {
 
 function RubricBreakdownTray({
   cardId,
+  statsNode,
   onClose,
   isMobile,
 }: {
   cardId: CardId
+  statsNode?: React.ReactNode
   onClose: () => void
   isMobile: boolean
 }) {
@@ -119,6 +121,20 @@ function RubricBreakdownTray({
           ✕
         </button>
       </div>
+      {statsNode && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px 14px',
+            marginBottom: '14px',
+            paddingBottom: '14px',
+            borderBottom: '1px solid var(--border)',
+          }}
+        >
+          {statsNode}
+        </div>
+      )}
       <RubricBlockPanel block={block} defaultOpen compact />
       <p style={{ margin: '12px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
         <Link href={`/how-we-score#hw-rubric-${block.id}`} style={{ color: 'var(--accent)' }}>
@@ -203,7 +219,6 @@ function GradeCard({
   label,
   laymanCopy,
   period,
-  footer,
   trendExplanation,
   isSelected,
   onSelectTrend,
@@ -221,7 +236,6 @@ function GradeCard({
   label: string
   laymanCopy: string
   period: Period
-  footer?: React.ReactNode
   trendExplanation?: TrendExplanation
   isSelected: boolean
   onSelectTrend: (id: CardId | null) => void
@@ -335,22 +349,7 @@ function GradeCard({
         {laymanCopy}
       </p>
 
-      {footer && (
-        <div
-          style={{
-            marginTop: 'auto',
-            paddingTop: '10px',
-            borderTop: '1px solid var(--border)',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px 12px',
-          }}
-        >
-          {footer}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: '4px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
         {canShowTrend && (
           <button
             type="button"
@@ -446,6 +445,48 @@ export default function GradesPanel({
     digestCards?.[period]?.integrity ??
     (ig ? integrityCardLayman(ig, period) : 'Integrity score unavailable')
 
+  const statSpan = (text: string, fullWidth = false) => (
+    <span style={{ fontSize: footerSize, color: 'var(--text-muted)', ...(fullWidth ? { flexBasis: '100%' } : {}) }}>
+      {text}
+    </span>
+  )
+
+  const cardStats: Record<CardId, React.ReactNode> = {
+    builder: stats && (
+      <>
+        {statSpan(`${stats.commits} commits`)}
+        {statSpan(`${stats.activeDays} active days`)}
+        {statSpan(`${stats.newRepos} new repos`)}
+      </>
+    ),
+    economic: tg?.counts && (
+      <>
+        {tg.counts.repos > 0 && statSpan(`${tg.counts.repos} repos in sample`)}
+        {tg.counts.high > 0 && statSpan(`${tg.counts.high} high-TM commits`)}
+        {tg.counts.mid > 0 && statSpan(`${tg.counts.mid} mid-TM commits`)}
+        {tg.counts.low > 0 && statSpan(`${tg.counts.low} low-TM commits`)}
+        {period !== '60d' && tg.tagCommits && (
+          <>
+            {tg.tagCommits.direct > 0 && statSpan(`${tg.tagCommits.direct} direct-tag commits`)}
+            {tg.tagCommits.lock > 0 && statSpan(`${tg.tagCommits.lock} supply-lock commits`)}
+            {tg.tagCommits.indirect > 0 && statSpan(`${tg.tagCommits.indirect} indirect commits`)}
+            {tg.tagCommits.infra > 0 && statSpan(`${tg.tagCommits.infra} infra/R&D commits`)}
+          </>
+        )}
+      </>
+    ),
+    integrity: ig && (
+      <>
+        {statSpan(`${ig.counts.active} repos in sample`)}
+        {ig.counts.commitWeight > 0 && statSpan(`${ig.counts.commitWeight} commits weighted`)}
+        {ig.counts.high > 0 && statSpan(`${ig.counts.high} high-integrity commits`)}
+        {ig.counts.mid > 0 && statSpan(`${ig.counts.mid} mid commits`)}
+        {ig.counts.low > 0 && statSpan(`${ig.counts.low} low-integrity commits`)}
+        {statSpan(integrityGradeFootnote(), true)}
+      </>
+    ),
+  }
+
   return (
     <div>
       <div
@@ -508,15 +549,6 @@ export default function GradesPanel({
           onSelectTrend={handleSelectTrend}
           isRubricSelected={rubricCard === 'builder'}
           onSelectRubric={handleSelectRubric}
-          footer={
-            stats && (
-              <>
-                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{stats.commits} commits</span>
-                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{stats.activeDays} active days</span>
-                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{stats.newRepos} new repos</span>
-              </>
-            )
-          }
         />
 
         <GradeCard
@@ -531,52 +563,6 @@ export default function GradesPanel({
           onSelectTrend={handleSelectTrend}
           isRubricSelected={rubricCard === 'economic'}
           onSelectRubric={handleSelectRubric}
-          footer={
-            tg?.counts && (
-              <>
-                {tg.counts.repos > 0 && (
-                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.repos} repos in sample</span>
-                )}
-                {period === '60d' || !tg.tagCommits ? (
-                  <>
-                    {tg.counts.high > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.high} high-TM commits</span>
-                    )}
-                    {tg.counts.mid > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.mid} mid-TM commits</span>
-                    )}
-                    {tg.counts.low > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.low} low-TM commits</span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {tg.counts.high > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.high} high-TM commits</span>
-                    )}
-                    {tg.counts.mid > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.mid} mid-TM commits</span>
-                    )}
-                    {tg.counts.low > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.counts.low} low-TM commits</span>
-                    )}
-                    {tg.tagCommits.direct > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.tagCommits.direct} direct-tag commits</span>
-                    )}
-                    {tg.tagCommits.lock > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.tagCommits.lock} supply-lock commits</span>
-                    )}
-                    {tg.tagCommits.indirect > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.tagCommits.indirect} indirect commits</span>
-                    )}
-                    {tg.tagCommits.infra > 0 && (
-                      <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{tg.tagCommits.infra} infra/R&D commits</span>
-                    )}
-                  </>
-                )}
-              </>
-            )
-          }
         />
 
         <GradeCard
@@ -591,26 +577,6 @@ export default function GradesPanel({
           onSelectTrend={handleSelectTrend}
           isRubricSelected={rubricCard === 'integrity'}
           onSelectRubric={handleSelectRubric}
-          footer={
-            ig && (
-              <>
-                <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.active} repos in sample</span>
-                {ig.counts.commitWeight > 0 && (
-                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.commitWeight} commits weighted</span>
-                )}
-                {ig.counts.high > 0 && (
-                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.high} high-integrity commits</span>
-                )}
-                {ig.counts.mid > 0 && (
-                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.mid} mid commits</span>
-                )}
-                {ig.counts.low > 0 && (
-                  <span style={{ fontSize: footerSize, color: 'var(--text-muted)' }}>{ig.counts.low} low-integrity commits</span>
-                )}
-                <span style={{ fontSize: footerSize, color: 'var(--text-muted)', flexBasis: '100%' }}>{integrityGradeFootnote()}</span>
-              </>
-            )
-          }
         />
       </div>
 
@@ -624,7 +590,12 @@ export default function GradesPanel({
       )}
 
       {rubricCard && (
-        <RubricBreakdownTray cardId={rubricCard} onClose={() => setRubricCard(null)} isMobile={isMobile} />
+        <RubricBreakdownTray
+          cardId={rubricCard}
+          statsNode={cardStats[rubricCard]}
+          onClose={() => setRubricCard(null)}
+          isMobile={isMobile}
+        />
       )}
     </div>
   )
