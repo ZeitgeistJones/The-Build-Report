@@ -1,16 +1,21 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { COLOR_THEMES, useColorTheme } from '@/components/ColorThemeProvider'
+import {
+  COLOR_THEME_GROUPS,
+  getColorThemeMeta,
+  type ColorThemeMeta,
+} from '@/lib/colorThemes'
+import { useColorTheme } from '@/components/ColorThemeProvider'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
-export default function ColorThemePicker() {
+export default function ColorThemePicker({ compact }: { compact?: boolean }) {
   const { theme, setTheme } = useColorTheme()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const isMobile = useIsMobile()
-  const current = COLOR_THEMES.find(t => t.id === theme)
+  const current = getColorThemeMeta(theme)
 
   useEffect(() => {
     if (!open) return
@@ -39,20 +44,12 @@ export default function ColorThemePicker() {
           background: 'var(--surface-1)',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '5px',
+          gap: '6px',
           cursor: 'pointer',
         }}
       >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: 'var(--accent)',
-            flexShrink: 0,
-          }}
-        />
-        {current?.label ?? 'Theme'}
+        <ThemeSwatch meta={current} size={compact ? 14 : 12} />
+        {!compact && (current?.label ?? 'Theme')}
       </button>
 
       {open && (
@@ -61,43 +58,43 @@ export default function ColorThemePicker() {
             position: 'absolute',
             top: 'calc(100% + 6px)',
             right: 0,
-            minWidth: '168px',
+            width: '220px',
+            maxHeight: 'min(70vh, 400px)',
+            overflowY: 'auto',
             background: 'var(--surface-2)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius)',
-            padding: '4px',
+            padding: '6px',
             zIndex: 50,
             boxShadow: 'var(--card-elevated)',
           }}
         >
-          {COLOR_THEMES.map(t => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                setTheme(t.id)
-                setOpen(false)
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                width: '100%',
-                textAlign: 'left',
-                padding: '8px 10px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                color: theme === t.id ? 'var(--accent)' : 'var(--text-secondary)',
-                background: theme === t.id ? 'var(--accent-dim)' : 'transparent',
-                cursor: 'pointer',
-              }}
-            >
-              <ThemeSwatch themeId={t.id} />
-              <span>
-                <span style={{ display: 'block', fontWeight: 500 }}>{t.label}</span>
-                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{t.hint}</span>
-              </span>
-            </button>
+          {COLOR_THEME_GROUPS.map((group, groupIndex) => (
+            <div key={group.label} style={{ marginTop: groupIndex > 0 ? '8px' : 0 }}>
+              <div
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
+                  padding: '4px 8px 6px',
+                }}
+              >
+                {group.label}
+              </div>
+              {group.themes.map(t => (
+                <ThemeOption
+                  key={t.id}
+                  meta={t}
+                  active={theme === t.id}
+                  onSelect={() => {
+                    setTheme(t.id)
+                    setOpen(false)
+                  }}
+                />
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -105,25 +102,80 @@ export default function ColorThemePicker() {
   )
 }
 
-function ThemeSwatch({ themeId }: { themeId: string }) {
-  const swatches: Record<string, string> = {
-    teal: '#5FB3A1',
-    'true-dark': '#ffffff',
-    lime: '#c8f060',
-    warm: '#C4A882',
-    slate: '#8BA4BC',
-    light: '#5FB3A1',
-  }
+function ThemeOption({
+  meta,
+  active,
+  onSelect,
+}: {
+  meta: ColorThemeMeta
+  active: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        width: '100%',
+        textAlign: 'left',
+        padding: '7px 8px',
+        borderRadius: '6px',
+        fontSize: '12px',
+        color: active ? 'var(--accent)' : 'var(--text-secondary)',
+        background: active ? 'var(--accent-dim)' : 'transparent',
+        cursor: 'pointer',
+      }}
+    >
+      <ThemeSwatch meta={meta} />
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', fontWeight: 500 }}>{meta.label}</span>
+        <span
+          style={{
+            display: 'block',
+            fontSize: '10px',
+            color: 'var(--text-muted)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {meta.hint}
+        </span>
+      </span>
+    </button>
+  )
+}
+
+function ThemeSwatch({ meta, size = 16 }: { meta: ColorThemeMeta; size?: number }) {
+  const dot = Math.max(5, Math.round(size * 0.38))
   return (
     <span
       style={{
-        width: 10,
-        height: 10,
-        borderRadius: '50%',
-        background: swatches[themeId] ?? '#888',
+        width: size,
+        height: size,
+        borderRadius: '4px',
+        background: meta.swatchBg,
         flexShrink: 0,
         border: '1px solid var(--border)',
+        position: 'relative',
+        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.04)',
       }}
-    />
+    >
+      <span
+        style={{
+          position: 'absolute',
+          right: -1,
+          bottom: -1,
+          width: dot,
+          height: dot,
+          borderRadius: '50%',
+          background: meta.swatchAccent,
+          border: '1.5px solid var(--surface-2)',
+        }}
+      />
+    </span>
   )
 }

@@ -64,8 +64,9 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         <a href="/about" className="mobile-nav-link" onClick={onClose}>
           About
         </a>
-        <div className="mobile-nav-link" style={{ paddingTop: '8px' }} onClick={e => e.stopPropagation()}>
-          <ColorThemePicker />
+        <div className="mobile-nav-theme-row" onClick={e => e.stopPropagation()}>
+          <span>Theme</span>
+          <ColorThemePicker compact />
         </div>
       </div>
     </>

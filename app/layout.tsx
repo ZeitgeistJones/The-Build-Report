@@ -22,7 +22,7 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#0B0E10',
+  themeColor: '#F4F6F8',
 }
 
 const themeBootScript = `(function(){try{var t=localStorage.getItem('${COLOR_THEME_STORAGE_KEY}');if(t)document.documentElement.dataset.colorTheme=t}catch(e){}})()`

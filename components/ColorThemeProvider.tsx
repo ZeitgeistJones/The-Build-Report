@@ -4,8 +4,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import {
   COLOR_THEME_STORAGE_KEY,
   COLOR_THEMES,
+  resolveColorThemeId,
   type ColorThemeId,
-  isColorThemeId,
 } from '@/lib/colorThemes'
 
 interface ColorThemeContextValue {
@@ -20,14 +20,17 @@ function applyTheme(theme: ColorThemeId) {
 }
 
 export function ColorThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ColorThemeId>('teal')
+  const [theme, setThemeState] = useState<ColorThemeId>('light')
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem(COLOR_THEME_STORAGE_KEY)
-    const initial = stored && isColorThemeId(stored) ? stored : 'teal'
+    const initial = resolveColorThemeId(stored)
     setThemeState(initial)
     applyTheme(initial)
+    if (stored && stored !== initial) {
+      localStorage.setItem(COLOR_THEME_STORAGE_KEY, initial)
+    }
     setReady(true)
   }, [])
 
@@ -50,7 +53,7 @@ export function useColorTheme(): ColorThemeContextValue {
   const ctx = useContext(ColorThemeContext)
   if (!ctx) {
     return {
-      theme: 'teal',
+      theme: 'light',
       setTheme: () => {},
     }
   }
