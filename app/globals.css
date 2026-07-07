@@ -110,17 +110,17 @@
   --card-elevated: 0 1px 0 rgba(0,0,0,0.03), 0 4px 18px rgba(30,45,32,0.07);
 }
 
-/* Pressroom — 90s metro daily: cool gray newsprint, heavy black ink, condensed gothic kickers */
+/* Pressroom — 90s metro daily: cool light grey newsprint (fresh offset stock, not aged cream) */
 [data-color-theme='light-90s'] {
-  --bg: #D9D6CC;
-  --surface-1: #E7E4DA;
-  --surface-2: #DFDCD1;
-  --surface-3: #D0CDBF;
-  --border: #ACA697;
+  --bg: #DBDBD8;
+  --surface-1: #E8E8E5;
+  --surface-2: #E2E2DF;
+  --surface-3: #D2D2CE;
+  --border: #B5B5B0;
   --border-strong: #121212;
   --text-primary: #111111;
-  --text-secondary: #33302A;
-  --text-muted: #635D52;
+  --text-secondary: #2E2E2C;
+  --text-muted: #5E5E5A;
   --accent: #8B2323;
   --accent-dim: rgba(139, 35, 35, 0.1);
   --accent-border: rgba(139, 35, 35, 0.35);
