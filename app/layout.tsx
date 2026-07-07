@@ -6,9 +6,26 @@ import { ColorThemeProvider } from '@/components/ColorThemeProvider'
 import NavBar from '@/components/NavBar'
 import { COLOR_THEME_STORAGE_KEY } from '@/lib/colorThemes'
 
+const SITE_URL = 'https://the-build-report.vercel.app'
+const SITE_TITLE = 'The Build Report'
+const SITE_DESCRIPTION = 'A plain English look at the repos, scored and sourced.'
+
 export const metadata: Metadata = {
-  title: 'The Build Report',
-  description: 'A plain English look at the repos, scored and sourced.',
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: 'website',
+    url: SITE_URL,
+    siteName: SITE_TITLE,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

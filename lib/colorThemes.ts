@@ -1,9 +1,9 @@
 export type ColorThemeId =
   | 'light'
-  | 'light-paper'
+  | 'light-lavender'
   | 'light-ink'
   | 'light-sage'
-  | 'light-newsprint'
+  | 'light-90s'
   | 'teal'
   | 'lime'
   | 'warm'
@@ -31,11 +31,11 @@ export const COLOR_THEME_GROUPS: { label: string; themes: ColorThemeMeta[] }[] =
         swatchAccent: '#3D9A88',
       },
       {
-        id: 'light-paper',
-        label: 'Paper',
-        hint: 'Warm cream editorial',
-        swatchBg: '#FAF7F2',
-        swatchAccent: '#6B5344',
+        id: 'light-lavender',
+        label: 'Lavender',
+        hint: 'Soft indigo desk',
+        swatchBg: '#F1EFF6',
+        swatchAccent: '#6A4FB0',
       },
       {
         id: 'light-ink',
@@ -52,10 +52,10 @@ export const COLOR_THEME_GROUPS: { label: string; themes: ColorThemeMeta[] }[] =
         swatchAccent: '#3D7A52',
       },
       {
-        id: 'light-newsprint',
+        id: 'light-90s',
         label: 'Newsprint',
-        hint: 'Broadsheet editorial',
-        swatchBg: '#EDE9DF',
+        hint: '90s broadsheet ink',
+        swatchBg: '#D9D6CC',
         swatchAccent: '#8B2323',
       },
     ],
@@ -106,6 +106,8 @@ export function isColorThemeId(value: string): value is ColorThemeId {
 /** Maps removed themes to a current replacement. */
 const LEGACY_THEME_MAP: Record<string, ColorThemeId> = {
   slate: 'teal',
+  'light-paper': 'light-lavender',
+  'light-newsprint': 'light-90s',
 }
 
 export function resolveColorThemeId(value: string | null | undefined): ColorThemeId {
