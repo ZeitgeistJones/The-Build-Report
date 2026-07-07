@@ -983,6 +983,11 @@ export default function RepoList({
                 <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
                   holder<br />economics
                 </div>
+                {showsEconomicNa(repo) && (
+                  <div style={{ fontSize: `${Math.max(8, d.metricLabel - 1)}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.15, fontStyle: 'italic', opacity: 0.85 }}>
+                    not in avg
+                  </div>
+                )}
               </RepoBadge>
 
               <MetricDivider show={!isMobile} />
