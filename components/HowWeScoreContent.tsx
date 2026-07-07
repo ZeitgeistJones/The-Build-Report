@@ -105,8 +105,9 @@ export default function HowWeScoreContent({
   return (
     <>
       <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '12px' }}>
-        Three Ecosystem Grades at the top, plus Repo Grades on each card. Together they answer: is the builder
-        shipping, does value flow to holders, and how do repos score on safety and transparency?
+        Four Ecosystem Grades at the top, plus Repo Grades on each card. Together they answer: is the builder
+        shipping, does value flow to holders (through direct burn and through shipping leverage), and how do repos
+        score on safety and transparency?
       </p>
 
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.55, marginBottom: '16px' }}>
@@ -144,6 +145,11 @@ export default function HowWeScoreContent({
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Holder economics</strong> — commit-weighted average of the direct-burn and supply-lock repos; infra excluded (
               <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>see rubric</a>
               ). When less than 20% of a window&apos;s commits land on holder-facing repos, the grade is scaled down (to a floor of 0.35×) to reflect thin holder attention — the unadjusted quality number is kept separately.
+            </li>
+            <li style={{ marginTop: '6px' }}>
+              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Shipping leverage</strong> — the second lens on holder value: a commit-weighted average of the infrastructure, indirect, and theoretical repos, scored on how much they multiply the builder&apos;s ability to ship consumer apps that burn or lock CLAWD (
+              <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>see rubric</a>
+              ). These are the repos excluded from Holder economics — here they get their own accumulated grade instead of only per-card scores.
             </li>
             <li style={{ marginTop: '6px' }}>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Builder standards</strong> — commit-weighted rubric quality across all scored repos, including infrastructure (

@@ -51,7 +51,7 @@ export const AWAITING_SCORE_TOOLTIP =
   'Recently pushed on GitHub but not scored yet. Pay to run Live AI for rubric grades.'
 
 export const HOLDER_ECONOMICS_COLUMN_TOOLTIP =
-  'This repo\'s holder economic impact. Burn apps and supply-lock repos are scored on their direct CLAWD burn or lock mechanic and feed the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage — shown here as a Repo Grade, but not averaged into that Ecosystem Grade.'
+  'This repo\'s holder economic impact. Burn apps and supply-lock repos are scored on their direct CLAWD burn or lock mechanic and feed the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage instead — they feed the separate Shipping leverage Ecosystem Grade, the second lens on holder value at the top.'
 
 export function criticalPathTooltip(roleBadge: string): string {
   return `${roleBadge} — locked tag on the builder critical path. Floor grades at C when functioning as designed.`

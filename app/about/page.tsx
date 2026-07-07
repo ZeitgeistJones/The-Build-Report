@@ -65,7 +65,7 @@ Accepted context is grounding the AI weighs, not a direct score override. On con
 
 Supply lock is not a burn. Locking CLAWD in a staking or vesting contract removes it from circulation temporarily — it can return. A burn permanently destroys tokens. Both are meaningful but they are not the same thing.
 
-Infrastructure repos are not expected to have direct burn or revenue mechanics. Their Repo Grade for holder economics is scored on shipping leverage instead — how much they multiply the builder's ability to ship consumer apps — and is shown on the card but not averaged into the Ecosystem Grade for Holder economics. All repos are scored on builder standards.`,
+Infrastructure repos are not expected to have direct burn or revenue mechanics. Their Repo Grade for holder economics is scored on shipping leverage instead — how much they multiply the builder's ability to ship consumer apps — and rolls up into its own Shipping leverage Ecosystem Grade at the top, a separate lens from Holder economics rather than being dropped from the averages. All repos are scored on builder standards.`,
     },
     {
       heading: 'Sources',

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { BuilderGrade, TokenMechanicGrade, IntegrityGrade, formatTrendDelta, TrendExplanation, Period } from '@/lib/grades'
+import { BuilderGrade, TokenMechanicGrade, ShippingLeverageGrade, IntegrityGrade, formatTrendDelta, TrendExplanation, Period } from '@/lib/grades'
 import type { GradeNewArrival } from '@/lib/gradeNewArrivals'
 import { timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
@@ -16,6 +16,7 @@ import {
   builderCardLayman,
   economicCardLayman,
   integrityCardLayman,
+  shippingLeverageCardLayman,
   digestMissingPeriodCards,
   type GradeCardId,
 } from '@/lib/gradeCardCopy'
@@ -33,6 +34,10 @@ interface Props {
   tokenMechanicGrade30: TokenMechanicGrade | null
   tokenMechanicGrade7: TokenMechanicGrade | null
   tokenMechanicGrade60: TokenMechanicGrade | null
+  shippingLeverageGrade24: ShippingLeverageGrade | null
+  shippingLeverageGrade30: ShippingLeverageGrade | null
+  shippingLeverageGrade7: ShippingLeverageGrade | null
+  shippingLeverageGrade60: ShippingLeverageGrade | null
   integrityGrade24: IntegrityGrade | null
   integrityGrade30: IntegrityGrade | null
   integrityGrade7: IntegrityGrade | null
@@ -51,12 +56,14 @@ const CARD_LABELS: Record<CardId, string> = {
   builder: 'Builder activity',
   economic: 'Holder economics',
   integrity: 'Builder standards',
+  leverage: 'Shipping leverage',
 }
 
 const CARD_RUBRIC_ID: Record<CardId, string> = {
   builder: 'builder-activity',
   economic: 'token-mechanic',
   integrity: 'builder-integrity',
+  leverage: 'shipping-leverage',
 }
 
 function TrendArrow({ trend }: { trend: 'up' | 'flat' | 'down' | 'new' }) {
@@ -530,6 +537,10 @@ export default function GradesPanel({
   tokenMechanicGrade30,
   tokenMechanicGrade7,
   tokenMechanicGrade60,
+  shippingLeverageGrade24,
+  shippingLeverageGrade30,
+  shippingLeverageGrade7,
+  shippingLeverageGrade60,
   integrityGrade24,
   integrityGrade30,
   integrityGrade7,
@@ -576,30 +587,34 @@ export default function GradesPanel({
     '24h': {
       bg: builderGrade24,
       tg: tokenMechanicGrade24,
+      sg: shippingLeverageGrade24,
       ig: integrityGrade24,
       stats: stats24h,
     },
     '7d': {
       bg: builderGrade7,
       tg: tokenMechanicGrade7,
+      sg: shippingLeverageGrade7,
       ig: integrityGrade7,
       stats: stats7d,
     },
     '30d': {
       bg: builderGrade30,
       tg: tokenMechanicGrade30,
+      sg: shippingLeverageGrade30,
       ig: integrityGrade30,
       stats: stats30d,
     },
     '60d': {
       bg: builderGrade60,
       tg: tokenMechanicGrade60,
+      sg: shippingLeverageGrade60,
       ig: integrityGrade60,
       stats: stats60d,
     },
   } as const
 
-  const { bg, tg, ig, stats } = periodGrades[period]
+  const { bg, tg, sg, ig, stats } = periodGrades[period]
 
   const selectedExplanation =
     selectedCard === 'builder'
@@ -608,7 +623,9 @@ export default function GradesPanel({
         ? tg?.trendExplanation
         : selectedCard === 'integrity'
           ? ig?.trendExplanation
-          : undefined
+          : selectedCard === 'leverage'
+            ? sg?.trendExplanation
+            : undefined
 
   const digestHasPeriod =
     Boolean(digestCards?.[period]?.builder) &&
@@ -630,6 +647,11 @@ export default function GradesPanel({
     : ig
       ? integrityCardLayman(ig, period, githubStats, repos)
       : 'Builder standards score unavailable'
+  const leverageCopy =
+    digestCards?.[period]?.leverage ??
+    (sg
+      ? shippingLeverageCardLayman(sg, period, githubStats, repos)
+      : 'Shipping leverage score unavailable')
 
   const digestPeriodMissing =
     digestCards != null && digestMissingPeriodCards(digestCards, period)
@@ -675,6 +697,18 @@ export default function GradesPanel({
         {ig.counts.mid > 0 && statSpan(`${ig.counts.mid} mid commits`)}
         {ig.counts.low > 0 && statSpan(`${ig.counts.low} low-standards commits`)}
         {statSpan(integrityGradeFootnote(), true)}
+      </>
+    ),
+    leverage: sg && (
+      <>
+        {sg.counts.repos > 0 && statSpan(`${sg.counts.repos} infra/tooling repos scored`)}
+        {sg.counts.high > 0 && statSpan(`${sg.counts.high} high-leverage commits`)}
+        {sg.counts.mid > 0 && statSpan(`${sg.counts.mid} mid-leverage commits`)}
+        {sg.counts.low > 0 && statSpan(`${sg.counts.low} low-leverage commits`)}
+        {statSpan(
+          'Scored on tooling that helps ship holder value, not direct CLAWD burn. Its own Ecosystem Grade — separate from Holder economics.',
+          true,
+        )}
       </>
     ),
   }
@@ -764,7 +798,7 @@ export default function GradesPanel({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
           gap: isMobile ? '10px' : '16px',
           alignItems: 'stretch',
         }}
@@ -784,6 +818,50 @@ export default function GradesPanel({
         />
 
         <GradeCard
+          cardId="integrity"
+          isMobile={isMobile}
+          grade={ig}
+          label="Builder Standards"
+          period={period}
+          laymanCopy={integrityCopy}
+          trendExplanation={ig?.trendExplanation}
+          isSelected={selectedCard === 'integrity'}
+          onSelectTrend={handleSelectTrend}
+          isRubricSelected={rubricCard === 'integrity'}
+          onSelectRubric={handleSelectRubric}
+          newArrivalsCount={ig?.newArrivals?.length ?? 0}
+          isArrivalsSelected={arrivalsCard === 'integrity'}
+          onSelectArrivals={() => handleSelectArrivals('integrity')}
+        />
+
+        <div
+          style={{
+            gridColumn: '1 / -1',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            marginTop: '4px',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '10px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: 'var(--text-muted)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Two lenses on holder value
+          </span>
+          <span style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            apps that serve holders directly · tooling that helps ship
+          </span>
+        </div>
+
+        <GradeCard
           cardId="economic"
           isMobile={isMobile}
           grade={tg}
@@ -801,20 +879,17 @@ export default function GradesPanel({
         />
 
         <GradeCard
-          cardId="integrity"
+          cardId="leverage"
           isMobile={isMobile}
-          grade={ig}
-          label="Builder Standards"
+          grade={sg}
+          label="Shipping leverage"
           period={period}
-          laymanCopy={integrityCopy}
-          trendExplanation={ig?.trendExplanation}
-          isSelected={selectedCard === 'integrity'}
+          laymanCopy={leverageCopy}
+          trendExplanation={sg?.trendExplanation}
+          isSelected={selectedCard === 'leverage'}
           onSelectTrend={handleSelectTrend}
-          isRubricSelected={rubricCard === 'integrity'}
+          isRubricSelected={rubricCard === 'leverage'}
           onSelectRubric={handleSelectRubric}
-          newArrivalsCount={ig?.newArrivals?.length ?? 0}
-          isArrivalsSelected={arrivalsCard === 'integrity'}
-          onSelectArrivals={() => handleSelectArrivals('integrity')}
         />
       </div>
 

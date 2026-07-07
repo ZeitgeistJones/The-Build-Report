@@ -12,11 +12,11 @@ const LEGEND_ITEMS = [
   },
   {
     label: 'Holder economics',
-    text: 'Repo Grade for holder economic impact. Burn and supply-lock repos are scored on direct CLAWD burn or lock, and count toward the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage — how much they multiply the builder\u2019s ability to ship consumer apps that burn or lock CLAWD.',
+    text: 'Repo Grade for holder economic impact. Burn and supply-lock repos are scored on direct CLAWD burn or lock, and feed the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage instead — how much they multiply the builder\u2019s ability to ship consumer apps that burn or lock CLAWD — and feed the separate Shipping leverage Ecosystem Grade.',
   },
   {
-    label: '“not in avg”',
-    text: 'This Repo Grade is shown on the card but not averaged into the Ecosystem Grade for Holder economics at the top — because it\u2019s scored on shipping leverage, not direct burn.',
+    label: '“feeds leverage grade”',
+    text: 'This repo is scored on shipping leverage, not direct burn — so its Repo Grade rolls up into the Shipping leverage Ecosystem Grade at the top, not the Holder economics one. Two separate lenses on holder value.',
   },
   {
     label: 'Builder standards',
@@ -28,7 +28,7 @@ const LEGEND_ITEMS = [
   },
   {
     label: 'Letter grades',
-    text: 'Each card shows two Repo Grades — Holder economics and Builder standards. Colors show A–F only. Builder activity is an Ecosystem Grade shown at the top panel, not on cards.',
+    text: 'Each card shows two Repo Grades — Holder economics and Builder standards. Colors show A–F only. Builder activity and Shipping leverage are Ecosystem Grades shown at the top panel, not on cards.',
   },
 ] as const
 

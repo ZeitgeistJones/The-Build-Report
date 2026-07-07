@@ -2,6 +2,7 @@ import type {
   BuilderGrade,
   IntegrityGrade,
   Period,
+  ShippingLeverageGrade,
   TokenMechanicGrade,
   TrendDirection,
   TrendExplanation,
@@ -9,7 +10,7 @@ import type {
 import type { GitHubStats } from '@/lib/github'
 import type { Repo } from '@/lib/scores'
 import { commitsInWindow } from '@/lib/scoringShared'
-import { isConsumerEconomicScored } from '@/lib/economicGrade'
+import { isConsumerEconomicScored, showsEconomicNa } from '@/lib/economicGrade'
 
 export function humanizeRepoSlug(slug: string): string {
   return slug.replace(/-/g, ' ')
@@ -85,7 +86,7 @@ export function dominantRepoSentence(
   return `Shipping was led by ${names}.`
 }
 
-export type GradeCardId = 'builder' | 'economic' | 'integrity'
+export type GradeCardId = 'builder' | 'economic' | 'integrity' | 'leverage'
 
 export interface GradeCardFace {
   hook: string
@@ -469,6 +470,73 @@ export function economicCardLayman(
   }
 
   return `${base} ${trendFlavor(grade.trend, 'holder economics', period)}`
+}
+
+export function shippingLeverageCardLayman(
+  grade: ShippingLeverageGrade,
+  period: Period,
+  githubStats?: GitHubStats | null,
+  repos?: Repo[],
+): string {
+  const window = periodPhrase(period)
+  const weight = grade.counts.high + grade.counts.mid + grade.counts.low
+
+  if (weight === 0 && grade.counts.repos === 0) {
+    return `Not enough infrastructure or tooling activity in ${window} to read shipping leverage. This grade needs commits on the repos that support the builder behind the scenes — try a longer window.`
+  }
+
+  const tier = letterTier(grade.letter)
+  let base: string
+
+  if (period === '60d') {
+    base =
+      tier === 'top'
+        ? `Over two months, the infrastructure and tooling the builder leans on has strongly multiplied the ability to ship things holders benefit from.`
+        : tier === 'solid'
+          ? `Across two months, the behind-the-scenes tooling is doing real work — a solid path from infrastructure to holder value.`
+          : tier === 'mixed'
+            ? `The two-month shipping-leverage picture is mixed: some tooling clearly speeds up holder-facing work, some is harder to connect.`
+            : `Over two months, much of the infrastructure work is hard to tie back to a clear path to holder value.`
+    return `${base} ${trendFlavor(grade.trend, 'shipping leverage', period)}`
+  }
+
+  if (period === '24h') {
+    base =
+      tier === 'top'
+        ? `In the last day, the tooling work that shipped clearly strengthens the builder's ability to deliver for holders.`
+        : tier === 'solid'
+          ? `Yesterday's behind-the-scenes work looks useful — it supports the apps holders actually touch.`
+          : tier === 'mixed'
+            ? `The last day gave a mixed shipping-leverage read — some useful tooling, some hard to place.`
+            : `In the last 24 hours, the infrastructure work we could see did not show an obvious path to holder value.`
+  } else if (period === '7d') {
+    base =
+      tier === 'top'
+        ? `This week, the infrastructure and tooling that moved clearly multiplies how fast holder-facing apps can ship.`
+        : tier === 'solid'
+          ? `This week, behind-the-scenes tooling is pulling its weight — a decent path toward holder value.`
+          : tier === 'mixed'
+            ? `This week, shipping leverage is split: some tooling speeds things up, some is unclear.`
+            : `This week, most infrastructure work was hard to connect to a clear holder-value payoff.`
+  } else {
+    base =
+      tier === 'top'
+        ? `This month, the tooling the builder relies on is strongly multiplying the ability to ship what holders benefit from.`
+        : tier === 'solid'
+          ? `This month, behind-the-scenes work is holding up well as a path to holder value.`
+          : tier === 'mixed'
+            ? `This month, the shipping-leverage picture is uneven — some tooling clearly helps, some does not.`
+            : `This month, a lot of infrastructure work did not show a clear path to holder value.`
+  }
+
+  const leaders = githubStats
+    ? topReposByCommits(githubStats, repos, period, 'current', 3, showsEconomicNa)
+    : []
+  const dominant =
+    leaders.length && weight > 0 ? dominantRepoSentence(leaders, weight, 'shipping') : null
+  if (dominant) base += ` ${dominant}`
+
+  return `${base} ${trendFlavor(grade.trend, 'shipping leverage', period)}`
 }
 
 export function integrityCardLayman(

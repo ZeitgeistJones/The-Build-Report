@@ -143,7 +143,7 @@ export const START_HERE_DISCLAIMER = [
 export const START_HERE_TOC = [
   { href: '#sh-what', label: 'What is this site?' },
   { href: '#sh-github', label: 'GitHub for you' },
-  { href: '#sh-scores', label: 'Three scores' },
+  { href: '#sh-scores', label: 'The grades' },
   { href: '#sh-walkthrough', label: '3-minute walkthrough' },
   { href: '#sh-token', label: 'CLAWD & CV' },
   { href: '#sh-glossary', label: 'Glossary' },
@@ -178,13 +178,18 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
   },
   {
     id: 'sh-scores',
-    title: 'The three scores, plain English',
-    subtitle: 'Holder economics, Builder standards, and Builder activity',
+    title: 'The grades, plain English',
+    subtitle: 'Holder economics, Shipping leverage, Builder standards, and Builder activity',
     callouts: [START_HERE_CALLOUTS.fNotScam, START_HERE_CALLOUTS.doneNotDead],
     subsections: [
       {
         title: 'Holder economics',
-        body: 'This asks one question: does this repo create real value for people who hold $CLAWD? The site sorts repos into four tiers — direct apps that use or reward $CLAWD directly, supply-lock repos that remove tokens from circulation, indirect repos that build the ecosystem without touching the token, and infra that supports everything else behind the scenes. A low or F grade here means the repo doesn\'t score well on this one rubric — it\'s an interpretive site score, not a scam alarm. Plenty of essential, well-built repos are pure infra and will always land low on Holder economics. That\'s expected, not a warning sign.',
+        body: 'This asks one question: does this repo create real value for people who hold $CLAWD? It applies to the repos that touch the token directly — direct apps that use or reward $CLAWD, and supply-lock repos that remove tokens from circulation. Their grades are averaged into the Holder economics Ecosystem Grade at the top. A low or F grade here means the repo doesn\'t score well on this one rubric — it\'s an interpretive site score, not a scam alarm. Infrastructure and tooling repos aren\'t judged on this rubric at all — they get graded on Shipping leverage instead (next).',
+        analogy: START_HERE_ANALOGIES[5],
+      },
+      {
+        title: 'Shipping leverage',
+        body: 'This is the second lens on holder value, for the behind-the-scenes repos — infrastructure, tooling, and R&D — that don\'t burn or lock $CLAWD themselves. It asks: how much does this work multiply the builder\'s ability to ship the apps that DO benefit holders? These repos used to be scored per-card but left out of the top averages, which was confusing. Now they roll up into their own Shipping leverage Ecosystem Grade at the top, paired with Holder economics as two lenses on the same question. A strong grade here means the plumbing is speeding up holder-facing shipping, even with zero direct burns in the repo.',
         analogy: START_HERE_ANALOGIES[5],
       },
       {
@@ -194,7 +199,7 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
       },
       {
         title: 'Builder activity',
-        body: 'This asks: is anyone actually working on this? It\'s based on commit counts across the org in your selected time window, measured against activity benchmarks. This one is an Ecosystem Grade only — it shows in the three cards at the top of the page, not on individual repo cards. Individual repos instead show their own commit count for the window. A quiet stretch can still be completely healthy: a Done supply-lock repo, for example, is supposed to go quiet once its job is finished. Quiet doesn\'t mean dead. Always check the status badge before assuming low activity is a problem.',
+        body: 'This asks: is anyone actually working on this? It\'s based on commit counts across the org in your selected time window, measured against activity benchmarks. This one is an Ecosystem Grade only — it shows in the grade cards at the top of the page, not on individual repo cards. Individual repos instead show their own commit count for the window. A quiet stretch can still be completely healthy: a Done supply-lock repo, for example, is supposed to go quiet once its job is finished. Quiet doesn\'t mean dead. Always check the status badge before assuming low activity is a problem.',
         analogy: START_HERE_ANALOGIES[2],
       },
     ],
@@ -202,11 +207,11 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
   {
     id: 'sh-walkthrough',
     title: 'How to read the homepage in 3 minutes',
-    subtitle: 'Three grade cards → activity snapshot → repo list',
+    subtitle: 'Four grade cards → activity snapshot → repo list',
     subsections: [
       {
-        title: 'Step 1 — The three grade cards at the top',
-        body: 'The top of the page shows three Ecosystem Grades — the org-wide average for Holder economics, Builder standards, and Builder activity. Each is its own lens on the same set of repos, so a project can score well on one and poorly on another, and that\'s normal, not a red flag. Use the 24h / 7d / 30d / 60d toggle to change the time window. If a card looks low, don\'t stop there: open the repo list (Step 3) to see which specific repos are pulling the average down, and why.',
+        title: 'Step 1 — The four grade cards at the top',
+        body: 'The top of the page shows four Ecosystem Grades — the org-wide averages for Builder activity, Builder standards, and the two holder-value lenses: Holder economics (repos that touch $CLAWD directly) and Shipping leverage (the tooling that helps ship them). Each is its own lens on the same set of repos, so a project can score well on one and poorly on another, and that\'s normal, not a red flag. Use the 24h / 7d / 30d / 60d toggle to change the time window. If a card looks low, don\'t stop there: open the repo list (Step 3) to see which specific repos are pulling the average down, and why.',
       },
       {
         title: 'Step 2 — Activity snapshot',

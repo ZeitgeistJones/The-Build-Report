@@ -12,6 +12,7 @@ import { stripMarkdown } from '@/lib/textCleanup'
 import {
   calcBuilderGrade,
   calcIntegrityGrade,
+  calcShippingLeverageGrade,
   calcTokenMechanicGrade,
   type Period,
 } from '@/lib/grades'
@@ -19,6 +20,7 @@ import {
   builderCardLayman,
   economicCardLayman,
   integrityCardLayman,
+  shippingLeverageCardLayman,
   builderWindowStatsFromGitHub,
   topReposByCommits,
 } from '@/lib/gradeCardCopy'
@@ -39,6 +41,8 @@ export interface CardBlurbs {
   builder: string
   economic: string
   integrity: string
+  /** Optional — older cached digests predate the Shipping leverage card; panel falls back to live copy. */
+  leverage?: string
 }
 
 export interface DailyDigestCards {
@@ -171,6 +175,7 @@ function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
     .map(period => {
       const bg = calcBuilderGrade(stats, period)
       const tg = calcTokenMechanicGrade(stats, period, repos)
+      const sg = calcShippingLeverageGrade(stats, period, repos)
       const ig = calcIntegrityGrade(stats, period, repos)
       const trend =
         period === '60d'
@@ -180,6 +185,7 @@ function formatGradeContext(stats: GitHubStats, repos: Repo[]): string {
         `${period} window:`,
         `  Builder activity: ${bg.letter} (${bg.pct}%), ${trend}`,
         `  Holder economics: ${tg.letter} (${tg.pct}%), ${tg.counts.repos} repos in sample${tg.holderCoveragePct != null ? `, ${tg.holderCoveragePct}% holder-facing commit share` : ''}`,
+        `  Shipping leverage: ${sg.letter} (${sg.pct}%), ${sg.counts.repos} infra/tooling repos in sample`,
         `  Builder standards: ${ig.letter} (${ig.pct}%), ${ig.counts.commitWeight} commits weighted (${ig.counts.low} low / ${ig.counts.mid} mid / ${ig.counts.high} high)`,
       ].join('\n')
     })
@@ -202,12 +208,14 @@ function buildFallbackDigest(
   for (const period of periods) {
     const bg = calcBuilderGrade(stats, period)
     const tg = calcTokenMechanicGrade(stats, period, repos)
+    const sg = calcShippingLeverageGrade(stats, period, repos)
     const ig = calcIntegrityGrade(stats, period, repos)
     const windowStats = builderWindowStatsFromGitHub(stats, period)
     cards[period] = {
       builder: builderCardLayman(bg, period, windowStats, stats, repos),
       economic: economicCardLayman(tg, period, { commits: windowStats.commits }, stats, repos),
       integrity: integrityCardLayman(ig, period, stats, repos),
+      leverage: shippingLeverageCardLayman(sg, period, stats, repos),
     }
   }
 
@@ -285,15 +293,17 @@ Return ONLY valid JSON, no markdown fences:
     "24h": {
       "builder": "2-3 sentences about builder activity for the last 24 hours.",
       "economic": "2-3 sentences about holder economics for the last 24 hours.",
+      "leverage": "2-3 sentences about shipping leverage (behind-the-scenes tooling and infrastructure that speeds up shipping holder value) for the last 24 hours.",
       "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the last 24 hours."
     },
     "7d": {
       "builder": "2-3 sentences about builder activity for the 7-day window.",
       "economic": "2-3 sentences about holder economics (burn apps and supply locks) for the 7-day window.",
+      "leverage": "2-3 sentences about shipping leverage (tooling and infrastructure that multiplies holder-facing shipping) for the 7-day window.",
       "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the 7-day window."
     },
-    "30d": { "builder": "...", "economic": "...", "integrity": "..." },
-    "60d": { "builder": "...", "economic": "...", "integrity": "..." }
+    "30d": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." },
+    "60d": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." }
   }
 }
 
@@ -307,6 +317,7 @@ Rules:
 - CARD COPY MUST BE PLAIN WORDS — no percentages, letter grades, or raw stats dumps in the card fields. You MAY name specific projects when PER-PERIOD TOP PROJECTS shows one repo dominated that window.
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
 - Say "holder economics" or "how apps and locks serve $CLAWD holders" instead of "token mechanics" or "burn apps" alone.
+- Shipping leverage = the behind-the-scenes tooling and infrastructure that multiplies how fast the builder can ship apps holders benefit from. It is a separate lens from holder economics (not direct burn). If the leverage context shows an empty sample or QUIET, say we cannot draw a strong read for that window yet.
 - Builder standards copy = observable rubric quality where commits landed — safety, testing, transparency. Not a moral verdict on the builder. Never say "trust" without context (e.g. trust in documented safety practices). Not moralizing.
 - If standards context shows below 60% or mostly low-scoring commits, the copy must acknowledge weak rubric scores — do not describe the window as steady, polished, or low-risk unless that matches the grade context.
 - Holder economics context may show low holder-facing commit share — if so, say plainly that most shipping was background tooling and holder value delivery was thin this window.
@@ -322,29 +333,19 @@ Rules:
     if (!text) return null
     const parsed = parseDigestJson(text)
     if (!parsed) return null
+    const mapRow = (row: CardBlurbs): CardBlurbs => ({
+      builder: stripMarkdown(row.builder),
+      economic: stripMarkdown(row.economic),
+      integrity: stripMarkdown(row.integrity),
+      ...(row.leverage ? { leverage: stripMarkdown(row.leverage) } : {}),
+    })
     return {
       general: stripMarkdown(parsed.general),
       cards: {
-        '24h': {
-          builder: stripMarkdown(parsed.cards['24h'].builder),
-          economic: stripMarkdown(parsed.cards['24h'].economic),
-          integrity: stripMarkdown(parsed.cards['24h'].integrity),
-        },
-        '7d': {
-          builder: stripMarkdown(parsed.cards['7d'].builder),
-          economic: stripMarkdown(parsed.cards['7d'].economic),
-          integrity: stripMarkdown(parsed.cards['7d'].integrity),
-        },
-        '30d': {
-          builder: stripMarkdown(parsed.cards['30d'].builder),
-          economic: stripMarkdown(parsed.cards['30d'].economic),
-          integrity: stripMarkdown(parsed.cards['30d'].integrity),
-        },
-        '60d': {
-          builder: stripMarkdown(parsed.cards['60d'].builder),
-          economic: stripMarkdown(parsed.cards['60d'].economic),
-          integrity: stripMarkdown(parsed.cards['60d'].integrity),
-        },
+        '24h': mapRow(parsed.cards['24h']),
+        '7d': mapRow(parsed.cards['7d']),
+        '30d': mapRow(parsed.cards['30d']),
+        '60d': mapRow(parsed.cards['60d']),
       },
     }
   } catch {

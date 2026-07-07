@@ -52,9 +52,9 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
   },
   {
     id: 'shipping-leverage',
-    title: 'Holder economics — shipping leverage',
+    title: 'Shipping leverage',
     appliesTo: 'infrastructure, indirect, and theoretical repos',
-    note: 'Used for holder economics where direct burn is not expected. Score the multiplier on autonomous-builder shipping.',
+    note: 'The second lens on holder value, for repos where direct burn is not expected. Score the multiplier on autonomous-builder shipping. Commit-weighted across these repos into the Shipping leverage Ecosystem Grade at the top — separate from Holder economics.',
     scope: 'repo',
     rows: [
       {

@@ -17,10 +17,15 @@ import {
   TM_CONSUMER_LABELS,
 } from './rubrics/tokenMechanic'
 import {
+  LEGACY_SL_TM_LABELS,
   SL_LABELS,
   slRubricLevelScore,
 } from './rubrics/shippingLeverage'
-import { getConsumerEconomicScorePct, isConsumerEconomicScored } from './economicGrade'
+import {
+  getConsumerEconomicScorePct,
+  getShippingLeverage,
+  isConsumerEconomicScored,
+} from './economicGrade'
 import {
   commitsInWindow,
   effectiveTag,
@@ -131,6 +136,19 @@ export interface TokenMechanicGrade {
   holderCoveragePct?: number | null
   /** TM quality before holder-attention coverage adjustment. */
   qualityPct?: number | null
+  letter: string
+  pct: number
+  priorPct: number | null
+  summary: string
+  signals: { label: string; level: 'high' | 'mid' | 'low'; pct: number }[]
+  trendPct: number | null
+  trend: TrendDirection
+  trendExplanation?: TrendExplanation
+  newArrivals?: GradeNewArrival[]
+}
+
+export interface ShippingLeverageGrade {
+  counts: { high: number; mid: number; low: number; repos: number }
   letter: string
   pct: number
   priorPct: number | null
@@ -654,6 +672,118 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
 
 export function calcTokenMechanicGrade(stats: GitHubStats, period: Period, repoSet: Repo[]): TokenMechanicGrade {
   return calcTokenMechanicGradeUnified(stats, repoSet, period)
+}
+
+/** Infra/indirect/theoretical repos that carry a shipping-leverage score — the second holder-value lens. */
+export function shippingLeverageRepos(repos: Repo[]): Repo[] {
+  return repos.filter(r => getShippingLeverage(r) != null)
+}
+
+function shippingLeverageRubricCommitCounts(
+  stats: GitHubStats,
+  repos: Repo[],
+  period: Period,
+) {
+  let high = 0
+  let mid = 0
+  let low = 0
+  let total = 0
+  for (const { repo, weight: w } of cappedCommitWeights(stats, repos, period, 'current')) {
+    const pct = getShippingLeverage(repo)?.pct
+    if (pct == null) continue
+    total += w
+    if (pct >= 80) high += w
+    else if (pct >= 60) mid += w
+    else low += w
+  }
+  return { high, mid, low, commitWeight: total, repos: repos.length }
+}
+
+function shippingLeverageSummary(pct: number, period: Period): string {
+  const window =
+    period === '60d'
+      ? 'over 60 days'
+      : period === '30d'
+        ? 'this month'
+        : period === '24h'
+          ? 'in the last 24 hours'
+          : 'this week'
+  if (pct >= 80) {
+    return `Infrastructure and tooling repos with the most commits ${window} strongly multiply the builder's ability to ship holder value.`
+  }
+  if (pct >= 60) {
+    return `The tooling repos seeing commits ${window} mostly show a solid path from infrastructure to holder value.`
+  }
+  if (pct >= 40) {
+    return `Shipping-leverage scores are mixed where infrastructure commit volume landed ${window}.`
+  }
+  return `Most infrastructure commits ${window} landed on repos with a weaker path to holder value.`
+}
+
+function calcShippingLeverageGradeUnified(
+  stats: GitHubStats,
+  repoSet: Repo[],
+  period: Period,
+): ShippingLeverageGrade {
+  const scored = shippingLeverageRepos(repoSet)
+  const activeRepos = reposActiveInWindow(stats, scored, period, 'current')
+  const priorActiveRepos = reposActiveInWindow(stats, scored, period, 'prior')
+  const sample = selectSampleWithFallback(activeRepos, scored)
+  const priorSample = selectSampleWithFallback(priorActiveRepos, scored)
+
+  const pct = weightedOrFlatAvg(stats, sample, period, 'current', r => getShippingLeverage(r)?.pct ?? 0)
+  const priorPct =
+    period === '60d' || !priorSample.length
+      ? null
+      : weightedOrFlatAvg(stats, priorSample, period, 'prior', r => getShippingLeverage(r)?.pct ?? 0)
+
+  const trendPct = period === '60d' ? null : pctChange(pct, priorPct ?? 0)
+
+  const rubricCounts = shippingLeverageRubricCommitCounts(stats, sample, period)
+  const weightBase = rubricCounts.commitWeight || 1
+
+  const capacityAvg = weightedOrFlatAvg(stats, sample, period, 'current', r =>
+    slRubricLevelScore(r, [SL_LABELS[0], LEGACY_SL_TM_LABELS[0], LEGACY_SL_TM_LABELS[3]]),
+  )
+  const pathAvg = weightedOrFlatAvg(stats, sample, period, 'current', r =>
+    slRubricLevelScore(r, [SL_LABELS[1], LEGACY_SL_TM_LABELS[4]]),
+  )
+  const roleAvg = weightedOrFlatAvg(stats, sample, period, 'current', r =>
+    slRubricLevelScore(r, [SL_LABELS[2], LEGACY_SL_TM_LABELS[1], LEGACY_SL_TM_LABELS[2]]),
+  )
+
+  return {
+    counts: {
+      high: rubricCounts.high,
+      mid: rubricCounts.mid,
+      low: rubricCounts.low,
+      repos: sample.length,
+    },
+    letter: pctToLetter(pct),
+    pct,
+    priorPct,
+    trendPct,
+    trend: period === '60d' ? 'flat' : trendDirection(pct, priorPct),
+    summary: shippingLeverageSummary(pct, period),
+    signals: [
+      { label: 'Multiplies shipping capacity', level: toLevel(capacityAvg / 100), pct: capacityAvg },
+      { label: 'Downstream path to holder value', level: toLevel(pathAvg / 100), pct: pathAvg },
+      { label: 'Role in ecosystem workflow', level: toLevel(roleAvg / 100), pct: roleAvg },
+      {
+        label: 'High-leverage share',
+        level: toLevel(rubricCounts.high / weightBase),
+        pct: Math.round((rubricCounts.high / weightBase) * 100),
+      },
+    ],
+  }
+}
+
+export function calcShippingLeverageGrade(
+  stats: GitHubStats,
+  period: Period,
+  repoSet: Repo[],
+): ShippingLeverageGrade {
+  return calcShippingLeverageGradeUnified(stats, repoSet, period)
 }
 
 /**

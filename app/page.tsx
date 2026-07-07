@@ -24,6 +24,7 @@ import { buildPathToC } from '@/lib/gradePathToC'
 import {
   calcBuilderGrade,
   calcTokenMechanicGrade,
+  calcShippingLeverageGrade,
   calcIntegrityGrade,
   consumerEconomicRepos,
   type Period,
@@ -170,6 +171,11 @@ export default async function Home() {
   const integrityGrade7Raw = stats
     ? attachIntegrityArrivals(calcIntegrityGrade(stats, '7d', allRepos), '7d')
     : calcIntegrityGrade(null, '7d', allRepos)
+
+  const shippingLeverageGrade24 = stats ? calcShippingLeverageGrade(stats, '24h', allRepos) : null
+  const shippingLeverageGrade30 = stats ? calcShippingLeverageGrade(stats, '30d', allRepos) : null
+  const shippingLeverageGrade7 = stats ? calcShippingLeverageGrade(stats, '7d', allRepos) : null
+  const shippingLeverageGrade60 = stats ? calcShippingLeverageGrade(stats, '60d', allRepos) : null
 
   const builderGrade60Raw = stats ? calcBuilderGrade(stats, '60d') : null
   const tokenMechanicGrade60Raw = stats ? attachHolderArrivals(calcTokenMechanicGrade(stats, '60d', allRepos), '60d') : null
@@ -334,6 +340,10 @@ export default async function Home() {
         tokenMechanicGrade30={tokenMechanicGrade30}
         tokenMechanicGrade7={tokenMechanicGrade7}
         tokenMechanicGrade60={tokenMechanicGrade60}
+        shippingLeverageGrade24={shippingLeverageGrade24}
+        shippingLeverageGrade30={shippingLeverageGrade30}
+        shippingLeverageGrade7={shippingLeverageGrade7}
+        shippingLeverageGrade60={shippingLeverageGrade60}
         integrityGrade24={integrityGrade24}
         integrityGrade30={integrityGrade30}
         integrityGrade7={integrityGrade7}
