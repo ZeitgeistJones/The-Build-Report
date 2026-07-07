@@ -4,6 +4,7 @@ export type ColorThemeId =
   | 'light-ink'
   | 'light-sage'
   | 'light-newsprint'
+  | 'light-broadsheet'
   | 'teal'
   | 'lime'
   | 'warm'
@@ -54,9 +55,16 @@ export const COLOR_THEME_GROUPS: { label: string; themes: ColorThemeMeta[] }[] =
       {
         id: 'light-newsprint',
         label: 'Newsprint',
-        hint: 'Broadsheet editorial',
+        hint: 'Cream + editorial red',
         swatchBg: '#EDE9DF',
         swatchAccent: '#8B2323',
+      },
+      {
+        id: 'light-broadsheet',
+        label: 'Broadsheet',
+        hint: 'Vintage B&W newsprint',
+        swatchBg: '#E4DFD3',
+        swatchAccent: '#121212',
       },
     ],
   },

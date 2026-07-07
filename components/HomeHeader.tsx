@@ -34,6 +34,7 @@ export default function HomeHeader({ rescoreBurns, latestCommitLabel, dataAsOfLa
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <p
+          className="site-tagline"
           style={{
             fontSize: isMobile ? '15px' : '16px',
             color: 'var(--text-secondary)',
@@ -44,11 +45,9 @@ export default function HomeHeader({ rescoreBurns, latestCommitLabel, dataAsOfLa
         >
           A plain English look at the repos, scored and sourced.
         </p>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: 1.5 }}>
+        <p className="site-deck" style={{ marginTop: '8px', lineHeight: 1.5 }}>
           Independent community project · Interpretive scores ·{' '}
-          <a href="/about" style={{ color: 'var(--accent)' }}>
-            Disclaimer
-          </a>
+          <a href="/about">Disclaimer</a>
           {latestCommitLabel && (
             <>
               {' '}
