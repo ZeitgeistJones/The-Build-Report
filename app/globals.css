@@ -89,34 +89,13 @@
   --card-elevated: 0 1px 0 rgba(0,0,0,0.04), 0 4px 16px rgba(15,23,42,0.08);
 }
 
-[data-color-theme='light-sage'] {
-  --bg: #F5F7F4;
-  --surface-1: #FFFFFF;
-  --surface-2: #EEF2EB;
-  --surface-3: #E0E8DC;
-  --border: #CCD4C6;
-  --border-strong: rgba(30, 45, 32, 0.1);
-  --text-primary: #1E2D20;
-  --text-secondary: #445748;
-  --text-muted: #6B7A6E;
-  --accent: #3D7A52;
-  --accent-dim: rgba(61, 122, 82, 0.1);
-  --accent-border: rgba(61, 122, 82, 0.24);
-  --grade-a: #2F8F4E;
-  --grade-b: #3B7BB8;
-  --grade-c: #9A7B2E;
-  --grade-d: #C4692A;
-  --grade-f: #C44040;
-  --card-elevated: 0 1px 0 rgba(0,0,0,0.03), 0 4px 18px rgba(30,45,32,0.07);
-}
-
-/* Pressroom — 90s metro daily: cool light grey newsprint (fresh offset stock, not aged cream) */
+/* Pressroom — 90s metro daily: near-white page, cards lift to white, heavy black ink */
 [data-color-theme='light-90s'] {
-  --bg: #E4E5E6;
-  --surface-1: #EEEEEC;
-  --surface-2: #E9E9E7;
-  --surface-3: #DADADB;
-  --border: #BDBDBC;
+  --bg: #FAFAFA;
+  --surface-1: #FFFFFF;
+  --surface-2: #F3F3F1;
+  --surface-3: #E8E8E6;
+  --border: #D0CFCD;
   --border-strong: #121212;
   --text-primary: #111111;
   --text-secondary: #2C2C2C;
