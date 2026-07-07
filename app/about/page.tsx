@@ -15,7 +15,7 @@ export default function AboutPage() {
   const sections = [
     {
       heading: 'What this is',
-      body: `The Build Report is an independent community project tracking what clawdbotatg is building on GitHub and scoring each repo on three axes: token mechanic or shipping leverage (holder economic impact), builder standards (observable safety, testing, and transparency rubrics), and ecosystem-wide builder activity from GitHub signals.
+      body: `The Build Report is an independent community project tracking what clawdbotatg is building on GitHub and scoring each repo on three axes: holder economics (holder economic impact — scored through a direct-burn or shipping-leverage lens depending on repo type), builder standards (observable safety, testing, and transparency rubrics), and ecosystem-wide builder activity from GitHub signals.
 
 It is not affiliated with clawdbotatg, Austin Griffith, or any core team. It was built by a community member who holds $CLAWD and wanted a clearer picture of what was being built and why.`,
     },
@@ -65,7 +65,7 @@ Accepted context is grounding the AI weighs, not a direct score override. On con
 
 Supply lock is not a burn. Locking CLAWD in a staking or vesting contract removes it from circulation temporarily — it can return. A burn permanently destroys tokens. Both are meaningful but they are not the same thing.
 
-Infrastructure repos are not expected to have direct burn or revenue mechanics. They may still receive adapted token mechanic scores on the launch baseline; live AI infrastructure often shows N/A. All repos are scored on builder standards.`,
+Infrastructure repos are not expected to have direct burn or revenue mechanics. Their holder economics grade is scored on shipping leverage instead — how much they multiply the builder's ability to ship consumer apps — and is shown on the card but not averaged into the ecosystem Holder economics grade. All repos are scored on builder standards.`,
     },
     {
       heading: 'Sources',

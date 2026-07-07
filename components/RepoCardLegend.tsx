@@ -8,7 +8,7 @@ const STORAGE_KEY = 'build-report-card-legend-open'
 const LEGEND_ITEMS = [
   {
     label: 'Tag',
-    text: 'Repo type — picks which economic rubric applies (direct, supply lock, leverage, etc.).',
+    text: 'Repo type — picks which holder-economics lens applies (direct burn, supply lock, shipping leverage, etc.).',
   },
   {
     label: 'Shipping / Stable / Done',

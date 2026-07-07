@@ -22,7 +22,7 @@ export type RubricReferenceBlock = {
 export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
   {
     id: 'token-mechanic',
-    title: 'Token mechanic',
+    title: 'Holder economics — direct burn',
     appliesTo: 'direct burn apps and supply-lock repos',
     note: 'Each row is low / mid / high (33 / 67 / 100). Score = weighted sum of row points. Supply-lock scores CLAWD lock impact — CV burns are not CLAWD burns. Ecosystem Holder economics commit-weights these repos and may scale the headline grade when holder-facing commit share is thin (see Ecosystem grades).',
     scope: 'repo',
@@ -52,7 +52,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
   },
   {
     id: 'shipping-leverage',
-    title: 'Shipping leverage',
+    title: 'Holder economics — shipping leverage',
     appliesTo: 'infrastructure, indirect, and theoretical repos',
     note: 'Replaces token mechanic where direct burn is not expected. Score the multiplier on autonomous-builder shipping.',
     scope: 'repo',

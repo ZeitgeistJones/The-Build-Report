@@ -45,7 +45,7 @@ import {
   RESCORE_SUMMARY_NOTE,
 } from '@/lib/scoringCopy'
 import { diffRubricRows, rowDeltaByLabel } from '@/lib/rescoreDeltas'
-import { integritySectionFraming, economicSectionFraming } from '@/lib/cardFraming'
+import { integritySectionFraming, economicSectionFraming, economicLensLabel } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 import { commitsSinceScoreLabel, countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
@@ -61,16 +61,13 @@ import {
 import {
   AWAITING_SCORE_TOOLTIP,
   criticalPathTooltip,
-  ECONOMIC_NA_TOOLTIP,
+  HOLDER_ECONOMICS_COLUMN_TOOLTIP,
   LIFECYCLE_TOOLTIPS,
   commitsColumnTooltip,
   formatPeriodCommitDisplay,
   REPO_FILTER_TOOLTIPS,
   REPO_SCOPE_TOOLTIPS,
   REPO_SORT_TOOLTIPS,
-  SHIPPING_LEVERAGE_COLUMN_TOOLTIP,
-  SUPPLY_LOCK_TM_COLUMN_TOOLTIP,
-  DIRECT_TM_COLUMN_TOOLTIP,
   TAG_TOOLTIPS,
 } from '@/lib/badgeTooltips'
 import {
@@ -290,21 +287,6 @@ function rubricSectionGridStyle(
   if (section === 'bi' && (hasSL || hasTM)) return { gridColumn: 2 }
   if ((section === 'sl' || section === 'tm') && (hasSL || hasTM)) return { gridColumn: 1 }
   return undefined
-}
-
-function economicColumnMeta(repo: Repo): { line1: string; line2: string; tooltip: string } {
-  if (repo.tag === 'supply-lock') {
-    return {
-      line1: 'CLAWD',
-      line2: 'lock score',
-      tooltip: SUPPLY_LOCK_TM_COLUMN_TOOLTIP,
-    }
-  }
-  return {
-    line1: 'token',
-    line2: 'mechanic',
-    tooltip: DIRECT_TM_COLUMN_TOOLTIP,
-  }
 }
 
 function RubricSectionTitle({ children, hint }: { children: ReactNode; hint?: string }) {
@@ -681,7 +663,6 @@ export default function RepoList({
     const lifecycle = computeRepoLifecycle(repo, periodCommits ?? 0)
     const sinceScored = getScoreAgeDisplay(repo, pending)
     const criticalPath = getCriticalPathRole(repo.githubSlug)
-    const economicNa = showsEconomicNa(repo)
     const shippingLeverage = getShippingLeverage(repo)
     const tokenMechanic = getTokenMechanicForDisplay(repo)
     const slRowDeltas = rescoreMeta?.oldRubrics
@@ -693,7 +674,7 @@ export default function RepoList({
     const biRowDeltas = rescoreMeta?.oldRubrics
       ? rowDeltaByLabel(diffRubricRows(rescoreMeta.oldRubrics.builderIntegrity, repo.builderIntegrity.rubric))
       : null
-    const economicCol = economicColumnMeta(repo)
+    const economicScore = shippingLeverage ?? tokenMechanic
     const collectionIds = collectionIdsForSlug(repo.githubSlug, {
       'cv-related': Array.from(collectionSets['cv-related']),
       'clawd-gated': Array.from(collectionSets['clawd-gated']),
@@ -948,9 +929,7 @@ export default function RepoList({
                     display: 'grid',
                     gridTemplateColumns: pending
                       ? 'repeat(2, minmax(0, 1fr))'
-                      : economicNa
-                        ? 'repeat(4, minmax(0, 1fr))'
-                        : 'repeat(3, minmax(0, 1fr))',
+                      : 'repeat(3, minmax(0, 1fr))',
                     gap: '6px',
                     width: '100%',
                     alignItems: 'start',
@@ -987,59 +966,24 @@ export default function RepoList({
                 </>
               ) : (
               <>
-              {economicNa ? (
-              <>
               <RepoBadge
-                tooltip={ECONOMIC_NA_TOOLTIP}
-                style={{ textAlign: 'center', minWidth: isMobile ? undefined : '36px', display: 'block' }}
-              >
-                <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
-                <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                  not in<br />burn avg
-                </div>
-              </RepoBadge>
-
-              <MetricDivider show={!isMobile} />
-
-              <RepoBadge
-                tooltip={SHIPPING_LEVERAGE_COLUMN_TOOLTIP}
-                style={{ textAlign: 'center', minWidth: isMobile ? undefined : '36px', display: 'block' }}
-              >
-                {shippingLeverage ? (
-                  <>
-                    <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(shippingLeverage.letter) }}>
-                      {shippingLeverage.letter}
-                    </div>
-                    <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{shippingLeverage.pct}%</div>
-                  </>
-                ) : (
-                  <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>—</div>
-                )}
-                <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                  shipping<br />leverage
-                </div>
-              </RepoBadge>
-              </>
-              ) : (
-              <RepoBadge
-                tooltip={economicCol.tooltip}
+                tooltip={HOLDER_ECONOMICS_COLUMN_TOOLTIP}
                 style={{ textAlign: 'center', minWidth: isMobile ? undefined : '40px', display: 'block' }}
               >
-                {tokenMechanic ? (
+                {economicScore ? (
                   <>
-                    <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(tokenMechanic.letter) }}>
-                      {tokenMechanic.letter}
+                    <div style={{ fontSize: `${d.gradeLetter}px`, fontWeight: 600, fontFamily: 'var(--font-mono)', color: gradeColor(economicScore.letter) }}>
+                      {economicScore.letter}
                     </div>
-                    <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{tokenMechanic.pct}%</div>
+                    <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{economicScore.pct}%</div>
                   </>
                 ) : (
                   <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
                 )}
                 <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                  {economicCol.line1}<br />{economicCol.line2}
+                  holder<br />economics
                 </div>
               </RepoBadge>
-              )}
 
               <MetricDivider show={!isMobile} />
 
@@ -1107,7 +1051,8 @@ export default function RepoList({
             {!pending && (() => {
               const hasSL = !!shippingLeverage
               const hasTM = !!tokenMechanic
-              const gridColumns = isMobile ? '1fr' : hasSL && hasTM ? '1fr 1fr' : hasSL || hasTM ? '1fr 1fr' : '1fr'
+              const gridColumns = isMobile ? '1fr' : hasSL || hasTM ? '1fr 1fr' : '1fr'
+              const economicRowDeltas = hasSL ? slRowDeltas : tmRowDeltas
 
               return (
                 <div
@@ -1118,43 +1063,21 @@ export default function RepoList({
                     marginBottom: '10px',
                   }}
                 >
-                  {hasSL && shippingLeverage && (
-                    <div style={rubricSectionGridStyle('sl', hasSL, hasTM, isMobile)}>
-                      <RubricSectionTitle>Shipping leverage</RubricSectionTitle>
-                      {shippingLeverage.rubric.map((row, i) => {
-                        const delta = slRowDeltas?.get(row.label)
-                        return (
-                        <RubricCriterionRow
-                          key={i}
-                          label={row.label}
-                          weight={row.weight}
-                          level={row.level}
-                          source={row.source}
-                          isMobile={isMobile}
-                          deltaEarned={slRowDeltas ? (delta?.deltaEarned ?? 0) : null}
-                          levelChangeLabel={delta?.levelChangeLabel ?? null}
-                          isNewRow={delta?.oldLevel == null && !!delta}
-                        />
-                        )
-                      })}
-                      <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px', marginBottom: 0, lineHeight: 1.35 }}>
-                        Indirect holder value — how much this repo multiplies the builder&apos;s ability to ship consumer apps that burn or lock CLAWD.
-                      </p>
-                    </div>
-                  )}
-
-                  {hasTM && tokenMechanic && (
+                  {economicScore && (
                     <div style={rubricSectionGridStyle('tm', hasSL, hasTM, isMobile)}>
                       <RubricSectionTitle>
-                        {repo.tag === 'supply-lock' ? 'CLAWD lock score' : 'Token mechanic'}
+                        Holder economics
+                        <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--text-muted)' }}>
+                          {' · '}{economicLensLabel(repo)}
+                        </span>
                       </RubricSectionTitle>
                       {economicSectionFraming(repo) && (
                         <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.35 }}>
                           {economicSectionFraming(repo)}
                         </p>
                       )}
-                      {tokenMechanic.rubric.map((row, i) => {
-                        const delta = tmRowDeltas?.get(row.label)
+                      {economicScore.rubric.map((row, i) => {
+                        const delta = economicRowDeltas?.get(row.label)
                         return (
                         <RubricCriterionRow
                           key={i}
@@ -1163,7 +1086,7 @@ export default function RepoList({
                           level={row.level}
                           source={row.source}
                           isMobile={isMobile}
-                          deltaEarned={tmRowDeltas ? (delta?.deltaEarned ?? 0) : null}
+                          deltaEarned={economicRowDeltas ? (delta?.deltaEarned ?? 0) : null}
                           levelChangeLabel={delta?.levelChangeLabel ?? null}
                           isNewRow={delta?.oldLevel == null && !!delta}
                         />
@@ -1173,10 +1096,10 @@ export default function RepoList({
                   )}
 
                   {!hasSL && !hasTM && (
-                    <div style={rubricSectionGridStyle('sl', false, false, isMobile)}>
-                      <RubricSectionTitle>Economic score</RubricSectionTitle>
+                    <div style={rubricSectionGridStyle('tm', false, false, isMobile)}>
+                      <RubricSectionTitle>Holder economics</RubricSectionTitle>
                       <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
-                        Not yet scored on token mechanic or shipping leverage.
+                        Not yet scored on holder economics.
                       </p>
                     </div>
                   )}

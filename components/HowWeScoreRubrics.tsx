@@ -11,7 +11,7 @@ export default function HowWeScoreRubrics() {
         Score rubrics
       </h3>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
-        Per-repo cards use token mechanic or shipping leverage plus builder standards. Expand each row for definitions and observable signal examples.
+        Per-repo cards show Holder economics (scored through a direct-burn or shipping-leverage lens, depending on repo type) plus builder standards. Expand each row for definitions and observable signal examples.
       </p>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
         <strong style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>Score floors:</strong>{' '}

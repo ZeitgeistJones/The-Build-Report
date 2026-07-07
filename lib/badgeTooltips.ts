@@ -50,17 +50,8 @@ export const LIFECYCLE_TOOLTIPS: Record<RepoLifecycle, string> = {
 export const AWAITING_SCORE_TOOLTIP =
   'Recently pushed on GitHub but not scored yet. Pay to run Live AI for rubric grades.'
 
-export const ECONOMIC_NA_TOOLTIP =
-  'Not in the burn-apps grade at the top. This repo type uses shipping leverage instead of direct CLAWD burns. Only direct and supply-lock repos feed the ecosystem economic average.'
-
-export const SHIPPING_LEVERAGE_COLUMN_TOOLTIP =
-  'How this repo multiplies holder value indirectly — display only, excluded from the burn-apps grade at the top.'
-
-export const SUPPLY_LOCK_TM_COLUMN_TOOLTIP =
-  'Scores CLAWD lock / supply impact — not CV burns. Larv.ai stakes CLAWD; burning CV is a separate token.'
-
-export const DIRECT_TM_COLUMN_TOOLTIP =
-  'Direct CLAWD burn or lock mechanic — feeds the burn-apps grade at the top.'
+export const HOLDER_ECONOMICS_COLUMN_TOOLTIP =
+  'This repo\'s holder economic impact. Burn apps and supply-lock repos are scored on their direct CLAWD burn or lock mechanic and feed the ecosystem Holder economics grade at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage — shown here, but not averaged into that ecosystem grade.'
 
 export function criticalPathTooltip(roleBadge: string): string {
   return `${roleBadge} — locked tag on the builder critical path. Floor grades at C when functioning as designed.`

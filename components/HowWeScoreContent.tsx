@@ -211,7 +211,7 @@ export default function HowWeScoreContent({
             </li>
             <li style={{ marginBottom: '6px' }}>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Scoring handbook</strong> — rules, repo
-              cheat sheet, Chronicle timeline below (economics, tags, token mechanic vs shipping leverage).
+              cheat sheet, Chronicle timeline below (economics, tags, the direct-burn vs shipping-leverage lens for holder economics).
             </li>
             <li>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Community submissions</strong> — holder
@@ -287,7 +287,7 @@ export default function HowWeScoreContent({
           Repo tags
         </h3>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>
-          Tag picks which economic rubric applies — direct/supply-lock use token mechanic; infra/indirect/theoretical use shipping leverage. Every repo gets builder standards.{' '}
+          Tag picks which holder-economics lens applies — direct/supply-lock are scored on their direct CLAWD burn or lock; infra/indirect/theoretical on shipping leverage. Every repo gets builder standards.{' '}
           <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>Row definitions →</a>
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
