@@ -4,6 +4,7 @@ export type ColorThemeId =
   | 'light-ink'
   | 'light-sage'
   | 'light-90s'
+  | 'light-broadsheet'
   | 'teal'
   | 'lime'
   | 'warm'
@@ -57,6 +58,13 @@ export const COLOR_THEME_GROUPS: { label: string; themes: ColorThemeMeta[] }[] =
         hint: '90s broadsheet ink',
         swatchBg: '#D9D6CC',
         swatchAccent: '#8B2323',
+      },
+      {
+        id: 'light-broadsheet',
+        label: 'Broadsheet',
+        hint: 'Vintage B&W newsprint',
+        swatchBg: '#E4DFD3',
+        swatchAccent: '#121212',
       },
     ],
   },

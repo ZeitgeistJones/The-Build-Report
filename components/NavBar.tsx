@@ -83,7 +83,7 @@ export default function NavBar() {
 
   return (
     <nav
-      className={isMobile ? 'site-nav' : undefined}
+      className={isMobile ? 'site-nav site-nav-bar' : 'site-nav-bar'}
       style={{
         borderBottom: '1px solid var(--border)',
         padding: isMobile ? '0 16px' : '0 24px',
