@@ -55,7 +55,7 @@ Live AI scores read Chronicle-grounded scoring context on the How we score page,
 
 Other holders vote it up or down. Enough net upvotes auto-accepts the context, which the AI then reads on the next paid rescore. Sources are encouraged — context with no source is labeled "No source provided" so voters can weigh it, and anyone can downvote fabricated claims.
 
-Accepted context is grounding the AI weighs, not a direct score override. Every submission, its votes, and its acceptance are public and permanently logged. Context that influences a score is visible on the repo card before and after it is read by a rescore.`,
+Accepted context is grounding the AI weighs, not a direct score override. On conflicts, repo files and the scoring handbook lead unless community cites verifiable on-chain facts — see How we score → Context layers. Every submission, its votes, and its acceptance are public and permanently logged. Context that influences a score is visible on the repo card before and after it is read by a rescore.`,
           },
         ]
       : []),

@@ -26,3 +26,7 @@ export function economicSectionFraming(repo: Repo): string | null {
 export function integrityGradeFootnote(): string {
   return 'All tracked repos, commit-weighted — infra scored on infra-appropriate standards criteria.'
 }
+
+export function builderActivityGradeFootnote(): string {
+  return 'Fixed targets tuned to this org\'s recent pace — velocity vs benchmarks, not repo quality.'
+}

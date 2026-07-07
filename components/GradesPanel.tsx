@@ -8,7 +8,7 @@ import { timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { rubricBlockById } from '@/lib/rubricReference'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
-import { integrityGradeFootnote } from '@/lib/cardFraming'
+import { integrityGradeFootnote, builderActivityGradeFootnote } from '@/lib/cardFraming'
 import type { DailyDigestCards } from '@/lib/buildBrief'
 import type { Repo } from '@/lib/scores'
 import type { GitHubStats } from '@/lib/github'
@@ -646,6 +646,7 @@ export default function GradesPanel({
         {statSpan(`${stats.commits} commits`)}
         {statSpan(`${stats.activeDays} active days`)}
         {statSpan(`${stats.newRepos} new repos`)}
+        {statSpan(builderActivityGradeFootnote(), true)}
       </>
     ),
     economic: tg?.counts && (

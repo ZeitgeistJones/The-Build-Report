@@ -36,6 +36,7 @@ function buildTocLinks(chronicle: ChronicleBannerData | null, communityContextEn
     links.push({ href: '#chronicle', label: 'Latest Chronicle' })
   }
   links.push(
+    { href: '#hw-score-layers', label: 'Context layers' },
     { href: '#context', label: 'Scoring context' },
     { href: '#hw-score-brief', label: 'Build brief' },
     { href: '#hw-score-activity', label: 'Activity' },
@@ -132,6 +133,10 @@ export default function HowWeScoreContent({
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Builder activity</strong> — GitHub velocity across ~150–200 repos (
               <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>see rubric</a>
               ). Not on repo cards.
+              <span style={{ display: 'block', marginTop: '4px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                Fixed targets tuned to this org&apos;s recent shipping pace — compares velocity to those benchmarks, not
+                per-repo quality. Rolling baselines planned.
+              </span>
             </li>
             <li style={{ marginTop: '6px' }}>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Holder economics</strong> — commit-weighted token mechanic average for direct burn apps and supply-lock repos; infra excluded (
@@ -172,14 +177,53 @@ export default function HowWeScoreContent({
             </ol>
             <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
               Sources are encouraged — context with no source is labeled &quot;No source provided.&quot; Accepted context is
-              grounding the AI weighs, not a direct score override. Every submission, its votes, and its acceptance are
-              public and permanently logged.
+              grounding the AI weighs, not a direct score override. See{' '}
+              <a href="#hw-score-layers" style={{ color: 'var(--accent)' }}>how context layers work</a>. Every submission,
+              its votes, and its acceptance are public and permanently logged.
             </p>
           </div>
         </section>
       )}
 
       <h2 style={H2_STYLE}>Context and grounding</h2>
+
+      <section id="hw-score-layers" style={{ marginBottom: '20px' }}>
+        <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+          How scoring context layers work
+        </h3>
+        <div
+          className="how-we-score-card"
+          style={{
+            ...CARD_STYLE,
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.6,
+            borderColor: 'var(--accent-border)',
+            background: 'var(--surface-2)',
+          }}
+        >
+          <ol style={{ margin: 0, paddingLeft: '18px' }}>
+            <li style={{ marginBottom: '6px' }}>
+              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Repo files</strong> — README, tests, CI,
+              SECURITY.md (builder standards rows).
+            </li>
+            <li style={{ marginBottom: '6px' }}>
+              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Scoring handbook</strong> — rules, repo
+              cheat sheet, Chronicle timeline below (economics, tags, token mechanic vs shipping leverage).
+            </li>
+            <li>
+              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Community submissions</strong> — holder
+              tips with sources; weighed on rescore, not guaranteed to move the letter.
+            </li>
+          </ol>
+          <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+            <strong style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>When they disagree:</strong> repo files
+            win on safety and testing claims; the handbook wins on economic story unless community cites verifiable
+            on-chain facts.
+          </p>
+        </div>
+      </section>
+
       <ChronicleSection chronicle={chronicle} />
       <ScoringContextSection activeText={scoringContextText} usingOverride={scoringContextOverride} />
 
