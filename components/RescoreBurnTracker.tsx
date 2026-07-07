@@ -3,10 +3,8 @@
 import InfoTooltip from '@/components/InfoTooltip'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import {
-  CLAWD_BURNED_TOOLTIP,
-  ETH_PENDING_TOOLTIP,
+  BURN_TRACKER_TOOLTIP,
   formatEthPendingLabel,
-  RESCORE_COUNT_TOOLTIP,
 } from '@/lib/burnTrackerCopy'
 import {
   formatClawdAmount,
@@ -35,83 +33,75 @@ export default function RescoreBurnTracker({
   if (count <= 0 && clawdBurnedOnChain <= 0 && ethPendingInReceiver <= 0) return null
 
   return (
-    <div style={{ textAlign: isMobile ? 'left' : 'right', maxWidth: isMobile ? undefined : '200px' }}>
+    <div
+      style={{
+        background: 'var(--surface-1)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '12px 14px',
+        minWidth: isMobile ? undefined : '220px',
+        maxWidth: isMobile ? undefined : '260px',
+        boxShadow: 'var(--card-elevated)',
+      }}
+    >
       <div
         style={{
-          display: 'inline-flex',
-          alignItems: 'baseline',
-          gap: '5px',
-          justifyContent: isMobile ? 'flex-start' : 'flex-end',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          paddingBottom: showMeta ? '8px' : 0,
+          borderBottom: showMeta ? '1px solid var(--border)' : undefined,
+          marginBottom: showMeta ? '8px' : 0,
         }}
       >
         <span
           style={{
             fontSize: '14px',
             fontWeight: 600,
-            color: 'var(--text-secondary)',
+            color: 'var(--text-primary)',
             fontFamily: 'var(--font-mono)',
             fontVariantNumeric: 'tabular-nums',
+            lineHeight: 1.3,
           }}
         >
-          {formatClawdAmount(clawdBurnedOnChain)} CLAWD
+          {formatClawdAmount(clawdBurnedOnChain)} CLAWD burned
         </span>
         <InfoTooltip
-          content={CLAWD_BURNED_TOOLTIP}
-          ariaLabel="About CLAWD burned total"
+          content={BURN_TRACKER_TOOLTIP}
+          ariaLabel="About CLAWD burned, rescores, and ETH queued"
           compact
-          width={240}
+          width={280}
         />
       </div>
 
       {showMeta && (
         <div
           style={{
-            fontSize: '10px',
-            color: 'var(--text-muted)',
-            marginTop: '3px',
-            lineHeight: 1.4,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: isMobile ? 'flex-start' : 'flex-end',
+            flexDirection: 'column',
             gap: '4px',
-            flexWrap: 'wrap',
+            fontSize: '11px',
+            color: 'var(--text-muted)',
+            lineHeight: 1.45,
+            marginBottom: '10px',
           }}
         >
           {count > 0 && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <span>
-                {count.toLocaleString('en-US')} rescore{count === 1 ? '' : 's'} funded
-              </span>
-              <InfoTooltip
-                content={RESCORE_COUNT_TOOLTIP}
-                ariaLabel="About rescore count"
-                icon="question"
-                compact
-                width={240}
-              />
-            </span>
+            <div>
+              {count.toLocaleString('en-US')} rescore{count === 1 ? '' : 's'} funded
+            </div>
           )}
-          {count > 0 && (lastBurnLabel || ethPendingLabel) && <span aria-hidden>·</span>}
-          {lastBurnLabel && <span>{lastBurnLabel}</span>}
-          {lastBurnLabel && ethPendingLabel && <span aria-hidden>·</span>}
-          {ethPendingLabel && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <span>{ethPendingLabel}</span>
-              <InfoTooltip
-                content={ETH_PENDING_TOOLTIP}
-                ariaLabel="About ETH queued for burn"
-                icon="question"
-                compact
-                width={260}
-              />
-            </span>
-          )}
+          {lastBurnLabel && <div>Last burn · {lastBurnLabel}</div>}
+          {ethPendingLabel && <div>{ethPendingLabel}</div>}
         </div>
       )}
 
-      <div style={{ marginTop: '6px', display: 'flex', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
-        <TriggerExecuteBurnButton ethPending={ethPendingInReceiver} compact />
-      </div>
+      <TriggerExecuteBurnButton
+        ethPending={ethPendingInReceiver}
+        compact
+        fullWidth={isMobile}
+      />
     </div>
   )
 }

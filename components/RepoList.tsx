@@ -14,8 +14,6 @@ import { hasShippingLeverageTag } from '@/lib/rubrics/shippingLeverage'
 import { getCriticalPathRole } from '@/lib/criticalPath'
 import {
   computeRepoLifecycle,
-  LIFECYCLE_LABELS,
-  LIFECYCLE_STYLES,
   lifecycleHint,
 } from '@/lib/repoLifecycle'
 import { timeAgo } from '@/lib/github'
@@ -51,6 +49,7 @@ import { integritySectionFraming, economicSectionFraming } from '@/lib/cardFrami
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 import { commitsSinceScoreLabel, countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
+import RepoCardLegend from '@/components/RepoCardLegend'
 import CommunityContextSection from '@/components/CommunityContextSection'
 import type { RepoContextSummary } from '@/lib/communityContextTypes'
 import { BI_WEIGHTS_TOOLTIP_SHORT } from '@/lib/rubrics/builderIntegrity'
@@ -74,30 +73,19 @@ import {
   DIRECT_TM_COLUMN_TOOLTIP,
   TAG_TOOLTIPS,
 } from '@/lib/badgeTooltips'
-const TAG_STYLES: Record<Tag, { color: string; bg: string; label: string }> = {
-  'direct': { color: '#5cb87a', bg: 'rgba(92,184,122,0.12)', label: 'direct' },
-  'supply-lock': { color: '#5b9bd5', bg: 'rgba(91,155,213,0.12)', label: 'supply lock' },
-  'indirect': { color: '#a07cd5', bg: 'rgba(160,124,213,0.12)', label: 'indirect' },
-  'infrastructure': { color: '#7a7670', bg: 'rgba(122,118,112,0.12)', label: 'infrastructure' },
-  'theoretical': { color: '#d4943a', bg: 'rgba(212,148,58,0.12)', label: 'theoretical' },
-}
-
-const TAG_BORDER_COLORS: Partial<Record<Tag, string>> = {
-  direct: '#c8f060',
-  'supply-lock': '#4ade80',
-  indirect: '#60a5fa',
-  infrastructure: '#6b7280',
-  theoretical: '#a78bfa',
-}
+import {
+  accentBadgeStyle,
+  COLLECTION_LABELS,
+  commitCountColor,
+  LIFECYCLE_DISPLAY,
+  neutralBadgeStyle,
+  TAG_LABELS,
+  warningBadgeStyle,
+} from '@/lib/repoVisualStyles'
 
 type ActivityScope = 'active' | 'all'
 type RepoSort = 'recent' | 'commits' | 'grade'
 export type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'clawd-cv-perks' | 'community-context' | Tag
-
-const COLLECTION_BADGE: Record<RepoCollectionId, { label: string; color: string; bg: string }> = {
-  'cv-related': { label: 'CV', color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
-  'clawd-gated': { label: 'CLAWD gate', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
-}
 
 const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20, metricLabel: 9, pctLabel: 10 } as const
 
@@ -112,13 +100,6 @@ const PERIOD_WINDOW_LABEL: Record<Period, string> = {
   '7d': 'last 7 days',
   '30d': 'last 30 days',
   '60d': 'last 60 days',
-}
-
-function commitCountColor(count: number | null): string {
-  if (count === null) return 'var(--text-muted)'
-  if (count === 0) return 'var(--text-muted)'
-  if (count < 5) return '#7aab82'
-  return '#5cb87a'
 }
 
 function MetricDivider({ show }: { show: boolean }) {
@@ -680,8 +661,7 @@ export default function RepoList({
   function renderRepoCard(repo: RepoWithLive) {
     const isExpanded = expandedSlugs.has(repo.githubSlug)
     const rescoreMeta = rescoreSummaries[repo.githubSlug]
-    const ts = TAG_STYLES[getEffectiveTag(repo)]
-    const borderColor = TAG_BORDER_COLORS[getEffectiveTag(repo)]
+    const effectiveTag = getEffectiveTag(repo)
     const auto = isAutoInferred(repo)
     const pending = isUnscoredRecent(repo)
     const blurb = pickRepoBlurb(repo.description, repo.verdict, pending)
@@ -701,7 +681,6 @@ export default function RepoList({
     const lifecycle = computeRepoLifecycle(repo, periodCommits ?? 0)
     const sinceScored = getScoreAgeDisplay(repo, pending)
     const criticalPath = getCriticalPathRole(repo.githubSlug)
-    const lcStyle = LIFECYCLE_STYLES[lifecycle]
     const economicNa = showsEconomicNa(repo)
     const shippingLeverage = getShippingLeverage(repo)
     const tokenMechanic = getTokenMechanicForDisplay(repo)
@@ -726,7 +705,6 @@ export default function RepoList({
         style={{
           background: 'var(--surface-1)',
           border: '1px solid var(--border)',
-          ...(borderColor ? { borderLeft: `3px solid ${borderColor}` } : {}),
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
           boxShadow: 'var(--card-elevated)',
@@ -799,82 +777,55 @@ export default function RepoList({
               }}
             >
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', gap: '5px', marginBottom: '5px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '5px', marginBottom: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <RepoBadge
-                  tooltip={TAG_TOOLTIPS[getEffectiveTag(repo)]}
-                  style={{
-                    fontSize: '11px',
-                    padding: '2px 8px',
-                    borderRadius: '99px',
-                    fontWeight: 500,
-                    color: ts.color,
-                    background: ts.bg,
-                    display: 'inline-block',
-                  }}
+                  tooltip={TAG_TOOLTIPS[effectiveTag]}
+                  style={{ ...neutralBadgeStyle(), fontSize: '11px', padding: '2px 8px' }}
                 >
-                  {ts.label}
+                  {TAG_LABELS[effectiveTag]}
                 </RepoBadge>
-                {pending && (
-                  <RepoBadge
-                    tooltip={AWAITING_SCORE_TOOLTIP}
-                    style={{
-                      fontSize: '10px',
-                      padding: '2px 7px',
-                      borderRadius: '99px',
-                      color: 'var(--amber)',
-                      background: 'rgba(212,148,58,0.1)',
-                      border: '1px solid var(--border)',
-                      letterSpacing: '0.03em',
-                      display: 'inline-block',
-                    }}
-                  >
+                {pending ? (
+                  <RepoBadge tooltip={AWAITING_SCORE_TOOLTIP} style={warningBadgeStyle()}>
                     awaiting score
                   </RepoBadge>
-                )}
-                {criticalPath && (
-                  <RepoBadge
-                    tooltip={criticalPathTooltip(criticalPath.roleBadge)}
-                    style={{
-                      fontSize: '10px',
-                      padding: '2px 7px',
-                      borderRadius: '99px',
-                      color: 'var(--accent)',
-                      background: 'var(--accent-dim)',
-                      border: '1px solid var(--accent-border)',
-                      letterSpacing: '0.02em',
-                      display: 'inline-block',
-                    }}
-                  >
-                    {criticalPath.roleBadge}
+                ) : (
+                  <RepoBadge tooltip={LIFECYCLE_TOOLTIPS[lifecycle]} style={neutralBadgeStyle()}>
+                    {LIFECYCLE_DISPLAY[lifecycle]}
                   </RepoBadge>
                 )}
-                {collectionIds.map(id => {
-                  const badge = COLLECTION_BADGE[id]
+              </div>
+
+              {(() => {
+                const secondary: ReactNode[] = []
+                if (criticalPath) {
+                  secondary.push(
+                    <RepoBadge
+                      key="critical"
+                      tooltip={criticalPathTooltip(criticalPath.roleBadge)}
+                      style={accentBadgeStyle()}
+                    >
+                      {criticalPath.roleBadge}
+                    </RepoBadge>,
+                  )
+                }
+                collectionIds.forEach(id => {
                   const def = REPO_COLLECTIONS.find(c => c.id === id)
-                  return (
+                  secondary.push(
                     <RepoBadge
                       key={id}
-                      tooltip={def?.tooltip ?? badge.label}
-                      style={{
-                        fontSize: '10px',
-                        padding: '2px 7px',
-                        borderRadius: '99px',
-                        fontWeight: 500,
-                        color: badge.color,
-                        background: badge.bg,
-                        letterSpacing: '0.02em',
-                        display: 'inline-block',
-                      }}
+                      tooltip={def?.tooltip ?? COLLECTION_LABELS[id]}
+                      style={neutralBadgeStyle()}
                     >
-                      {badge.label}
-                    </RepoBadge>
+                      {COLLECTION_LABELS[id]}
+                    </RepoBadge>,
                   )
-                })}
-                {communityContextEnabled && contextSummary[repo.githubSlug] && (() => {
+                })
+                if (communityContextEnabled && contextSummary[repo.githubSlug]) {
                   const ctx = contextSummary[repo.githubSlug]
                   const accepted = ctx.state === 'accepted'
-                  return (
+                  secondary.push(
                     <Link
+                      key="context"
                       href="/how-we-score#hw-score-community"
                       onClick={e => e.stopPropagation()}
                       style={{ textDecoration: 'none' }}
@@ -885,62 +836,49 @@ export default function RepoList({
                             ? 'Holder context accepted — applied on the next rescore. Expand for details.'
                             : `Holder context gathering votes (${ctx.upvotes}/${ctx.needed} to accept). Expand to vote.`
                         }
-                        style={{
-                          fontSize: '10px',
-                          padding: '2px 7px',
-                          borderRadius: '99px',
-                          fontWeight: 500,
-                          color: accepted ? 'var(--accent)' : 'var(--amber)',
-                          background: accepted ? 'var(--accent-dim)' : 'rgba(212,148,58,0.1)',
-                          border: `1px solid ${accepted ? 'var(--accent-border)' : 'var(--border)'}`,
-                          letterSpacing: '0.02em',
-                          display: 'inline-block',
-                        }}
+                        style={accepted ? accentBadgeStyle() : warningBadgeStyle()}
                       >
                         {accepted ? 'context ✓' : `context ${ctx.upvotes}/${ctx.needed}`}
                       </RepoBadge>
-                    </Link>
+                    </Link>,
                   )
-                })()}
-                {!pending && (
-                  <RepoBadge
-                    tooltip={LIFECYCLE_TOOLTIPS[lifecycle]}
+                }
+                if (!pending && repo.scoredAt) {
+                  secondary.push(<ScoreTypeBadge key="score-type" adminNote={repo.adminNote} />)
+                }
+                if (!pending && isAutoInferredNote(repo.adminNote)) {
+                  secondary.push(
+                    <Link
+                      key="scoring-ctx"
+                      href="/how-we-score#context"
+                      title={scoringContextTooltip(repo.scoringContextVersion)}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <RepoBadge
+                        tooltip={scoringContextTooltip(repo.scoringContextVersion)}
+                        style={neutralBadgeStyle()}
+                      >
+                        {formatScoringContextLabel(repo.scoringContextVersion)}
+                      </RepoBadge>
+                    </Link>,
+                  )
+                }
+                if (secondary.length === 0) return null
+                return (
+                  <div
                     style={{
-                      fontSize: '10px',
-                      padding: '2px 7px',
-                      borderRadius: '99px',
-                      fontWeight: 500,
-                      color: lcStyle.color,
-                      background: lcStyle.bg,
-                      letterSpacing: '0.02em',
-                      display: 'inline-block',
+                      display: 'flex',
+                      gap: '5px',
+                      marginBottom: '5px',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      opacity: 0.92,
                     }}
                   >
-                    {lifecycle === 'done' ? `${LIFECYCLE_LABELS.done} ✅` : LIFECYCLE_LABELS[lifecycle]}
-                  </RepoBadge>
-                )}
-                {!pending && repo.scoredAt && (
-                  <ScoreTypeBadge adminNote={repo.adminNote} />
-                )}
-                {!pending && isAutoInferredNote(repo.adminNote) && (
-                  <Link
-                    href="/how-we-score#context"
-                    title={scoringContextTooltip(repo.scoringContextVersion)}
-                    style={{
-                      fontSize: '10px',
-                      fontWeight: 500,
-                      color: 'var(--text-muted)',
-                      textDecoration: 'none',
-                      padding: '2px 7px',
-                      borderRadius: '99px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--surface-2)',
-                    }}
-                  >
-                    {formatScoringContextLabel(repo.scoringContextVersion)}
-                  </Link>
-                )}
-              </div>
+                    {secondary}
+                  </div>
+                )
+              })()}
 
               <div style={{ fontSize: `${d.name}px`, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.01em', lineHeight: 1.35 }}>
                 {repo.name}
@@ -1410,6 +1348,8 @@ export default function RepoList({
           </PillButton>
         </div>
       </div>
+
+      <RepoCardLegend />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {visibleRepos.map(repo => renderRepoCard(repo))}

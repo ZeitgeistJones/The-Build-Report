@@ -99,6 +99,7 @@ export default function NavBar() {
     >
       <a
         href="/"
+        className="site-masthead"
         style={{
           fontFamily: 'var(--font-mono)',
           fontWeight: 500,

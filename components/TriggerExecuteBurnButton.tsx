@@ -16,9 +16,11 @@ interface Props {
   ethPending: number
   /** Smaller layout for homepage header */
   compact?: boolean
+  /** Stretch button to card width (burn tracker card on mobile) */
+  fullWidth?: boolean
 }
 
-export default function TriggerExecuteBurnButton({ ethPending, compact = false }: Props) {
+export default function TriggerExecuteBurnButton({ ethPending, compact = false, fullWidth = false }: Props) {
   const { isConnected, connectWallet, isWrongChain, switchToBase } = useClawdAccess()
   const isMobile = useIsMobile()
   const [error, setError] = useState<string | null>(null)
@@ -76,8 +78,9 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
-        alignItems: compact ? 'flex-end' : 'flex-start',
-        maxWidth: compact ? '200px' : undefined,
+        alignItems: fullWidth ? 'stretch' : compact ? 'flex-end' : 'flex-start',
+        width: fullWidth ? '100%' : undefined,
+        maxWidth: compact && !fullWidth ? '200px' : undefined,
       }}
     >
       {!compact && (
@@ -93,7 +96,15 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: compact ? 'flex-end' : 'flex-start' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          justifyContent: fullWidth ? 'stretch' : compact ? 'flex-end' : 'flex-start',
+          width: fullWidth ? '100%' : undefined,
+        }}
+      >
         <button
           type="button"
           onClick={handleClick}
@@ -101,7 +112,7 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
           style={{
             fontSize: compact ? '10px' : '13px',
             fontWeight: 600,
-            padding: compact ? '4px 10px' : isMobile ? '12px 18px' : '10px 18px',
+            padding: compact ? '6px 12px' : isMobile ? '12px 18px' : '10px 18px',
             minHeight: isMobile && !compact ? MIN_TAP : undefined,
             borderRadius: '99px',
             border: '1px solid var(--accent-border)',
@@ -109,6 +120,7 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false }
             color: canBurn || !isConnected || isSuccess ? 'var(--accent)' : 'var(--text-muted)',
             cursor: busy ? 'wait' : 'pointer',
             whiteSpace: 'nowrap',
+            width: fullWidth ? '100%' : undefined,
             maxWidth: '100%',
             overflow: 'hidden',
             textOverflow: 'ellipsis',

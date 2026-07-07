@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { CHANGELOG } from '@/lib/scores'
 import { TAG_TOOLTIPS, LIFECYCLE_TOOLTIPS } from '@/lib/badgeTooltips'
+import { neutralBadgeStyle, TAG_LABELS } from '@/lib/repoVisualStyles'
+import type { Tag } from '@/lib/scores'
 import type { ChronicleBannerData } from '@/lib/chronicle'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import HowWeScoreRubrics from '@/components/HowWeScoreRubrics'
@@ -79,12 +81,12 @@ function TocNav({
   )
 }
 
-const TAG_PILLS: { tag: string; label: string; color: string; bg: string }[] = [
-  { tag: 'direct', label: 'direct', color: '#5cb87a', bg: 'rgba(92,184,122,0.1)' },
-  { tag: 'supply-lock', label: 'supply lock', color: '#5b9bd5', bg: 'rgba(91,155,213,0.1)' },
-  { tag: 'indirect', label: 'indirect', color: '#a07cd5', bg: 'rgba(160,124,213,0.1)' },
-  { tag: 'infrastructure', label: 'infrastructure', color: 'var(--text-secondary)', bg: 'var(--surface-3)' },
-  { tag: 'theoretical', label: 'theoretical', color: '#d4943a', bg: 'rgba(212,148,58,0.1)' },
+const TAG_PILLS: { tag: Tag; label: string }[] = [
+  { tag: 'direct', label: TAG_LABELS.direct },
+  { tag: 'supply-lock', label: TAG_LABELS['supply-lock'] },
+  { tag: 'indirect', label: TAG_LABELS.indirect },
+  { tag: 'infrastructure', label: TAG_LABELS.infrastructure },
+  { tag: 'theoretical', label: TAG_LABELS.theoretical },
 ]
 
 interface Props {
@@ -292,15 +294,8 @@ export default function HowWeScoreContent({
           {TAG_PILLS.map(t => (
             <span
               key={t.tag}
-              title={TAG_TOOLTIPS[t.tag as keyof typeof TAG_TOOLTIPS]}
-              style={{
-                fontSize: '11px',
-                padding: '3px 10px',
-                borderRadius: '99px',
-                color: t.color,
-                background: t.bg,
-                fontWeight: 500,
-              }}
+              title={TAG_TOOLTIPS[t.tag]}
+              style={neutralBadgeStyle()}
             >
               {t.label}
             </span>

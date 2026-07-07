@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -19,6 +19,7 @@
   --content-padding-x: 24px;
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
 }
 
 /* Default + light frost */
@@ -36,11 +37,11 @@
   --accent: #3D9A88;
   --accent-dim: rgba(61,154,136,0.12);
   --accent-border: rgba(61,154,136,0.28);
-  --grade-a: #2E9E4A;
-  --grade-b: #2B7FD4;
-  --grade-c: #B8860B;
-  --grade-d: #C96A2E;
-  --grade-f: #C94444;
+  --grade-a: #2D6A4A;
+  --grade-b: #3D5A80;
+  --grade-c: #7A6A2E;
+  --grade-d: #8B5A3C;
+  --grade-f: #9B4040;
   --card-elevated: 0 1px 0 rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.08);
 }
 
@@ -105,6 +106,27 @@
   --grade-d: #C4692A;
   --grade-f: #C44040;
   --card-elevated: 0 1px 0 rgba(0,0,0,0.03), 0 4px 18px rgba(30,45,32,0.07);
+}
+
+[data-color-theme='light-newsprint'] {
+  --bg: #EDE9DF;
+  --surface-1: #FFFCF5;
+  --surface-2: #F5F1E8;
+  --surface-3: #E8E2D6;
+  --border: #C8C0B0;
+  --border-strong: rgba(20, 20, 20, 0.12);
+  --text-primary: #141414;
+  --text-secondary: #3D3D3D;
+  --text-muted: #6B6560;
+  --accent: #8B2323;
+  --accent-dim: rgba(139, 35, 35, 0.1);
+  --accent-border: rgba(139, 35, 35, 0.28);
+  --grade-a: #3D5C48;
+  --grade-b: #3D4F66;
+  --grade-c: #6B5C2E;
+  --grade-d: #8B4A32;
+  --grade-f: #8B3232;
+  --card-elevated: 0 1px 0 rgba(0,0,0,0.04), 0 2px 12px rgba(20,20,20,0.06);
 }
 
 /* Dark themes */
@@ -256,4 +278,10 @@ button {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+[data-color-theme='light-newsprint'] .site-masthead {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }

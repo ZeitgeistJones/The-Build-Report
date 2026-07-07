@@ -13,6 +13,13 @@ export const CLAWD_BURNED_TOOLTIP =
 export const RESCORE_COUNT_TOOLTIP =
   'Paid rescores that funded ETH into the receiver. CLAWD burned only increases after someone calls execute().'
 
+/** Combined tooltip for the burn tracker stat card headline. */
+export const BURN_TRACKER_TOOLTIP = [
+  CLAWD_BURNED_TOOLTIP,
+  RESCORE_COUNT_TOOLTIP,
+  ETH_PENDING_TOOLTIP,
+].join(' ')
+
 /** Compact label for pending ETH in the header burn tracker. */
 export function formatEthPendingLabel(ethPending: number): string {
   if (ethPending <= 0) return ''

@@ -47,14 +47,14 @@ export const SCORE_TYPE_LIVE_AI_TOOLTIP =
 
 export const SCORE_TYPE_STYLES = {
   baseline: {
-    color: '#6b9eb8',
-    bg: 'rgba(107, 158, 184, 0.14)',
-    border: 'rgba(107, 158, 184, 0.35)',
+    color: 'var(--text-secondary)',
+    bg: 'var(--surface-2)',
+    border: 'var(--border)',
   },
   liveAi: {
-    color: '#a78bc9',
-    bg: 'rgba(167, 139, 201, 0.14)',
-    border: 'rgba(167, 139, 201, 0.35)',
+    color: 'var(--text-secondary)',
+    bg: 'var(--surface-2)',
+    border: 'var(--border)',
   },
 } as const
 

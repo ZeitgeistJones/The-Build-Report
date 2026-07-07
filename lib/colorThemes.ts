@@ -3,6 +3,7 @@ export type ColorThemeId =
   | 'light-paper'
   | 'light-ink'
   | 'light-sage'
+  | 'light-newsprint'
   | 'teal'
   | 'lime'
   | 'warm'
@@ -49,6 +50,13 @@ export const COLOR_THEME_GROUPS: { label: string; themes: ColorThemeMeta[] }[] =
         hint: 'Soft green report desk',
         swatchBg: '#F5F7F4',
         swatchAccent: '#3D7A52',
+      },
+      {
+        id: 'light-newsprint',
+        label: 'Newsprint',
+        hint: 'Broadsheet editorial',
+        swatchBg: '#EDE9DF',
+        swatchAccent: '#8B2323',
       },
     ],
   },

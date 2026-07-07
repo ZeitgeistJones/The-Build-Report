@@ -68,7 +68,7 @@ export default function HomeHeader({ rescoreBurns, latestCommitLabel, dataAsOfLa
       </div>
 
       {showBurn && (
-        <div style={{ flexShrink: 0, alignSelf: isMobile ? 'flex-start' : 'flex-start' }}>
+        <div style={{ flexShrink: 0, alignSelf: isMobile ? 'stretch' : 'flex-start' }}>
           <RescoreBurnTracker
             count={rescoreBurns!.count}
             ethPendingInReceiver={rescoreBurns!.ethPendingInReceiver}
