@@ -8,7 +8,19 @@ const STORAGE_KEY = 'build-report-card-legend-open'
 const LEGEND_ITEMS = [
   {
     label: 'Tag',
-    text: 'Repo type — picks which holder-economics lens applies (direct burn, supply lock, shipping leverage, etc.).',
+    text: 'Repo type — picks which lens Holder economics is scored through (direct burn, supply lock, or shipping leverage).',
+  },
+  {
+    label: 'Holder economics',
+    text: 'Holder economic impact. Burn and supply-lock repos are scored on direct CLAWD burn or lock, and count toward the top ecosystem Holder economics grade. Infrastructure, indirect, and theoretical repos are scored on shipping leverage — how much they multiply the builder\u2019s ability to ship consumer apps that burn or lock CLAWD.',
+  },
+  {
+    label: '“not in avg”',
+    text: 'A repo marked this under Holder economics is shown on the card but not averaged into the top ecosystem Holder economics grade — because it\u2019s scored on shipping leverage, not direct burn.',
+  },
+  {
+    label: 'Builder standards',
+    text: 'Observable safety, testing, and transparency — scored on every repo, with rules that vary by repo type.',
   },
   {
     label: 'Shipping / Stable / Done',
@@ -16,7 +28,7 @@ const LEGEND_ITEMS = [
   },
   {
     label: 'Letter grades',
-    text: 'Scored axes — holder economics, builder standards, builder activity. Colors show A–F only.',
+    text: 'Each card shows two graded axes — Holder economics and Builder standards. Colors show A–F only. Builder activity is an ecosystem grade at the top, not on cards.',
   },
 ] as const
 
