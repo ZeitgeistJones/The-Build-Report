@@ -4,7 +4,7 @@ import './mobile.css'
 import Web3Provider from '@/components/wallet/Web3Provider'
 import { ColorThemeProvider } from '@/components/ColorThemeProvider'
 import NavBar from '@/components/NavBar'
-import { COLOR_THEME_STORAGE_KEY } from '@/lib/colorThemes'
+import { COLOR_THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY } from '@/lib/colorThemes'
 
 const SITE_URL = 'https://the-build-report.vercel.app'
 const SITE_TITLE = 'The Build Report'
@@ -42,7 +42,35 @@ export const viewport = {
   themeColor: '#F4F6F8',
 }
 
-const themeBootScript = `(function(){try{var t=localStorage.getItem('${COLOR_THEME_STORAGE_KEY}');if(t)document.documentElement.dataset.colorTheme=t}catch(e){}})()`
+const themeBootScript = `(function(){try{
+  var c=localStorage.getItem('${CUSTOM_THEME_STORAGE_KEY}');
+  if(c){
+    var v=JSON.parse(c);
+    var bg=v.bg||'#FAFAFA',ac=v.accent||'#3D9A88',dark=v.base==='dark';
+    function hr(h){var n=parseInt(h.replace('#',''),16);return[(n>>16)&255,(n>>8)&255,n&255]}
+    function sl(h,d){var rgb=hr(h);return'#'+rgb.map(function(x){var r=Math.round(x+d);return Math.max(0,Math.min(255,r)).toString(16).padStart(2,'0')}).join('')}
+    var step=dark?-10:10;
+    var rgb=hr(ac);
+    var style=[
+      '--bg:'+bg,
+      '--surface-1:'+sl(bg,step),
+      '--surface-2:'+sl(bg,step*0.6),
+      '--surface-3:'+sl(bg,step*0.3),
+      '--border:'+sl(bg,step*2.2),
+      '--border-strong:'+(dark?'rgba(255,255,255,0.18)':'rgba(0,0,0,0.18)'),
+      '--text-primary:'+(dark?'#F0F0F0':'#111111'),
+      '--text-secondary:'+(dark?'#B0B0B0':'#333333'),
+      '--text-muted:'+(dark?'#707070':'#666666'),
+      '--accent:'+ac,
+      '--accent-dim:rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0.12)',
+      '--accent-border:rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0.3)'
+    ].join(';');
+    document.documentElement.setAttribute('style',style);
+    return;
+  }
+  var t=localStorage.getItem('${COLOR_THEME_STORAGE_KEY}');
+  if(t)document.documentElement.dataset.colorTheme=t;
+}catch(e){}})()`
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

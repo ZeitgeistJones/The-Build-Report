@@ -3,31 +3,53 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import {
   COLOR_THEME_STORAGE_KEY,
+  CUSTOM_THEME_STORAGE_KEY,
   COLOR_THEMES,
   resolveColorThemeId,
+  applyCustomTheme,
   type ColorThemeId,
+  type CustomThemeVars,
 } from '@/lib/colorThemes'
 
 interface ColorThemeContextValue {
   theme: ColorThemeId
   setTheme: (theme: ColorThemeId) => void
+  customVars: CustomThemeVars | null
+  setCustomTheme: (vars: CustomThemeVars) => void
+  clearCustomTheme: () => void
+  isCustomActive: boolean
 }
 
 const ColorThemeContext = createContext<ColorThemeContextValue | null>(null)
 
-function applyTheme(theme: ColorThemeId) {
-  document.documentElement.dataset.colorTheme = theme
+function applyPreset(theme: ColorThemeId) {
+  const el = document.documentElement
+  el.removeAttribute('style')
+  el.dataset.colorTheme = theme
 }
 
 export function ColorThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ColorThemeId>('light')
+  const [customVars, setCustomVarsState] = useState<CustomThemeVars | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    const storedCustom = localStorage.getItem(CUSTOM_THEME_STORAGE_KEY)
+    if (storedCustom) {
+      try {
+        const parsed = JSON.parse(storedCustom) as CustomThemeVars
+        setCustomVarsState(parsed)
+        applyCustomTheme(parsed)
+        setReady(true)
+        return
+      } catch {
+        localStorage.removeItem(CUSTOM_THEME_STORAGE_KEY)
+      }
+    }
     const stored = localStorage.getItem(COLOR_THEME_STORAGE_KEY)
     const initial = resolveColorThemeId(stored)
     setThemeState(initial)
-    applyTheme(initial)
+    applyPreset(initial)
     if (stored && stored !== initial) {
       localStorage.setItem(COLOR_THEME_STORAGE_KEY, initial)
     }
@@ -36,14 +58,35 @@ export function ColorThemeProvider({ children }: { children: ReactNode }) {
 
   function setTheme(next: ColorThemeId) {
     setThemeState(next)
+    setCustomVarsState(null)
     localStorage.setItem(COLOR_THEME_STORAGE_KEY, next)
-    applyTheme(next)
+    localStorage.removeItem(CUSTOM_THEME_STORAGE_KEY)
+    applyPreset(next)
+  }
+
+  function setCustomTheme(vars: CustomThemeVars) {
+    setCustomVarsState(vars)
+    localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify(vars))
+    applyCustomTheme(vars)
+  }
+
+  function clearCustomTheme() {
+    setCustomVarsState(null)
+    localStorage.removeItem(CUSTOM_THEME_STORAGE_KEY)
+    applyPreset(theme)
   }
 
   if (!ready) return <>{children}</>
 
   return (
-    <ColorThemeContext.Provider value={{ theme, setTheme }}>
+    <ColorThemeContext.Provider value={{
+      theme,
+      setTheme,
+      customVars,
+      setCustomTheme,
+      clearCustomTheme,
+      isCustomActive: customVars !== null,
+    }}>
       {children}
     </ColorThemeContext.Provider>
   )
@@ -55,6 +98,10 @@ export function useColorTheme(): ColorThemeContextValue {
     return {
       theme: 'light',
       setTheme: () => {},
+      customVars: null,
+      setCustomTheme: () => {},
+      clearCustomTheme: () => {},
+      isCustomActive: false,
     }
   }
   return ctx
