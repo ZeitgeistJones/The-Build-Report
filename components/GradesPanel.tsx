@@ -798,11 +798,39 @@ export default function GradesPanel({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
-          gap: isMobile ? '10px' : '16px',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))',
+          gap: isMobile ? '10px' : '12px',
           alignItems: 'stretch',
         }}
       >
+        {!isMobile && (
+          <>
+            <div aria-hidden style={{ gridColumn: '1 / 3' }} />
+            <div
+              style={{
+                gridColumn: '3 / 5',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  color: 'var(--text-muted)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Two lenses on holder value
+              </span>
+              <span style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+            </div>
+          </>
+        )}
+
         <GradeCard
           cardId="builder"
           isMobile={isMobile}
@@ -834,32 +862,30 @@ export default function GradesPanel({
           onSelectArrivals={() => handleSelectArrivals('integrity')}
         />
 
-        <div
-          style={{
-            gridColumn: '1 / -1',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            marginTop: '4px',
-          }}
-        >
-          <span
+        {isMobile && (
+          <div
             style={{
-              fontSize: '10px',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: 'var(--text-muted)',
-              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              marginTop: '2px',
             }}
           >
-            Two lenses on holder value
-          </span>
-          <span style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            apps that serve holders directly · tooling that helps ship
-          </span>
-        </div>
+            <span
+              style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.1em',
+                color: 'var(--text-muted)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Two lenses on holder value
+            </span>
+            <span style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+          </div>
+        )}
 
         <GradeCard
           cardId="economic"
