@@ -624,7 +624,7 @@ export default function GradesPanel({
     ? digestCards![period].economic
     : tg
       ? economicCardLayman(tg, period, stats ? { commits: stats.commits } : null, githubStats, repos)
-      : 'Token mechanic score unavailable'
+      : 'Holder economics score unavailable'
   const integrityCopy = digestHasPeriod
     ? digestCards![period].integrity
     : ig
@@ -654,15 +654,15 @@ export default function GradesPanel({
         {tg.counts.repos > 0 && statSpan(`${tg.counts.repos} holder-facing repos scored`)}
         {tg.holderCoveragePct != null && statSpan(`${tg.holderCoveragePct}% of commits holder-facing`)}
         {tg.qualityPct != null && tg.qualityPct !== tg.pct && statSpan(`quality ${tg.qualityPct}% before coverage`)}
-        {tg.counts.high > 0 && statSpan(`${tg.counts.high} high-TM commits`)}
-        {tg.counts.mid > 0 && statSpan(`${tg.counts.mid} mid-TM commits`)}
-        {tg.counts.low > 0 && statSpan(`${tg.counts.low} low-TM commits`)}
+        {tg.counts.high > 0 && statSpan(`${tg.counts.high} high-scoring commits`)}
+        {tg.counts.mid > 0 && statSpan(`${tg.counts.mid} mid-scoring commits`)}
+        {tg.counts.low > 0 && statSpan(`${tg.counts.low} low-scoring commits`)}
         {period !== '60d' && tg.tagCommits && (
           <>
-            {tg.tagCommits.direct > 0 && statSpan(`${tg.tagCommits.direct} direct-tag commits`)}
+            {tg.tagCommits.direct > 0 && statSpan(`${tg.tagCommits.direct} direct-burn commits`)}
             {tg.tagCommits.lock > 0 && statSpan(`${tg.tagCommits.lock} supply-lock commits`)}
             {tg.tagCommits.indirect > 0 && statSpan(`${tg.tagCommits.indirect} indirect commits`)}
-            {tg.tagCommits.infra > 0 && statSpan(`${tg.tagCommits.infra} infra/R&D commits`)}
+            {tg.tagCommits.infra > 0 && statSpan(`${tg.tagCommits.infra} infrastructure commits`)}
           </>
         )}
       </>

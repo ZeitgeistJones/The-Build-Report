@@ -33,11 +33,13 @@ const LEGEND_ITEMS = [
 ] as const
 
 export default function RepoCardLegend() {
-  const [open, setOpen] = useState(false)
+  // Default OPEN so first-time visitors see the key without hunting for it.
+  // Once a user explicitly closes it, the dismissal persists across visits.
+  const [open, setOpen] = useState(true)
 
   useEffect(() => {
     try {
-      setOpen(sessionStorage.getItem(STORAGE_KEY) === '1')
+      if (localStorage.getItem(STORAGE_KEY) === '0') setOpen(false)
     } catch {
       /* ignore */
     }
@@ -47,7 +49,7 @@ export default function RepoCardLegend() {
     setOpen(prev => {
       const next = !prev
       try {
-        sessionStorage.setItem(STORAGE_KEY, next ? '1' : '0')
+        localStorage.setItem(STORAGE_KEY, next ? '1' : '0')
       } catch {
         /* ignore */
       }

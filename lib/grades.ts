@@ -644,7 +644,7 @@ function calcTokenMechanicGradeUnified(stats: GitHubStats, repoSet: Repo[], peri
       { label: 'Mechanism clarity', level: toLevel(clarityAvg / 100), pct: clarityAvg },
       { label: 'Economic alignment', level: toLevel(alignmentAvg / 100), pct: alignmentAvg },
       {
-        label: 'High-TM share',
+        label: 'High-scoring share',
         level: toLevel(rubricCounts.high / weightBase),
         pct: Math.round((rubricCounts.high / weightBase) * 100),
       },

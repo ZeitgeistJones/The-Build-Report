@@ -194,7 +194,7 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
       },
       {
         title: 'Builder activity',
-        body: 'This asks: is anyone actually working on this? It\'s based on commit counts in your selected time window, compared against the repo\'s Launch baseline — what activity looked like when it first shipped. A repo can score low here and still be completely healthy: a Done supply-lock repo, for example, is supposed to go quiet once its job is finished. Quiet doesn\'t mean dead. Always check the status badge before assuming a low activity score is a problem.',
+        body: 'This asks: is anyone actually working on this? It\'s based on commit counts across the org in your selected time window, measured against activity benchmarks. This one is an Ecosystem Grade only — it shows in the three cards at the top of the page, not on individual repo cards. Individual repos instead show their own commit count for the window. A quiet stretch can still be completely healthy: a Done supply-lock repo, for example, is supposed to go quiet once its job is finished. Quiet doesn\'t mean dead. Always check the status badge before assuming low activity is a problem.',
         analogy: START_HERE_ANALOGIES[2],
       },
     ],
@@ -202,23 +202,19 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
   {
     id: 'sh-walkthrough',
     title: 'How to read the homepage in 3 minutes',
-    subtitle: 'Overall grade → three cards → activity snapshot → repo list',
+    subtitle: 'Three grade cards → activity snapshot → repo list',
     subsections: [
       {
-        title: 'Step 1 — The overall grade',
-        body: 'The letter grade at the top of the page is a report card for the whole clawdbotatg org, right now. It\'s a rollup of every scored repo across all three categories. It moves as repos ship, go quiet, or get rescored — so a dip today doesn\'t mean much on its own. Check back over time, or click into the repo list, before drawing conclusions from a single grade.',
+        title: 'Step 1 — The three grade cards at the top',
+        body: 'The top of the page shows three Ecosystem Grades — the org-wide average for Holder economics, Builder standards, and Builder activity. Each is its own lens on the same set of repos, so a project can score well on one and poorly on another, and that\'s normal, not a red flag. Use the 24h / 7d / 30d / 60d toggle to change the time window. If a card looks low, don\'t stop there: open the repo list (Step 3) to see which specific repos are pulling the average down, and why.',
       },
       {
-        title: 'Step 2 — The three grade cards',
-        body: 'Below the overall grade, three cards show the org-wide average for Holder economics, Builder standards, and Builder activity. Each is its own lens on the same repos — a project can score well on one and poorly on another, and that\'s normal, not a red flag. If a card looks low, don\'t stop there: open the repo list (Step 4) and sort by that category to see which specific repos are pulling the average down, and why.',
+        title: 'Step 2 — Activity snapshot',
+        body: 'This shows commit counts for the org, using the same 24h / 7d / 30d / 60d window you picked above. Shorter windows are noisy — a quiet 24h is normal on weekends or for mature repos. Widen to 7d or 30d for a fairer read on whether real work is happening. A flat line here is a scheduling artifact, not a verdict; it never means abandoned on its own.',
       },
       {
-        title: 'Step 3 — Activity snapshot',
-        body: 'This shows commit counts for the org, and you control the window with the 24h / 7d / 30d / 60d toggle at the top. Shorter windows are noisy — a quiet 24h is normal on weekends or for mature repos. Widen to 7d or 30d for a fairer read on whether real work is happening. A flat line here is a scheduling artifact, not a verdict; it never means abandoned on its own.',
-      },
-      {
-        title: 'Step 4 — The repo list',
-        body: 'Each row is one project. Columns show its Holder economics, Builder standards, and Builder activity scores, plus its last-activity timestamp and a status badge — Shipping, Stable, or Done. Use the filters above the list to narrow things down: Burn apps for repos tied to $CLAWD burns, Clawd/CV perks for repos that gate features behind holding, Discussion for repos with community-submitted notes. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Builder activity, set the window to 7d, and start there.',
+        title: 'Step 3 — The repo list',
+        body: 'Each row is one project. Each card shows two Repo Grades — Holder economics and Builder standards — plus that repo\'s commit count for the window, its last-activity timestamp, and a status badge (Shipping, Stable, or Done). Use the filters above the list to narrow things down: Burn apps for repos tied to $CLAWD burns, Clawd/CV perks for repos that gate features behind holding, Discussion for repos with community-submitted notes. Sort by Recent, Most active, or Grades. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Most active, set the window to 7d, and start there.',
       },
     ],
   },

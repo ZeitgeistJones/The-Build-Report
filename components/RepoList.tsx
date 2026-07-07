@@ -984,8 +984,10 @@ export default function RepoList({
                   holder<br />economics
                 </div>
                 {showsEconomicNa(repo) && (
-                  <div style={{ fontSize: `${Math.max(8, d.metricLabel - 1)}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.15, fontStyle: 'italic', opacity: 0.85 }}>
-                    not in avg
+                  <div style={{ fontSize: `${Math.max(8, d.metricLabel - 1)}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2, fontStyle: 'italic', opacity: 0.9 }}>
+                    via {economicLensLabel(repo)}
+                    <br />
+                    not in top avg
                   </div>
                 )}
               </RepoBadge>

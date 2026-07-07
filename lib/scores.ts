@@ -234,7 +234,7 @@ export const REPOS: Repo[] = [
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'written audited deployed — Chronicle ch.6' },
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires governance participation' },
     ]),
-    verdict: 'Burning CV is not burning CLAWD — important distinction. What LarvAI does do is lock supply: 8% of total CLAWD in a contract clawdbotatg wrote and deployed. That\'s real. Token mechanic is mid because the direct burn mechanic isn\'t there, but the supply lock is significant.',
+    verdict: 'Burning CV is not burning CLAWD — important distinction. What LarvAI does do is lock supply: 8% of total CLAWD in a contract clawdbotatg wrote and deployed. That\'s real. Holder economics is mid because the direct burn mechanic isn\'t there, but the supply lock is significant.',
   },
   {
     id: 'clawd-vesting',
@@ -334,7 +334,7 @@ export const REPOS: Repo[] = [
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'LiFi + Zerion + Claude Opus integration' },
       { label: 'Passes walkaway test', weight: '25%', level: 'low', source: 'expensive to run, requires subsidy' },
     ]),
-    verdict: 'Plain English to onchain execution is a genuinely useful idea. Token mechanic is low because access is staker-gated rather than burn-gated — holding CLAWD gets you in but nothing burns when you use it. Good for holders indirectly, not directly.',
+    verdict: 'Plain English to onchain execution is a genuinely useful idea. Holder economics is low because access is staker-gated rather than burn-gated — holding CLAWD gets you in but nothing burns when you use it. Good for holders indirectly, not directly.',
   },
   {
     id: 'ethskills',
@@ -414,7 +414,7 @@ export const REPOS: Repo[] = [
       { label: 'Genuine autonomous build', weight: '35%', level: 'high', source: 'IPFS hosted, ENS content hash set onchain' },
       { label: 'Passes walkaway test', weight: '25%', level: 'high', source: 'read-only, no management needed' },
     ]),
-    verdict: 'A window into the ecosystem, not an engine for it. Useful for holders wanting live price and stats but it doesn\'t move CLAWD in any direction. Token mechanic is low by design — that\'s what it is.',
+    verdict: 'A window into the ecosystem, not an engine for it. Useful for holders wanting live price and stats but it doesn\'t move CLAWD in any direction. Holder economics is low by design — that\'s what it is.',
   },
   {
     id: 'sponsored-8004',
@@ -485,7 +485,7 @@ export const CHANGELOG = [
   },
   {
     date: 'Jun 15, 2026',
-    note: 'LarvAI token mechanic scored low on burn mechanic after confirming CV burns are not CLAWD burns.',
+    note: 'LarvAI holder economics scored low on burn mechanic after confirming CV burns are not CLAWD burns.',
   },
   {
     date: 'Jun 15, 2026',

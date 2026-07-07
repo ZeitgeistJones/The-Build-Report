@@ -20,7 +20,7 @@ function formatScoreBlock(label: string, score: Score | null): string {
 function formatEconomicBlock(repo: Repo): string {
   const shipping = getShippingLeverage(repo)
   if (shipping) return formatScoreBlock('Shipping leverage', shipping)
-  return formatScoreBlock('Token mechanic', getTokenMechanicForDisplay(repo))
+  return formatScoreBlock('Holder economics', getTokenMechanicForDisplay(repo))
 }
 
 function formatRepoScores(repo: Repo): string {

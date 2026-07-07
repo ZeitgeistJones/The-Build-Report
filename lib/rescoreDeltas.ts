@@ -131,7 +131,7 @@ export function formatRescoreDeltaHeader(deltas: RescoreAggregateDelta): string 
   const parts: string[] = []
 
   if (deltas.economic.newPct != null) {
-    const axis = deltas.rowDeltas.shippingLeverage.length ? 'Shipping leverage' : 'Token mechanic'
+    const axis = deltas.rowDeltas.shippingLeverage.length ? 'Shipping leverage' : 'Holder economics'
     if (deltas.economic.oldPct == null) {
       parts.push(`${axis}: first score (${deltas.economic.newPct}%)`)
     } else {
