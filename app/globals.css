@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Libre+Franklin:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Libre+Franklin:wght@500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=Oswald:wght@400;500;600;700&display=swap');
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -20,6 +20,8 @@
   --font-mono: 'JetBrains Mono', monospace;
   --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
   --font-headline: 'Libre Franklin', 'Arial Narrow', system-ui, sans-serif;
+  --font-slab: 'Bitter', Georgia, 'Times New Roman', serif;
+  --font-kicker: 'Oswald', 'Arial Narrow', 'Helvetica Neue', system-ui, sans-serif;
 }
 
 /* Default + light frost */
@@ -108,122 +110,28 @@
   --card-elevated: 0 1px 0 rgba(0,0,0,0.03), 0 4px 18px rgba(30,45,32,0.07);
 }
 
-/* 90s broadsheet — grayer/cooler newsprint, heavy black ink, one ink-family grades */
+/* Pressroom — 90s metro daily: cool gray newsprint, heavy black ink, condensed gothic kickers */
 [data-color-theme='light-90s'] {
   --bg: #D9D6CC;
-  --surface-1: #E9E6DC;
-  --surface-2: #E1DED3;
-  --surface-3: #D2CEC1;
-  --border: #B3AE9F;
-  --border-strong: rgba(18, 16, 12, 0.24);
-  --text-primary: #14120E;
-  --text-secondary: #3A362E;
-  --text-muted: #6A6459;
+  --surface-1: #E7E4DA;
+  --surface-2: #DFDCD1;
+  --surface-3: #D0CDBF;
+  --border: #ACA697;
+  --border-strong: #121212;
+  --text-primary: #111111;
+  --text-secondary: #33302A;
+  --text-muted: #635D52;
   --accent: #8B2323;
   --accent-dim: rgba(139, 35, 35, 0.1);
-  --accent-border: rgba(139, 35, 35, 0.3);
-  --grade-a: #2E4A3A;
-  --grade-b: #35485C;
-  --grade-c: #5C5230;
-  --grade-d: #6E4530;
-  --grade-f: #7A2E2E;
-  --card-elevated: 0 1px 0 rgba(0,0,0,0.05), 0 2px 10px rgba(18,16,12,0.1);
-}
-
-/* Vintage broadsheet — eggshell newsprint, ink monochrome (1990s metro daily feel) */
-[data-color-theme='light-broadsheet'] {
-  --bg: #E4DFD3;
-  --surface-1: #F3F0E8;
-  --surface-2: #ECE8DE;
-  --surface-3: #D5CFC3;
-  --border: #A8A196;
-  --border-strong: #1C1C1C;
-  --text-primary: #121212;
-  --text-secondary: #2A2A2A;
-  --text-muted: #5C5C5C;
-  --accent: #121212;
-  --accent-dim: rgba(18, 18, 18, 0.07);
-  --accent-border: rgba(18, 18, 18, 0.38);
-  --grade-a: #141414;
-  --grade-b: #383838;
-  --grade-c: #555555;
-  --grade-d: #6E6E6E;
-  --grade-f: #878787;
-  --radius: 2px;
-  --radius-lg: 3px;
-  --card-elevated: 0 1px 0 rgba(28, 28, 28, 0.12);
-}
-
-[data-color-theme='light-broadsheet'] html {
-  background-color: var(--bg);
-  background-image:
-    radial-gradient(ellipse 120% 80% at 10% 0%, rgba(255, 252, 245, 0.45) 0%, transparent 55%),
-    radial-gradient(ellipse 90% 60% at 90% 100%, rgba(0, 0, 0, 0.04) 0%, transparent 50%),
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
-  background-blend-mode: normal, normal, multiply;
-}
-
-[data-color-theme='light-broadsheet'] a {
-  color: var(--text-primary);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-
-[data-color-theme='light-broadsheet'] a:hover {
-  text-decoration-thickness: 2px;
-}
-
-[data-color-theme='light-broadsheet'] .site-nav-bar {
-  border-bottom: 3px double var(--border-strong) !important;
-}
-
-[data-color-theme='light-broadsheet'] .site-footer {
-  border-top: 3px double var(--border-strong) !important;
-}
-
-[data-color-theme='light-broadsheet'] .site-nav-bar a,
-[data-color-theme='light-broadsheet'] .site-masthead {
-  text-decoration: none;
-}
-
-[data-color-theme='light-broadsheet'] .site-nav-bar a:hover {
-  text-decoration: underline;
-}
-
-[data-color-theme='light-broadsheet'] .site-masthead:hover {
-  text-decoration: none;
-}
-
-[data-color-theme='light-broadsheet'] .site-masthead {
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text-primary) !important;
-  letter-spacing: -0.02em;
-}
-
-[data-color-theme='light-broadsheet'] .site-tagline {
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-style: italic;
-  color: var(--text-primary);
-  line-height: 1.5;
-}
-
-[data-color-theme='light-broadsheet'] .site-deck {
-  font-family: var(--font-headline);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-[data-color-theme='light-broadsheet'] .site-section-rule {
-  border-top: 1px solid var(--border-strong);
-  margin: 20px 0 16px;
-  padding-top: 12px;
+  --accent-border: rgba(139, 35, 35, 0.35);
+  --grade-a: #23402F;
+  --grade-b: #2E4256;
+  --grade-c: #5A4E28;
+  --grade-d: #6C4026;
+  --grade-f: #7C2626;
+  --radius: 3px;
+  --radius-lg: 4px;
+  --card-elevated: 0 1px 0 rgba(17,17,17,0.08);
 }
 
 /* Dark themes */
@@ -382,9 +290,42 @@ button {
   color: var(--text-muted);
 }
 
+/* Pressroom masthead — heavy slab nameplate */
 [data-color-theme='light-90s'] .site-masthead {
-  font-family: 'Bitter', Georgia, 'Times New Roman', serif !important;
-  font-weight: 800 !important;
+  font-family: var(--font-slab) !important;
+  font-weight: 900 !important;
+  font-size: 15px !important;
   color: var(--text-primary) !important;
-  letter-spacing: -0.01em !important;
+  letter-spacing: 0.01em !important;
+  text-transform: uppercase;
+}
+
+/* Thick black rule under the nameplate — the porch-paper signal */
+[data-color-theme='light-90s'] .site-nav-bar {
+  border-bottom: 3px solid var(--border-strong) !important;
+}
+
+[data-color-theme='light-90s'] .site-footer {
+  border-top: 3px solid var(--border-strong) !important;
+}
+
+/* Condensed all-caps gothic for datelines / kickers */
+[data-color-theme='light-90s'] .site-deck {
+  font-family: var(--font-kicker);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+[data-color-theme='light-90s'] .site-tagline {
+  font-family: var(--font-slab);
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+[data-color-theme='light-90s'] .site-section-rule {
+  border-top: 1px solid var(--border-strong);
 }

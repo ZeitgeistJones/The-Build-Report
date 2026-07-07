@@ -4,7 +4,6 @@ export type ColorThemeId =
   | 'light-ink'
   | 'light-sage'
   | 'light-90s'
-  | 'light-broadsheet'
   | 'teal'
   | 'lime'
   | 'warm'
@@ -54,17 +53,10 @@ export const COLOR_THEME_GROUPS: { label: string; themes: ColorThemeMeta[] }[] =
       },
       {
         id: 'light-90s',
-        label: 'Newsprint',
-        hint: '90s broadsheet ink',
+        label: 'Pressroom',
+        hint: '90s metro daily',
         swatchBg: '#D9D6CC',
         swatchAccent: '#8B2323',
-      },
-      {
-        id: 'light-broadsheet',
-        label: 'Broadsheet',
-        hint: 'Vintage B&W newsprint',
-        swatchBg: '#E4DFD3',
-        swatchAccent: '#121212',
       },
     ],
   },
@@ -116,6 +108,7 @@ const LEGACY_THEME_MAP: Record<string, ColorThemeId> = {
   slate: 'teal',
   'light-paper': 'light-lavender',
   'light-newsprint': 'light-90s',
+  'light-broadsheet': 'light-90s',
 }
 
 export function resolveColorThemeId(value: string | null | undefined): ColorThemeId {
