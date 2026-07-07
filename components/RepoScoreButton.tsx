@@ -21,6 +21,7 @@ import InfoTooltip from '@/components/InfoTooltip'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 import { formatScoredDateLabel, isLaunchBaseline, RESCORE_BUTTON_TOOLTIP } from '@/lib/scoringCopy'
+import { SCORE_PAYMENT_ETH } from '@/lib/rescoreBurns'
 
 interface Props {
   repoSlug: string
@@ -53,6 +54,11 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
 
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
   const busy = phase !== 'idle' || isSending
+  const actionLabel = busy
+    ? phase === 'paying' || isSending
+      ? 'Paying…'
+      : 'Scoring…'
+    : `${label} (${SCORE_PAYMENT_ETH} ETH)`
   const showScoreMeta = scoringStatus === 'scored' && activity.scoredAt
   const { hasNew: hasNewCommitsSinceScore } = countCommitsSinceScore(
     activity.scoredAt,
@@ -155,7 +161,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
             fontWeight: 500,
           }}
         >
-          {busy ? (phase === 'paying' || isSending ? 'Paying…' : 'Scoring…') : label}
+          {actionLabel}
         </button>
         <InfoTooltip
           content={<RescoreTooltipContent />}

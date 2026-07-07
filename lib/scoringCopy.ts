@@ -7,7 +7,7 @@ export const ABOUT_SCORE_TYPES_SECTIONS = [
   },
   {
     title: 'Live AI score',
-    body: `Claude infers grades from repo metadata, GitHub activity, ecosystem context, and optional Chronicle grounding. Rubric rows are AI-generated inference notes — not row-by-row Chronicle citations like baseline. Treat as a starting-point estimate; Rescore can refresh it.`,
+    body: `Claude infers grades from repo metadata, GitHub files, and Chronicle-grounded scoring context. Rubric rows are AI-generated inference notes — not row-by-row Chronicle citations like baseline. Treat as a starting-point estimate; Rescore can refresh it.`,
   },
   {
     title: 'Rescore',

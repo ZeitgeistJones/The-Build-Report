@@ -5,7 +5,6 @@ import type { ChronicleBannerData } from '@/lib/chronicle'
 import CollapsibleSection from '@/components/CollapsibleSection'
 import HowWeScoreRubrics from '@/components/HowWeScoreRubrics'
 import ChronicleSection from '@/components/ChronicleSection'
-import ChronicleContextSection from '@/components/ChronicleContextSection'
 import ScoringContextSection from '@/components/ScoringContextSection'
 
 const CARD_STYLE = {
@@ -15,31 +14,46 @@ const CARD_STYLE = {
   padding: '14px 16px',
 } as const
 
-const BASE_TOC_LINKS = [
-  { href: '#hw-score-rubrics', label: 'Rubrics' },
-  { href: '#hw-score-grades', label: 'Ecosystem grades' },
-  { href: '#chronicle', label: 'Latest Chronicle' },
-  { href: '#chronicle-context', label: 'Chronicle context' },
-  { href: '#context', label: 'Ecosystem context' },
-  { href: '#hw-score-brief', label: 'Build brief' },
-  { href: '#hw-score-activity', label: 'Activity' },
-  { href: '#hw-score-scale', label: 'Letter scale' },
-  { href: '#hw-score-tags', label: 'Tags' },
-  { href: '#hw-score-changelog', label: 'Changelog' },
-] as const
+const H2_STYLE = {
+  fontSize: '15px',
+  fontWeight: 600,
+  color: 'var(--text-primary)',
+  margin: '28px 0 12px',
+  letterSpacing: '-0.01em',
+} as const
 
 type TocLink = { href: string; label: string }
 
-function buildTocLinks(communityContextEnabled: boolean): TocLink[] {
-  if (!communityContextEnabled) return [...BASE_TOC_LINKS]
-  const links: TocLink[] = [...BASE_TOC_LINKS]
-  const ecosystemIdx = links.findIndex(l => l.href === '#context')
-  links.splice(ecosystemIdx, 0, { href: '#hw-score-community', label: 'Community context' })
+function buildTocLinks(chronicle: ChronicleBannerData | null, communityContextEnabled: boolean): TocLink[] {
+  const links: TocLink[] = [
+    { href: '#hw-score-rubrics', label: 'Rubrics' },
+    { href: '#hw-score-grades', label: 'Ecosystem grades' },
+  ]
+  if (communityContextEnabled) {
+    links.push({ href: '#hw-score-community', label: 'Community context' })
+  }
+  if (chronicle?.lastUpdated || chronicle?.summary) {
+    links.push({ href: '#chronicle', label: 'Latest Chronicle' })
+  }
+  links.push(
+    { href: '#context', label: 'Scoring context' },
+    { href: '#hw-score-brief', label: 'Build brief' },
+    { href: '#hw-score-activity', label: 'Activity' },
+    { href: '#hw-score-scale', label: 'Letter scale' },
+    { href: '#hw-score-tags', label: 'Tags' },
+    { href: '#hw-score-changelog', label: 'Changelog' },
+  )
   return links
 }
 
-function TocNav({ communityContextEnabled }: { communityContextEnabled: boolean }) {
-  const links = buildTocLinks(communityContextEnabled)
+function TocNav({
+  chronicle,
+  communityContextEnabled,
+}: {
+  chronicle: ChronicleBannerData | null
+  communityContextEnabled: boolean
+}) {
+  const links = buildTocLinks(chronicle, communityContextEnabled)
   return (
     <nav
       aria-label="How we score sections"
@@ -74,7 +88,6 @@ const TAG_PILLS: { tag: string; label: string; color: string; bg: string }[] = [
 
 interface Props {
   chronicle: ChronicleBannerData | null
-  chronicleContextText: string | null
   scoringContextText: string
   scoringContextOverride: boolean
   communityContextEnabled?: boolean
@@ -82,7 +95,6 @@ interface Props {
 
 export default function HowWeScoreContent({
   chronicle,
-  chronicleContextText,
   scoringContextText,
   scoringContextOverride,
   communityContextEnabled = false,
@@ -100,14 +112,14 @@ export default function HowWeScoreContent({
         (fixed Jun 15 snapshot) or{' '}
         <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>live AI</strong>{' '}
         (auto-inferred or paid Rescore). Live AI reads{' '}
-        <a href="#context" style={{ color: 'var(--accent)' }}>ecosystem context</a> (rules, repo cheat sheet, Chronicle
-        timeline) plus each repo&apos;s GitHub files;{' '}
-        <a href="#chronicle-context" style={{ color: 'var(--accent)' }}>Chronicle context</a> is an optional dated addendum
-        when configured. See{' '}
+        <a href="#context" style={{ color: 'var(--accent)' }}>scoring context</a> — rules, repo cheat sheet, and Chronicle
+        timeline — plus each repo&apos;s GitHub files. See{' '}
         <Link href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</Link>.
       </p>
 
-      <TocNav communityContextEnabled={communityContextEnabled} />
+      <TocNav chronicle={chronicle} communityContextEnabled={communityContextEnabled} />
+
+      <h2 style={{ ...H2_STYLE, marginTop: 0 }}>Scoring methodology</h2>
       <HowWeScoreRubrics />
 
       <section id="hw-score-grades" style={{ marginBottom: '20px' }}>
@@ -167,10 +179,11 @@ export default function HowWeScoreContent({
         </section>
       )}
 
+      <h2 style={H2_STYLE}>Context and grounding</h2>
       <ChronicleSection chronicle={chronicle} />
-      <ChronicleContextSection activeText={chronicleContextText} />
       <ScoringContextSection activeText={scoringContextText} usingOverride={scoringContextOverride} />
 
+      <h2 style={H2_STYLE}>Reference</h2>
       <section
         id="hw-score-brief"
         className="how-we-score-card"
@@ -182,9 +195,9 @@ export default function HowWeScoreContent({
           lineHeight: 1.6,
         }}
       >
-        <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '4px' }}>
+        <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
           Build brief
-        </div>
+        </h3>
         <p style={{ margin: 0 }}>
           Daily AI summary above Grades — what repos moved in the last 24h and what kind of work landed. Generated after the autoscore cron from commit messages.
         </p>
@@ -203,9 +216,9 @@ export default function HowWeScoreContent({
           lineHeight: 1.6,
         }}
       >
-        <div style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '4px' }}>
+        <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
           Activity counts
-        </div>
+        </h3>
         <p style={{ margin: 0, fontSize: '12px' }}>
           <strong style={{ fontWeight: 500 }}>Activity ·</strong> next to Grades — counts repos that are{' '}
           {LIFECYCLE_TOOLTIPS.shipping.split('.')[0].toLowerCase()}, stable, or done. Context only, not a letter grade.

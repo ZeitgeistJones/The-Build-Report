@@ -26,9 +26,6 @@ export default function AdminPage() {
   const [briefResult, setBriefResult] = useState<string | null>(null)
   const [refreshRunning, setRefreshRunning] = useState(false)
   const [refreshResult, setRefreshResult] = useState<string | null>(null)
-  const [chronicleContext, setChronicleContextText] = useState('')
-  const [savingChronicle, setSavingChronicle] = useState(false)
-  const [chronicleSaved, setChronicleSaved] = useState(false)
   const [ecosystemContext, setEcosystemContextText] = useState('')
   const [savingEcosystem, setSavingEcosystem] = useState(false)
   const [ecosystemSaved, setEcosystemSaved] = useState(false)
@@ -146,7 +143,6 @@ export default function AdminPage() {
       setNotes(data.notes ?? {})
       setExcluded(data.excluded ?? {})
       setAutoScored(data.autoScored ?? [])
-      setChronicleContextText(data.chronicleContext ?? '')
       setEcosystemContextText(data.ecosystemContext ?? '')
       setCollections(data.collections ?? { 'cv-related': [], 'clawd-gated': [] })
       setForceInclude(data.forceInclude ?? [])
@@ -228,18 +224,6 @@ export default function AdminPage() {
     const data = await res.json()
     if (data.ok && data.forceInclude) setForceInclude(data.forceInclude)
     setCollectionBusy(null)
-  }
-
-  async function saveChronicleContext() {
-    setSavingChronicle(true)
-    await fetch('/api/admin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'saveChronicleContext', password, chronicleContext }),
-    })
-    setSavingChronicle(false)
-    setChronicleSaved(true)
-    setTimeout(() => setChronicleSaved(false), 2200)
   }
 
   async function saveEcosystemContext() {
@@ -536,60 +520,13 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* Chronicle context for rescores */}
+      {/* Scoring context (Chronicle-grounded) */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Chronicle context</h2>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Scoring context</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px' }}>
-            Optional dated addendum only — timeline and Chronicle facts belong in Ecosystem context. When non-empty, this
-            is prepended to autoscore and rescore prompts; leave blank to avoid duplicating the ecosystem paste.
-          </p>
-        </div>
-        <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          <textarea
-            value={chronicleContext}
-            onChange={e => setChronicleContextText(e.target.value)}
-            placeholder="Condensed Chronicle summary for rescore grounding..."
-            rows={8}
-            style={{
-              display: 'block',
-              width: '100%',
-              boxSizing: 'border-box',
-              background: 'var(--surface-1)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: '10px 14px',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-              fontFamily: 'var(--font-sans)',
-              resize: 'vertical',
-              marginBottom: '8px',
-            }}
-          />
-          <button
-            onClick={saveChronicleContext}
-            disabled={savingChronicle}
-            style={{
-              display: 'block',
-              fontSize: '12px',
-              padding: '5px 14px',
-              borderRadius: 'var(--radius)',
-              background: chronicleSaved ? 'var(--accent-dim)' : 'var(--surface-3)',
-              color: chronicleSaved ? 'var(--accent)' : 'var(--text-secondary)',
-              border: `1px solid ${chronicleSaved ? 'var(--accent-border)' : 'var(--border)'}`,
-            }}
-          >
-            {savingChronicle ? 'Saving…' : chronicleSaved ? 'Saved ✓' : 'Save Chronicle context'}
-          </button>
-        </div>
-      </div>
-
-      {/* Ecosystem context for autoscore */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Ecosystem context</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px' }}>
-            Background knowledge prepended to all autoscore prompts (batch and paid rescore). Leave empty to use the built-in default.
+            Chronicle-grounded handbook prepended to all autoscore and rescore prompts — rules, repo cheat sheet, and
+            timeline. Leave empty to use the built-in default.
           </p>
         </div>
         <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
@@ -626,7 +563,7 @@ export default function AdminPage() {
               border: `1px solid ${ecosystemSaved ? 'var(--accent-border)' : 'var(--border)'}`,
             }}
           >
-            {savingEcosystem ? 'Saving…' : ecosystemSaved ? 'Saved ✓' : 'Save ecosystem context'}
+            {savingEcosystem ? 'Saving…' : ecosystemSaved ? 'Saved ✓' : 'Save scoring context'}
           </button>
         </div>
       </div>

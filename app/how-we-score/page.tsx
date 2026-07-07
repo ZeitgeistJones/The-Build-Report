@@ -1,20 +1,18 @@
 import Link from 'next/link'
 import { getChronicleBannerData } from '@/lib/chronicle'
-import { getChronicleContext } from '@/lib/chronicleContext'
 import { DEFAULT_ECOSYSTEM_CONTEXT, getEcosystemContext } from '@/lib/ecosystemContext'
 import { isCommunityContextEnabled } from '@/lib/communityContext'
 import HowWeScoreContent from '@/components/HowWeScoreContent'
 
 export const metadata = {
   title: 'How we score — The Build Report',
-  description: 'Methodology, rubrics, Chronicle summary, and scoring context for The Build Report.',
+  description: 'Methodology, rubrics, Chronicle-grounded scoring context, and grade changelog for The Build Report.',
 }
 
 export default async function HowWeScorePage() {
-  const [chronicle, override, chronicleContextText] = await Promise.all([
+  const [chronicle, override] = await Promise.all([
     getChronicleBannerData().catch(() => null),
     getEcosystemContext().catch(() => null),
-    getChronicleContext().catch(() => null),
   ])
   const activeText = override?.trim() || DEFAULT_ECOSYSTEM_CONTEXT
 
@@ -32,7 +30,6 @@ export default async function HowWeScorePage() {
 
       <HowWeScoreContent
         chronicle={chronicle}
-        chronicleContextText={chronicleContextText}
         scoringContextText={activeText}
         scoringContextOverride={Boolean(override?.trim())}
         communityContextEnabled={isCommunityContextEnabled()}

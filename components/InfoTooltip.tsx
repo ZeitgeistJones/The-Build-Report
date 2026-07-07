@@ -96,8 +96,8 @@ export default function InfoTooltip({
     }
   }, [show, isMobile, width, placement])
 
-  const size = compact ? 14 : (isMobile ? MIN_TAP : 14)
-  const iconChar = icon === 'question' ? '?' : 'ⓘ'
+  const hitSize = isMobile ? MIN_TAP : compact ? 24 : 14
+  const iconSize = compact ? 9 : icon === 'question' ? 9 : 11
 
   const panelStyle = {
     background: 'var(--surface-3)',
@@ -121,12 +121,14 @@ export default function InfoTooltip({
         onClick={handleClick}
         aria-label={ariaLabel}
         style={{
-          width: size,
-          height: size,
+          width: hitSize,
+          height: hitSize,
+          minWidth: hitSize,
+          minHeight: hitSize,
           borderRadius: '50%',
           background: icon === 'question' ? 'var(--surface-3)' : 'transparent',
           color: 'var(--text-muted)',
-          fontSize: icon === 'question' ? '9px' : '11px',
+          fontSize: iconSize,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -136,7 +138,7 @@ export default function InfoTooltip({
           border: 'none',
         }}
       >
-        {iconChar}
+        {icon === 'question' ? '?' : 'ⓘ'}
       </button>
       {show && pos && createPortal(
         <div

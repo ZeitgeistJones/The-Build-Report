@@ -4,6 +4,12 @@ import {
 } from '@/lib/scoringCopy'
 import { isCommunityContextEnabled } from '@/lib/communityContext'
 
+export const metadata = {
+  title: 'About — The Build Report',
+  description:
+    'What The Build Report is, how launch baseline and live AI scores differ, and how holders can submit community context.',
+}
+
 export default function AboutPage() {
   const communityContextEnabled = isCommunityContextEnabled()
   const sections = [
@@ -39,7 +45,7 @@ Who can use it: any wallet that passes CLAWDGate tier 1 on Base (10M+ $CLAWD). T
 
 Result is shared: once a repo is scored, the result is cached in Redis and everyone sees it for free — including visitors who have not connected a wallet.
 
-Live AI scores read public scoring context on the How we score page. Optional Chronicle grounding can be configured in admin for richer rescore prompts.`,
+Live AI scores read Chronicle-grounded scoring context on the How we score page, plus each repo's GitHub files.`,
     },
     ...(communityContextEnabled
       ? [
