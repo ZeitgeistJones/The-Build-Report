@@ -15,7 +15,7 @@ export function integritySectionFraming(repo: Repo): string | null {
 
 export function economicSectionFraming(repo: Repo): string | null {
   if (showsEconomicNa(repo)) {
-    return 'Indirect holder value — how much this repo multiplies the builder\'s ability to ship consumer apps that burn or lock CLAWD. Shown here, but not averaged into the ecosystem Holder economics grade at the top.'
+    return 'Indirect holder value — how much this repo multiplies the builder\'s ability to ship consumer apps that burn or lock CLAWD. Shown here as a Repo Grade, but not averaged into the Ecosystem Grade for Holder economics at the top.'
   }
   if (getEffectiveTag(repo) === 'supply-lock') {
     return 'CLAWD lock / supply impact — CV burns are not CLAWD burns. Expand rows for detail.'

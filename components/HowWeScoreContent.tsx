@@ -29,7 +29,7 @@ type TocLink = { href: string; label: string }
 function buildTocLinks(chronicle: ChronicleBannerData | null, communityContextEnabled: boolean): TocLink[] {
   const links: TocLink[] = [
     { href: '#hw-score-rubrics', label: 'Rubrics' },
-    { href: '#hw-score-grades', label: 'Ecosystem grades' },
+    { href: '#hw-score-grades', label: 'Ecosystem Grades' },
   ]
   if (communityContextEnabled) {
     links.push({ href: '#hw-score-community', label: 'Community context' })
@@ -105,7 +105,7 @@ export default function HowWeScoreContent({
   return (
     <>
       <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '12px' }}>
-        Three ecosystem letter grades at the top, plus per-repo scores on each card. Together they answer: is the builder
+        Three Ecosystem Grades at the top, plus Repo Grades on each card. Together they answer: is the builder
         shipping, does value flow to holders, and how do repos score on safety and transparency?
       </p>
 
@@ -127,7 +127,7 @@ export default function HowWeScoreContent({
 
       <section id="hw-score-grades" style={{ marginBottom: '20px' }}>
         <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
-          Ecosystem grades
+          Ecosystem Grades
         </h3>
         <div className="how-we-score-card" style={{ ...CARD_STYLE, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
           <ul style={{ margin: 0, paddingLeft: '18px' }}>
@@ -152,7 +152,7 @@ export default function HowWeScoreContent({
             </li>
           </ul>
           <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-            Use the period toggle (7d / 30d / 60d) on the Grades panel. Repos with more commits in the window weigh more in economic and builder-standards blends.
+            Use the period toggle (7d / 30d / 60d) on the Ecosystem Grades panel. Repos with more commits in the window weigh more in economic and builder-standards blends.
           </p>
         </div>
       </section>

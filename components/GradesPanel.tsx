@@ -742,7 +742,7 @@ export default function GradesPanel({
               letterSpacing: '0.1em',
             }}
           >
-            Grades
+            Ecosystem Grades
           </span>
           <Link href="/how-we-score" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none' }}>
             How we score →

@@ -11,7 +11,7 @@ export default function HowWeScoreRubrics() {
         Score rubrics
       </h3>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
-        Per-repo cards show Holder economics (scored through a direct-burn or shipping-leverage lens, depending on repo type) plus builder standards. Expand each row for definitions and observable signal examples.
+        Repo Grades — each card shows Holder economics (scored through a direct-burn or shipping-leverage lens, depending on repo type) plus builder standards. Expand each row for definitions and observable signal examples.
       </p>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
         <strong style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>Score floors:</strong>{' '}
@@ -43,7 +43,7 @@ export default function HowWeScoreRubrics() {
       </div>
 
       <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
-        Per-repo (3 grades on each card)
+        Repo Grades (on each card)
       </div>
       {RUBRIC_REFERENCE_REPO.map(block => (
         <RubricBlockPanel key={block.id} block={block} />
@@ -60,7 +60,7 @@ export default function HowWeScoreRubrics() {
           marginBottom: '4px',
         }}
       >
-        Ecosystem-only (Grades panel)
+        Ecosystem Grades (panel at top)
       </div>
       {RUBRIC_REFERENCE_ECOSYSTEM.map(block => (
         <RubricBlockPanel key={block.id} block={block} />

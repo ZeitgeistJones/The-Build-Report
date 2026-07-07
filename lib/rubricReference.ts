@@ -24,7 +24,7 @@ export const RUBRIC_REFERENCE: RubricReferenceBlock[] = [
     id: 'token-mechanic',
     title: 'Holder economics — direct burn',
     appliesTo: 'direct burn apps and supply-lock repos',
-    note: 'Each row is low / mid / high (33 / 67 / 100). Score = weighted sum of row points. Supply-lock scores CLAWD lock impact — CV burns are not CLAWD burns. Ecosystem Holder economics commit-weights these repos and may scale the headline grade when holder-facing commit share is thin (see Ecosystem grades).',
+    note: 'Each row is low / mid / high (33 / 67 / 100). Score = weighted sum of row points. Supply-lock scores CLAWD lock impact — CV burns are not CLAWD burns. The Ecosystem Grade for Holder economics commit-weights these repos and may scale the headline grade when holder-facing commit share is thin (see Ecosystem Grades).',
     scope: 'repo',
     rows: [
       {
