@@ -55,7 +55,7 @@ export const COLOR_THEME_GROUPS: { label: string; themes: ColorThemeMeta[] }[] =
         id: 'light-90s',
         label: 'Pressroom',
         hint: '90s metro daily',
-        swatchBg: '#DBDBD8',
+        swatchBg: '#E4E5E6',
         swatchAccent: '#8B2323',
       },
     ],
