@@ -22,35 +22,7 @@ import {
   type GradeCardId,
 } from '@/lib/gradeCardCopy'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import { MIN_TAP } from '@/lib/responsive'
 import RubricBlockPanel from '@/components/RubricBlockPanel'
-
-function GradeSectionChip({ href, children }: { href: string; children: React.ReactNode }) {
-  const isMobile = useIsMobile()
-
-  return (
-    <Link
-      href={href}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '12px',
-        fontWeight: 500,
-        color: 'var(--text-secondary)',
-        textDecoration: 'none',
-        padding: isMobile ? '8px 14px' : '5px 12px',
-        minHeight: isMobile ? MIN_TAP : undefined,
-        borderRadius: 'var(--radius-pill)',
-        border: '1px solid var(--border)',
-        background: 'var(--surface-1)',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {children}
-    </Link>
-  )
-}
 
 type CardId = GradeCardId
 
@@ -798,25 +770,17 @@ export default function GradesPanel({
           gap: isMobile ? '10px' : '16px',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
-          <span
-            style={{
-              fontSize: '11px',
-              fontWeight: 600,
-              color: 'var(--text-muted)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-            }}
-          >
-            Ecosystem Grades
-          </span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            <GradeSectionChip href="/how-we-score">How we score</GradeSectionChip>
-            {communityContextEnabled && (
-              <GradeSectionChip href="/how-we-score#hw-score-community">Add context</GradeSectionChip>
-            )}
-          </div>
-        </div>
+        <span
+          style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
+          }}
+        >
+          Ecosystem Grades
+        </span>
         <div style={isMobile ? { width: '100%', display: 'flex' } : { flexShrink: 0 }}>
           <PeriodToggle />
         </div>
