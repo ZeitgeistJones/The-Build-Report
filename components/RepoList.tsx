@@ -48,7 +48,7 @@ import {
 import { diffRubricRows, rowDeltaByLabel } from '@/lib/rescoreDeltas'
 import { integritySectionFraming, economicSectionFraming, economicLensLabel } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
-import { commitsSinceScoreLabel, countCommitsSinceScore } from '@/lib/commitsSinceScore'
+import { commitsSinceScoreLabel, countCommitsSinceScore, repoNeedsRescore, repoNeedsRescoreSortKey } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
 import RepoCardLegend from '@/components/RepoCardLegend'
 import CommunityContextSection from '@/components/CommunityContextSection'
@@ -82,8 +82,8 @@ import {
 } from '@/lib/repoVisualStyles'
 
 type ActivityScope = 'active' | 'all'
-type RepoSort = 'recent' | 'commits' | 'grade'
-export type RepoFilter = 'all' | 'burn-apps' | 'leverage' | 'clawd-cv-perks' | 'community-context' | Tag
+type RepoSort = 'recent' | 'commits' | 'needs-rescore' | 'grade'
+export type RepoFilter = 'all' | 'needs-rescore' | 'burn-apps' | 'leverage' | 'clawd-cv-perks' | 'community-context' | Tag
 
 const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20, metricLabel: 9, pctLabel: 10 } as const
 
@@ -126,6 +126,12 @@ function repoMatchesFilter(
   const slug = repo.githubSlug
   const tag = getEffectiveTag(repo)
   if (filter === 'all') return true
+  if (filter === 'needs-rescore') {
+    return repoNeedsRescore(repo.scoredAt, repo.commitTimestamps, {
+      lastCommitAt: repo.lastCommitAt,
+      pushedAt: repo.pushedAt,
+    })
+  }
   if (filter === 'burn-apps') return tag === 'direct' || tag === 'supply-lock'
   if (filter === 'leverage') return hasShippingLeverageTag(tag)
   if (filter === 'clawd-cv-perks') {
@@ -390,6 +396,14 @@ function githubOrderIndex(slug: string, order: string[]): number {
   return idx === -1 ? Number.MAX_SAFE_INTEGER : idx
 }
 
+function repoActivityFallback(repo: RepoWithLive) {
+  return { lastCommitAt: repo.lastCommitAt, pushedAt: repo.pushedAt }
+}
+
+function repoNeedsRescoreKey(repo: RepoWithLive): number {
+  return repoNeedsRescoreSortKey(repo.scoredAt, repo.commitTimestamps, repoActivityFallback(repo))
+}
+
 function repoRecentTimestamp(repo: RepoWithLive): number {
   const raw = repo.lastCommitAt ?? repo.pushedAt
   if (!raw) return 0
@@ -557,6 +571,7 @@ export default function RepoList({
 
   const filters: { key: RepoFilter; label: string; tooltip?: string }[] = [
     { key: 'all', label: 'All', tooltip: REPO_FILTER_TOOLTIPS.all },
+    { key: 'needs-rescore', label: 'Needs rescore', tooltip: REPO_FILTER_TOOLTIPS['needs-rescore'] },
     { key: 'burn-apps', label: 'Burn apps', tooltip: REPO_FILTER_TOOLTIPS['burn-apps'] },
     { key: 'clawd-cv-perks', label: 'Clawd/CV perks', tooltip: REPO_FILTER_TOOLTIPS['clawd-cv-perks'] },
     { key: 'leverage', label: 'Leverage', tooltip: REPO_FILTER_TOOLTIPS.leverage },
@@ -581,7 +596,8 @@ export default function RepoList({
     const c = repoCommitsForPeriodKey(r, repoPeriod)
     return c != null && c > 0
   })
-  const filtered = (activityScope === 'active' ? activeInPeriod : tagFiltered)
+  const skipActiveScope = activeFilter === 'needs-rescore'
+  const filtered = (activityScope === 'active' && !skipActiveScope ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
       if (activeFilter === 'community-context') {
         const aTalk = contextSummary[a.githubSlug]?.lastActivityAt ?? ''
@@ -604,6 +620,12 @@ export default function RepoList({
         return repoRecentTimestamp(b) - repoRecentTimestamp(a)
       }
 
+      if (sortBy === 'needs-rescore') {
+        const diff = repoNeedsRescoreKey(b) - repoNeedsRescoreKey(a)
+        if (diff !== 0) return diff
+        return repoRecentTimestamp(b) - repoRecentTimestamp(a)
+      }
+
       const aRecent = repoRecentTimestamp(a)
       const bRecent = repoRecentTimestamp(b)
       if (aRecent !== bRecent) return bRecent - aRecent
@@ -617,13 +639,15 @@ export default function RepoList({
       return a.name.localeCompare(b.name)
     })
 
-  const repoCountLabel = activityScope === 'active'
-    ? activeFilter === 'all'
-      ? ` · ${filtered.length} active (${periodKeyLabel(repoPeriod)})`
-      : ` · ${filtered.length} of ${activeInPeriod.length} active (${periodKeyLabel(repoPeriod)})`
-    : activeFilter === 'all'
-      ? ` · ${filtered.length} total`
-      : ` · ${filtered.length} of ${tagFiltered.length}`
+  const repoCountLabel = activeFilter === 'needs-rescore'
+    ? ` · ${filtered.length} need rescore`
+    : activityScope === 'active'
+      ? activeFilter === 'all'
+        ? ` · ${filtered.length} active (${periodKeyLabel(repoPeriod)})`
+        : ` · ${filtered.length} of ${activeInPeriod.length} active (${periodKeyLabel(repoPeriod)})`
+      : activeFilter === 'all'
+        ? ` · ${filtered.length} total`
+        : ` · ${filtered.length} of ${tagFiltered.length}`
 
   function isAutoInferred(repo: RepoWithLive) {
     return isAutoInferredNote(repo.adminNote)
@@ -1232,7 +1256,10 @@ export default function RepoList({
             <PillButton
               key={f.key}
               active={activeFilter === f.key}
-              onClick={() => setActiveFilter(f.key)}
+              onClick={() => {
+                setActiveFilter(f.key)
+                if (f.key === 'needs-rescore') setSortBy('needs-rescore')
+              }}
               isMobile={isMobile}
               tooltip={f.tooltip}
             >
@@ -1255,6 +1282,14 @@ export default function RepoList({
             tooltip={REPO_SORT_TOOLTIPS.commits}
           >
             Most active
+          </PillButton>
+          <PillButton
+            active={sortBy === 'needs-rescore'}
+            onClick={() => setSortBy('needs-rescore')}
+            isMobile={isMobile}
+            tooltip={REPO_SORT_TOOLTIPS['needs-rescore']}
+          >
+            Needs rescore
           </PillButton>
           <PillButton
             active={sortBy === 'grade'}

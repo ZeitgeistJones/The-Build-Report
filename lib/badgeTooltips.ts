@@ -9,6 +9,7 @@ export const DISCUSSION_FILTER_TOOLTIP =
 
 export const REPO_FILTER_TOOLTIPS = {
   all: 'Every tracked repo in the ecosystem.',
+  'needs-rescore': 'Scored repos with new GitHub commits since the last score — rescore (or promo) may apply.',
   'burn-apps': 'Apps that burn or lock CLAWD when you use them.',
   leverage: 'Indirect repos scored on how much they help other burn apps ship.',
   'clawd-cv-perks': CLAWD_CV_PERKS_TOOLTIP,
@@ -18,6 +19,7 @@ export const REPO_FILTER_TOOLTIPS = {
 export const REPO_SORT_TOOLTIPS = {
   recent: 'Sorted by last GitHub push — newest activity first.',
   commits: 'Sorted by commit count in the selected window.',
+  'needs-rescore': 'Sorted by commits since the last score — most outdated first.',
   grade: 'Sorted by overall rubric grades — highest first.',
 } as const
 

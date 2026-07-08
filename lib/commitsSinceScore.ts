@@ -127,3 +127,27 @@ export function commitsSinceScoreLabel(
   }
   return 'New commits since scored'
 }
+
+export function repoNeedsRescore(
+  scoredAt: string | null | undefined,
+  commitTimestamps: string[] | null | undefined,
+  fallback?: { lastCommitAt: string | null; pushedAt: string | null },
+): boolean {
+  if (!scoredAt) return false
+  const result = countCommitsSinceScore(scoredAt, commitTimestamps, fallback)
+  return result.hasNew || result.count > 0
+}
+
+/** Higher = more commits since last score; unscored repos sort last. */
+export function repoNeedsRescoreSortKey(
+  scoredAt: string | null | undefined,
+  commitTimestamps: string[] | null | undefined,
+  fallback?: { lastCommitAt: string | null; pushedAt: string | null },
+): number {
+  if (!scoredAt) return -1
+  const result = countCommitsSinceScore(scoredAt, commitTimestamps, fallback)
+  if (result.capped) return COMMIT_CAP + 1
+  if (result.count > 0) return result.count
+  if (result.hasNew) return 50
+  return 0
+}
