@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "debug:burn": "node scripts/debug-burn-scan.mjs",
+    "debug:promo": "node scripts/debug-promo-eligibility.mjs",
     "debug:theme": "node scripts/debug-custom-theme.mjs",
     "debug:theme:local": "node scripts/debug-custom-theme.mjs http://localhost:3000",
     "setup:playwright": "playwright install chromium"
