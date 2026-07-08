@@ -22,7 +22,12 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
   useEffect(() => {
     if (!open) return
     function onDocClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const outside = ref.current ? !ref.current.contains(e.target as Node) : true
+      // #region agent log
+      const tgt = e.target as HTMLElement | null
+      console.log('[custom-debug] doc mousedown', { outside, targetTag: tgt?.tagName, targetType: (tgt as HTMLInputElement | null)?.type, targetId: tgt?.id })
+      // #endregion
+      if (outside) {
         setOpen(false)
         setShowCustomPanel(false)
       }
@@ -123,7 +128,12 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
             </div>
             <button
               type="button"
-              onClick={() => setShowCustomPanel(p => !p)}
+              onClick={() => {
+                // #region agent log
+                console.log('[custom-debug] Customize button clicked', { willShow: !showCustomPanel })
+                // #endregion
+                setShowCustomPanel(p => !p)
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -186,6 +196,9 @@ function CustomPanel({
 
   function update(next: Partial<CustomThemeVars>) {
     const merged = { bg, accent, base, ...next }
+    // #region agent log
+    console.log('[custom-debug] CustomPanel update', { next, merged })
+    // #endregion
     if (next.bg !== undefined) setBg(next.bg)
     if (next.accent !== undefined) setAccent(next.accent)
     if (next.base !== undefined) setBase(next.base)
