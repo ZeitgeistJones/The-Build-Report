@@ -131,6 +131,7 @@ export default function InfoTooltip({
             ? {
                 fontSize: '12px',
                 color: 'var(--accent)',
+                textDecoration: 'none',
                 background: 'transparent',
                 border: 'none',
                 padding: isMobile ? '8px 0' : 0,

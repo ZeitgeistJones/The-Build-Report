@@ -23,7 +23,7 @@ import {
 } from '@/lib/gradeCardCopy'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import InfoTooltip from '@/components/InfoTooltip'
-import { ECOSYSTEM_ADD_CONTEXT_TOOLTIP } from '@/lib/scoringCopy'
+import { ECOSYSTEM_ADD_CONTEXT_LABEL, ECOSYSTEM_ADD_CONTEXT_TOOLTIP } from '@/lib/scoringCopy'
 import RubricBlockPanel from '@/components/RubricBlockPanel'
 
 type CardId = GradeCardId
@@ -786,7 +786,7 @@ export default function GradesPanel({
           </span>
           {communityContextEnabled && (
             <InfoTooltip
-              textTrigger="Think we're missing something? Add context →"
+              textTrigger={ECOSYSTEM_ADD_CONTEXT_LABEL}
               content={ECOSYSTEM_ADD_CONTEXT_TOOLTIP}
               ariaLabel="About community context"
               width={280}
