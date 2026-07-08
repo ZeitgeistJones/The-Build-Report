@@ -16,6 +16,7 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
   const [open, setOpen] = useState(false)
   const [showCustomPanel, setShowCustomPanel] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const isMobile = useIsMobile()
   const current = getColorThemeMeta(theme)
 
@@ -35,6 +36,21 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [open])
+
+  useEffect(() => {
+    if (!showCustomPanel) return
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    // #region agent log
+    requestAnimationFrame(() => {
+      const input = document.querySelector('#custom-bg') as HTMLElement | null
+      const sr = el.getBoundingClientRect()
+      const ir = input?.getBoundingClientRect()
+      console.log('[custom-debug] custom panel scroll', { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, inputBelowFold: ir ? Math.round(ir.top) > Math.round(sr.bottom) : null })
+    })
+    // #endregion
+  }, [showCustomPanel])
 
   const triggerLabel = isCustomActive ? 'Custom' : (current?.label ?? 'Theme')
   const triggerSwatchBg = isCustomActive ? (customVars?.bg ?? '#FAFAFA') : (current?.swatchBg ?? '#FAFAFA')
@@ -68,6 +84,7 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
 
       {open && (
         <div
+          ref={scrollRef}
           style={{
             position: 'absolute',
             top: 'calc(100% + 6px)',
