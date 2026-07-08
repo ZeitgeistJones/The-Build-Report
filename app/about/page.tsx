@@ -41,7 +41,7 @@ This is not a real-time data feed. Launch baseline grades are a fixed Jun 15 sna
 
 Cost: 0.000008 ETH per score. When you pay, ETH goes to the receiver-buy-and-burn contract (0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad). CLAWD is destroyed when someone calls execute() on that contract. The homepage shows on-chain CLAWD burned, pending ETH, and a button to trigger the batch burn.
 
-Launch promo (limited time): on rescored repos with stale commits, rescore can be free and the site sends ~$0.01 per stale commit to your wallet from a promo treasury (approximate USD; paid in ETH). This is temporary — not a permanent subsidy.
+Launch promo (limited time): on rescored repos with stale commits, rescore can be free — ~$0.01 per stale commit to your wallet and the same queued for CLAWD burns (50/50 treasury subsidy; approximate USD; paid in ETH). This is temporary — not a permanent subsidy.
 
 Who can use it: any wallet that passes CLAWDGate tier 1 on Base (10M+ $CLAWD). The full report blur gate uses the same check.
 

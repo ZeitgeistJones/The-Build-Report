@@ -13,12 +13,18 @@ const PAYOUT_PREFIX = 'build-report:promo-payout:'
 const SPONSORED_COUNT_KEY = 'build-report:promo:sponsored-count'
 const SPONSORED_ETH_KEY = 'build-report:promo:eth-paid-total'
 const NONCE_TTL_SEC = 300
+/** Per stale commit: half to wallet, half to receiver-buy-and-burn (burn fuel). */
+export const PROMO_WALLET_SHARE_BPS = 5000
+const DEFAULT_PROMO_TOTAL_ETH = Number(SCORE_PAYMENT_WEI) / 1e18
 
 export type PromoConfig = {
   enabled: boolean
   endsAt: string | null
+  /** Total treasury subsidy per stale commit (wallet + burn receiver). */
   pennyEth: number
   pennyWei: bigint
+  walletRewardEth: number
+  walletRewardWei: bigint
   maxCommits: number
   minStale: number
   minTreasuryEth: number
@@ -54,9 +60,15 @@ function parseEth(raw: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback
 }
 
+export function splitPromoWei(totalWei: bigint): { walletWei: bigint; burnFundWei: bigint } {
+  const walletWei = totalWei / BigInt(2)
+  return { walletWei, burnFundWei: totalWei - walletWei }
+}
+
 export function getPromoConfig(): PromoConfig {
-  const pennyEth = parseEth(process.env.RESCORE_PROMO_PENNY_ETH, 0.000004)
+  const pennyEth = parseEth(process.env.RESCORE_PROMO_PENNY_ETH, DEFAULT_PROMO_TOTAL_ETH)
   const pennyWei = BigInt(Math.round(pennyEth * 1e18))
+  const { walletWei } = splitPromoWei(pennyWei)
   const maxPayoutsRaw = process.env.RESCORE_PROMO_MAX_PAYOUTS_PER_WALLET
   const maxPayouts = maxPayoutsRaw ? parsePositiveInt(maxPayoutsRaw, 0) : null
 
@@ -65,6 +77,8 @@ export function getPromoConfig(): PromoConfig {
     endsAt: process.env.RESCORE_PROMO_ENDS_AT?.trim() || null,
     pennyEth,
     pennyWei,
+    walletRewardEth: Number(walletWei) / 1e18,
+    walletRewardWei: walletWei,
     maxCommits: parsePositiveInt(process.env.RESCORE_PROMO_MAX_COMMITS, 25),
     minStale: parsePositiveInt(process.env.RESCORE_PROMO_MIN_STALE, 1),
     minTreasuryEth: parseEth(process.env.RESCORE_PROMO_MIN_TREASURY_ETH, 0.001),
@@ -84,12 +98,14 @@ export function getPromoStatusForDisplay(): {
   active: boolean
   endsAt: string | null
   pennyEth: number
+  walletRewardEth: number
 } {
   const config = getPromoConfig()
   return {
     active: isPromoWindowOpen(config),
     endsAt: config.endsAt,
     pennyEth: config.pennyEth,
+    walletRewardEth: config.walletRewardEth,
   }
 }
 
@@ -109,14 +125,39 @@ export function computeStaleCommitCount(activity: RepoActivitySnapshot): number 
 export function computePromoReward(
   activity: RepoActivitySnapshot,
   config: PromoConfig = getPromoConfig(),
-): { staleCommits: number; rewardWei: bigint; rewardEth: number } {
+): {
+  staleCommits: number
+  totalWei: bigint
+  totalEth: number
+  rewardWei: bigint
+  rewardEth: number
+  burnFundWei: bigint
+  burnFundEth: number
+} {
   const staleCommits = computeStaleCommitCount(activity)
   if (!isPromoWindowOpen(config) || staleCommits < config.minStale) {
-    return { staleCommits, rewardWei: BigInt(0), rewardEth: 0 }
+    return {
+      staleCommits,
+      totalWei: BigInt(0),
+      totalEth: 0,
+      rewardWei: BigInt(0),
+      rewardEth: 0,
+      burnFundWei: BigInt(0),
+      burnFundEth: 0,
+    }
   }
   const credited = Math.min(staleCommits, config.maxCommits)
-  const rewardWei = BigInt(credited) * config.pennyWei
-  return { staleCommits, rewardWei, rewardEth: Number(rewardWei) / 1e18 }
+  const totalWei = BigInt(credited) * config.pennyWei
+  const { walletWei, burnFundWei } = splitPromoWei(totalWei)
+  return {
+    staleCommits,
+    totalWei,
+    totalEth: Number(totalWei) / 1e18,
+    rewardWei: walletWei,
+    rewardEth: Number(walletWei) / 1e18,
+    burnFundWei,
+    burnFundEth: Number(burnFundWei) / 1e18,
+  }
 }
 
 export function promoSignMessage(repoSlug: string, nonce: string): string {
@@ -168,14 +209,15 @@ export async function markPromoPayout(
   repoSlug: string,
   nonce: string,
   payoutTxHash: string,
-  rewardEth: number,
+  walletRewardEth: number,
+  totalTreasuryEth: number,
 ): Promise<void> {
   const r = getRedis()
   const payoutKey = `${PAYOUT_PREFIX}${walletAddress.toLowerCase()}:${repoSlug}:${nonce}`
   await Promise.all([
     r.set(payoutKey, payoutTxHash, { ex: 60 * 60 * 24 * 30 }),
     r.incr(SPONSORED_COUNT_KEY),
-    r.incrbyfloat(SPONSORED_ETH_KEY, rewardEth),
+    r.incrbyfloat(SPONSORED_ETH_KEY, totalTreasuryEth),
     r.incr(`build-report:promo:wallet-payouts:${walletAddress.toLowerCase()}`),
   ])
 }
@@ -208,10 +250,10 @@ export async function buildPromoQuote(
 ): Promise<PromoRewardQuote> {
   const config = getPromoConfig()
   const promoActive = isPromoWindowOpen(config)
-  const { staleCommits, rewardWei, rewardEth } = computePromoReward(activity, config)
+  const { staleCommits, totalWei, rewardWei, rewardEth } = computePromoReward(activity, config)
   const treasuryFunded =
     treasuryBalanceEth !== null && treasuryBalanceEth >= config.minTreasuryEth &&
-    treasuryBalanceEth * 1e18 >= Number(rewardWei) + 0.00005 * 1e18
+    treasuryBalanceEth * 1e18 >= Number(totalWei) + 0.0001 * 1e18
 
   let eligible = promoActive && staleCommits >= config.minStale && rewardWei > BigInt(0) && treasuryFunded
   let reason: string | null = null
@@ -241,9 +283,9 @@ export async function buildPromoQuote(
     buttonLabel = `Rescore free · earn ${formatApproxUsdFromEth(rewardEth)}`
   }
 
-  const perCommitUsd = formatPerCommitRewardUsd(config.pennyEth)
+  const perCommitUsd = formatPerCommitRewardUsd(config.walletRewardEth)
   const promoBanner = eligible
-    ? `Launch promo (limited time): free rescore on stale repos — ${perCommitUsd} to your wallet (paid in ETH).`
+    ? `Launch promo: free rescore on stale repos — ${perCommitUsd} to your wallet; half of each commit subsidy fuels CLAWD burns (paid in ETH).`
     : null
 
   return {

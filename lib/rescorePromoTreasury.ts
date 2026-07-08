@@ -8,7 +8,7 @@ import {
   parseEther,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { BASE_CHAIN_ID } from '@/lib/web3/constants'
+import { BASE_CHAIN_ID, RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
 
 const base = defineChain({
   id: BASE_CHAIN_ID,
@@ -72,6 +72,37 @@ function createTreasuryWalletClient() {
 }
 
 const GAS_BUFFER_WEI = parseEther('0.00005')
+const SPLIT_PAYOUT_GAS_BUFFER_WEI = parseEther('0.0001')
+
+export type PromoTxResult = { hash: `0x${string}`; confirmed: boolean }
+
+async function sendTreasuryEth(
+  to: `0x${string}`,
+  valueWei: bigint,
+): Promise<PromoTxResult> {
+  const wallet = createTreasuryWalletClient()
+  if (!wallet) {
+    throw new Error('Promo treasury is not configured')
+  }
+
+  const hash = await wallet.sendTransaction({
+    to,
+    value: valueWei,
+    chain: base,
+  })
+
+  const publicClient = createBasePublicClient()
+  try {
+    const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 25_000 })
+    if (receipt.status !== 'success') {
+      throw new Error('Promo treasury transaction failed on-chain')
+    }
+    return { hash, confirmed: true }
+  } catch (err) {
+    console.warn('[promo-treasury] tx broadcast; receipt unconfirmed:', hash, err)
+    return { hash, confirmed: false }
+  }
+}
 
 export async function getTreasuryBalanceEth(): Promise<number | null> {
   const address = getTreasuryAddress()
@@ -85,13 +116,14 @@ export async function getTreasuryBalanceEth(): Promise<number | null> {
   }
 }
 
-export async function treasuryCanCover(rewardWei: bigint): Promise<boolean> {
+export async function treasuryCanCover(totalWei: bigint, splitPayout = false): Promise<boolean> {
   const address = getTreasuryAddress()
-  if (!address || rewardWei <= BigInt(0)) return false
+  if (!address || totalWei <= BigInt(0)) return false
+  const gasBuffer = splitPayout ? SPLIT_PAYOUT_GAS_BUFFER_WEI : GAS_BUFFER_WEI
   try {
     const client = createBasePublicClient()
     const balance = await client.getBalance({ address })
-    return balance >= rewardWei + GAS_BUFFER_WEI
+    return balance >= totalWei + gasBuffer
   } catch {
     return false
   }
@@ -100,36 +132,36 @@ export async function treasuryCanCover(rewardWei: bigint): Promise<boolean> {
 export async function sendPromoReward(
   toAddress: string,
   rewardWei: bigint,
-): Promise<{ hash: `0x${string}`; confirmed: boolean }> {
+): Promise<PromoTxResult> {
   if (rewardWei <= BigInt(0)) {
     throw new Error('Reward amount must be positive')
   }
 
-  const wallet = createTreasuryWalletClient()
-  if (!wallet) {
-    throw new Error('Promo treasury is not configured')
-  }
-
-  const canCover = await treasuryCanCover(rewardWei)
-  if (!canCover) {
+  if (!(await treasuryCanCover(rewardWei))) {
     throw new Error('Promo treasury balance is too low for this reward')
   }
 
-  const hash = await wallet.sendTransaction({
-    to: getAddress(toAddress),
-    value: rewardWei,
-    chain: base,
-  })
+  return sendTreasuryEth(getAddress(toAddress), rewardWei)
+}
 
-  const publicClient = createBasePublicClient()
-  try {
-    const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 25_000 })
-    if (receipt.status !== 'success') {
-      throw new Error('Promo reward transaction failed on-chain')
-    }
-    return { hash, confirmed: true }
-  } catch (err) {
-    console.warn('[promo-treasury] payout broadcast; receipt unconfirmed:', hash, err)
-    return { hash, confirmed: false }
+export async function sendPromoSplitReward(
+  walletAddress: string,
+  totalWei: bigint,
+  burnFundWei: bigint,
+  walletRewardWei: bigint,
+): Promise<{ burnFundTx: PromoTxResult; walletTx: PromoTxResult }> {
+  if (totalWei <= BigInt(0) || burnFundWei <= BigInt(0) || walletRewardWei <= BigInt(0)) {
+    throw new Error('Promo split amounts must be positive')
   }
+  if (burnFundWei + walletRewardWei !== totalWei) {
+    throw new Error('Promo split amounts must sum to total')
+  }
+
+  if (!(await treasuryCanCover(totalWei, true))) {
+    throw new Error('Promo treasury balance is too low for this reward')
+  }
+
+  const burnFundTx = await sendTreasuryEth(RECEIVER_BUY_AND_BURN, burnFundWei)
+  const walletTx = await sendTreasuryEth(getAddress(walletAddress), walletRewardWei)
+  return { burnFundTx, walletTx }
 }

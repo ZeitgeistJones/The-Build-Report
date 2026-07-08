@@ -42,15 +42,15 @@ function formatEndsAt(endsAt: string | null): string | null {
 
 export default function RescorePromoBanner({
   endsAt,
-  pennyEth,
+  walletRewardEth,
 }: {
   endsAt: string | null
-  pennyEth: number
+  walletRewardEth: number
 }) {
   const isMobile = useIsMobile()
   const [mode, setMode] = useState<BannerMode | null>(null)
   const endsLabel = formatEndsAt(endsAt)
-  const perCommitLabel = formatPerCommitRewardUsd(pennyEth)
+  const perCommitLabel = formatPerCommitRewardUsd(walletRewardEth)
 
   useEffect(() => {
     setMode(loadMode())

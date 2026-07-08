@@ -5,5 +5,5 @@ export default function RescorePromoBannerShell() {
   const status = getPromoStatusForDisplay()
   if (!status.active) return null
 
-  return <RescorePromoBanner endsAt={status.endsAt} pennyEth={status.pennyEth} />
+  return <RescorePromoBanner endsAt={status.endsAt} walletRewardEth={status.walletRewardEth} />
 }

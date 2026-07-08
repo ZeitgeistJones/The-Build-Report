@@ -11,7 +11,7 @@ export const ABOUT_SCORE_TYPES_SECTIONS = [
   },
   {
     title: 'Rescore',
-    body: `Same live AI pass, triggered when someone pays 0.000008 ETH — or, during the limited launch promo, free on stale repos with a small reward sent to your wallet (~$0.01 per stale commit, approximate USD; paid in ETH). Result is cached for everyone. First rescore on a baseline card often shifts the letter — different method, not always a repo change overnight.`,
+    body: `Same live AI pass, triggered when someone pays 0.000008 ETH — or, during the limited launch promo, free on stale repos with ~$0.01 per stale commit to your wallet and matching ETH queued for CLAWD burns (50/50 subsidy; approximate USD; paid in ETH). Result is cached for everyone. First rescore on a baseline card often shifts the letter — different method, not always a repo change overnight.`,
   },
 ] as const
 
@@ -37,7 +37,7 @@ export const RESCORE_BUTTON_TOOLTIP =
   'Score this repo using Claude AI. Cost: 0.000008 ETH. Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone.'
 
 export const RESCORE_PROMO_TOOLTIP =
-  'Limited launch promo: on stale repos, rescore is free and we send ~$0.01 per stale commit to your wallet from the promo treasury (approximate USD; paid in ETH). Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low.'
+  'Limited launch promo: on stale repos, rescore is free — ~$0.01 per stale commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy; approximate USD; paid in ETH). Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low.'
 
 export const ECOSYSTEM_ADD_CONTEXT_LABEL =
   'Disagree with a grade? Holders can add context →'
@@ -48,18 +48,18 @@ export const ECOSYSTEM_ADD_CONTEXT_TOOLTIP =
 export const RESCORE_PROMO_SITE_BANNER = {
   title: 'Limited-time rescore promo',
   summary:
-    'On eligible stale repos, rescore is free and we send a small reward per stale commit to your wallet from the promo treasury (approximate USD; paid in ETH).',
+    'On eligible stale repos, rescore is free — ~$0.01 per stale commit to your wallet and the same to the burn queue (50/50 treasury subsidy; approximate USD; paid in ETH).',
   bullets: [
     'Hold 10M $CLAWD and connect on Base to use Score / Rescore.',
     'Promo applies to rescored repos with commits since the last score — not every card qualifies.',
-    '{{perCommit}} to your wallet from the promo treasury.',
+    '{{perCommit}} to your wallet; the other half fuels CLAWD burns when someone runs Execute burn.',
     'Promo ends when funds run low or we turn it off.',
   ],
   disclaimer:
     'Experimental launch promo — no guarantee of eligibility, reward amount, payout timing, or continued availability. Bugs, treasury limits, rate limits, or manual shutdown can change or end rewards without notice. Not financial advice.',
   minimizeLabel: 'Minimize',
   expandLabel: 'Show promo details',
-  minimizedHint: 'Launch promo active — free stale rescore + ~$ rewards on eligible repos',
+  minimizedHint: 'Launch promo active — free stale rescore + ~$ rewards & burn fuel on eligible repos',
 } as const
 
 export const SCORE_TYPE_BASELINE_LABEL = 'Baseline'

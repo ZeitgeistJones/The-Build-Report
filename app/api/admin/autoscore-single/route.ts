@@ -24,7 +24,8 @@ import {
   promoSignMessage,
   resolvePromoActivitySnapshot,
 } from '@/lib/rescorePromo'
-import { sendPromoReward, treasuryCanCover } from '@/lib/rescorePromoTreasury'
+import { incrementEthPendingOptimistic, scheduleBurnSnapshotSync } from '@/lib/burnSnapshot'
+import { sendPromoSplitReward, treasuryCanCover } from '@/lib/rescorePromoTreasury'
 
 export const maxDuration = 60
 
@@ -108,8 +109,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Rate limit exceeded — max 3 rescores per hour per wallet' }, { status: 429 })
     }
 
+    let promoTotalWei = BigInt(0)
     let promoRewardWei = BigInt(0)
     let promoRewardEth = 0
+    let promoBurnFundWei = BigInt(0)
+    let promoBurnFundEth = 0
+    let promoTotalEth = 0
 
     if (isPromoPath) {
       if (!isPromoWindowOpen()) {
@@ -144,10 +149,14 @@ export async function POST(req: NextRequest) {
       }
 
       const reward = computePromoReward(beforeActivity)
+      promoTotalWei = reward.totalWei
       promoRewardWei = reward.rewardWei
       promoRewardEth = reward.rewardEth
+      promoBurnFundWei = reward.burnFundWei
+      promoBurnFundEth = reward.burnFundEth
+      promoTotalEth = reward.totalEth
 
-      if (promoRewardWei <= BigInt(0)) {
+      if (promoTotalWei <= BigInt(0)) {
         return NextResponse.json({ ok: false, error: 'Repo is not eligible for promo reward' }, { status: 400 })
       }
 
@@ -159,7 +168,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (!(await treasuryCanCover(promoRewardWei))) {
+      if (!(await treasuryCanCover(promoTotalWei, true))) {
         return NextResponse.json({ ok: false, error: 'Promo treasury balance is too low' }, { status: 503 })
       }
     } else {
@@ -183,9 +192,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (isPromoPath) {
-      let payoutResult: { hash: `0x${string}`; confirmed: boolean }
+      let payoutResult: Awaited<ReturnType<typeof sendPromoSplitReward>>
       try {
-        payoutResult = await sendPromoReward(walletAddress, promoRewardWei)
+        payoutResult = await sendPromoSplitReward(
+          walletAddress,
+          promoTotalWei,
+          promoBurnFundWei,
+          promoRewardWei,
+        )
+        await incrementEthPendingOptimistic(promoBurnFundEth)
+        scheduleBurnSnapshotSync()
       } catch (payoutErr) {
         console.error('[autoscore-single] promo payout failed after rescore:', payoutErr)
         return NextResponse.json({
@@ -202,7 +218,15 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      await markPromoPayout(walletAddress, repoSlug, promoNonce, payoutResult.hash, promoRewardEth)
+      const walletConfirmed = payoutResult.walletTx.confirmed
+      await markPromoPayout(
+        walletAddress,
+        repoSlug,
+        promoNonce,
+        payoutResult.walletTx.hash,
+        promoRewardEth,
+        promoTotalEth,
+      )
 
       return NextResponse.json({
         ok: true,
@@ -211,9 +235,11 @@ export async function POST(req: NextRequest) {
         rescoreMeta: pipeline.rescoreMeta,
         promo: {
           rewardEth: promoRewardEth,
-          payoutTxHash: payoutResult.hash,
-          payoutPending: !payoutResult.confirmed,
-          payoutError: payoutResult.confirmed
+          burnFundEth: promoBurnFundEth,
+          payoutTxHash: payoutResult.walletTx.hash,
+          burnFundTxHash: payoutResult.burnFundTx.hash,
+          payoutPending: !walletConfirmed,
+          payoutError: walletConfirmed
             ? null
             : 'Reward sent — waiting for Base confirmation. Check your wallet in a minute.',
         },

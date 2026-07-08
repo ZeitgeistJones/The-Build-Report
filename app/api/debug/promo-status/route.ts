@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
     hasTreasuryKey: Boolean(process.env.RESCORE_PROMO_TREASURY_PRIVATE_KEY?.trim()),
     endsAt: config.endsAt,
     pennyEth: config.pennyEth,
+    walletRewardEth: config.walletRewardEth,
+    burnSplitBps: 5000,
     maxCommits: config.maxCommits,
     minStale: config.minStale,
     minTreasuryEth: config.minTreasuryEth,
