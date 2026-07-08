@@ -21,6 +21,21 @@ function walletButtonStyle(isMobile: boolean): React.CSSProperties {
   }
 }
 
+function WalletIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18a2 2 0 0 1 2 2v1.2M3 7.5V18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9.7M3 7.5h17.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="17" cy="14" r="1.2" fill="currentColor" />
+    </svg>
+  )
+}
+
 export default function ConnectWalletButton() {
   const {
     isConnected,
@@ -76,14 +91,18 @@ export default function ConnectWalletButton() {
       type="button"
       onClick={connectWallet}
       disabled={isLoading}
+      aria-label="Connect wallet"
+      title="Connect wallet"
       style={{
         ...base,
         border: '1px solid var(--border)',
         background: 'transparent',
         color: 'var(--text-secondary)',
+        minWidth: isMobile ? MIN_TAP : undefined,
+        padding: isMobile ? '8px' : base.padding,
       }}
     >
-      Connect wallet
+      {isMobile ? <WalletIcon /> : 'Connect wallet'}
     </button>
   )
 }

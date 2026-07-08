@@ -22,7 +22,35 @@ import {
   type GradeCardId,
 } from '@/lib/gradeCardCopy'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import { MIN_TAP } from '@/lib/responsive'
 import RubricBlockPanel from '@/components/RubricBlockPanel'
+
+function GradeSectionChip({ href, children }: { href: string; children: React.ReactNode }) {
+  const isMobile = useIsMobile()
+
+  return (
+    <Link
+      href={href}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '12px',
+        fontWeight: 500,
+        color: 'var(--text-secondary)',
+        textDecoration: 'none',
+        padding: isMobile ? '8px 14px' : '5px 12px',
+        minHeight: isMobile ? MIN_TAP : undefined,
+        borderRadius: 'var(--radius-pill)',
+        border: '1px solid var(--border)',
+        background: 'var(--surface-1)',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {children}
+    </Link>
+  )
+}
 
 type CardId = GradeCardId
 
@@ -767,11 +795,10 @@ export default function GradesPanel({
           alignItems: isMobile ? 'stretch' : 'center',
           marginBottom: '16px',
           flexDirection: isMobile ? 'column' : 'row',
-          flexWrap: isMobile ? 'nowrap' : 'nowrap',
           gap: isMobile ? '10px' : '16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: isMobile ? '10px' : '16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: 0 }}>
           <span
             style={{
               fontSize: '11px',
@@ -783,19 +810,14 @@ export default function GradesPanel({
           >
             Ecosystem Grades
           </span>
-          <Link href="/how-we-score" style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none' }}>
-            How we score →
-          </Link>
-          {communityContextEnabled && (
-            <Link
-              href="/how-we-score#hw-score-community"
-              style={{ fontSize: '12px', color: 'var(--accent)', textDecoration: 'none' }}
-            >
-              Think we&apos;re missing something? Add context →
-            </Link>
-          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <GradeSectionChip href="/how-we-score">How we score</GradeSectionChip>
+            {communityContextEnabled && (
+              <GradeSectionChip href="/how-we-score#hw-score-community">Add context</GradeSectionChip>
+            )}
+          </div>
         </div>
-        <div style={isMobile ? { width: '100%', display: 'flex' } : undefined}>
+        <div style={isMobile ? { width: '100%', display: 'flex' } : { flexShrink: 0 }}>
           <PeriodToggle />
         </div>
       </div>

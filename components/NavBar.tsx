@@ -100,7 +100,7 @@ export default function NavBar() {
         position: 'sticky',
         top: 0,
         background: 'var(--bg)',
-        zIndex: 10,
+        zIndex: 20,
       }}
     >
       <a
@@ -119,7 +119,8 @@ export default function NavBar() {
 
       {isMobile ? (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <NormieToggle header />
             <ConnectWalletButton />
             <button
               type="button"

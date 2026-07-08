@@ -41,9 +41,9 @@
     padding-left: calc(16px + var(--safe-left)) !important;
     padding-right: calc(16px + var(--safe-right)) !important;
     height: calc(var(--nav-height) + var(--safe-top)) !important;
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-    background: color-mix(in srgb, var(--bg) 92%, transparent) !important;
+    background: var(--bg) !important;
+    z-index: 20;
+    box-shadow: 0 1px 0 var(--border);
   }
 
   .mobile-nav-backdrop {
@@ -164,5 +164,28 @@
   .build-brief-card {
     padding: 12px 14px !important;
     margin-bottom: 16px !important;
+  }
+
+  .build-brief-body--collapsed {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+    overflow: hidden;
+  }
+
+  .build-brief-toggle {
+    margin-top: 10px;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .build-brief-meta {
+    line-height: 1.4;
   }
 }

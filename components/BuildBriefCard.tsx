@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import type { BuildBriefData } from '@/lib/buildBrief'
 import { useNormieMode } from '@/components/NormieModeProvider'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 interface Props {
   brief: BuildBriefData | null
@@ -17,13 +19,42 @@ function formatDigestDate(dateKey: string): string {
   })
 }
 
+/** Split a wall of text into 2–3 short paragraphs for scanning. */
+function splitBriefParagraphs(text: string): string[] {
+  const trimmed = text.trim()
+  if (!trimmed) return []
+
+  if (trimmed.includes('\n\n')) {
+    return trimmed.split(/\n\n+/).map(p => p.trim()).filter(Boolean)
+  }
+
+  const sentences =
+    trimmed.match(/[^.!?]+[.!?]+(?:\s|$)/g)?.map(s => s.trim()).filter(Boolean) ?? [trimmed]
+  if (sentences.length <= 2) return [trimmed]
+
+  const chunkSize = sentences.length <= 4 ? 2 : Math.ceil(sentences.length / 3)
+  const paragraphs: string[] = []
+  for (let i = 0; i < sentences.length; i += chunkSize) {
+    paragraphs.push(sentences.slice(i, i + chunkSize).join(' '))
+  }
+  return paragraphs
+}
+
+const MOBILE_COLLAPSE_CHARS = 220
+
 export default function BuildBriefCard({ brief }: Props) {
   const { normie } = useNormieMode()
+  const isMobile = useIsMobile()
+  const [expanded, setExpanded] = useState(false)
+
   if (!brief) return null
   const text = (normie && brief.generalNormie) || brief.general || brief.text
   if (!text) return null
 
   const dayLabel = brief.dateKey ? formatDigestDate(brief.dateKey) : 'yesterday'
+  const paragraphs = splitBriefParagraphs(text)
+  const collapsible = isMobile && text.length > MOBILE_COLLAPSE_CHARS
+  const collapsed = collapsible && !expanded
 
   return (
     <div
@@ -58,7 +89,7 @@ export default function BuildBriefCard({ brief }: Props) {
         >
           Yesterday&apos;s build
         </span>
-        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+        <span className="build-brief-meta" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           {dayLabel}
           {brief.repoCount > 0 && (
             <>
@@ -69,16 +100,34 @@ export default function BuildBriefCard({ brief }: Props) {
           )}
         </span>
       </div>
-      <p
-        style={{
-          margin: 0,
-          fontSize: '14px',
-          color: 'var(--text-secondary)',
-          lineHeight: 1.65,
-        }}
-      >
-        {text}
-      </p>
+
+      <div className={collapsed ? 'build-brief-body build-brief-body--collapsed' : 'build-brief-body'}>
+        {paragraphs.map((paragraph, index) => (
+          <p
+            key={index}
+            style={{
+              margin: index === 0 ? 0 : '12px 0 0',
+              fontSize: '14px',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.65,
+            }}
+          >
+            {paragraph}
+          </p>
+        ))}
+      </div>
+
+      {collapsible && (
+        <button
+          type="button"
+          className="build-brief-toggle"
+          onClick={() => setExpanded(open => !open)}
+          aria-expanded={expanded}
+        >
+          {expanded ? 'Show less' : 'Read more'}
+        </button>
+      )}
+
       <p style={{ margin: '10px 0 0', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
         Plain-English summary · refreshes daily overnight Eastern
       </p>
