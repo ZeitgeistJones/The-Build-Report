@@ -1,6 +1,6 @@
 const SOUND_PREF_KEY = 'promo-reward-sound'
 
-export type PromoRewardSoundGroup = 'combo' | 'soft' | 'drawer' | 'classic'
+export type PromoRewardSoundGroup = 'glow' | 'soft' | 'combo' | 'drawer' | 'classic'
 
 export type PromoRewardSoundVariant =
   | 'cha-ching'
@@ -13,10 +13,20 @@ export type PromoRewardSoundVariant =
   | 'gentle-payout'
   | 'soft-cash-combo'
   | 'register-glow'
+  | 'glow-trio'
+  | 'glow-earn'
+  | 'glow-payout'
+  | 'whisper-glow'
+  | 'soft-glow'
+  | 'gentle-glow'
+  | 'earn-whisper'
+  | 'payout-glow'
+  | 'register-hush'
 
 export const PROMO_REWARD_SOUND_GROUPS: { id: PromoRewardSoundGroup; label: string }[] = [
+  { id: 'glow', label: 'Glow family (your direction)' },
+  { id: 'soft', label: 'Soft earn & gentle payout' },
   { id: 'combo', label: 'Combos (soft + drawer)' },
-  { id: 'soft', label: 'Soft earn family' },
   { id: 'drawer', label: 'Cash drawer family' },
   { id: 'classic', label: 'Earlier options' },
 ]
@@ -30,37 +40,62 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   pick?: boolean
 }[] = [
   {
-    id: 'soft-cash-combo',
-    label: 'Soft cash combo',
-    hint: 'Your two picks blended — light drawer + warm earn bell + tiny tail.',
-    group: 'combo',
+    id: 'glow-trio',
+    label: 'Glow trio',
+    hint: 'All three favorites — register rustle, gentle pings, soft earn finish.',
+    group: 'glow',
     pick: true,
-  },
-  {
-    id: 'soft-drawer',
-    label: 'Soft drawer',
-    hint: 'Gentle register thunk, then the soft-earn bell.',
-    group: 'combo',
-    pick: true,
-  },
-  {
-    id: 'drawer-earn',
-    label: 'Drawer + earn',
-    hint: 'Cash-drawer mechanics with soft-earn tones instead of a harsh ring.',
-    group: 'combo',
-    pick: true,
-  },
-  {
-    id: 'warm-register',
-    label: 'Warm register',
-    hint: 'Cash drawer shape, but lower and rounder — less metallic.',
-    group: 'combo',
   },
   {
     id: 'register-glow',
     label: 'Register glow',
     hint: 'Drawer rustle under a soft glowing payout tone.',
-    group: 'combo',
+    group: 'glow',
+    pick: true,
+  },
+  {
+    id: 'glow-earn',
+    label: 'Glow earn',
+    hint: 'Register glow opening with a clearer soft-earn bell.',
+    group: 'glow',
+    pick: true,
+  },
+  {
+    id: 'glow-payout',
+    label: 'Glow payout',
+    hint: 'Register rustle into gentle-payout pings — no sharp bell.',
+    group: 'glow',
+    pick: true,
+  },
+  {
+    id: 'whisper-glow',
+    label: 'Whisper glow',
+    hint: 'Register glow turned down — hushed money received.',
+    group: 'glow',
+  },
+  {
+    id: 'soft-glow',
+    label: 'Soft glow',
+    hint: 'Pure warm tones, no mechanical rustle.',
+    group: 'glow',
+  },
+  {
+    id: 'gentle-glow',
+    label: 'Gentle glow',
+    hint: 'Gentle payout notes with a faint register shimmer underneath.',
+    group: 'glow',
+  },
+  {
+    id: 'register-hush',
+    label: 'Register hush',
+    hint: 'Tiny rustle + one warm tone — bare minimum glow.',
+    group: 'glow',
+  },
+  {
+    id: 'payout-glow',
+    label: 'Payout glow',
+    hint: 'Gentle payout lead-in, soft-earn bell lands at the end.',
+    group: 'glow',
   },
   {
     id: 'soft-earn',
@@ -74,13 +109,43 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
     label: 'Gentle payout',
     hint: 'Minimal double ping — quiet “funds received” feel.',
     group: 'soft',
+    pick: true,
+  },
+  {
+    id: 'earn-whisper',
+    label: 'Earn whisper',
+    hint: 'Soft earn at half volume — longer, softer decay.',
+    group: 'soft',
+  },
+  {
+    id: 'soft-cash-combo',
+    label: 'Soft cash combo',
+    hint: 'Light drawer + warm earn bell + tiny tail.',
+    group: 'combo',
+  },
+  {
+    id: 'soft-drawer',
+    label: 'Soft drawer',
+    hint: 'Gentle register thunk, then the soft-earn bell.',
+    group: 'combo',
+  },
+  {
+    id: 'drawer-earn',
+    label: 'Drawer + earn',
+    hint: 'Cash-drawer mechanics with soft-earn tones instead of a harsh ring.',
+    group: 'combo',
+  },
+  {
+    id: 'warm-register',
+    label: 'Warm register',
+    hint: 'Cash drawer shape, but lower and rounder — less metallic.',
+    group: 'combo',
   },
   {
     id: 'cash-drawer',
     label: 'Cash drawer',
     hint: 'Heavier register open, then a longer metallic ring.',
     group: 'drawer',
-    pick: true,
   },
   {
     id: 'cha-ching',
@@ -353,13 +418,106 @@ function playSoftCashCombo(synth: Synth) {
   playTone(synth, now + 0.22, 1174, 0.08, 0.18)
 }
 
+function playRegisterGlowRustle(synth: Synth, start: number, scale = 1) {
+  playDrawerNoise(synth, start, 0.045 * scale, 0.1, 520)
+  playDrawerNoise(synth, start + 0.04, 0.025 * scale, 0.07, 1100)
+}
+
 function playRegisterGlow(synth: Synth) {
   const { now } = synth
-  playDrawerNoise(synth, now, 0.045, 0.1, 520)
-  playDrawerNoise(synth, now + 0.04, 0.025, 0.07, 1100)
+  playRegisterGlowRustle(synth, now)
   playTone(synth, now + 0.07, 620, 0.12, 0.1, 'sine', 520)
   playSoftEarnBell(synth, now + 0.11, 0.17)
   playTone(synth, now + 0.26, 1318, 0.05, 0.2)
+}
+
+function playGlowTrio(synth: Synth) {
+  const { now } = synth
+  playRegisterGlowRustle(synth, now, 0.85)
+  playTone(synth, now + 0.08, 620, 0.1, 0.1, 'sine', 540)
+  playTone(synth, now + 0.14, 660, 0.1, 0.14, 'sine')
+  playTone(synth, now + 0.22, 988, 0.11, 0.18, 'sine')
+  playSoftEarnBell(synth, now + 0.28, 0.15)
+  playTone(synth, now + 0.38, 1174, 0.05, 0.14)
+}
+
+function playGlowEarn(synth: Synth) {
+  const { now } = synth
+  playRegisterGlowRustle(synth, now)
+  playTone(synth, now + 0.06, 700, 0.11, 0.09, 'sine', 590)
+  playSoftEarnBell(synth, now + 0.1, 0.19)
+  playTone(synth, now + 0.24, 1480, 0.07, 0.16)
+}
+
+function playGlowPayout(synth: Synth) {
+  const { now } = synth
+  playRegisterGlowRustle(synth, now, 0.9)
+  playTone(synth, now + 0.1, 660, 0.1, 0.14, 'sine')
+  playTone(synth, now + 0.2, 988, 0.12, 0.2, 'sine')
+  playTone(synth, now + 0.3, 1174, 0.06, 0.16)
+}
+
+function playWhisperGlow(synth: Synth) {
+  const { now } = synth
+  playRegisterGlowRustle(synth, now, 0.55)
+  playTone(synth, now + 0.08, 580, 0.08, 0.12, 'sine', 500)
+  playSoftEarnBell(synth, now + 0.12, 0.11)
+  playTone(synth, now + 0.28, 1244, 0.035, 0.22)
+}
+
+function playSoftGlow(synth: Synth) {
+  const { now } = synth
+  playTone(synth, now + 0.02, 580, 0.11, 0.12, 'sine', 500)
+  playBell(
+    synth,
+    now + 0.1,
+    [
+      [1174, 1],
+      [2348, 0.12],
+    ],
+    0.14,
+    0.3,
+  )
+  playTone(synth, now + 0.24, 1318, 0.05, 0.2)
+}
+
+function playGentleGlow(synth: Synth) {
+  const { now } = synth
+  playDrawerNoise(synth, now, 0.022, 0.12, 480)
+  playTone(synth, now + 0.06, 640, 0.09, 0.14, 'sine')
+  playTone(synth, now + 0.16, 932, 0.11, 0.2, 'sine')
+  playTone(synth, now + 0.26, 1108, 0.05, 0.18)
+}
+
+function playEarnWhisper(synth: Synth) {
+  const { now } = synth
+  playTone(synth, now + 0.02, 740, 0.09, 0.14, 'sine', 600)
+  playSoftEarnBell(synth, now + 0.1, 0.12)
+  playTone(synth, now + 0.24, 1480, 0.045, 0.24)
+}
+
+function playPayoutGlow(synth: Synth) {
+  const { now } = synth
+  playTone(synth, now, 660, 0.1, 0.14, 'sine')
+  playTone(synth, now + 0.1, 932, 0.11, 0.18, 'sine')
+  playSoftEarnBell(synth, now + 0.2, 0.14)
+  playTone(synth, now + 0.32, 1174, 0.045, 0.16)
+}
+
+function playRegisterHush(synth: Synth) {
+  const { now } = synth
+  playDrawerNoise(synth, now, 0.028, 0.08, 500)
+  playTone(synth, now + 0.06, 700, 0.09, 0.14, 'sine', 580)
+  playBell(
+    synth,
+    now + 0.12,
+    [
+      [1108, 1],
+      [2216, 0.1],
+    ],
+    0.1,
+    0.26,
+  )
 }
 
 const VARIANT_PLAYERS: Record<PromoRewardSoundVariant, (synth: Synth) => void> = {
@@ -373,6 +531,15 @@ const VARIANT_PLAYERS: Record<PromoRewardSoundVariant, (synth: Synth) => void> =
   'gentle-payout': playGentlePayout,
   'soft-cash-combo': playSoftCashCombo,
   'register-glow': playRegisterGlow,
+  'glow-trio': playGlowTrio,
+  'glow-earn': playGlowEarn,
+  'glow-payout': playGlowPayout,
+  'whisper-glow': playWhisperGlow,
+  'soft-glow': playSoftGlow,
+  'gentle-glow': playGentleGlow,
+  'earn-whisper': playEarnWhisper,
+  'payout-glow': playPayoutGlow,
+  'register-hush': playRegisterHush,
 }
 
 export function playPromoRewardVariant(
