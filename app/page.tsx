@@ -35,6 +35,7 @@ import {
   buildBuilderTrendExplanation,
   buildTokenMechanicTrendExplanation,
   buildIntegrityTrendExplanation,
+  buildShippingLeverageTrendExplanation,
 } from '@/lib/gradeNarratives'
 import { type RepoWithLive } from '@/components/RepoList'
 import HomeRepoSection from '@/components/HomeRepoSection'
@@ -195,9 +196,9 @@ export default async function Home() {
     ? attachIntegrityArrivals(calcIntegrityGrade(stats, '7d', allRepos), '7d')
     : calcIntegrityGrade(null, '7d', allRepos)
 
-  const shippingLeverageGrade24 = stats ? calcShippingLeverageGrade(stats, '24h', allRepos) : null
-  const shippingLeverageGrade30 = stats ? calcShippingLeverageGrade(stats, '30d', allRepos) : null
-  const shippingLeverageGrade7 = stats ? calcShippingLeverageGrade(stats, '7d', allRepos) : null
+  const shippingLeverageGrade24Raw = stats ? calcShippingLeverageGrade(stats, '24h', allRepos) : null
+  const shippingLeverageGrade30Raw = stats ? calcShippingLeverageGrade(stats, '30d', allRepos) : null
+  const shippingLeverageGrade7Raw = stats ? calcShippingLeverageGrade(stats, '7d', allRepos) : null
   const shippingLeverageGrade60 = stats ? calcShippingLeverageGrade(stats, '60d', allRepos) : null
 
   const builderGrade60Raw = stats ? calcBuilderGrade(stats, '60d') : null
@@ -309,6 +310,45 @@ export default async function Home() {
         ),
       }
     : integrityGrade7Raw
+  const shippingLeverageGrade24 = shippingLeverageGrade24Raw && stats
+    ? {
+        ...shippingLeverageGrade24Raw,
+        trendExplanation: buildShippingLeverageTrendExplanation(
+          stats,
+          '24h',
+          allRepos,
+          shippingLeverageGrade24Raw.pct,
+          shippingLeverageGrade24Raw.priorPct,
+          shippingLeverageGrade24Raw.trend,
+        ),
+      }
+    : shippingLeverageGrade24Raw
+  const shippingLeverageGrade30 = shippingLeverageGrade30Raw && stats
+    ? {
+        ...shippingLeverageGrade30Raw,
+        trendExplanation: buildShippingLeverageTrendExplanation(
+          stats,
+          '30d',
+          allRepos,
+          shippingLeverageGrade30Raw.pct,
+          shippingLeverageGrade30Raw.priorPct,
+          shippingLeverageGrade30Raw.trend,
+        ),
+      }
+    : shippingLeverageGrade30Raw
+  const shippingLeverageGrade7 = shippingLeverageGrade7Raw && stats
+    ? {
+        ...shippingLeverageGrade7Raw,
+        trendExplanation: buildShippingLeverageTrendExplanation(
+          stats,
+          '7d',
+          allRepos,
+          shippingLeverageGrade7Raw.pct,
+          shippingLeverageGrade7Raw.priorPct,
+          shippingLeverageGrade7Raw.trend,
+        ),
+      }
+    : shippingLeverageGrade7Raw
   const builderGrade60 = builderGrade60Raw
   const tokenMechanicGrade60 = tokenMechanicGrade60Raw
   const integrityGrade60 = integrityGrade60Raw

@@ -1,6 +1,6 @@
 import { Repo } from './scores'
 import { GitHubStats } from './github'
-import { Period, formatTrendDelta, TrendExplanation, TrendDirection } from './grades'
+import { Period, formatTrendDelta, TrendExplanation, TrendDirection, shippingLeverageRepos } from './grades'
 import {
   commitsInWindow,
   effectiveTag,
@@ -8,7 +8,7 @@ import {
   reposActiveInWindow,
   selectSampleWithFallback,
 } from './scoringShared'
-import { getConsumerEconomicScorePct } from './economicGrade'
+import { getConsumerEconomicScorePct, getShippingLeverage, showsEconomicNa } from './economicGrade'
 import {
   formatRepoLeaders,
   topReposByCommits,
@@ -366,6 +366,113 @@ export function buildIntegrityTrendExplanation(
       : trend === 'down'
         ? `Standards dipped (${trendLabel}) — more commit weight landed on repos with weaker rubric scores.`
         : `Standards held steady (${trendLabel}) — similar rubric quality where commits landed.`
+
+  return { headline, bullets: bullets.slice(0, 4) }
+}
+
+function shippingLeveragePct(repo: Repo): number | null {
+  return getShippingLeverage(repo)?.pct ?? null
+}
+
+export function buildShippingLeverageTrendExplanation(
+  stats: GitHubStats,
+  period: Period,
+  repoSet: Repo[],
+  pct: number,
+  priorPct: number | null,
+  trend: TrendDirection,
+): TrendExplanation {
+  const leverageSet = shippingLeverageRepos(repoSet)
+  const activeNow = reposActiveInWindow(stats, leverageSet, period, 'current')
+  const activePrior = reposActiveInWindow(stats, leverageSet, period, 'prior')
+  const sample = selectSampleWithFallback(activeNow, leverageSet)
+  const priorSample = selectSampleWithFallback(activePrior, leverageSet)
+
+  const nowSlugs = new Set(sample.map(r => r.githubSlug))
+  const priorSlugs = new Set(priorSample.map(r => r.githubSlug))
+
+  const added = sample.filter(r => !priorSlugs.has(r.githubSlug))
+  const dropped = priorSample.filter(r => !nowSlugs.has(r.githubSlug))
+
+  const lowAdded = added.filter(r => {
+    const sl = shippingLeveragePct(r)
+    return sl != null && sl < 60
+  })
+  const highDropped = dropped.filter(r => {
+    const sl = shippingLeveragePct(r)
+    return sl != null && sl >= 80
+  })
+
+  const bullets: string[] = []
+
+  if (added.length) {
+    const names = formatRepoNames(added, stats, period, 2)
+    bullets.push(
+      `Infrastructure projects entered the sample${names ? `, including ${names}` : ''}.`,
+    )
+  }
+
+  if (lowAdded.length && bullets.length < 4) {
+    bullets.push(
+      `Some newly active tooling repos score lower on shipping leverage (${formatRepoNames(lowAdded, stats, period, 2)}).`,
+    )
+  }
+
+  if (highDropped.length && bullets.length < 4) {
+    bullets.push(
+      `Higher-leverage projects that were busy before went quiet (${formatRepoNames(highDropped, stats, period, 2)}).`,
+    )
+  }
+
+  const topByCommits = topReposByCommits(stats, repoSet, period, 'current', 3, showsEconomicNa)
+  if (topByCommits.length && bullets.length < 4) {
+    bullets.push(`Most infrastructure work landed on ${formatRepoLeaders(topByCommits, 2)}.`)
+  }
+
+  const holderFacingNow = repoSet.filter(r => isHolderFacingTag(effectiveTag(r)))
+  const totalCommitsNow = totalCommitsInWindow(stats, repoSet, period, 'current')
+  const holderCommitsNow = totalCommitsInWindow(stats, holderFacingNow, period, 'current')
+  if (totalCommitsNow > 0 && bullets.length < 4) {
+    const holderShare = Math.round((holderCommitsNow / totalCommitsNow) * 100)
+    if (holderShare < 20) {
+      bullets.push(
+        `Only about ${holderShare}% of commits this window landed on holder-facing apps — most shipping was behind-the-scenes tooling, which is what this grade tracks.`,
+      )
+    }
+  }
+
+  const highNow = sample.filter(r => (shippingLeveragePct(r) ?? 0) >= 80).length
+  const highPrior = priorSample.filter(r => (shippingLeveragePct(r) ?? 0) >= 80).length
+  const lowNow = sample.filter(r => {
+    const sl = shippingLeveragePct(r)
+    return sl != null && sl < 60
+  }).length
+  const lowPrior = priorSample.filter(r => {
+    const sl = shippingLeveragePct(r)
+    return sl != null && sl < 60
+  }).length
+
+  if ((highNow > highPrior || lowNow < lowPrior) && bullets.length < 4) {
+    bullets.push(
+      'More of the active infrastructure set multiplies shipping capacity or connects clearly to holder value.',
+    )
+  } else if ((lowNow > lowPrior || highNow < highPrior) && bullets.length < 4) {
+    bullets.push(
+      'More of the visible infrastructure work shifted toward repos with a weaker path to holder value.',
+    )
+  }
+
+  if (!bullets.length) {
+    bullets.push('Shipping-leverage rubric scores look about the same as the prior window.')
+  }
+
+  const trendLabel = formatTrendDelta(pct, priorPct, period)
+  const headline =
+    trend === 'up'
+      ? `Shipping leverage rose (${trendLabel}) — the busiest infrastructure repos scored higher on multiplying holder value.`
+      : trend === 'down'
+        ? `Shipping leverage dipped (${trendLabel}) — more commit weight landed on weaker infrastructure rubric scores.`
+        : `Shipping leverage held steady (${trendLabel}) — similar leverage quality where infrastructure commits landed.`
 
   return { headline, bullets: bullets.slice(0, 4) }
 }
