@@ -303,7 +303,7 @@ ${gradeContext}
 Return ONLY valid JSON, no markdown fences:
 {
   "general": "5-6 sentences. Plain English morning overview of what shipped yesterday. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.",
-  "generalNormie": "The SAME overview as general, rewritten for someone who knows nothing about code or crypto. Same facts, even warmer and simpler. Follow the normie voice guide below.",
+  "generalNormie": "Same facts and repo coverage as general, rewritten for someone who knows nothing about code or crypto — warmer and simpler words, not a shorter summary. 2-5 sentences as needed (fewer only when honestly warranted). Follow the generalNormie voice guide below.",
   "cards": {
     "24h": {
       "builder": "2-3 sentences about builder activity for the last 24 hours.",
@@ -324,7 +324,10 @@ Return ONLY valid JSON, no markdown fences:
   }
 }
 
-NORMIE VOICE GUIDE (applies to generalNormie and every card "normie" field):
+GENERAL NORMIE VOICE GUIDE (applies to generalNormie only):
+${normieVoiceGuidance('digestGeneral')}
+
+CARD NORMIE VOICE GUIDE (applies to every card "normie" field):
 ${normieVoiceGuidance('gradeCard')}
 
 Rules:
@@ -334,6 +337,7 @@ Rules:
 - 60d cards: describe the two-month arc. Do not imply week-over-week trend or compare to a prior 60d window.
 - 24h with no activity: one short honest sentence per card beats three padded ones.
 - general: 5-6 complete sentences, meatier than any single card. Use the extra sentences to name specific repos/work from the commit list and explain why it matters to holders — not repetition.
+- generalNormie: same facts and repo names as general — simpler words, not a compressed summary. 2-5 sentences as needed; shorter only when the day was genuinely quiet.
 - CARD COPY MUST BE PLAIN WORDS — no percentages, letter grades, or raw stats dumps in the card fields. You MAY name specific projects when PER-PERIOD TOP PROJECTS shows one repo dominated that window.
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
 - Say "holder economics" or "how apps and locks serve $CLAWD holders" instead of "token mechanics" or "burn apps" alone.

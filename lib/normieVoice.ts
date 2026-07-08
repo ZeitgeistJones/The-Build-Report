@@ -52,7 +52,8 @@ export const NORMIE_VOICE_RULES = [
 export const NORMIE_SURFACE_SHAPES = {
   verdict: '2-4 sentences, a single paragraph. No headers or dates.',
   gradeCard: '2-3 sentences, plain words, no stats or letter grades.',
-  digestGeneral: '5-6 sentences, a warm morning overview of what shipped.',
+  digestGeneral:
+    '2-5 sentences as needed — use fewer when the day was quiet or the story is simple; use more when multiple repos shipped meaningful work. Same repo names and wins as the standard overview, just simpler words. Do not pad; do not compress away real detail.',
 } as const
 
 /**
