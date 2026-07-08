@@ -24,10 +24,6 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
     if (!open) return
     function onDocClick(e: MouseEvent) {
       const outside = ref.current ? !ref.current.contains(e.target as Node) : true
-      // #region agent log
-      const tgt = e.target as HTMLElement | null
-      console.log('[custom-debug] doc mousedown', { outside, targetTag: tgt?.tagName, targetType: (tgt as HTMLInputElement | null)?.type, targetId: tgt?.id })
-      // #endregion
       if (outside) {
         setOpen(false)
         setShowCustomPanel(false)
@@ -42,14 +38,6 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
     const el = scrollRef.current
     if (!el) return
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-    // #region agent log
-    requestAnimationFrame(() => {
-      const input = document.querySelector('#custom-bg') as HTMLElement | null
-      const sr = el.getBoundingClientRect()
-      const ir = input?.getBoundingClientRect()
-      console.log('[custom-debug] custom panel scroll', { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, inputBelowFold: ir ? Math.round(ir.top) > Math.round(sr.bottom) : null })
-    })
-    // #endregion
   }, [showCustomPanel])
 
   const triggerLabel = isCustomActive ? 'Custom' : (current?.label ?? 'Theme')
@@ -145,12 +133,7 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
             </div>
             <button
               type="button"
-              onClick={() => {
-                // #region agent log
-                console.log('[custom-debug] Customize button clicked', { willShow: !showCustomPanel })
-                // #endregion
-                setShowCustomPanel(p => !p)
-              }}
+              onClick={() => setShowCustomPanel(p => !p)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -213,9 +196,6 @@ function CustomPanel({
 
   function update(next: Partial<CustomThemeVars>) {
     const merged = { bg, accent, base, ...next }
-    // #region agent log
-    console.log('[custom-debug] CustomPanel update', { next, merged })
-    // #endregion
     if (next.bg !== undefined) setBg(next.bg)
     if (next.accent !== undefined) setAccent(next.accent)
     if (next.base !== undefined) setBase(next.base)

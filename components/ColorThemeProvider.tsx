@@ -67,16 +67,7 @@ export function ColorThemeProvider({ children }: { children: ReactNode }) {
   function setCustomTheme(vars: CustomThemeVars) {
     setCustomVarsState(vars)
     localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify(vars))
-    // #region agent log
-    try {
-      applyCustomTheme(vars)
-      const computedBg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
-      const inlineStyle = document.documentElement.getAttribute('style') || ''
-      console.log('[custom-debug] setCustomTheme applied', { vars, computedBg, inlineStyleLen: inlineStyle.length, inlineStyleHead: inlineStyle.slice(0, 60), hasDataAttr: document.documentElement.hasAttribute('data-color-theme') })
-    } catch (err) {
-      console.log('[custom-debug] setCustomTheme THREW', { vars, err: String(err) })
-    }
-    // #endregion
+    applyCustomTheme(vars)
   }
 
   function clearCustomTheme() {
