@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "debug:burn": "node scripts/debug-burn-scan.mjs",
+    "debug:theme": "node scripts/debug-custom-theme.mjs",
+    "debug:theme:local": "node scripts/debug-custom-theme.mjs http://localhost:3000",
+    "setup:playwright": "playwright install chromium"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.0",

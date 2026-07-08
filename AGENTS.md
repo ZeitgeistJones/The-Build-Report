@@ -31,3 +31,15 @@ are commit-weighted aggregates. Shipping leverage aggregates the same per-repo s
 ## Workflow conventions
 
 - Git: the agent **commits**, the user **pushes**. Don't push unless asked.
+
+## Local debug tooling
+
+After `npm install`, run `npm run setup:playwright` once (downloads Chromium for automation).
+
+| Command | What it does |
+|---------|----------------|
+| `npm run debug:burn` | Live Blockscout CLAWD burn scan vs cache (no server needed) |
+| `npm run debug:theme` | Playwright repro against production |
+| `npm run debug:theme:local` | Same, against `localhost:3000` (start `npm run dev` first) |
+
+Gated production debug APIs (use `CRON_SECRET` as `?key=`): `/api/debug/burn-totals`, `/api/debug/home-perf`, `/api/debug/commit-counts`.
