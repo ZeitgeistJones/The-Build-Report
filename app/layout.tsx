@@ -5,6 +5,7 @@ import Web3Provider from '@/components/wallet/Web3Provider'
 import { ColorThemeProvider } from '@/components/ColorThemeProvider'
 import { NormieModeProvider, NORMIE_MODE_STORAGE_KEY } from '@/components/NormieModeProvider'
 import NavBar from '@/components/NavBar'
+import RescorePromoBannerShell from '@/components/RescorePromoBannerShell'
 import { COLOR_THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY } from '@/lib/colorThemes'
 
 const SITE_URL = 'https://the-build-report.vercel.app'
@@ -87,6 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <NormieModeProvider>
           <Web3Provider>
             <NavBar />
+            <RescorePromoBannerShell />
             <main className="site-main" style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', padding: '32px var(--content-padding-x) 80px' }}>
               {children}
             </main>

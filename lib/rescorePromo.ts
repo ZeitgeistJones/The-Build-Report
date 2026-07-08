@@ -77,6 +77,19 @@ export function isPromoWindowOpen(config: PromoConfig = getPromoConfig()): boole
   return !Number.isNaN(end) && Date.now() < end
 }
 
+export function getPromoStatusForDisplay(): {
+  active: boolean
+  endsAt: string | null
+  pennyEth: number
+} {
+  const config = getPromoConfig()
+  return {
+    active: isPromoWindowOpen(config),
+    endsAt: config.endsAt,
+    pennyEth: config.pennyEth,
+  }
+}
+
 export function computeStaleCommitCount(activity: RepoActivitySnapshot): number {
   if (!activity.scoredAt) return 0
   const { count, exact, hasNew } = countCommitsSinceScore(

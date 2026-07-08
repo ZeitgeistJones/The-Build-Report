@@ -188,4 +188,14 @@
   .build-brief-meta {
     line-height: 1.4;
   }
+
+  .rescore-promo-banner {
+    padding-left: calc(var(--content-padding-x) + var(--safe-left)) !important;
+    padding-right: calc(var(--content-padding-x) + var(--safe-right)) !important;
+  }
+
+  .rescore-promo-banner__action {
+    min-height: 44px;
+    padding: 8px 14px;
+  }
 }

@@ -52,7 +52,7 @@ export default function BuildBriefCard({ brief }: Props) {
   if (!text) return null
 
   const dayLabel = brief.dateKey ? formatDigestDate(brief.dateKey) : 'yesterday'
-  const paragraphs = splitBriefParagraphs(text)
+  const paragraphs = isMobile ? splitBriefParagraphs(text) : [text]
   const collapsible = isMobile && text.length > MOBILE_COLLAPSE_CHARS
   const collapsed = collapsible && !expanded
 
