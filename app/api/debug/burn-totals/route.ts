@@ -21,8 +21,9 @@ export async function GET(req: NextRequest) {
     live: {
       clawdBurned: live.clawdBurned,
       lastBurnAt: live.lastBurnAt,
+      ok: live.ok,
     },
     cached,
-    match: live.clawdBurned === cached.clawdBurned && live.lastBurnAt === cached.lastBurnAt,
+    match: live.ok && live.clawdBurned === cached.clawdBurned && live.lastBurnAt === cached.lastBurnAt,
   })
 }

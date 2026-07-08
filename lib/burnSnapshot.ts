@@ -17,25 +17,41 @@ export type BurnSnapshot = {
 
 /** Slow path — Blockscout scan. Call from cron/admin only. */
 export async function syncBurnSnapshot(): Promise<BurnSnapshot> {
-  const [totals, ethPending] = await Promise.all([
+  const [totals, ethPending, existing] = await Promise.all([
     fetchOnChainBurnTotals([RECEIVER_BUY_AND_BURN]),
     getContractEthBalance(RECEIVER_BUY_AND_BURN),
+    getBurnSnapshotForDisplay(),
   ])
   const updatedAt = new Date().toISOString()
+  const scanOk = totals.ok
   const snapshot: BurnSnapshot = {
-    clawdBurned: totals.clawdBurned,
-    lastBurnAt: totals.lastBurnAt,
-    updatedAt,
+    clawdBurned: scanOk ? totals.clawdBurned : existing.clawdBurned,
+    lastBurnAt: scanOk ? totals.lastBurnAt : existing.lastBurnAt,
+    updatedAt: scanOk ? updatedAt : (existing.updatedAt ?? updatedAt),
     ethPendingInReceiver: ethPending,
   }
 
   const r = getRedis()
-  await Promise.all([
-    r.set(CLAWD_BURNED_KEY, snapshot.clawdBurned),
-    r.set(LAST_BURN_AT_KEY, snapshot.lastBurnAt),
-    r.set(UPDATED_AT_KEY, snapshot.updatedAt),
+  const writes: Promise<unknown>[] = [
     r.set(ETH_PENDING_KEY, snapshot.ethPendingInReceiver),
-  ])
+  ]
+  if (scanOk) {
+    writes.push(
+      r.set(CLAWD_BURNED_KEY, snapshot.clawdBurned),
+      r.set(LAST_BURN_AT_KEY, snapshot.lastBurnAt),
+      r.set(UPDATED_AT_KEY, snapshot.updatedAt),
+    )
+  } else {
+    // #region agent log
+    console.log('[burn-debug] sync skipped clawd overwrite', {
+      existingClawdBurned: existing.clawdBurned,
+      failedScanClawdBurned: totals.clawdBurned,
+      ethPending,
+    })
+    // #endregion
+  }
+
+  await Promise.all(writes)
 
   return snapshot
 }

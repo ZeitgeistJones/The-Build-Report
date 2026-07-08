@@ -23,6 +23,8 @@ export type OnChainBurnTotals = {
   clawdBurned: number
   /** ISO timestamp of the most recent matching CLAWD→dead transfer */
   lastBurnAt: string | null
+  /** False when Blockscout timed out or errored — callers must not treat totals as authoritative. */
+  ok: boolean
 }
 
 interface AddressTxItem {
@@ -149,7 +151,7 @@ async function fetchOnChainBurnTotalsInner(
     }
   }
 
-  return { clawdBurned: Number(total) / 1e18, lastBurnAt }
+  return { clawdBurned: Number(total) / 1e18, lastBurnAt, ok: true }
 }
 
 /**
@@ -168,7 +170,7 @@ export async function fetchOnChainBurnTotals(
       }),
     ])
   } catch {
-    return { clawdBurned: 0, lastBurnAt: null }
+    return { clawdBurned: 0, lastBurnAt: null, ok: false }
   }
 }
 
