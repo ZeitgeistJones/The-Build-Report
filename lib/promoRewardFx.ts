@@ -1,6 +1,6 @@
 const SOUND_PREF_KEY = 'promo-reward-sound'
 
-export type PromoRewardSoundGroup = 'payoff-final' | 'payoff' | 'glow-payout' | 'glow' | 'soft' | 'combo' | 'drawer' | 'classic'
+export type PromoRewardSoundGroup = 'touchdown-pitch' | 'payoff-final' | 'payoff' | 'glow-payout' | 'glow' | 'soft' | 'combo' | 'drawer' | 'classic'
 
 export type PromoRewardSoundVariant =
   | 'cha-ching'
@@ -51,6 +51,15 @@ export type PromoRewardSoundVariant =
   | 'glow-payout-payoff-touchdown-warm'
   | 'glow-payout-payoff-touchdown-lift'
   | 'glow-payout-payoff-sweet-touch'
+  | 'glow-payout-touchdown-pitch-deep'
+  | 'glow-payout-touchdown-pitch-low'
+  | 'glow-payout-touchdown-pitch-gold'
+  | 'glow-payout-touchdown-pitch-warm'
+  | 'glow-payout-touchdown-pitch-mid'
+  | 'glow-payout-touchdown-pitch-cool'
+  | 'glow-payout-touchdown-pitch-airy'
+  | 'glow-payout-touchdown-pitch-bright'
+  | 'glow-payout-touchdown-pitch-hush'
   | 'whisper-glow'
   | 'soft-glow'
   | 'gentle-glow'
@@ -61,7 +70,8 @@ export type PromoRewardSoundVariant =
 export const PROMO_REWARD_PREVIEW_WAIT_MS = 5000
 
 export const PROMO_REWARD_SOUND_GROUPS: { id: PromoRewardSoundGroup; label: string }[] = [
-  { id: 'payoff-final', label: 'Touchdown + sweet land (your finalists)' },
+  { id: 'touchdown-pitch', label: 'Touchdown — pitch variants only' },
+  { id: 'payoff-final', label: 'Touchdown + sweet land blends' },
   { id: 'payoff', label: 'Other after-the-wait payoff' },
   { id: 'glow-payout', label: 'Glow payout variants' },
   { id: 'glow', label: 'Glow family' },
@@ -80,6 +90,86 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   pick?: boolean
   finalist?: boolean
 }[] = [
+  {
+    id: 'glow-payout-payoff-touchdown',
+    label: 'Touchdown · base pitch',
+    hint: 'Reference — light rustle, [620 · 934 · 1108] Hz pings.',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-touchdown-pitch-deep',
+    label: 'Touchdown · deep',
+    hint: 'Lower pitch — [560 · 840 · 1000].',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-touchdown-pitch-low',
+    label: 'Touchdown · low',
+    hint: 'Lowest — [540 · 810 · 960].',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-touchdown-pitch-gold',
+    label: 'Touchdown · gold',
+    hint: 'Warm-low — [590 · 885 · 1050].',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-touchdown-pitch-warm',
+    label: 'Touchdown · warm pitch',
+    hint: 'Slightly lower — [610 · 920 · 1095].',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-touchdown-pitch-mid',
+    label: 'Touchdown · mid',
+    hint: 'Between warm and base — [600 · 900 · 1070].',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-touchdown-pitch-hush',
+    label: 'Touchdown · hush pitch',
+    hint: 'Landed-style low notes on touchdown — [580 · 870 · 1034].',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-touchdown-pitch-cool',
+    label: 'Touchdown · cool',
+    hint: 'A bit higher — [640 · 960 · 1140].',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-touchdown-pitch-airy',
+    label: 'Touchdown · airy',
+    hint: 'Higher, lighter — [660 · 990 · 1175].',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-touchdown-pitch-bright',
+    label: 'Touchdown · bright',
+    hint: 'Highest — [680 · 1020 · 1210].',
+    group: 'touchdown-pitch',
+    pick: true,
+    finalist: true,
+  },
   {
     id: 'glow-payout-payoff',
     label: 'Payoff · sweet land',
@@ -132,14 +222,6 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
     id: 'glow-payout-payoff-sweet-breathe',
     label: 'Payoff · sweet breathe',
     hint: 'Sweet land slowed slightly — more air between pings.',
-    group: 'payoff-final',
-    pick: true,
-    finalist: true,
-  },
-  {
-    id: 'glow-payout-payoff-touchdown-warm',
-    label: 'Payoff · touchdown warm',
-    hint: 'Touchdown’s light rustle + slightly warmer note shape.',
     group: 'payoff-final',
     pick: true,
     finalist: true,
@@ -977,15 +1059,55 @@ function playGlowPayoutPayoffMerge(synth: Synth) {
   })
 }
 
-function playGlowPayoutPayoffTouchdown(synth: Synth) {
+function playTouchdownPitch(synth: Synth, freqs: [number, number, number]) {
   playGlowPayoutBase(synth, {
     rustleScale: 0.65,
     pingOffset: 0.12,
     pingGap: 0.11,
-    freqs: [620, 934, 1108],
+    freqs,
     peaks: [0.1, 0.12, 0.07],
     decays: [0.16, 0.22, 0.24],
   })
+}
+
+function playGlowPayoutPayoffTouchdown(synth: Synth) {
+  playTouchdownPitch(synth, [620, 934, 1108])
+}
+
+function playTouchdownPitchDeep(synth: Synth) {
+  playTouchdownPitch(synth, [560, 840, 1000])
+}
+
+function playTouchdownPitchLow(synth: Synth) {
+  playTouchdownPitch(synth, [540, 810, 960])
+}
+
+function playTouchdownPitchGold(synth: Synth) {
+  playTouchdownPitch(synth, [590, 885, 1050])
+}
+
+function playTouchdownPitchWarm(synth: Synth) {
+  playTouchdownPitch(synth, [610, 920, 1095])
+}
+
+function playTouchdownPitchMid(synth: Synth) {
+  playTouchdownPitch(synth, [600, 900, 1070])
+}
+
+function playTouchdownPitchHush(synth: Synth) {
+  playTouchdownPitch(synth, [580, 870, 1034])
+}
+
+function playTouchdownPitchCool(synth: Synth) {
+  playTouchdownPitch(synth, [640, 960, 1140])
+}
+
+function playTouchdownPitchAiry(synth: Synth) {
+  playTouchdownPitch(synth, [660, 990, 1175])
+}
+
+function playTouchdownPitchBright(synth: Synth) {
+  playTouchdownPitch(synth, [680, 1020, 1210])
 }
 
 function playGlowPayoutPayoffTouchdownSweet(synth: Synth) {
@@ -1044,14 +1166,7 @@ function playGlowPayoutPayoffSweetBreathe(synth: Synth) {
 }
 
 function playGlowPayoutPayoffTouchdownWarm(synth: Synth) {
-  playGlowPayoutBase(synth, {
-    rustleScale: 0.65,
-    pingOffset: 0.12,
-    pingGap: 0.11,
-    freqs: [610, 920, 1095],
-    peaks: [0.1, 0.12, 0.07],
-    decays: [0.16, 0.22, 0.25],
-  })
+  playTouchdownPitchWarm(synth)
 }
 
 function playGlowPayoutPayoffTouchdownLift(synth: Synth) {
@@ -1221,6 +1336,15 @@ const VARIANT_PLAYERS: Record<PromoRewardSoundVariant, (synth: Synth) => void> =
   'glow-payout-payoff-touchdown-warm': playGlowPayoutPayoffTouchdownWarm,
   'glow-payout-payoff-touchdown-lift': playGlowPayoutPayoffTouchdownLift,
   'glow-payout-payoff-sweet-touch': playGlowPayoutPayoffSweetTouch,
+  'glow-payout-touchdown-pitch-deep': playTouchdownPitchDeep,
+  'glow-payout-touchdown-pitch-low': playTouchdownPitchLow,
+  'glow-payout-touchdown-pitch-gold': playTouchdownPitchGold,
+  'glow-payout-touchdown-pitch-warm': playTouchdownPitchWarm,
+  'glow-payout-touchdown-pitch-mid': playTouchdownPitchMid,
+  'glow-payout-touchdown-pitch-hush': playTouchdownPitchHush,
+  'glow-payout-touchdown-pitch-cool': playTouchdownPitchCool,
+  'glow-payout-touchdown-pitch-airy': playTouchdownPitchAiry,
+  'glow-payout-touchdown-pitch-bright': playTouchdownPitchBright,
   'whisper-glow': playWhisperGlow,
   'soft-glow': playSoftGlow,
   'gentle-glow': playGentleGlow,

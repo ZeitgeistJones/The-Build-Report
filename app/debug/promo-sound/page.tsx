@@ -117,7 +117,7 @@ export default function PromoSoundPreviewPage() {
     >
       <h1 style={{ fontSize: '20px', fontWeight: 600 }}>Promo reward sound preview</h1>
       <p style={{ fontSize: '14px', color: 'var(--text-muted)', maxWidth: '480px', textAlign: 'center', lineHeight: 1.5 }}>
-        Touchdown + sweet land at the top. Keep 5s wait on.
+        Touchdown pitch variants at the top — same rustle/timing, only the note height changes.
       </p>
 
       <label
