@@ -79,12 +79,14 @@ export function isPromoWindowOpen(config: PromoConfig = getPromoConfig()): boole
 
 export function computeStaleCommitCount(activity: RepoActivitySnapshot): number {
   if (!activity.scoredAt) return 0
-  const { count, exact } = countCommitsSinceScore(
+  const { count, exact, hasNew } = countCommitsSinceScore(
     activity.scoredAt,
     activity.commitTimestamps,
     { lastCommitAt: activity.lastCommitAt, pushedAt: activity.pushedAt },
   )
   if (exact && count > 0) return count
+  // UI can show "new commits since scored" before we have exact timestamps — credit 1 for promo.
+  if (!exact && hasNew) return 1
   return 0
 }
 
@@ -223,7 +225,7 @@ export async function buildPromoQuote(
     buttonLabel = `Rescore free · earn ${formatEthAmount(rewardEth)} ETH`
   }
 
-  const promoBanner = promoActive
+  const promoBanner = eligible
     ? 'Launch promo (limited time): free rescored on stale repos — we send ~1¢ ETH per stale commit to your wallet.'
     : null
 

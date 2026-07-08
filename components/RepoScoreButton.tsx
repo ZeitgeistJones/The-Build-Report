@@ -79,7 +79,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       : phase === 'signing'
         ? 'Signing…'
         : 'Scoring…'
-    : promoQuote?.buttonLabel ?? defaultLabel
+    : promoEligible
+      ? (promoQuote?.buttonLabel ?? defaultLabel)
+      : defaultLabel
   const showScoreMeta = scoringStatus === 'scored' && activity.scoredAt
   const { hasNew: hasNewCommitsSinceScore } = countCommitsSinceScore(
     activity.scoredAt,
@@ -92,23 +94,25 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
 
   useEffect(() => {
     let cancelled = false
-    const params = new URLSearchParams({ repoSlug })
-    if (address) params.set('wallet', address)
-
-    fetch(`/api/rescore/promo-quote?${params.toString()}`)
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled || !data.ok) return
-        setPromoQuote(data.quote as PromoQuote)
-      })
-      .catch(() => {
-        if (!cancelled) setPromoQuote(null)
-      })
-
+    void fetchPromoQuote(repoSlug, address).then(quote => {
+      if (!cancelled) setPromoQuote(quote)
+    })
     return () => {
       cancelled = true
     }
   }, [repoSlug, address, activity.scoredAt, activity.commitTimestamps, activity.lastCommitAt, activity.pushedAt])
+
+  async function fetchPromoQuote(slug: string, wallet: string | undefined): Promise<PromoQuote | null> {
+    const params = new URLSearchParams({ repoSlug: slug })
+    if (wallet) params.set('wallet', wallet)
+    try {
+      const res = await fetch(`/api/rescore/promo-quote?${params.toString()}`)
+      const data = await res.json()
+      return data.ok ? (data.quote as PromoQuote) : null
+    } catch {
+      return null
+    }
+  }
 
   async function submitRescore(body: Record<string, string>) {
     const res = await fetch('/api/admin/autoscore-single', {
@@ -186,7 +190,11 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     if (!address) return
 
     try {
-      if (promoEligible) {
+      const freshQuote = await fetchPromoQuote(repoSlug, address)
+      if (freshQuote) setPromoQuote(freshQuote)
+      const usePromo = Boolean(freshQuote?.eligible)
+
+      if (usePromo) {
         await runPromoRescore()
       } else {
         await runPaidRescore()
@@ -261,9 +269,15 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         />
       </div>
 
-      {promoQuote?.promoBanner && promoQuote.promoActive && (
+      {promoQuote?.promoBanner && promoEligible && (
         <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: '180px', marginInline: 'auto' }}>
           {promoQuote.promoBanner}
+        </div>
+      )}
+
+      {promoQuote?.promoActive && !promoEligible && promoQuote.reason && (
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: '180px', marginInline: 'auto' }}>
+          {promoQuote.reason}
         </div>
       )}
 
@@ -295,7 +309,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         >
           <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
             {promoEligible
-              ? `No new commits since the last score, but the launch promo still applies — free rescore plus ~${promoQuote?.rewardEth ?? 0} ETH reward. Continue?`
+              ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — free rescore plus ~${promoQuote?.rewardEth ?? 0} ETH reward. Continue?`
               : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'}
           </p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
