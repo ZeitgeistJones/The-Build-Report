@@ -33,11 +33,14 @@ export const BASELINE_CONFIDENCE_TOOLTIP =
 export const LIVE_AI_CONFIDENCE_TOOLTIP =
   'Live AI — Claude inferred from repo metadata, GitHub activity, and public scoring context. Rescore can refresh it.'
 
+export const APPROX_USD_NOTE =
+  'Approx USD labels use a weekly ETH price check; on-chain payment and rewards are still ETH.'
+
 export const RESCORE_BUTTON_TOOLTIP =
-  'Score this repo using Claude AI. Cost: ~$0.01 (0.000008 ETH). Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone.'
+  `Score this repo using Claude AI. Cost: ~$0.01 (0.000008 ETH). Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone. ${APPROX_USD_NOTE}`
 
 export const RESCORE_PROMO_TOOLTIP =
-  'Limited launch promo: on stale repos, rescore is free — ~$0.01 per stale commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy; approximate USD; paid in ETH). Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low.'
+  `Limited launch promo: on stale repos, rescore is free — ~$0.01 per stale commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy). Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
 
 export const ECOSYSTEM_ADD_CONTEXT_LABEL =
   'Disagree with a grade? Holders can add context →'
@@ -56,7 +59,7 @@ export const RESCORE_PROMO_SITE_BANNER = {
     'Promo ends when funds run low or we turn it off.',
   ],
   disclaimer:
-    'Experimental launch promo — no guarantee of eligibility, reward amount, payout timing, or continued availability. Bugs, treasury limits, rate limits, or manual shutdown can change or end rewards without notice. Not financial advice.',
+    'Experimental launch promo — no guarantee of eligibility, reward amount, payout timing, or continued availability. Bugs, treasury limits, rate limits, or manual shutdown can change or end rewards without notice. Approx USD labels use a weekly ETH price check. Not financial advice.',
   minimizeLabel: 'Minimize',
   expandLabel: 'Show promo details',
   minimizedHint: 'Launch promo active — free stale rescore + ~$ rewards & burn fuel on eligible repos',
