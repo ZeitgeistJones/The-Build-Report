@@ -122,11 +122,13 @@ function repoMatchesFilter(
   filter: RepoFilter,
   collectionSets: Record<RepoCollectionId, Set<string>>,
   contextSummary: Record<string, RepoContextSummary>,
+  pinnedNeedsRescoreSlugs: readonly string[] = [],
 ): boolean {
   const slug = repo.githubSlug
   const tag = getEffectiveTag(repo)
   if (filter === 'all') return true
   if (filter === 'needs-rescore') {
+    if (pinnedNeedsRescoreSlugs.includes(slug)) return true
     return repoNeedsRescore(repo.scoredAt, repo.commitTimestamps, {
       lastCommitAt: repo.lastCommitAt,
       pushedAt: repo.pushedAt,
@@ -522,6 +524,7 @@ export default function RepoList({
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
   const [rescoreSummaries, setRescoreSummaries] = useState(initialRescoreSummaries)
+  const [pinnedNeedsRescoreSlugs, setPinnedNeedsRescoreSlugs] = useState<string[]>([])
   const { unlocked } = useClawdAccess()
   const { normie } = useNormieMode()
   const isMobile = useIsMobile()
@@ -561,6 +564,10 @@ export default function RepoList({
     if (rescoreMeta) {
       setRescoreSummaries(prev => ({ ...prev, [updated.githubSlug]: rescoreMeta }))
     }
+    setPinnedNeedsRescoreSlugs(prev => {
+      if (activeFilter !== 'needs-rescore') return prev
+      return [updated.githubSlug, ...prev.filter(slug => slug !== updated.githubSlug)]
+    })
     setRepoItems(prev =>
       prev.map(r =>
         r.githubSlug === updated.githubSlug
@@ -608,7 +615,9 @@ export default function RepoList({
     })
   }
 
-  const tagFiltered = repoItems.filter(r => repoMatchesFilter(r, activeFilter, collectionSets, contextSummary))
+  const tagFiltered = repoItems.filter(r =>
+    repoMatchesFilter(r, activeFilter, collectionSets, contextSummary, pinnedNeedsRescoreSlugs),
+  )
   const activeInPeriod = tagFiltered.filter(r => {
     const c = repoCommitsForPeriodKey(r, repoPeriod)
     return c != null && c > 0
@@ -616,6 +625,16 @@ export default function RepoList({
   const skipActiveScope = activeFilter === 'needs-rescore'
   const filtered = (activityScope === 'active' && !skipActiveScope ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
+      if (activeFilter === 'needs-rescore' && pinnedNeedsRescoreSlugs.length) {
+        const aPinned = pinnedNeedsRescoreSlugs.indexOf(a.githubSlug)
+        const bPinned = pinnedNeedsRescoreSlugs.indexOf(b.githubSlug)
+        if (aPinned !== -1 || bPinned !== -1) {
+          if (aPinned === -1) return 1
+          if (bPinned === -1) return -1
+          return aPinned - bPinned
+        }
+      }
+
       if (activeFilter === 'community-context') {
         const aTalk = contextSummary[a.githubSlug]?.lastActivityAt ?? ''
         const bTalk = contextSummary[b.githubSlug]?.lastActivityAt ?? ''
