@@ -27,7 +27,7 @@ import {
   RESCORE_PROMO_TOOLTIP,
 } from '@/lib/scoringCopy'
 import { SCORE_PAYMENT_ETH } from '@/lib/rescoreBurns'
-import { formatEthAmount } from '@/lib/clawdBurnIndex'
+import { formatApproxUsdFromEth } from '@/lib/promoUsd'
 
 interface Props {
   repoSlug: string
@@ -131,12 +131,12 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     router.refresh()
 
     if (data.promo?.payoutTxHash) {
-      const amt = formatEthAmount(Number(data.promo.rewardEth ?? 0))
+      const amt = formatApproxUsdFromEth(Number(data.promo.rewardEth ?? 0))
       setPayoutTxUrl(`https://basescan.org/tx/${data.promo.payoutTxHash}`)
       if (data.promo.payoutPending) {
-        setInlineMsg(`Rescore saved — ${amt} ETH payout sent (confirming on Base).`)
+        setInlineMsg(`Rescore saved — ${amt} reward sent (confirming on Base).`)
       } else {
-        setInlineMsg(`Rescore saved — ${amt} ETH sent to your wallet.`)
+        setInlineMsg(`Rescore saved — ${amt} sent to your wallet.`)
       }
     } else if (data.promo?.payoutPending) {
       setError(data.promo.payoutError ?? 'Promo rescore saved but reward payout failed.')
@@ -318,7 +318,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         >
           <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
             {promoEligible
-              ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — free rescore plus ~${promoQuote?.rewardEth ?? 0} ETH reward. Continue?`
+              ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — free rescore plus ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0)} reward. Continue?`
               : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'}
           </p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>

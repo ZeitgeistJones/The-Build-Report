@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { RESCORE_PROMO_SITE_BANNER } from '@/lib/scoringCopy'
-import { formatEthAmount } from '@/lib/clawdBurnIndex'
+import { formatPerCommitRewardUsd } from '@/lib/promoUsd'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
@@ -50,7 +50,7 @@ export default function RescorePromoBanner({
   const isMobile = useIsMobile()
   const [mode, setMode] = useState<BannerMode | null>(null)
   const endsLabel = formatEndsAt(endsAt)
-  const rewardLabel = formatEthAmount(pennyEth)
+  const perCommitLabel = formatPerCommitRewardUsd(pennyEth)
 
   useEffect(() => {
     setMode(loadMode())
@@ -102,7 +102,7 @@ export default function RescorePromoBanner({
 
       <ul className="rescore-promo-banner__list">
         {RESCORE_PROMO_SITE_BANNER.bullets.map(item => (
-          <li key={item}>{item.replace('~1¢', `~${rewardLabel}`)}</li>
+          <li key={item}>{item.replace('{{perCommit}}', perCommitLabel)}</li>
         ))}
       </ul>
 
