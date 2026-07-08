@@ -55,7 +55,7 @@ export default function PromoSoundPreviewPage() {
     >
       <h1 style={{ fontSize: '20px', fontWeight: 600 }}>Promo reward sound preview</h1>
       <p style={{ fontSize: '14px', color: 'var(--text-muted)', maxWidth: '460px', textAlign: 'center', lineHeight: 1.5 }}>
-        More glow / soft-earn / gentle-payout variants below. Green = your picks so far.
+        Glow payout variants at the top — same vibe, different tweaks. Green = closest to your pick.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', width: 'min(460px, 100%)' }}>
