@@ -25,6 +25,11 @@ export type PromoRewardSoundVariant =
   | 'glow-payout-rustle'
   | 'glow-payout-tail'
   | 'glow-payout-dusk'
+  | 'glow-payout-warm-quick'
+  | 'glow-payout-sweet'
+  | 'glow-payout-snappy'
+  | 'glow-payout-warm-snap'
+  | 'glow-payout-almost'
   | 'whisper-glow'
   | 'soft-glow'
   | 'gentle-glow'
@@ -52,14 +57,56 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   {
     id: 'glow-payout',
     label: 'Glow payout',
-    hint: 'Base version — register rustle into gentle pings. Your current favorite.',
+    hint: 'Base — rustle into three gentle pings.',
     group: 'glow-payout',
     pick: true,
   },
   {
     id: 'glow-payout-warm',
     label: 'Glow payout · warm',
-    hint: 'Lower, rounder ping tones — cozier funds received.',
+    hint: 'Lower, rounder pings — close but not quite.',
+    group: 'glow-payout',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-quick',
+    label: 'Glow payout · quick',
+    hint: 'Snappier timing — interesting edge.',
+    group: 'glow-payout',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-warm-quick',
+    label: 'Glow payout · warm + quick',
+    hint: 'Your two near-misses combined — cozy tones, tight timing.',
+    group: 'glow-payout',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-sweet',
+    label: 'Glow payout · sweet spot',
+    hint: 'Halfway between base and warm, medium-snappy timing.',
+    group: 'glow-payout',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-warm-snap',
+    label: 'Glow payout · warm snap',
+    hint: 'Warm tones + quick rhythm, softened so it doesn’t feel rushed.',
+    group: 'glow-payout',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-snappy',
+    label: 'Glow payout · snappy',
+    hint: 'Base pitch + quick timing, middle ping pops a touch more.',
+    group: 'glow-payout',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-almost',
+    label: 'Glow payout · almost',
+    hint: 'Barely warmer than base, slightly quicker — micro-tweak.',
     group: 'glow-payout',
     pick: true,
   },
@@ -68,25 +115,17 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
     label: 'Glow payout · deep',
     hint: 'Deeper rustle and lower notes — more weight, still soft.',
     group: 'glow-payout',
-    pick: true,
   },
   {
     id: 'glow-payout-dusk',
     label: 'Glow payout · dusk',
     hint: 'Warm + deep + a little more space between pings.',
     group: 'glow-payout',
-    pick: true,
   },
   {
     id: 'glow-payout-hush',
     label: 'Glow payout · hush',
     hint: 'Same shape, quieter — subtle background earn.',
-    group: 'glow-payout',
-  },
-  {
-    id: 'glow-payout-quick',
-    label: 'Glow payout · quick',
-    hint: 'Tighter timing — snappier payout confirmation.',
     group: 'glow-payout',
   },
   {
@@ -616,6 +655,57 @@ function playGlowPayoutTail(synth: Synth) {
   })
 }
 
+function playGlowPayoutWarmQuick(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    pingOffset: 0.08,
+    pingGap: 0.07,
+    freqs: [580, 880, 1046],
+    peaks: [0.1, 0.115, 0.058],
+    decays: [0.12, 0.17, 0.14],
+  })
+}
+
+function playGlowPayoutSweet(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    pingOffset: 0.085,
+    pingGap: 0.085,
+    freqs: [620, 934, 1108],
+    peaks: [0.1, 0.12, 0.058],
+    decays: [0.13, 0.18, 0.15],
+  })
+}
+
+function playGlowPayoutWarmSnap(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.82,
+    pingOffset: 0.085,
+    pingGap: 0.075,
+    freqs: [590, 892, 1058],
+    peaks: [0.095, 0.11, 0.055],
+    decays: [0.13, 0.18, 0.16],
+  })
+}
+
+function playGlowPayoutSnappy(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.8,
+    pingOffset: 0.08,
+    pingGap: 0.07,
+    peaks: [0.1, 0.13, 0.06],
+    decays: [0.12, 0.16, 0.13],
+  })
+}
+
+function playGlowPayoutAlmost(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    pingOffset: 0.085,
+    pingGap: 0.085,
+    freqs: [640, 948, 1120],
+    peaks: [0.1, 0.12, 0.058],
+    decays: [0.13, 0.18, 0.15],
+  })
+}
+
 function playWhisperGlow(synth: Synth) {
   const { now } = synth
   playRegisterGlowRustle(synth, now, 0.55)
@@ -702,6 +792,11 @@ const VARIANT_PLAYERS: Record<PromoRewardSoundVariant, (synth: Synth) => void> =
   'glow-payout-minimal': playGlowPayoutMinimal,
   'glow-payout-rustle': playGlowPayoutRustle,
   'glow-payout-tail': playGlowPayoutTail,
+  'glow-payout-warm-quick': playGlowPayoutWarmQuick,
+  'glow-payout-sweet': playGlowPayoutSweet,
+  'glow-payout-warm-snap': playGlowPayoutWarmSnap,
+  'glow-payout-snappy': playGlowPayoutSnappy,
+  'glow-payout-almost': playGlowPayoutAlmost,
   'whisper-glow': playWhisperGlow,
   'soft-glow': playSoftGlow,
   'gentle-glow': playGentleGlow,
