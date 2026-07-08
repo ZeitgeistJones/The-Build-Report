@@ -157,10 +157,11 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   {
     id: 'glow-payout-touchdown-pitch-airy',
     label: 'Touchdown · airy',
-    hint: 'Higher, lighter — [660 · 990 · 1175].',
+    hint: 'Higher, lighter — [660 · 990 · 1175]. Live promo sound.',
     group: 'touchdown-pitch',
     pick: true,
     finalist: true,
+    live: true,
   },
   {
     id: 'glow-payout-touchdown-pitch-bright',
@@ -507,9 +508,8 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   {
     id: 'cha-ching',
     label: 'Cha-ching',
-    hint: 'Quick drawer thunk + bright coin bell. Current live sound.',
+    hint: 'Quick drawer thunk + bright coin bell.',
     group: 'classic',
-    live: true,
   },
   {
     id: 'coin-stack',
@@ -519,7 +519,7 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   },
 ]
 
-const DEFAULT_VARIANT: PromoRewardSoundVariant = 'cha-ching'
+const DEFAULT_VARIANT: PromoRewardSoundVariant = 'glow-payout-touchdown-pitch-airy'
 
 let primedAudioContext: AudioContext | null = null
 
