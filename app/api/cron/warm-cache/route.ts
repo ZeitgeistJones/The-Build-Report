@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getGitHubStats } from '@/lib/github'
 import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
+import { syncEthUsdRate } from '@/lib/ethUsdRate'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -21,7 +22,10 @@ export async function GET(req: NextRequest) {
   try {
     const stats = await getGitHubStats({ fresh: true })
     const githubSnapshotUpdatedAt = await syncGitHubStatsSnapshot(stats)
-    const burnSnapshot = await syncBurnSnapshot()
+    const [burnSnapshot, ethUsd] = await Promise.all([
+      syncBurnSnapshot(),
+      syncEthUsdRate(),
+    ])
 
     return NextResponse.json({
       ok: true,
@@ -31,6 +35,7 @@ export async function GET(req: NextRequest) {
       lastCommitAt: stats.lastCommitAt,
       githubSnapshotUpdatedAt,
       burnSnapshot,
+      ethUsd,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Warm cache cron failed'

@@ -28,6 +28,7 @@ import {
 } from '@/lib/scoringCopy'
 import { SCORE_PAYMENT_ETH } from '@/lib/rescoreBurns'
 import { formatApproxUsdFromEth, formatRescorePriceLabel } from '@/lib/promoUsd'
+import { useEthUsdRate } from '@/components/EthUsdProvider'
 
 interface Props {
   repoSlug: string
@@ -71,10 +72,11 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction()
   const { signMessageAsync } = useSignMessage()
 
+  const ethUsdRate = useEthUsdRate()
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
   const promoEligible = Boolean(promoQuote?.eligible)
   const busy = phase !== 'idle' || isSending
-  const defaultLabel = `${label} (${formatRescorePriceLabel(SCORE_PAYMENT_ETH)})`
+  const defaultLabel = `${label} (${formatRescorePriceLabel(SCORE_PAYMENT_ETH, ethUsdRate)})`
   const actionLabel = busy
     ? phase === 'paying' || isSending
       ? 'Paying…'
@@ -131,7 +133,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     router.refresh()
 
     if (data.promo?.payoutTxHash) {
-      const amt = formatApproxUsdFromEth(Number(data.promo.rewardEth ?? 0))
+      const amt = formatApproxUsdFromEth(Number(data.promo.rewardEth ?? 0), ethUsdRate)
       setPayoutTxUrl(`https://basescan.org/tx/${data.promo.payoutTxHash}`)
       if (data.promo.payoutPending) {
         setInlineMsg(`Rescore saved — ${amt} reward sent (confirming on Base).`)
@@ -318,7 +320,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         >
           <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
             {promoEligible
-              ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — free rescore plus ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0)} reward. Continue?`
+              ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — free rescore plus ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)} reward. Continue?`
               : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'}
           </p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>

@@ -4,6 +4,7 @@ import { SCORE_PAYMENT_WEI } from '@/lib/web3/constants'
 import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import type { RepoActivitySnapshot } from '@/lib/rescoreGuards'
 import { formatApproxUsdFromEth, formatPerCommitRewardUsd, formatRescorePriceLabel } from '@/lib/promoUsd'
+import { getEthUsdRateCached } from '@/lib/ethUsdRate'
 import { resolveRepoBeforeRescore } from '@/lib/autoscore'
 import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 
@@ -248,6 +249,7 @@ export async function buildPromoQuote(
   walletAddress?: string | null,
 ): Promise<PromoRewardQuote> {
   const config = getPromoConfig()
+  const ethUsdRate = await getEthUsdRateCached()
   const promoActive = isPromoWindowOpen(config)
   const { staleCommits, totalWei, rewardWei, rewardEth } = computePromoReward(activity, config)
   const treasuryFunded =
@@ -277,12 +279,12 @@ export async function buildPromoQuote(
   }
 
   const feeEth = Number(SCORE_PAYMENT_WEI) / 1e18
-  let buttonLabel = `Rescore (${formatRescorePriceLabel(feeEth)})`
+  let buttonLabel = `Rescore (${formatRescorePriceLabel(feeEth, ethUsdRate)})`
   if (eligible) {
-    buttonLabel = `Rescore free · earn ${formatApproxUsdFromEth(rewardEth)}`
+    buttonLabel = `Rescore free · earn ${formatApproxUsdFromEth(rewardEth, ethUsdRate)}`
   }
 
-  const perCommitUsd = formatPerCommitRewardUsd(config.walletRewardEth)
+  const perCommitUsd = formatPerCommitRewardUsd(config.walletRewardEth, ethUsdRate)
   const promoBanner = eligible
     ? `Launch promo: free rescore on stale repos — ${perCommitUsd} to your wallet; half of each commit subsidy fuels CLAWD burns (paid in ETH).`
     : null

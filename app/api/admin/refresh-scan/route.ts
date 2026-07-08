@@ -3,6 +3,7 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 import { guardAdmin } from '@/lib/admin'
 import { getGitHubStats } from '@/lib/github'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
+import { syncEthUsdRate } from '@/lib/ethUsdRate'
 import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
 
 export const maxDuration = 300
@@ -17,7 +18,10 @@ export async function POST(req: NextRequest) {
   try {
     const stats = await getGitHubStats({ fresh: true })
     const githubSnapshotUpdatedAt = await syncGitHubStatsSnapshot(stats)
-    const burnSnapshot = await syncBurnSnapshot()
+    const [burnSnapshot, ethUsd] = await Promise.all([
+      syncBurnSnapshot(),
+      syncEthUsdRate(),
+    ])
     revalidateTag('github-stats')
     revalidatePath('/')
 
@@ -29,6 +33,7 @@ export async function POST(req: NextRequest) {
       lastCommitAt: stats.lastCommitAt,
       githubSnapshotUpdatedAt,
       burnSnapshot,
+      ethUsd,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'GitHub refresh failed'

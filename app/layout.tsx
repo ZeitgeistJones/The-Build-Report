@@ -6,6 +6,8 @@ import { ColorThemeProvider } from '@/components/ColorThemeProvider'
 import { NormieModeProvider, NORMIE_MODE_STORAGE_KEY } from '@/components/NormieModeProvider'
 import NavBar from '@/components/NavBar'
 import RescorePromoBannerShell from '@/components/RescorePromoBannerShell'
+import { EthUsdProvider } from '@/components/EthUsdProvider'
+import { getEthUsdRateCached } from '@/lib/ethUsdRate'
 import { COLOR_THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY } from '@/lib/colorThemes'
 
 const SITE_URL = 'https://the-build-report.vercel.app'
@@ -77,7 +79,9 @@ try{
   if(localStorage.getItem('${NORMIE_MODE_STORAGE_KEY}')==='1')document.documentElement.dataset.normie='1';
 }catch(e){}})()`
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const ethUsdRate = await getEthUsdRateCached()
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -86,6 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <ColorThemeProvider>
           <NormieModeProvider>
+          <EthUsdProvider rate={ethUsdRate}>
           <Web3Provider>
             <NavBar />
             <RescorePromoBannerShell />
@@ -102,6 +107,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               The Build Report is an independent community project. Not affiliated with clawdbotatg, Austin Griffith, or the core team. Not financial advice.
             </footer>
           </Web3Provider>
+          </EthUsdProvider>
           </NormieModeProvider>
         </ColorThemeProvider>
       </body>

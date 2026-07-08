@@ -1,13 +1,8 @@
-/** Approximate ETH/USD for rescore price labels — not a live price feed. */
-const DEFAULT_ETH_USD = 1738.93
+import { FALLBACK_ETH_USD, fallbackEthUsdRate } from '@/lib/ethUsdRate'
 
+/** Sync fallback for client render before provider hydrates. */
 export function getEthUsdRate(): number {
-  const raw =
-    process.env.NEXT_PUBLIC_RESCORE_PROMO_ETH_USD?.trim() ??
-    process.env.RESCORE_PROMO_ETH_USD?.trim()
-  if (!raw) return DEFAULT_ETH_USD
-  const n = parseFloat(raw)
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_ETH_USD
+  return fallbackEthUsdRate()
 }
 
 /** Human-friendly ~$0.01 style label from an ETH amount (promo rewards). */
@@ -22,10 +17,10 @@ export function formatApproxUsdFromEth(eth: number, rate = getEthUsdRate()): str
   return `~$${Math.round(usd).toLocaleString('en-US')}`
 }
 
-export function formatRescorePriceLabel(eth: number): string {
-  return formatApproxUsdFromEth(eth)
+export function formatRescorePriceLabel(eth: number, rate?: number): string {
+  return formatApproxUsdFromEth(eth, rate)
 }
 
-export function formatPerCommitRewardUsd(walletRewardEth: number): string {
-  return `${formatApproxUsdFromEth(walletRewardEth)} per stale commit`
+export function formatPerCommitRewardUsd(walletRewardEth: number, rate?: number): string {
+  return `${formatApproxUsdFromEth(walletRewardEth, rate)} per stale commit`
 }

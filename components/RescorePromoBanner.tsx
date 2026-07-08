@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { RESCORE_PROMO_SITE_BANNER } from '@/lib/scoringCopy'
 import { formatPerCommitRewardUsd } from '@/lib/promoUsd'
+import { useEthUsdRate } from '@/components/EthUsdProvider'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
@@ -48,9 +49,10 @@ export default function RescorePromoBanner({
   walletRewardEth: number
 }) {
   const isMobile = useIsMobile()
+  const ethUsdRate = useEthUsdRate()
   const [mode, setMode] = useState<BannerMode | null>(null)
   const endsLabel = formatEndsAt(endsAt)
-  const perCommitLabel = formatPerCommitRewardUsd(walletRewardEth)
+  const perCommitLabel = formatPerCommitRewardUsd(walletRewardEth, ethUsdRate)
 
   useEffect(() => {
     setMode(loadMode())
