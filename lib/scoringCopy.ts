@@ -11,7 +11,7 @@ export const ABOUT_SCORE_TYPES_SECTIONS = [
   },
   {
     title: 'Rescore',
-    body: `Same live AI pass, triggered when someone pays 0.000008 ETH — or, during the limited launch promo, free on stale repos with ~$0.01 per stale commit to your wallet and matching ETH queued for CLAWD burns (50/50 subsidy; approximate USD; paid in ETH). Result is cached for everyone. First rescore on a baseline card often shifts the letter — different method, not always a repo change overnight.`,
+    body: `Same live AI pass, triggered when someone pays 0.000008 ETH — or, during the limited launch promo, free on stale repos with ~$0.01 per stale commit to your wallet and matching ETH queued for CLAWD burns (50/50 subsidy). Approx USD refreshes weekly from ETH price; on-chain amounts are still ETH. Result is cached for everyone. First rescore on a baseline card often shifts the letter — different method, not always a repo change overnight.`,
   },
 ] as const
 
@@ -36,6 +36,8 @@ export const LIVE_AI_CONFIDENCE_TOOLTIP =
 export const APPROX_USD_NOTE =
   'Approx USD labels use a weekly ETH price check; on-chain payment and rewards are still ETH.'
 
+export const APPROX_USD_NOTE_SHORT = 'Approx USD refreshes weekly from ETH price.'
+
 export const RESCORE_BUTTON_TOOLTIP =
   `Score this repo using Claude AI. Cost: ~$0.01 (0.000008 ETH). Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone. ${APPROX_USD_NOTE}`
 
@@ -51,7 +53,7 @@ export const ECOSYSTEM_ADD_CONTEXT_TOOLTIP =
 export const RESCORE_PROMO_SITE_BANNER = {
   title: 'Limited-time rescore promo',
   summary:
-    'On eligible stale repos, rescore is free — ~$0.01 per stale commit to your wallet and the same to the burn queue (50/50 treasury subsidy; approximate USD; paid in ETH).',
+    'On eligible stale repos, rescore is free — ~$0.01 per stale commit to your wallet and the same to the burn queue (50/50 treasury subsidy). Approx USD refreshes weekly from ETH price.',
   bullets: [
     'Hold 10M $CLAWD and connect on Base to use Score / Rescore.',
     'Promo applies to rescored repos with commits since the last score — not every card qualifies.',

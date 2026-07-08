@@ -5,6 +5,7 @@ import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import type { RepoActivitySnapshot } from '@/lib/rescoreGuards'
 import { formatApproxUsdFromEth, formatPerCommitRewardUsd, formatRescorePriceLabel } from '@/lib/promoUsd'
 import { getEthUsdRateCached } from '@/lib/ethUsdRate'
+import { APPROX_USD_NOTE_SHORT } from '@/lib/scoringCopy'
 import { resolveRepoBeforeRescore } from '@/lib/autoscore'
 import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 
@@ -286,7 +287,7 @@ export async function buildPromoQuote(
 
   const perCommitUsd = formatPerCommitRewardUsd(config.walletRewardEth, ethUsdRate)
   const promoBanner = eligible
-    ? `Launch promo: free rescore on stale repos — ${perCommitUsd} to your wallet; half of each commit subsidy fuels CLAWD burns (paid in ETH).`
+    ? `Launch promo: free rescore on stale repos — ${perCommitUsd} to your wallet; half fuels CLAWD burns. ${APPROX_USD_NOTE_SHORT}`
     : null
 
   return {
