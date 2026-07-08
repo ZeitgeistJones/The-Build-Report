@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath, revalidateTag } from 'next/cache'
-import { verifyAdminPassword } from '@/lib/admin'
+import { guardAdmin } from '@/lib/admin'
 import { getGitHubStats } from '@/lib/github'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
 import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
@@ -11,9 +11,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const password = body?.password
 
-  if (!(await verifyAdminPassword(password))) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  const denied = await guardAdmin(req, password)
+  if (denied) return denied
 
   try {
     const stats = await getGitHubStats({ fresh: true })

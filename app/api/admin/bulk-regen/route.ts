@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminPassword } from '@/lib/admin'
+import { guardAdmin } from '@/lib/admin'
 import { listCachedAutoScores } from '@/lib/autoscore'
 import { BULK_REGEN_DEFAULT_BATCH, BULK_REGEN_MAX_BATCH } from '@/lib/bulkRegenConfig'
 import {
@@ -14,9 +14,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const password = body?.password
 
-  if (!(await verifyAdminPassword(password))) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  }
+  const denied = await guardAdmin(req, password)
+  if (denied) return denied
 
   const action = body?.action as string
 

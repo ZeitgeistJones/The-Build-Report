@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
-import { getAdminNotes, setAdminNote, verifyAdminPassword } from '@/lib/admin'
+import { getAdminNotes, setAdminNote, guardAdmin } from '@/lib/admin'
 import { flushAutoScore, listCachedAutoScores } from '@/lib/autoscore'
 import { getChronicleContext, setChronicleContext } from '@/lib/chronicleContext'
 import { getEcosystemContext, setEcosystemContext } from '@/lib/ecosystemContext'
@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { action, password, repoId, note } = body
 
-  const ok = await verifyAdminPassword(password)
-  if (!ok) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const denied = await guardAdmin(req, password)
+  if (denied) return denied
 
   if (action === 'auth') {
     const notes = await getAdminNotes()

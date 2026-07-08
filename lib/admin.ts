@@ -1,5 +1,6 @@
-import { timingSafeEqual } from 'crypto'
-import type { NextRequest } from 'next/server'
+import { createHash, timingSafeEqual } from 'crypto'
+import { NextRequest, NextResponse } from 'next/server'
+import { Ratelimit } from '@upstash/ratelimit'
 import { getRedis } from '@/lib/redis'
 
 export function extractClientIp(req: NextRequest): string {
@@ -40,9 +41,36 @@ export async function verifyAdminPassword(password: unknown): Promise<boolean> {
   const expected = process.env.ADMIN_PASSWORD
   if (!expected || typeof password !== 'string' || password.length === 0) return false
 
-  const a = Buffer.from(password)
-  const b = Buffer.from(expected)
-  if (a.length !== b.length) return false
+  // Hash both sides to a fixed length before comparing so the compare does not
+  // leak the expected password length via an early length-mismatch return.
+  const a = createHash('sha256').update(password).digest()
+  const b = createHash('sha256').update(expected).digest()
 
   return timingSafeEqual(a, b)
+}
+
+// Per-IP limiter for password-gated admin endpoints. Generous enough for real
+// admin use, tight enough to blunt brute-force attempts. Consumed on every
+// attempt (success or fail).
+const adminAttemptLimit = new Ratelimit({
+  redis: getRedis(),
+  limiter: Ratelimit.slidingWindow(20, '10 m'),
+  prefix: 'build-report:rl:admin-attempt',
+})
+
+/**
+ * Rate-limits and authenticates an admin request. Returns a NextResponse to
+ * short-circuit on rate-limit (429) or bad password (401), or null when the
+ * request is authorized and may proceed.
+ */
+export async function guardAdmin(req: NextRequest, password: unknown): Promise<NextResponse | null> {
+  const ip = extractClientIp(req)
+  const { success } = await adminAttemptLimit.limit(ip)
+  if (!success) {
+    return NextResponse.json({ ok: false, error: 'Rate limit exceeded — try again later' }, { status: 429 })
+  }
+  if (!(await verifyAdminPassword(password))) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
+  return null
 }

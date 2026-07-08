@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { guardDebugRoute } from '@/lib/debugAuth'
 import {
   getGitHubStatsSnapshotDiagnostics,
   loadGitHubStatsForPage,
@@ -28,7 +29,10 @@ async function timed<T>(label: string, timings: Record<string, number>, fn: () =
 }
 
 /** Mirrors homepage data fetches with per-step timings. */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const denied = guardDebugRoute(req)
+  if (denied) return denied
+
   const timings: Record<string, number> = {}
   const totalStart = Date.now()
   let statsSource: 'snapshot' | 'live' | 'none' = 'none'
@@ -96,7 +100,6 @@ export async function GET() {
         }))
     : []
 
-  // #region agent log
   const lastCommitDebug = {
     rawLastCommit,
     trackableLastCommit,
@@ -105,9 +108,6 @@ export async function GET() {
     forceInclude: [...forceIncludeSet],
     cappedReposSample,
   }
-  console.log('[home-perf]', JSON.stringify({ timings, statsSource, slugCount: cacheSlugs.length, lastCommitDebug }))
-  fetch('http://127.0.0.1:7483/ingest/84e5d7e1-b2bc-4b0e-8677-7b0875f46cc6',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8818b3'},body:JSON.stringify({sessionId:'8818b3',location:'home-perf/route.ts:GET',message:'last commit filter debug',data:lastCommitDebug,timestamp:Date.now(),hypothesisId:'H1',runId:'post-fix-2'})}).catch(()=>{});
-  // #endregion
 
   return NextResponse.json({
     timings,

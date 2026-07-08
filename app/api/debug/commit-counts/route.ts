@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { guardDebugRoute } from '@/lib/debugAuth'
 import { loadGitHubStatsForPage, getGitHubStatsSnapshotUpdatedAt } from '@/lib/githubStatsSnapshot'
 import { inferCommitsScanned, countCommitsWithinHours, fetchTrackableRepoPushes } from '@/lib/github'
 import { REPOS } from '@/lib/scores'
@@ -26,7 +27,10 @@ function hoursAgo(dateStr: string): number {
 }
 
 /** Diagnose 24h + commits-since-scored for sample repos. */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const denied = guardDebugRoute(req)
+  if (denied) return denied
+
   const { stats, source } = await loadGitHubStatsForPage()
   const snapshotUpdatedAt = await getGitHubStatsSnapshotUpdatedAt()
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminPassword } from '@/lib/admin'
+import { guardAdmin } from '@/lib/admin'
 import { getGitHubStats } from '@/lib/github'
 import { generateAndCacheBuildBrief, loadReposForBrief } from '@/lib/buildBrief'
 
@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { password } = body
 
-  const ok = await verifyAdminPassword(password)
-  if (!ok) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const denied = await guardAdmin(req, password)
+  if (denied) return denied
 
   try {
     const stats = await getGitHubStats({ fresh: true })
