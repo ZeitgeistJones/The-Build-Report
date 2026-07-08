@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { issuePromoNonce, isPromoWindowOpen } from '@/lib/rescorePromo'
+import { resolveRepoBeforeRescore } from '@/lib/autoscore'
+import { issuePromoNonce, isPromoWindowOpen, buildPromoQuote, repoToActivitySnapshot } from '@/lib/rescorePromo'
+import { getTreasuryBalanceEth } from '@/lib/rescorePromoTreasury'
 import { walletHasGateAccess } from '@/lib/web3/verifyPayment'
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +23,27 @@ export async function POST(req: NextRequest) {
     const hasAccess = await walletHasGateAccess(walletAddress)
     if (!hasAccess) {
       return NextResponse.json({ ok: false, error: 'Wallet does not meet CLAWDGate access requirements' }, { status: 403 })
+    }
+
+    const repo = await resolveRepoBeforeRescore(repoSlug)
+    if (!repo?.scoredAt) {
+      return NextResponse.json(
+        { ok: false, error: 'Promo applies to rescored repos with stale commits' },
+        { status: 400 },
+      )
+    }
+
+    const treasuryBalanceEth = await getTreasuryBalanceEth()
+    const quote = await buildPromoQuote(
+      repoToActivitySnapshot(repo),
+      treasuryBalanceEth,
+      walletAddress,
+    )
+    if (!quote.eligible) {
+      return NextResponse.json(
+        { ok: false, error: quote.reason ?? 'Repo is not eligible for promo rescore' },
+        { status: 400 },
+      )
     }
 
     const issued = await issuePromoNonce(walletAddress, repoSlug)

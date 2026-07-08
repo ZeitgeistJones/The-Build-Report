@@ -183,9 +183,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (isPromoPath) {
-      let payoutTxHash: `0x${string}`
+      let payoutResult: { hash: `0x${string}`; confirmed: boolean }
       try {
-        payoutTxHash = await sendPromoReward(walletAddress, promoRewardWei)
+        payoutResult = await sendPromoReward(walletAddress, promoRewardWei)
       } catch (payoutErr) {
         console.error('[autoscore-single] promo payout failed after rescore:', payoutErr)
         return NextResponse.json({
@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      await markPromoPayout(walletAddress, repoSlug, promoNonce, payoutTxHash, promoRewardEth)
+      await markPromoPayout(walletAddress, repoSlug, promoNonce, payoutResult.hash, promoRewardEth)
 
       return NextResponse.json({
         ok: true,
@@ -211,8 +211,11 @@ export async function POST(req: NextRequest) {
         rescoreMeta: pipeline.rescoreMeta,
         promo: {
           rewardEth: promoRewardEth,
-          payoutTxHash,
-          payoutPending: false,
+          payoutTxHash: payoutResult.hash,
+          payoutPending: !payoutResult.confirmed,
+          payoutError: payoutResult.confirmed
+            ? null
+            : 'Reward sent — waiting for Base confirmation. Check your wallet in a minute.',
         },
       })
     }

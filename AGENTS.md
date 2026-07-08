@@ -42,4 +42,4 @@ After `npm install`, run `npm run setup:playwright` once (downloads Chromium for
 | `npm run debug:theme` | Playwright repro against production |
 | `npm run debug:theme:local` | Same, against `localhost:3000` (start `npm run dev` first) |
 
-Gated production debug APIs (use `CRON_SECRET` as `?key=`): `/api/debug/burn-totals`, `/api/debug/home-perf`, `/api/debug/commit-counts`.
+Gated production debug APIs (use `CRON_SECRET` as `?key=`): `/api/debug/burn-totals`, `/api/debug/home-perf`, `/api/debug/commit-counts`, `/api/debug/promo-status`.

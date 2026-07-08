@@ -100,7 +100,7 @@ export async function treasuryCanCover(rewardWei: bigint): Promise<boolean> {
 export async function sendPromoReward(
   toAddress: string,
   rewardWei: bigint,
-): Promise<`0x${string}`> {
+): Promise<{ hash: `0x${string}`; confirmed: boolean }> {
   if (rewardWei <= BigInt(0)) {
     throw new Error('Reward amount must be positive')
   }
@@ -118,13 +118,18 @@ export async function sendPromoReward(
   const hash = await wallet.sendTransaction({
     to: getAddress(toAddress),
     value: rewardWei,
+    chain: base,
   })
 
   const publicClient = createBasePublicClient()
-  const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 60_000 })
-  if (receipt.status !== 'success') {
-    throw new Error('Promo reward transaction failed')
+  try {
+    const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 25_000 })
+    if (receipt.status !== 'success') {
+      throw new Error('Promo reward transaction failed on-chain')
+    }
+    return { hash, confirmed: true }
+  } catch (err) {
+    console.warn('[promo-treasury] payout broadcast; receipt unconfirmed:', hash, err)
+    return { hash, confirmed: false }
   }
-
-  return hash
 }
