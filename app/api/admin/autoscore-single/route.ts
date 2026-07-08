@@ -22,7 +22,7 @@ import {
   markPromoPayout,
   peekPromoNonce,
   promoSignMessage,
-  repoToActivitySnapshot,
+  resolvePromoActivitySnapshot,
 } from '@/lib/rescorePromo'
 import { sendPromoReward, treasuryCanCover } from '@/lib/rescorePromoTreasury'
 
@@ -138,12 +138,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Invalid or expired promo authorization' }, { status: 400 })
       }
 
-      const beforeRepo = await resolveRepoBeforeRescore(repoSlug)
-      if (!beforeRepo?.scoredAt) {
-        return NextResponse.json({ ok: false, error: 'Promo applies to rescored repos with stale commits' }, { status: 400 })
+      const beforeActivity = await resolvePromoActivitySnapshot(repoSlug)
+      if (!beforeActivity?.scoredAt) {
+        return NextResponse.json({ ok: false, error: 'Promo applies to rescored repos with commits since the last score' }, { status: 400 })
       }
 
-      const reward = computePromoReward(repoToActivitySnapshot(beforeRepo))
+      const reward = computePromoReward(beforeActivity)
       promoRewardWei = reward.rewardWei
       promoRewardEth = reward.rewardEth
 

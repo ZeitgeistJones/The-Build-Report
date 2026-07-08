@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { resolveRepoBeforeRescore } from '@/lib/autoscore'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { isRepoExcluded } from '@/lib/repoExclude'
-import { buildPromoQuote, repoToActivitySnapshot } from '@/lib/rescorePromo'
+import { buildPromoQuote, resolvePromoActivitySnapshot } from '@/lib/rescorePromo'
 import { getTreasuryBalanceEth } from '@/lib/rescorePromoTreasury'
 
 export const dynamic = 'force-dynamic'
@@ -19,17 +18,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Repo not eligible' }, { status: 400 })
   }
 
-  const repo = await resolveRepoBeforeRescore(repoSlug)
-  if (!repo) {
+  const repo = await resolvePromoActivitySnapshot(repoSlug)
+  if (!repo?.scoredAt) {
     return NextResponse.json({ ok: false, error: 'Repo not found' }, { status: 404 })
   }
 
   const treasuryBalanceEth = await getTreasuryBalanceEth()
-  const quote = await buildPromoQuote(
-    repoToActivitySnapshot(repo),
-    treasuryBalanceEth,
-    walletAddress,
-  )
+  const quote = await buildPromoQuote(repo, treasuryBalanceEth, walletAddress)
 
   return NextResponse.json({
     ok: true,

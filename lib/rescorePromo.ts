@@ -4,6 +4,8 @@ import { SCORE_PAYMENT_WEI } from '@/lib/web3/constants'
 import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import type { RepoActivitySnapshot } from '@/lib/rescoreGuards'
 import { formatEthAmount } from '@/lib/clawdBurnIndex'
+import { resolveRepoBeforeRescore } from '@/lib/autoscore'
+import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 
 const NONCE_PREFIX = 'build-report:promo-nonce:'
 const PAYOUT_PREFIX = 'build-report:promo-payout:'
@@ -219,7 +221,7 @@ export async function buildPromoQuote(
     reason = 'Promo applies to rescored repos with stale commits'
     eligible = false
   } else if (staleCommits < config.minStale) {
-    reason = 'No stale commits since last score'
+    reason = 'No commits since last score'
     eligible = false
   } else if (!treasuryFunded) {
     reason = 'Promo treasury is low — paid rescore still available'
@@ -276,4 +278,29 @@ export function repoToActivitySnapshot(repo: {
     adminNote: repo.adminNote ?? null,
     scoringContextVersion: repo.scoringContextVersion,
   }
+}
+
+/** Merge cached score metadata with live GitHub activity — same inputs the repo card uses. */
+export async function resolvePromoActivitySnapshot(
+  repoSlug: string,
+): Promise<RepoActivitySnapshot | null> {
+  const repo = await resolveRepoBeforeRescore(repoSlug)
+  if (!repo) return null
+
+  const stats = await getGitHubStatsForDisplay()
+  const activity = stats?.repoActivity[repoSlug]
+  const githubRepo =
+    stats?.trackableRepos?.find(r => r.name === repoSlug) ??
+    stats?.repos?.find(r => r.name === repoSlug)
+
+  return repoToActivitySnapshot({
+    scoredAt: repo.scoredAt,
+    lastCommitAt: activity?.lastCommitAt ?? null,
+    pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
+    commits7d: activity?.commits7d ?? null,
+    commits30d: activity?.commits30d ?? null,
+    commitTimestamps: activity?.commitTimestamps ?? null,
+    adminNote: repo.adminNote ?? null,
+    scoringContextVersion: repo.scoringContextVersion,
+  })
 }

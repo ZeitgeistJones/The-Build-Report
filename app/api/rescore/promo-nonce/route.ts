@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveRepoBeforeRescore } from '@/lib/autoscore'
-import { issuePromoNonce, isPromoWindowOpen, buildPromoQuote, repoToActivitySnapshot } from '@/lib/rescorePromo'
+import {
+  issuePromoNonce,
+  isPromoWindowOpen,
+  buildPromoQuote,
+  resolvePromoActivitySnapshot,
+} from '@/lib/rescorePromo'
 import { getTreasuryBalanceEth } from '@/lib/rescorePromoTreasury'
 import { walletHasGateAccess } from '@/lib/web3/verifyPayment'
 
@@ -25,20 +30,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Wallet does not meet CLAWDGate access requirements' }, { status: 403 })
     }
 
-    const repo = await resolveRepoBeforeRescore(repoSlug)
-    if (!repo?.scoredAt) {
+    const activity = await resolvePromoActivitySnapshot(repoSlug)
+    if (!activity?.scoredAt) {
       return NextResponse.json(
-        { ok: false, error: 'Promo applies to rescored repos with stale commits' },
+        { ok: false, error: 'Promo applies to rescored repos with commits since the last score' },
         { status: 400 },
       )
     }
 
     const treasuryBalanceEth = await getTreasuryBalanceEth()
-    const quote = await buildPromoQuote(
-      repoToActivitySnapshot(repo),
-      treasuryBalanceEth,
-      walletAddress,
-    )
+    const quote = await buildPromoQuote(activity, treasuryBalanceEth, walletAddress)
     if (!quote.eligible) {
       return NextResponse.json(
         { ok: false, error: quote.reason ?? 'Repo is not eligible for promo rescore' },
