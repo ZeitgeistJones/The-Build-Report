@@ -52,7 +52,7 @@ export const NORMIE_VOICE_RULES = [
 export const NORMIE_SURFACE_SHAPES = {
   verdict: '2-4 sentences, a single paragraph. No headers or dates.',
   gradeCard: '2-3 sentences, plain words, no stats or letter grades.',
-  digestGeneral: '3-4 sentences, a warm morning overview of what shipped.',
+  digestGeneral: '5-6 sentences, a warm morning overview of what shipped.',
 } as const
 
 /**
