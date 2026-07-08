@@ -1,6 +1,6 @@
 const SOUND_PREF_KEY = 'promo-reward-sound'
 
-export type PromoRewardSoundGroup = 'glow-payout' | 'glow' | 'soft' | 'combo' | 'drawer' | 'classic'
+export type PromoRewardSoundGroup = 'payoff' | 'glow-payout' | 'glow' | 'soft' | 'combo' | 'drawer' | 'classic'
 
 export type PromoRewardSoundVariant =
   | 'cha-ching'
@@ -30,6 +30,13 @@ export type PromoRewardSoundVariant =
   | 'glow-payout-snappy'
   | 'glow-payout-warm-snap'
   | 'glow-payout-almost'
+  | 'glow-payout-payoff'
+  | 'glow-payout-arrival'
+  | 'glow-payout-settle'
+  | 'glow-payout-rewarded'
+  | 'glow-payout-waited'
+  | 'glow-payout-landed'
+  | 'glow-payout-payoff-warm'
   | 'whisper-glow'
   | 'soft-glow'
   | 'gentle-glow'
@@ -37,8 +44,11 @@ export type PromoRewardSoundVariant =
   | 'payout-glow'
   | 'register-hush'
 
+export const PROMO_REWARD_PREVIEW_WAIT_MS = 5000
+
 export const PROMO_REWARD_SOUND_GROUPS: { id: PromoRewardSoundGroup; label: string }[] = [
-  { id: 'glow-payout', label: 'Glow payout variants (your pick)' },
+  { id: 'payoff', label: 'After-the-wait payoff (real timing)' },
+  { id: 'glow-payout', label: 'Glow payout variants' },
   { id: 'glow', label: 'Glow family' },
   { id: 'soft', label: 'Soft earn & gentle payout' },
   { id: 'combo', label: 'Combos (soft + drawer)' },
@@ -54,6 +64,54 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   live?: boolean
   pick?: boolean
 }[] = [
+  {
+    id: 'glow-payout-payoff',
+    label: 'Payoff · sweet land',
+    hint: 'Sweet-spot tones, slower landing — built for post-scoring wait.',
+    group: 'payoff',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-arrival',
+    label: 'Payoff · arrival',
+    hint: 'Rustle, brief pause, then warm pings — “result showed up”.',
+    group: 'payoff',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-payoff-warm',
+    label: 'Payoff · warm land',
+    hint: 'Warm glow payout with space to breathe after the wait.',
+    group: 'payoff',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-settle',
+    label: 'Payoff · settle',
+    hint: 'Warm cascade + soft tail — money landed and settled.',
+    group: 'payoff',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-rewarded',
+    label: 'Payoff · rewarded',
+    hint: 'Mid-warm tones, unhurried rhythm, stronger final note.',
+    group: 'payoff',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-waited',
+    label: 'Payoff · waited',
+    hint: 'For the “I sat through Scoring…” moment — cozy, not snappy.',
+    group: 'payoff',
+    pick: true,
+  },
+  {
+    id: 'glow-payout-landed',
+    label: 'Payoff · landed',
+    hint: 'Light rustle, warm pings, lingering last tone.',
+    group: 'payoff',
+  },
   {
     id: 'glow-payout',
     label: 'Glow payout',
@@ -706,6 +764,83 @@ function playGlowPayoutAlmost(synth: Synth) {
   })
 }
 
+function playGlowPayoutPayoff(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.85,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.1, 0.12, 0.07],
+    decays: [0.16, 0.22, 0.24],
+  })
+}
+
+function playGlowPayoutArrival(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.88,
+    pingOffset: 0.14,
+    pingGap: 0.11,
+    freqs: [600, 900, 1068],
+    peaks: [0.095, 0.115, 0.065],
+    decays: [0.15, 0.21, 0.23],
+  })
+}
+
+function playGlowPayoutPayoffWarm(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.82,
+    pingOffset: 0.13,
+    pingGap: 0.11,
+    freqs: [580, 880, 1046],
+    peaks: [0.1, 0.115, 0.068],
+    decays: [0.16, 0.22, 0.25],
+  })
+}
+
+function playGlowPayoutSettle(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.8,
+    pingOffset: 0.12,
+    pingGap: 0.12,
+    freqs: [590, 892, 1058],
+    peaks: [0.095, 0.11, 0.065],
+    decays: [0.17, 0.23, 0.26],
+    tail: { offset: 0.46, freq: 988, peak: 0.045, decay: 0.22 },
+  })
+}
+
+function playGlowPayoutRewarded(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    pingOffset: 0.11,
+    pingGap: 0.11,
+    freqs: [610, 920, 1096],
+    peaks: [0.095, 0.125, 0.075],
+    decays: [0.15, 0.2, 0.26],
+  })
+}
+
+function playGlowPayoutWaited(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.9,
+    pingOffset: 0.13,
+    pingGap: 0.12,
+    freqs: [600, 880, 1046],
+    peaks: [0.09, 0.11, 0.07],
+    decays: [0.18, 0.24, 0.28],
+  })
+}
+
+function playGlowPayoutLanded(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.65,
+    pingOffset: 0.12,
+    pingGap: 0.1,
+    freqs: [580, 870, 1034],
+    peaks: [0.1, 0.12, 0.072],
+    decays: [0.16, 0.22, 0.27],
+  })
+}
+
 function playWhisperGlow(synth: Synth) {
   const { now } = synth
   playRegisterGlowRustle(synth, now, 0.55)
@@ -797,6 +932,13 @@ const VARIANT_PLAYERS: Record<PromoRewardSoundVariant, (synth: Synth) => void> =
   'glow-payout-warm-snap': playGlowPayoutWarmSnap,
   'glow-payout-snappy': playGlowPayoutSnappy,
   'glow-payout-almost': playGlowPayoutAlmost,
+  'glow-payout-payoff': playGlowPayoutPayoff,
+  'glow-payout-arrival': playGlowPayoutArrival,
+  'glow-payout-settle': playGlowPayoutSettle,
+  'glow-payout-rewarded': playGlowPayoutRewarded,
+  'glow-payout-waited': playGlowPayoutWaited,
+  'glow-payout-landed': playGlowPayoutLanded,
+  'glow-payout-payoff-warm': playGlowPayoutPayoffWarm,
   'whisper-glow': playWhisperGlow,
   'soft-glow': playSoftGlow,
   'gentle-glow': playGentleGlow,

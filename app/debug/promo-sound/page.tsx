@@ -1,6 +1,8 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
 import {
+  PROMO_REWARD_PREVIEW_WAIT_MS,
   PROMO_REWARD_SOUND_GROUPS,
   PROMO_REWARD_SOUND_VARIANTS,
   playPromoRewardVariant,
@@ -35,11 +37,69 @@ const pickButtonStyle = {
   background: 'color-mix(in srgb, var(--green) 10%, var(--surface-2))',
 }
 
+const payoffButtonStyle = {
+  ...pickButtonStyle,
+  border: '1px solid color-mix(in srgb, var(--green) 55%, transparent)',
+}
+
 export default function PromoSoundPreviewPage() {
-  function handlePlay(variant: PromoRewardSoundVariant) {
-    primePromoRewardAudio({ preview: true })
-    playPromoRewardVariant(variant, { preview: true })
+  const [simulateWait, setSimulateWait] = useState(true)
+  const [waitSecondsLeft, setWaitSecondsLeft] = useState<number | null>(null)
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null)
+  const playTimeoutRef = useRef<number | null>(null)
+  const tickIntervalRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (playTimeoutRef.current) window.clearTimeout(playTimeoutRef.current)
+      if (tickIntervalRef.current) window.clearInterval(tickIntervalRef.current)
+    }
+  }, [])
+
+  function clearPendingTimers() {
+    if (playTimeoutRef.current) {
+      window.clearTimeout(playTimeoutRef.current)
+      playTimeoutRef.current = null
+    }
+    if (tickIntervalRef.current) {
+      window.clearInterval(tickIntervalRef.current)
+      tickIntervalRef.current = null
+    }
+    setWaitSecondsLeft(null)
+    setPendingLabel(null)
   }
+
+  function handlePlay(variant: PromoRewardSoundVariant, label: string) {
+    clearPendingTimers()
+    primePromoRewardAudio({ preview: true })
+
+    if (!simulateWait) {
+      playPromoRewardVariant(variant, { preview: true })
+      return
+    }
+
+    const waitSec = PROMO_REWARD_PREVIEW_WAIT_MS / 1000
+    setPendingLabel(label)
+    setWaitSecondsLeft(waitSec)
+
+    tickIntervalRef.current = window.setInterval(() => {
+      setWaitSecondsLeft(prev => {
+        if (prev === null || prev <= 1) return null
+        return prev - 1
+      })
+    }, 1000)
+
+    playTimeoutRef.current = window.setTimeout(() => {
+      if (tickIntervalRef.current) window.clearInterval(tickIntervalRef.current)
+      tickIntervalRef.current = null
+      playTimeoutRef.current = null
+      setWaitSecondsLeft(null)
+      setPendingLabel(null)
+      playPromoRewardVariant(variant, { preview: true })
+    }, PROMO_REWARD_PREVIEW_WAIT_MS)
+  }
+
+  const busy = waitSecondsLeft !== null
 
   return (
     <main
@@ -54,11 +114,48 @@ export default function PromoSoundPreviewPage() {
       }}
     >
       <h1 style={{ fontSize: '20px', fontWeight: 600 }}>Promo reward sound preview</h1>
-      <p style={{ fontSize: '14px', color: 'var(--text-muted)', maxWidth: '460px', textAlign: 'center', lineHeight: 1.5 }}>
-        Base, warm, and quick didn’t quite land — try the green combos that blend them.
+      <p style={{ fontSize: '14px', color: 'var(--text-muted)', maxWidth: '480px', textAlign: 'center', lineHeight: 1.5 }}>
+        Real promo plays after Signing → Scoring → payout. Use the 5s wait toggle to feel that payoff moment.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', width: 'min(460px, 100%)' }}>
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '13px',
+          color: 'var(--text-secondary)',
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={simulateWait}
+          onChange={e => {
+            if (!e.target.checked) clearPendingTimers()
+            setSimulateWait(e.target.checked)
+          }}
+        />
+        Simulate 5s scoring wait (recommended)
+      </label>
+
+      {busy && (
+        <div
+          style={{
+            fontSize: '13px',
+            color: 'var(--accent)',
+            fontWeight: 600,
+            padding: '8px 12px',
+            borderRadius: 'var(--radius-pill)',
+            border: '1px solid var(--accent-border)',
+            background: 'var(--accent-dim)',
+          }}
+        >
+          Scoring… {waitSecondsLeft}s — then “{pendingLabel}”
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', width: 'min(480px, 100%)' }}>
         {PROMO_REWARD_SOUND_GROUPS.map(group => {
           const variants = PROMO_REWARD_SOUND_VARIANTS.filter(v => v.group === group.id)
           if (!variants.length) return null
@@ -73,13 +170,22 @@ export default function PromoSoundPreviewPage() {
                   <button
                     key={variant.id}
                     type="button"
-                    onClick={() => handlePlay(variant.id)}
-                    style={variant.live ? liveButtonStyle : variant.pick ? pickButtonStyle : buttonStyle}
+                    disabled={busy}
+                    onClick={() => handlePlay(variant.id, variant.label)}
+                    style={
+                      variant.live
+                        ? { ...liveButtonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }
+                        : variant.group === 'payoff'
+                          ? { ...payoffButtonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }
+                          : variant.pick
+                            ? { ...pickButtonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }
+                            : { ...buttonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }
+                    }
                   >
                     <div>
                       {variant.label}
                       {variant.live ? ' · live now' : ''}
-                      {variant.pick && !variant.live ? ' · your pick' : ''}
+                      {variant.pick && !variant.live && variant.group !== 'payoff' ? ' · your pick' : ''}
                     </div>
                     <div style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '3px', lineHeight: 1.35 }}>
                       {variant.hint}
