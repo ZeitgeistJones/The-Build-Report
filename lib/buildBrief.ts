@@ -346,7 +346,10 @@ Rules:
   try {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1400,
+      // Normie fields roughly doubled the JSON payload (general + generalNormie + 4 periods ×
+      // 8 fields). 1400 tokens truncated the response mid-JSON, so parsing failed and the digest
+      // silently fell back to the non-normie template. Give it ample room for the full structure.
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     })
     const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
