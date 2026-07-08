@@ -41,14 +41,6 @@ export async function syncBurnSnapshot(): Promise<BurnSnapshot> {
       r.set(LAST_BURN_AT_KEY, snapshot.lastBurnAt),
       r.set(UPDATED_AT_KEY, snapshot.updatedAt),
     )
-  } else {
-    // #region agent log
-    console.log('[burn-debug] sync skipped clawd overwrite', {
-      existingClawdBurned: existing.clawdBurned,
-      failedScanClawdBurned: totals.clawdBurned,
-      ethPending,
-    })
-    // #endregion
   }
 
   await Promise.all(writes)
