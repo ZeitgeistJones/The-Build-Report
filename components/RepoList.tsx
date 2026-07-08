@@ -650,13 +650,24 @@ export default function RepoList({
     const pending = isUnscoredRecent(repo)
     const effectiveVerdict =
       normie && repo.normieVerdict?.trim() ? repo.normieVerdict : repo.verdict
-    const blurb = pickRepoBlurb(repo.description, effectiveVerdict, pending)
+    // In normie mode, prefer our plain-English verdict over the GitHub description
+    // (which is usually written for developers). Fall back to description only when
+    // there is no normie verdict and no regular verdict either.
+    const blurbDescription =
+      normie && repo.normieVerdict?.trim() ? null : repo.description
+    const blurb = pickRepoBlurb(blurbDescription, effectiveVerdict, pending)
     const verdictText = effectiveVerdict?.trim() ?? ''
     const showSeparateVerdict =
       isExpanded &&
       blurb.source === 'description' &&
       verdictText.length > 0 &&
       verdictText !== blurb.text
+    // #region agent log
+    if (repo.githubSlug === 'leftclaw-services' || repo.githubSlug === 'clawd-containers') {
+      console.log('[normie-debug] repo card render', {slug:repo.githubSlug,normie,hasNormieVerdict:!!repo.normieVerdict,blurbSource:blurb.source,blurbText:blurb.text?.slice(0,80),showSeparateVerdict,isExpanded})
+      fetch('http://127.0.0.1:7847/ingest/fc8118d7-2715-401b-9b09-36b7aa816eb8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'687a39'},body:JSON.stringify({sessionId:'687a39',location:'RepoList.tsx:renderRepoCard',message:'render sample repo post-fix',data:{slug:repo.githubSlug,normie,hasNormieVerdict:!!repo.normieVerdict,blurbSource:blurb.source,blurbText:blurb.text?.slice(0,80),showSeparateVerdict,isExpanded},timestamp:Date.now(),hypothesisId:'H1-H2-H3',runId:'post-fix'})}).catch(()=>{});
+    }
+    // #endregion
     const periodCommits = repoCommitsForPeriod(repo, repoPeriod)
     const commitsHitCap = Boolean(
       periodCommits != null &&

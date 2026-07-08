@@ -22,12 +22,14 @@ function applyNormieAttr(on: boolean) {
 
 export function NormieModeProvider({ children }: { children: ReactNode }) {
   const [normie, setNormieState] = useState(false)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem(NORMIE_MODE_STORAGE_KEY)
     const on = stored === '1'
     setNormieState(on)
     applyNormieAttr(on)
+    setReady(true)
   }, [])
 
   function setNormie(on: boolean) {
@@ -35,6 +37,10 @@ export function NormieModeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(NORMIE_MODE_STORAGE_KEY, on ? '1' : '0')
     applyNormieAttr(on)
   }
+
+  // Mirror of ColorThemeProvider: render children outside context before localStorage
+  // is read so the server-rendered HTML matches the initial client render (no hydration mismatch).
+  if (!ready) return <>{children}</>
 
   return (
     <NormieModeContext.Provider value={{ normie, setNormie, toggleNormie: () => setNormie(!normie) }}>
