@@ -30,6 +30,7 @@ import {
 import { getLockedTag } from './criticalPath'
 import { ECOSYSTEM_DECODER_RING } from './rubrics/decoderRing'
 import { SCORING_CONTEXT_VERSION } from './scoringContext'
+import { normieVoiceGuidance } from './normieVoice'
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
 const CACHE_KEY_PREFIX_V2 = 'build-report:autoscore:v2:'
@@ -227,7 +228,9 @@ ${evidenceBlock}${evidenceInstructions}Infer:
    - indirect, infrastructure, or theoretical → shippingLeverage rubric, tokenMechanic: null
 3. builderIntegrity rubric (5 rows — ALWAYS include all five; apply tag-specific BI rules below)
 4. verdict: 2-3 sentence plain English — honest, not hype; quick-glance friendly
-5. adminNote: one sentence — live AI score, not a launch baseline
+5. normieVerdict: a plain-English ("normie") rewrite of the verdict for someone who knows nothing about code or crypto. Same facts, warmer voice. Follow this voice guide:
+${normieVoiceGuidance('verdict')}
+6. adminNote: one sentence — live AI score, not a launch baseline
 
 Framing: score by repo type, not one universal standard. Infra/indirect score shipping leverage, not direct burn. Low GitHub activity is not automatic failure. CV/CONVICTION ≠ CLAWD burns. Locks/vesting ≠ burns. Hold clawdbotatg accountable on consumer apps and money-moving repos; do not penalize dev tools for missing burns.
 
@@ -256,6 +259,7 @@ Respond ONLY with valid JSON, no markdown:
     { "label": "Security, testing, and cryptographic rigor", "weight": "20%", "level": "mid", "source": "..." }
   ],
   "verdict": "...",
+  "normieVerdict": "...",
   "adminNote": "Live AI score (v3) — inferred from repo metadata and ecosystem context v${SCORING_CONTEXT_VERSION}."
 }`
 
@@ -333,6 +337,9 @@ Respond ONLY with valid JSON, no markdown:
       shippingLeverage,
       builderIntegrity: makeBiScore(parsed.builderIntegrity),
       verdict: parsed.verdict,
+      ...(typeof parsed.normieVerdict === 'string' && parsed.normieVerdict.trim()
+        ? { normieVerdict: parsed.normieVerdict.trim() }
+        : {}),
       adminNote: parsed.adminNote,
       scoringContextVersion: SCORING_CONTEXT_VERSION,
     }

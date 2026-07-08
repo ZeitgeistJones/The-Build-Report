@@ -9,6 +9,7 @@ import { shouldSkipRepo } from '@/lib/repoFilters'
 import { REPOS, type Repo } from '@/lib/scores'
 import type { GitHubStats } from '@/lib/github'
 import { stripMarkdown } from '@/lib/textCleanup'
+import { normieVoiceGuidance } from '@/lib/normieVoice'
 import {
   calcBuilderGrade,
   calcIntegrityGrade,
@@ -37,12 +38,21 @@ export interface RepoBuildActivity {
   commits: string[]
 }
 
+export interface CardNormieBlurbs {
+  builder: string
+  economic: string
+  integrity: string
+  leverage?: string
+}
+
 export interface CardBlurbs {
   builder: string
   economic: string
   integrity: string
   /** Optional — older cached digests predate the Shipping leverage card; panel falls back to live copy. */
   leverage?: string
+  /** Optional plain-English ("normie") versions; older cached digests omit these and the panel falls back. */
+  normie?: CardNormieBlurbs
 }
 
 export interface DailyDigestCards {
@@ -54,6 +64,8 @@ export interface DailyDigestCards {
 
 export interface DailyDigestCache {
   general: string
+  /** Optional plain-English ("normie") version of the overview; omitted on older cached digests. */
+  generalNormie?: string
   cards: DailyDigestCards
   dateKey: string
   repoCount: number
@@ -64,6 +76,7 @@ export interface DailyDigestCache {
 export interface BuildBriefData {
   text: string
   general: string
+  generalNormie?: string
   cards: DailyDigestCards | null
   dateKey: string
   isToday: boolean
@@ -247,6 +260,7 @@ function buildFallbackDigest(
 
 interface DigestAiPayload {
   general: string
+  generalNormie?: string
   cards: DailyDigestCards
 }
 
@@ -289,23 +303,29 @@ ${gradeContext}
 Return ONLY valid JSON, no markdown fences:
 {
   "general": "3-4 sentences. Plain English morning overview of what shipped yesterday. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.",
+  "generalNormie": "The SAME overview as general, rewritten for someone who knows nothing about code or crypto. Same facts, even warmer and simpler. Follow the normie voice guide below.",
   "cards": {
     "24h": {
       "builder": "2-3 sentences about builder activity for the last 24 hours.",
       "economic": "2-3 sentences about holder economics for the last 24 hours.",
       "leverage": "2-3 sentences about shipping leverage (behind-the-scenes tooling and infrastructure that speeds up shipping holder value) for the last 24 hours.",
-      "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the last 24 hours."
+      "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the last 24 hours.",
+      "normie": { "builder": "same as builder, extra-plain normie voice", "economic": "same as economic, extra-plain normie voice", "leverage": "same as leverage, extra-plain normie voice", "integrity": "same as integrity, extra-plain normie voice" }
     },
     "7d": {
       "builder": "2-3 sentences about builder activity for the 7-day window.",
       "economic": "2-3 sentences about holder economics (burn apps and supply locks) for the 7-day window.",
       "leverage": "2-3 sentences about shipping leverage (tooling and infrastructure that multiplies holder-facing shipping) for the 7-day window.",
-      "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the 7-day window."
+      "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the 7-day window.",
+      "normie": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." }
     },
-    "30d": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." },
-    "60d": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." }
+    "30d": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "...", "normie": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." } },
+    "60d": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "...", "normie": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." } }
   }
 }
+
+NORMIE VOICE GUIDE (applies to generalNormie and every card "normie" field):
+${normieVoiceGuidance('gradeCard')}
 
 Rules:
 - Each card field: 2-3 complete sentences. Each period must sound DISTINCT from the others — a holder toggling 24h vs 30d should read different stories.
@@ -338,9 +358,20 @@ Rules:
       economic: stripMarkdown(row.economic),
       integrity: stripMarkdown(row.integrity),
       ...(row.leverage ? { leverage: stripMarkdown(row.leverage) } : {}),
+      ...(row.normie
+        ? {
+            normie: {
+              builder: stripMarkdown(row.normie.builder),
+              economic: stripMarkdown(row.normie.economic),
+              integrity: stripMarkdown(row.normie.integrity),
+              ...(row.normie.leverage ? { leverage: stripMarkdown(row.normie.leverage) } : {}),
+            },
+          }
+        : {}),
     })
     return {
       general: stripMarkdown(parsed.general),
+      ...(parsed.generalNormie ? { generalNormie: stripMarkdown(parsed.generalNormie) } : {}),
       cards: {
         '24h': mapRow(parsed.cards['24h']),
         '7d': mapRow(parsed.cards['7d']),
@@ -385,6 +416,7 @@ export async function generateAndCacheDailyDigest(
 
   const payload: DailyDigestCache = {
     general: ai?.general ?? fallback.general,
+    ...(ai?.generalNormie ? { generalNormie: ai.generalNormie } : {}),
     cards: ai?.cards ?? fallback.cards,
     dateKey: easternDateKey,
     repoCount: activity.length,
@@ -439,6 +471,7 @@ function toBuildBriefData(digest: DailyDigestCache): BuildBriefData {
   return {
     text: digest.general,
     general: digest.general,
+    ...(digest.generalNormie ? { generalNormie: digest.generalNormie } : {}),
     cards: digest.cards,
     dateKey: digest.dateKey,
     isToday: false,
@@ -477,7 +510,7 @@ export async function getBuildBrief(): Promise<BuildBriefData | null> {
 export function cardCopyForPeriod(
   brief: BuildBriefData | null,
   period: Period,
-  card: keyof CardBlurbs,
+  card: 'builder' | 'economic' | 'integrity' | 'leverage',
 ): string | null {
   return brief?.cards?.[period]?.[card] ?? null
 }

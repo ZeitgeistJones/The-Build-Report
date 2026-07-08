@@ -1,4 +1,7 @@
+'use client'
+
 import type { BuildBriefData } from '@/lib/buildBrief'
+import { useNormieMode } from '@/components/NormieModeProvider'
 
 interface Props {
   brief: BuildBriefData | null
@@ -15,8 +18,9 @@ function formatDigestDate(dateKey: string): string {
 }
 
 export default function BuildBriefCard({ brief }: Props) {
+  const { normie } = useNormieMode()
   if (!brief) return null
-  const text = brief.general ?? brief.text
+  const text = (normie && brief.generalNormie) || brief.general || brief.text
   if (!text) return null
 
   const dayLabel = brief.dateKey ? formatDigestDate(brief.dateKey) : 'yesterday'
@@ -76,7 +80,7 @@ export default function BuildBriefCard({ brief }: Props) {
         {text}
       </p>
       <p style={{ margin: '10px 0 0', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-        Plain-English summary · refreshes daily around midnight Eastern
+        Plain-English summary · refreshes daily overnight Eastern
       </p>
     </div>
   )

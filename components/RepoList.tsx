@@ -24,6 +24,7 @@ import { getScoringStatus } from '@/lib/scoringStatus'
 import GateBlur from '@/components/wallet/GateBlur'
 import GateOverlay from '@/components/wallet/GateOverlay'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
+import { useNormieMode } from '@/components/NormieModeProvider'
 import RepoScoreButton from '@/components/RepoScoreButton'
 import { RepoWindowToggle } from '@/components/GradePeriodContext'
 import { periodKeyLabel, repoCommitsForPeriodKey, type Period } from '@/lib/grades'
@@ -508,6 +509,7 @@ export default function RepoList({
   const [repoItems, setRepoItems] = useState(repos)
   const [rescoreSummaries, setRescoreSummaries] = useState(initialRescoreSummaries)
   const { unlocked } = useClawdAccess()
+  const { normie } = useNormieMode()
   const isMobile = useIsMobile()
   const d = cardLayout(isMobile)
   const collectionSets = buildCollectionSets(repoCollections)
@@ -646,8 +648,10 @@ export default function RepoList({
     const effectiveTag = getEffectiveTag(repo)
     const auto = isAutoInferred(repo)
     const pending = isUnscoredRecent(repo)
-    const blurb = pickRepoBlurb(repo.description, repo.verdict, pending)
-    const verdictText = repo.verdict?.trim() ?? ''
+    const effectiveVerdict =
+      normie && repo.normieVerdict?.trim() ? repo.normieVerdict : repo.verdict
+    const blurb = pickRepoBlurb(repo.description, effectiveVerdict, pending)
+    const verdictText = effectiveVerdict?.trim() ?? ''
     const showSeparateVerdict =
       isExpanded &&
       blurb.source === 'description' &&

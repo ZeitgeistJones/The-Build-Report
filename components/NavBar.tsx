@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import ConnectWalletButton from './wallet/ConnectWalletButton'
 import ColorThemePicker from './ColorThemePicker'
+import NormieToggle from './NormieToggle'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
@@ -22,6 +23,7 @@ function DesktopNavLinks() {
         About
       </a>
       <ConnectWalletButton />
+      <NormieToggle />
       <ColorThemePicker />
     </div>
   )
@@ -64,6 +66,10 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         <a href="/about" className="mobile-nav-link" onClick={onClose}>
           About
         </a>
+        <div className="mobile-nav-theme-row" onClick={e => e.stopPropagation()}>
+          <span>Plain English</span>
+          <NormieToggle compact />
+        </div>
         <div className="mobile-nav-theme-row" onClick={e => e.stopPropagation()}>
           <span>Theme</span>
           <ColorThemePicker compact />

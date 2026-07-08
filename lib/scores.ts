@@ -33,6 +33,8 @@ export interface Repo {
   shippingLeverage?: Score | null
   builderIntegrity: Score
   verdict: string
+  /** Optional plain-English ("normie") rewrite of the verdict, shown when Plain English mode is on. */
+  normieVerdict?: string
   scoredAt: string
   adminNote?: string
   /** Ecosystem context version the AI read at score time. Omitted on legacy cached scores. */
@@ -135,6 +137,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires job runners to operate' },
     ]),
     verdict: 'The burn mechanic is real and the path to it is clear — pay for a job, CLAWD gets bought and burned. We\'re not measuring how much has burned, just that the plumbing is live and pointed the right direction.',
+    normieVerdict: 'This is where the money actually moves. When someone pays for a job here, that payment is used to buy CLAWD and permanently destroy it — which slowly shrinks the supply, and that\'s generally good for people holding the token. We\'re not tracking exactly how much has been burned so far, just confirming the pipes are built and pointed the right way.',
   },
   {
     id: 'clawd-incinerator',
@@ -155,6 +158,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'high', source: 'self-incentivising — Mar 17 tweet' },
     ]),
     verdict: 'Dormant because the community voted to stop refilling it — not because it failed. The mechanic itself was about as clean as it gets. Scores stay high because the design was right and it stepped aside correctly.',
+    normieVerdict: 'This one\'s quiet now, but not because it broke — the community actually voted to stop topping it up. Its whole job was to destroy CLAWD tokens, and it did that about as cleanly as you can. It scores high because the design was solid and it bowed out gracefully when its job was done.',
   },
   {
     id: 'clawd-fomo3d',
@@ -175,6 +179,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires round management' },
     ]),
     verdict: 'Real burns, real payouts, real rounds. 38+ rounds and $18k+ paid out. The gamble mechanic evolved into something the community genuinely played. Burns happen on every key purchase automatically.',
+    normieVerdict: 'This is a game people actually played — more than 38 rounds and over $18k paid out to real players. Every time someone buys in, a slice of CLAWD gets automatically destroyed, no one has to push a button. It started as a gamble and turned into something the community genuinely enjoyed.',
   },
   {
     id: 'clawd-pfp-market',
@@ -195,6 +200,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'low', source: 'required clawdbotatg as oracle' },
     ]),
     verdict: 'The first real consumer app. Burns 25% of every round automatically. Dormant now — it ran one round, did its job, and the community moved on. Scored on what it was, not what came after.',
+    normieVerdict: 'This was the first real app regular people could use, not just a behind-the-scenes tool. A quarter of every round\'s money went straight to destroying CLAWD, automatically. It only ran once and then went quiet — we\'re grading it on what it actually was, not holding the quiet against it.',
   },
   {
     id: '1024x',
@@ -215,6 +221,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'high', source: 'ownership burned, no admin — Feb 26 tweet' },
     ]),
     verdict: 'Burns on both sides of every play and ownership is burned — nobody controls it. Builder integrity is mid on vision because it emerged from community demand rather than the stated roadmap, which is honest context not a criticism.',
+    normieVerdict: 'Every play destroys a little CLAWD on both the bet and the win, so the token supply shrinks from two directions. On top of that, the builder threw away the keys — literally nobody can control or change it anymore. It scores a bit lower on "vision" only because the community asked for it rather than it being on the original plan, which is just honest context, not a knock.',
   },
   {
     id: 'clawdviction',
@@ -235,6 +242,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires governance participation' },
     ]),
     verdict: 'Burning CV is not burning CLAWD — important distinction. What LarvAI does do is lock supply: 8% of total CLAWD in a contract clawdbotatg wrote and deployed. That\'s real. Holder economics is mid because the direct burn mechanic isn\'t there, but the supply lock is significant.',
+    normieVerdict: 'Quick but important distinction: this burns a different token (CV), not CLAWD itself, so don\'t confuse the two. What it does do for CLAWD is lock a big chunk away — about 8% of all of it is parked in a contract the builder wrote, so it can\'t be sold. That\'s meaningful, which is why it lands in the middle: no direct burning, but a serious amount of supply taken off the table.',
   },
   {
     id: 'clawd-vesting',
@@ -255,6 +263,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'high', source: 'anyone could call release() — 1063 txns' },
     ]),
     verdict: 'The first thing clawdbotatg ever built. Not a burn — a lock. 1.23B CLAWD removed from circulation for 30 days as a cryptographic commitment not to sell. Dormant because it completed its job. Builder integrity is high because it set the tone for everything that followed.',
+    normieVerdict: 'This was the very first thing the builder ever made. It didn\'t destroy any CLAWD — instead it locked up a huge pile (1.23 billion tokens) for 30 days as a way of publicly promising "I\'m not going to dump these." It\'s quiet now because that job is finished, and it scores high because it set the honest tone for everything that came after.',
   },
   {
     id: 'liquidity-vesting',
@@ -275,6 +284,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires multisig proposals' },
     ]),
     verdict: 'Locks CLAWD into a Uniswap V3 position that earns fees while vesting. Not a burn but a clever lock — the liquidity works while it waits. Builder integrity high because the "wrote, deployed, proposed transactions, Austin just signs" dynamic is a genuine demonstration of autonomous operation.',
+    normieVerdict: 'This locks up CLAWD, but cleverly — instead of just sitting there, the locked tokens earn trading fees the whole time they\'re parked. So it\'s not destroying supply, it\'s a smart holding pen that stays productive. It scores well because the AI wrote and deployed it itself, with the human just signing off — a real example of it working on its own.',
   },
   {
     id: 'clawd-meme-arena',
@@ -295,6 +305,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'low', source: 'clawdbotatg required as judge' },
     ]),
     verdict: 'Burns 10% of stakes automatically. One round ran, community voted on winners. Needs clawdbotatg as the judge so it doesn\'t fully pass the walkaway test. Good mechanic, limited by the oracle dependency.',
+    normieVerdict: 'A meme contest where 10% of everything staked gets automatically destroyed. It ran one round and the community voted on the winners. The catch: it needs the builder to step in as the judge, so it can\'t fully run itself unattended — a good idea held back a little by that dependency.',
   },
   {
     id: 'zk-llm',
@@ -315,6 +326,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires server infrastructure' },
     ]),
     verdict: 'The most technically ambitious build in the ecosystem. ZK proofs, E2EE, TEE — genuinely novel. CLAWD accepted as payment but the burn path is less explicit than other apps. Builder integrity is high because this is exactly what cypherpunk mode promised.',
+    normieVerdict: 'This is the most technically impressive thing in the whole lineup — serious privacy tech that keeps your data encrypted end to end and provable without exposing it. You can pay with CLAWD, but exactly how that translates into destroying tokens is fuzzier here than in the other apps. It scores high on trust because it delivered precisely the hardcore privacy build that was promised.',
   },
   {
     id: 'clawd-talk-to-wallet',
@@ -335,6 +347,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'low', source: 'expensive to run, requires subsidy' },
     ]),
     verdict: 'Plain English to onchain execution is a genuinely useful idea. Holder economics is low because access is staker-gated rather than burn-gated — holding CLAWD gets you in but nothing burns when you use it. Good for holders indirectly, not directly.',
+    normieVerdict: 'The idea is genuinely handy — you type what you want in plain English and it does the crypto stuff for you. The reason it scores low for holders is that holding CLAWD just unlocks the door; actually using it doesn\'t destroy any tokens. So it\'s a nice perk for holders, but it doesn\'t directly move the needle on supply.',
   },
   {
     id: 'ethskills',
@@ -355,6 +368,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires ongoing updates to stay current' },
     ]),
     verdict: 'Makes every future app smarter and more accurate. Its holder value is upstream — it shows in the quality of consumer apps built on top of it, not in the repo itself. The connection to burns is real, just indirect.',
+    normieVerdict: 'Think of this as a shared knowledge pack that makes every app built on top of it smarter and more accurate. It doesn\'t touch tokens itself — its value shows up in the quality of the other apps that use it. The link to CLAWD is real, just one step removed.',
   },
   {
     id: 'dead-simple-agent',
@@ -375,6 +389,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'framework requires orchestration' },
     ]),
     verdict: 'The agent framework powering the Leftclaw worker fleet. Every job that burns CLAWD runs on this. The downstream path to holder value is as direct as infrastructure gets — if Leftclaw earns, this is part of why.',
+    normieVerdict: 'This is the toolkit that the paid worker agents are actually built on. Every job that ends up destroying CLAWD runs through this thing first. It\'s behind-the-scenes plumbing, but about as close to the money as plumbing gets — if the paid work earns, this is a big part of why.',
   },
   {
     id: 'clawd-containers',
@@ -395,6 +410,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires Mac Mini hardware to run' },
     ]),
     verdict: 'The factory floor. If this breaks, Leftclaw stops running and burns stop happening. The holder value is existential — not exciting but foundational.',
+    normieVerdict: 'This is basically the engine room — the code that keeps the fleet of AI workers running on a Mac somewhere. It\'s not flashy, but if it goes down, the paid work stops and so does the token burning. Boring on the surface, absolutely essential underneath.',
   },
   {
     id: 'clawd-token-hub',
@@ -415,6 +431,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'high', source: 'read-only, no management needed' },
     ]),
     verdict: 'A window into the ecosystem, not an engine for it. Useful for holders wanting live price and stats but it doesn\'t move CLAWD in any direction. Holder economics is low by design — that\'s what it is.',
+    normieVerdict: 'This is a dashboard — a window for checking the live price and stats. It\'s genuinely useful if you just want to see what\'s going on, but it doesn\'t buy, sell, or destroy any CLAWD. It scores low on holder economics on purpose, because that\'s simply not its job.',
   },
   {
     id: 'sponsored-8004',
@@ -435,6 +452,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires gas sponsorship funding' },
     ]),
     verdict: 'Pioneer work on gasless agent identity. The holder value is theoretical — more agents onchain expands the ecosystem clawdbotatg is building toward, which could mean more Leftclaw jobs and more burns. Early stage signal.',
+    normieVerdict: 'This is early groundwork for letting AI agents get an on-chain identity without paying fees to do it. The payoff for holders is still theoretical — more agents out there could eventually mean more paid jobs and more token burning down the line. Promising, but very much an early signal, not a sure thing.',
   },
   {
     id: 'builder-agent',
@@ -455,6 +473,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'low', source: 'meta-tooling, not a live product' },
     ]),
     verdict: 'An agent that builds agents. If this matures it multiplies clawdbotatg\'s shipping capacity significantly. Holder value is potential not present — we\'re scoring R&D and confidence is low accordingly.',
+    normieVerdict: 'This is an AI that builds other AIs. If it grows up, it could massively speed up how fast new apps get made. But right now the benefit to holders is potential, not real yet — we\'re grading an experiment, so we\'re keeping our confidence low on purpose.',
   },
   {
     id: 'clawd-harness',
@@ -475,6 +494,7 @@ export const REPOS: Repo[] = [
       { label: 'Passes walkaway test', weight: '25%', level: 'mid', source: 'requires local/session setup to run' },
     ]),
     verdict: 'A multi-project web harness for interactive Claude Code sessions — builder infrastructure that speeds up shipping. Holder value is indirect: faster builds mean more consumer apps that can burn CLAWD.',
+    normieVerdict: 'This is a workbench that lets the builder juggle several coding projects at once from the browser — basically a tool that makes shipping faster. The benefit to holders is indirect: quicker building means more apps get made, and more apps means more chances to burn CLAWD.',
   },
 ]
 

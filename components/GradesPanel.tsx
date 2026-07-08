@@ -8,6 +8,7 @@ import { timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { rubricBlockById } from '@/lib/rubricReference'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
+import { useNormieMode } from './NormieModeProvider'
 import { integrityGradeFootnote, builderActivityGradeFootnote } from '@/lib/cardFraming'
 import type { DailyDigestCards } from '@/lib/buildBrief'
 import type { Repo } from '@/lib/scores'
@@ -555,6 +556,7 @@ export default function GradesPanel({
   communityContextEnabled = false,
 }: Props) {
   const { period } = useGradePeriod()
+  const { normie } = useNormieMode()
   const isMobile = useIsMobile()
   const footerSize = isMobile ? '11px' : '10px'
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
@@ -632,22 +634,25 @@ export default function GradesPanel({
     Boolean(digestCards?.[period]?.economic) &&
     Boolean(digestCards?.[period]?.integrity)
 
-  const builderCopy = digestHasPeriod
+  const normieRow = normie ? digestCards?.[period]?.normie : undefined
+
+  const builderCopy = (normieRow?.builder) ?? (digestHasPeriod
     ? digestCards![period].builder
     : bg
       ? builderCardLayman(bg, period, stats, githubStats, repos)
-      : 'GitHub data unavailable'
-  const economicCopy = digestHasPeriod
+      : 'GitHub data unavailable')
+  const economicCopy = (normieRow?.economic) ?? (digestHasPeriod
     ? digestCards![period].economic
     : tg
       ? economicCardLayman(tg, period, stats ? { commits: stats.commits } : null, githubStats, repos)
-      : 'Holder economics score unavailable'
-  const integrityCopy = digestHasPeriod
+      : 'Holder economics score unavailable')
+  const integrityCopy = (normieRow?.integrity) ?? (digestHasPeriod
     ? digestCards![period].integrity
     : ig
       ? integrityCardLayman(ig, period, githubStats, repos)
-      : 'Builder standards score unavailable'
+      : 'Builder standards score unavailable')
   const leverageCopy =
+    (normieRow?.leverage) ??
     digestCards?.[period]?.leverage ??
     (sg
       ? shippingLeverageCardLayman(sg, period, githubStats, repos)

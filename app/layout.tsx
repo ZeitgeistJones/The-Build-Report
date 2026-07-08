@@ -3,6 +3,7 @@ import './globals.css'
 import './mobile.css'
 import Web3Provider from '@/components/wallet/Web3Provider'
 import { ColorThemeProvider } from '@/components/ColorThemeProvider'
+import { NormieModeProvider, NORMIE_MODE_STORAGE_KEY } from '@/components/NormieModeProvider'
 import NavBar from '@/components/NavBar'
 import { COLOR_THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY } from '@/lib/colorThemes'
 
@@ -70,6 +71,9 @@ const themeBootScript = `(function(){try{
   }
   var t=localStorage.getItem('${COLOR_THEME_STORAGE_KEY}');
   if(t)document.documentElement.dataset.colorTheme=t;
+}catch(e){}
+try{
+  if(localStorage.getItem('${NORMIE_MODE_STORAGE_KEY}')==='1')document.documentElement.dataset.normie='1';
 }catch(e){}})()`
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -80,6 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <ColorThemeProvider>
+          <NormieModeProvider>
           <Web3Provider>
             <NavBar />
             <main className="site-main" style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', padding: '32px var(--content-padding-x) 80px' }}>
@@ -95,6 +100,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               The Build Report is an independent community project. Not affiliated with clawdbotatg, Austin Griffith, or the core team. Not financial advice.
             </footer>
           </Web3Provider>
+          </NormieModeProvider>
         </ColorThemeProvider>
       </body>
     </html>
