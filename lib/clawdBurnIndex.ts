@@ -116,6 +116,27 @@ function clawdToDeadInLogs(logs: TxLogItem[]): bigint {
   return total
 }
 
+/** Sum CLAWD→dead Transfer logs from an RPC tx receipt (viem format). */
+export function clawdToDeadFromRpcLogs(
+  logs: { address: string; topics: readonly string[]; data: string }[],
+): bigint {
+  const clawd = CLAWD_TOKEN_ADDRESS.toLowerCase()
+  let total = BigInt(0)
+
+  for (const log of logs) {
+    if (log.address.toLowerCase() !== clawd) continue
+    if (log.topics[0]?.toLowerCase() !== TRANSFER_TOPIC) continue
+    if (log.topics[2]?.toLowerCase() !== DEAD_TOPIC) continue
+    try {
+      total += BigInt(log.data)
+    } catch {
+      // skip malformed values
+    }
+  }
+
+  return total
+}
+
 async function fetchOnChainBurnTotalsInner(
   attributedContracts: string[],
 ): Promise<OnChainBurnTotals> {

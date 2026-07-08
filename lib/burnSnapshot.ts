@@ -1,7 +1,7 @@
 import { createPublicClient, defineChain, http } from 'viem'
 import { getRedis } from '@/lib/redis'
-import { BASE_CHAIN_ID, CLAWD_TOKEN_ADDRESS, RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
-import { fetchOnChainBurnTotals, getContractEthBalance } from '@/lib/clawdBurnIndex'
+import { BASE_CHAIN_ID, RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
+import { fetchOnChainBurnTotals, getContractEthBalance, clawdToDeadFromRpcLogs } from '@/lib/clawdBurnIndex'
 
 const base = defineChain({
   id: BASE_CHAIN_ID,
@@ -24,10 +24,6 @@ const ETH_PENDING_KEY = 'build-report:burns:hub:ethPending'
 const APPLIED_TX_PREFIX = 'build-report:burns:applied-tx:'
 const LEGACY_ONCHAIN_CACHE_KEY = 'build-report:burns:onchain-cache'
 
-const TRANSFER_TOPIC =
-  '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
-const DEAD_TOPIC = '0x000000000000000000000000000000000000dead'
-
 function pickNewerBurnAt(a: string | null, b: string | null): string | null {
   if (!a) return b
   if (!b) return a
@@ -37,26 +33,6 @@ function pickNewerBurnAt(a: string | null, b: string | null): string | null {
 function mergeClawdBurned(existing: number, scanned: number, scanOk: boolean): number {
   if (!scanOk) return existing
   return scanned >= existing ? scanned : existing
-}
-
-function clawdToDeadFromReceiptLogs(
-  logs: { address: string; topics: readonly `0x${string}`[]; data: `0x${string}` }[],
-): bigint {
-  const clawd = CLAWD_TOKEN_ADDRESS.toLowerCase()
-  let total = BigInt(0)
-
-  for (const log of logs) {
-    if (log.address.toLowerCase() !== clawd) continue
-    if (log.topics[0]?.toLowerCase() !== TRANSFER_TOPIC) continue
-    if (log.topics[2]?.toLowerCase() !== DEAD_TOPIC) continue
-    try {
-      total += BigInt(log.data)
-    } catch {
-      // skip malformed values
-    }
-  }
-
-  return total
 }
 
 export type BurnSnapshot = {
@@ -138,7 +114,7 @@ export async function refreshBurnAfterExecute(txHash: `0x${string}`): Promise<Bu
     return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }
   }
 
-  const clawdFromTx = clawdToDeadFromReceiptLogs(receipt.logs)
+  const clawdFromTx = clawdToDeadFromRpcLogs(receipt.logs)
   if (clawdFromTx <= BigInt(0)) {
     const snapshot = await getBurnSnapshotForDisplay()
     return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }

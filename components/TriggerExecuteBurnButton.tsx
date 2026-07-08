@@ -50,6 +50,10 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false, 
           body: JSON.stringify({ txHash: hash }),
         })
         const data = await res.json()
+        if (!cancelled && data.appliedFromTx) {
+          window.location.reload()
+          return
+        }
         if (!cancelled) router.refresh()
         if (!cancelled && !data.appliedFromTx && attempt < delays.length - 1) {
           window.setTimeout(() => refreshTotals(attempt + 1), delays[attempt + 1]! - delays[attempt]!)
