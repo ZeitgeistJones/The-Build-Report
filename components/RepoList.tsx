@@ -662,12 +662,6 @@ export default function RepoList({
       blurb.source === 'description' &&
       verdictText.length > 0 &&
       verdictText !== blurb.text
-    // #region agent log
-    if (repo.githubSlug === 'leftclaw-services' || repo.githubSlug === 'clawd-containers') {
-      console.log('[normie-debug] repo card render', {slug:repo.githubSlug,normie,hasNormieVerdict:!!repo.normieVerdict,blurbSource:blurb.source,blurbText:blurb.text?.slice(0,80),showSeparateVerdict,isExpanded})
-      fetch('http://127.0.0.1:7847/ingest/fc8118d7-2715-401b-9b09-36b7aa816eb8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'687a39'},body:JSON.stringify({sessionId:'687a39',location:'RepoList.tsx:renderRepoCard',message:'render sample repo post-fix',data:{slug:repo.githubSlug,normie,hasNormieVerdict:!!repo.normieVerdict,blurbSource:blurb.source,blurbText:blurb.text?.slice(0,80),showSeparateVerdict,isExpanded},timestamp:Date.now(),hypothesisId:'H1-H2-H3',runId:'post-fix'})}).catch(()=>{});
-    }
-    // #endregion
     const periodCommits = repoCommitsForPeriod(repo, repoPeriod)
     const commitsHitCap = Boolean(
       periodCommits != null &&

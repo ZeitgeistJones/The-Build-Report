@@ -19,6 +19,18 @@ function formatDigestDate(dateKey: string): string {
 
 export default function BuildBriefCard({ brief }: Props) {
   const { normie } = useNormieMode()
+  // #region agent log
+  if (typeof window !== 'undefined') {
+    console.log('[brief-debug]', {
+      briefNull: !brief,
+      normie,
+      hasGeneralNormie: !!brief?.generalNormie,
+      generalLen: brief?.general?.length ?? 0,
+      textLen: brief?.text?.length ?? 0,
+      dateKey: brief?.dateKey ?? null,
+    })
+  }
+  // #endregion
   if (!brief) return null
   const text = (normie && brief.generalNormie) || brief.general || brief.text
   if (!text) return null

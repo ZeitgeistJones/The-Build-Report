@@ -9,10 +9,6 @@ export default function NormieToggle({ compact }: { compact?: boolean }) {
   const isMobile = useIsMobile()
 
   function handleClick() {
-    // #region agent log
-    console.log('[normie-debug] toggle clicked — normie_before:', normie)
-    fetch('http://127.0.0.1:7847/ingest/fc8118d7-2715-401b-9b09-36b7aa816eb8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'687a39'},body:JSON.stringify({sessionId:'687a39',location:'NormieToggle.tsx:handleClick',message:'toggle clicked',data:{normie_before:normie},timestamp:Date.now(),hypothesisId:'H3',runId:'init'})}).catch(()=>{});
-    // #endregion
     toggleNormie()
   }
 

@@ -636,13 +636,6 @@ export default function GradesPanel({
 
   const normieRow = normie ? digestCards?.[period]?.normie : undefined
 
-  // #region agent log
-  if (normie) {
-    console.log('[normie-debug] GradesPanel normie state', {normie, period, hasDigestCards: !!digestCards, digestHasPeriod, normieRowExists: !!normieRow, normieRowBuilder: normieRow?.builder?.slice(0,60) ?? null, regularBuilder: digestCards?.[period]?.builder?.slice(0,60) ?? null})
-    fetch('http://127.0.0.1:7847/ingest/fc8118d7-2715-401b-9b09-36b7aa816eb8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'687a39'},body:JSON.stringify({sessionId:'687a39',location:'GradesPanel.tsx',message:'normie state in grades panel',data:{normie,period,hasDigestCards:!!digestCards,digestHasPeriod,normieRowExists:!!normieRow},timestamp:Date.now(),hypothesisId:'H4',runId:'init'})}).catch(()=>{})
-  }
-  // #endregion
-
   const builderCopy = (normieRow?.builder) ?? (digestHasPeriod
     ? digestCards![period].builder
     : bg
