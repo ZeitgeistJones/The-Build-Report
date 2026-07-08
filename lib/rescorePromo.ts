@@ -3,8 +3,7 @@ import { getRedis } from '@/lib/redis'
 import { SCORE_PAYMENT_WEI } from '@/lib/web3/constants'
 import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import type { RepoActivitySnapshot } from '@/lib/rescoreGuards'
-import { formatEthAmount } from '@/lib/clawdBurnIndex'
-import { formatApproxUsdFromEth, formatPerCommitRewardUsd } from '@/lib/promoUsd'
+import { formatApproxUsdFromEth, formatPerCommitRewardUsd, formatRescorePriceLabel } from '@/lib/promoUsd'
 import { resolveRepoBeforeRescore } from '@/lib/autoscore'
 import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 
@@ -278,7 +277,7 @@ export async function buildPromoQuote(
   }
 
   const feeEth = Number(SCORE_PAYMENT_WEI) / 1e18
-  let buttonLabel = `Rescore (${formatEthAmount(feeEth)} ETH)`
+  let buttonLabel = `Rescore (${formatRescorePriceLabel(feeEth)})`
   if (eligible) {
     buttonLabel = `Rescore free · earn ${formatApproxUsdFromEth(rewardEth)}`
   }

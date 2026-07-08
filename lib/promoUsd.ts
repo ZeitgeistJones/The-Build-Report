@@ -1,5 +1,5 @@
-/** Approximate ETH/USD for promo reward labels only — not a live price feed. */
-const DEFAULT_ETH_USD = 2500
+/** Approximate ETH/USD for rescore price labels — not a live price feed. */
+const DEFAULT_ETH_USD = 1738.93
 
 export function getEthUsdRate(): number {
   const raw =
@@ -22,6 +22,10 @@ export function formatApproxUsdFromEth(eth: number, rate = getEthUsdRate()): str
   return `~$${Math.round(usd).toLocaleString('en-US')}`
 }
 
-export function formatPerCommitRewardUsd(pennyEth: number): string {
-  return `${formatApproxUsdFromEth(pennyEth)} per stale commit`
+export function formatRescorePriceLabel(eth: number): string {
+  return formatApproxUsdFromEth(eth)
+}
+
+export function formatPerCommitRewardUsd(walletRewardEth: number): string {
+  return `${formatApproxUsdFromEth(walletRewardEth)} per stale commit`
 }

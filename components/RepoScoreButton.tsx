@@ -27,7 +27,7 @@ import {
   RESCORE_PROMO_TOOLTIP,
 } from '@/lib/scoringCopy'
 import { SCORE_PAYMENT_ETH } from '@/lib/rescoreBurns'
-import { formatApproxUsdFromEth } from '@/lib/promoUsd'
+import { formatApproxUsdFromEth, formatRescorePriceLabel } from '@/lib/promoUsd'
 
 interface Props {
   repoSlug: string
@@ -74,7 +74,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
   const promoEligible = Boolean(promoQuote?.eligible)
   const busy = phase !== 'idle' || isSending
-  const defaultLabel = `${label} (${SCORE_PAYMENT_ETH} ETH)`
+  const defaultLabel = `${label} (${formatRescorePriceLabel(SCORE_PAYMENT_ETH)})`
   const actionLabel = busy
     ? phase === 'paying' || isSending
       ? 'Paying…'

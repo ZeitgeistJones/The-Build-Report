@@ -34,7 +34,7 @@ export const LIVE_AI_CONFIDENCE_TOOLTIP =
   'Live AI — Claude inferred from repo metadata, GitHub activity, and public scoring context. Rescore can refresh it.'
 
 export const RESCORE_BUTTON_TOOLTIP =
-  'Score this repo using Claude AI. Cost: 0.000008 ETH. Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone.'
+  'Score this repo using Claude AI. Cost: ~$0.01 (0.000008 ETH). Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone.'
 
 export const RESCORE_PROMO_TOOLTIP =
   'Limited launch promo: on stale repos, rescore is free — ~$0.01 per stale commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy; approximate USD; paid in ETH). Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low.'
