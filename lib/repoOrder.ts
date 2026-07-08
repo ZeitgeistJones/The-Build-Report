@@ -7,7 +7,14 @@ import { normalizeAndApplyV3 } from './repoV3'
 function overlayCachedOnBaseline(baseline: Repo | undefined, cached: Repo): Repo {
   const normalized = normalizeAndApplyV3(cached)
   if (!baseline) return normalized
-  return { ...normalized, id: baseline.id }
+  // Cache wins on scores, but fall back to the hand-written baseline for display-copy
+  // fields the cache predates (e.g. normieVerdict, added to the autoscore prompt later).
+  // Without this, actively-rescored repos silently lose their baseline normie copy.
+  return {
+    ...normalized,
+    id: baseline.id,
+    normieVerdict: normalized.normieVerdict ?? baseline.normieVerdict,
+  }
 }
 
 /** Merge repo sources; Redis autoscore/rescore cache wins over launch baseline for the same slug. */
