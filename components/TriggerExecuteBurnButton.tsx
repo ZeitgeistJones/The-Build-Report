@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import {
@@ -21,15 +22,54 @@ interface Props {
 }
 
 export default function TriggerExecuteBurnButton({ ethPending, compact = false, fullWidth = false }: Props) {
+  const router = useRouter()
   const { isConnected, connectWallet, isWrongChain, switchToBase } = useClawdAccess()
   const isMobile = useIsMobile()
   const [error, setError] = useState<string | null>(null)
+  const [refreshingTotals, setRefreshingTotals] = useState(false)
 
   const { writeContract, data: hash, isPending, reset } = useWriteContract()
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash })
 
-  const busy = isPending || confirming
+  const busy = isPending || confirming || refreshingTotals
   const canBurn = ethPending > 0
+
+  useEffect(() => {
+    if (!isSuccess || !hash) return
+
+    let cancelled = false
+    const delays = [0, 3000, 10000, 25000]
+
+    async function refreshTotals(attempt: number) {
+      if (cancelled) return
+      setRefreshingTotals(true)
+      try {
+        const res = await fetch('/api/burns/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ txHash: hash }),
+        })
+        const data = await res.json()
+        if (!cancelled) router.refresh()
+        if (!cancelled && !data.appliedFromTx && attempt < delays.length - 1) {
+          window.setTimeout(() => refreshTotals(attempt + 1), delays[attempt + 1]! - delays[attempt]!)
+          return
+        }
+      } catch {
+        if (!cancelled && attempt < delays.length - 1) {
+          window.setTimeout(() => refreshTotals(attempt + 1), delays[attempt + 1]! - delays[attempt]!)
+          return
+        }
+      } finally {
+        if (!cancelled) setRefreshingTotals(false)
+      }
+    }
+
+    void refreshTotals(0)
+    return () => {
+      cancelled = true
+    }
+  }, [isSuccess, hash, router])
 
   function handleClick() {
     setError(null)
@@ -66,7 +106,7 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false, 
   let label = 'Execute burn'
   if (!isConnected) label = 'Connect'
   else if (isWrongChain) label = 'Switch to Base'
-  else if (busy) label = 'Confirm…'
+  else if (busy) label = refreshingTotals ? 'Updating totals…' : 'Confirm…'
   else if (isSuccess && compact) label = 'Submitted ✓ · Basescan'
   else if (isSuccess) label = 'Submitted ✓'
   else if (canBurn && compact) label = 'Execute burn'
@@ -159,7 +199,7 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false, 
 
       {!compact && (
         <p style={{ margin: 0, fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-          No 10M CLAWD required — only Base gas. Totals refresh within a few minutes after the tx confirms.
+          No 10M CLAWD required — only Base gas. Totals update shortly after execute() confirms.
         </p>
       )}
     </div>

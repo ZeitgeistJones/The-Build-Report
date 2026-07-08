@@ -1,12 +1,63 @@
+import { createPublicClient, defineChain, http } from 'viem'
 import { getRedis } from '@/lib/redis'
-import { RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
+import { BASE_CHAIN_ID, CLAWD_TOKEN_ADDRESS, RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
 import { fetchOnChainBurnTotals, getContractEthBalance } from '@/lib/clawdBurnIndex'
+
+const base = defineChain({
+  id: BASE_CHAIN_ID,
+  name: 'Base',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: { default: { http: ['https://mainnet.base.org'] } },
+})
+
+function createBaseClient() {
+  return createPublicClient({
+    chain: base,
+    transport: http('https://mainnet.base.org', { timeout: 15_000 }),
+  })
+}
 
 const CLAWD_BURNED_KEY = 'build-report:burns:hub:clawdBurned'
 const LAST_BURN_AT_KEY = 'build-report:burns:hub:lastBurnAt'
 const UPDATED_AT_KEY = 'build-report:burns:hub:updatedAt'
 const ETH_PENDING_KEY = 'build-report:burns:hub:ethPending'
+const APPLIED_TX_PREFIX = 'build-report:burns:applied-tx:'
 const LEGACY_ONCHAIN_CACHE_KEY = 'build-report:burns:onchain-cache'
+
+const TRANSFER_TOPIC =
+  '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+const DEAD_TOPIC = '0x000000000000000000000000000000000000dead'
+
+function pickNewerBurnAt(a: string | null, b: string | null): string | null {
+  if (!a) return b
+  if (!b) return a
+  return a >= b ? a : b
+}
+
+function mergeClawdBurned(existing: number, scanned: number, scanOk: boolean): number {
+  if (!scanOk) return existing
+  return scanned >= existing ? scanned : existing
+}
+
+function clawdToDeadFromReceiptLogs(
+  logs: { address: string; topics: readonly `0x${string}`[]; data: `0x${string}` }[],
+): bigint {
+  const clawd = CLAWD_TOKEN_ADDRESS.toLowerCase()
+  let total = BigInt(0)
+
+  for (const log of logs) {
+    if (log.address.toLowerCase() !== clawd) continue
+    if (log.topics[0]?.toLowerCase() !== TRANSFER_TOPIC) continue
+    if (log.topics[2]?.toLowerCase() !== DEAD_TOPIC) continue
+    try {
+      total += BigInt(log.data)
+    } catch {
+      // skip malformed values
+    }
+  }
+
+  return total
+}
 
 export type BurnSnapshot = {
   clawdBurned: number
@@ -25,8 +76,8 @@ export async function syncBurnSnapshot(): Promise<BurnSnapshot> {
   const updatedAt = new Date().toISOString()
   const scanOk = totals.ok
   const snapshot: BurnSnapshot = {
-    clawdBurned: scanOk ? totals.clawdBurned : existing.clawdBurned,
-    lastBurnAt: scanOk ? totals.lastBurnAt : existing.lastBurnAt,
+    clawdBurned: mergeClawdBurned(existing.clawdBurned, totals.clawdBurned, scanOk),
+    lastBurnAt: scanOk ? pickNewerBurnAt(existing.lastBurnAt, totals.lastBurnAt) : existing.lastBurnAt,
     updatedAt: scanOk ? updatedAt : (existing.updatedAt ?? updatedAt),
     ethPendingInReceiver: ethPending,
   }
@@ -46,6 +97,79 @@ export async function syncBurnSnapshot(): Promise<BurnSnapshot> {
   await Promise.all(writes)
 
   return snapshot
+}
+
+export type BurnRefreshResult = BurnSnapshot & {
+  appliedFromTx: boolean
+}
+
+/** Fast path after execute() — parse receipt via RPC and bump cached totals. */
+export async function refreshBurnAfterExecute(txHash: `0x${string}`): Promise<BurnRefreshResult> {
+  const r = getRedis()
+  const appliedKey = `${APPLIED_TX_PREFIX}${txHash.toLowerCase()}`
+  const ethPendingInReceiver = await getContractEthBalance(RECEIVER_BUY_AND_BURN)
+  await r.set(ETH_PENDING_KEY, ethPendingInReceiver)
+
+  if (await r.get(appliedKey)) {
+    const snapshot = await getBurnSnapshotForDisplay()
+    return { ...snapshot, ethPendingInReceiver, appliedFromTx: true }
+  }
+
+  const client = createBaseClient()
+  let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>> | null = null
+  let tx: Awaited<ReturnType<typeof client.getTransaction>> | null = null
+
+  try {
+    ;[receipt, tx] = await Promise.all([
+      client.getTransactionReceipt({ hash: txHash }),
+      client.getTransaction({ hash: txHash }),
+    ])
+  } catch {
+    const snapshot = await getBurnSnapshotForDisplay()
+    return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }
+  }
+
+  if (
+    !receipt ||
+    receipt.status !== 'success' ||
+    tx?.to?.toLowerCase() !== RECEIVER_BUY_AND_BURN.toLowerCase()
+  ) {
+    const snapshot = await getBurnSnapshotForDisplay()
+    return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }
+  }
+
+  const clawdFromTx = clawdToDeadFromReceiptLogs(receipt.logs)
+  if (clawdFromTx <= BigInt(0)) {
+    const snapshot = await getBurnSnapshotForDisplay()
+    return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }
+  }
+
+  const existing = await getBurnSnapshotForDisplay()
+  const clawdBurned = existing.clawdBurned + Number(clawdFromTx) / 1e18
+  let lastBurnAt = existing.lastBurnAt
+  try {
+    const block = await client.getBlock({ blockHash: receipt.blockHash })
+    lastBurnAt = new Date(Number(block.timestamp) * 1000).toISOString()
+  } catch {
+    // keep prior lastBurnAt
+  }
+  const updatedAt = new Date().toISOString()
+
+  await Promise.all([
+    r.set(CLAWD_BURNED_KEY, clawdBurned),
+    r.set(LAST_BURN_AT_KEY, lastBurnAt),
+    r.set(UPDATED_AT_KEY, updatedAt),
+    r.set(appliedKey, 1, { ex: 60 * 60 * 24 * 30 }),
+    r.set(ETH_PENDING_KEY, ethPendingInReceiver),
+  ])
+
+  return {
+    clawdBurned,
+    lastBurnAt,
+    updatedAt,
+    ethPendingInReceiver,
+    appliedFromTx: true,
+  }
 }
 
 /** Fast path — KV read only. Never hits Blockscout. */
