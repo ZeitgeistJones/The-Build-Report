@@ -406,10 +406,31 @@ export async function inferAndCacheRepo(
   return { ...scored, ...(options?.scoreOrigin ? { scoreOrigin: options.scoreOrigin } : {}) }
 }
 
-// HOMEPAGE-SAFE: cache only, no Anthropic calls
+// HOMEPAGE-SAFE: cache only, no Anthropic calls. Returns [] on Redis failure — never throws.
 export async function getCachedAutoScoresForSlugs(slugs: string[]): Promise<Repo[]> {
-  if (!slugs.length) return []
+  const result = await getCachedAutoScoresResult(slugs)
+  return result.repos
+}
 
+export type CachedAutoScoresResult = {
+  repos: Repo[]
+  /** True when Redis was unreachable; repos will be empty. Distinct from a legitimate empty cache. */
+  cacheReadFailed: boolean
+}
+
+export async function getCachedAutoScoresResult(slugs: string[]): Promise<CachedAutoScoresResult> {
+  if (!slugs.length) return { repos: [], cacheReadFailed: false }
+
+  try {
+    const repos = await readCachedAutoScoresForSlugs(slugs)
+    return { repos, cacheReadFailed: false }
+  } catch (err) {
+    console.error('[autoscore] cache read failed', err)
+    return { repos: [], cacheReadFailed: true }
+  }
+}
+
+async function readCachedAutoScoresForSlugs(slugs: string[]): Promise<Repo[]> {
   const r = getRedis()
   const results: Repo[] = []
 

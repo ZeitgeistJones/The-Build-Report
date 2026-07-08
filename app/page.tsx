@@ -3,7 +3,7 @@ import { loadGitHubStatsForPage, getGitHubStatsSnapshotUpdatedAt } from '@/lib/g
 import { getTrackableLastCommit } from '@/lib/github'
 import { REPOS } from '@/lib/scores'
 import { getAdminNotes } from '@/lib/admin'
-import { getCachedAutoScoresForSlugs } from '@/lib/autoscore'
+import { getCachedAutoScoresResult } from '@/lib/autoscore'
 import { makeUnscoredRecentRepo } from '@/lib/recentRepos'
 import { getAllCollectionSlugs, getTrackableForceIncludeSet } from '@/lib/repoCollections'
 import { shouldSkipRepo } from '@/lib/repoFilters'
@@ -52,9 +52,24 @@ import type { GitHubStats } from '@/lib/github'
 
 export const dynamic = 'force-dynamic'
 
+function degradedBannerMessage(opts: {
+  githubUnavailable: boolean
+  cacheUnavailable: boolean
+  rateLimited: boolean
+}): string {
+  const parts: string[] = []
+  if (opts.githubUnavailable) parts.push('GitHub data unavailable — commit counts and activity grades may be limited.')
+  if (opts.cacheUnavailable) parts.push('Live score cache temporarily unavailable — showing baseline repos where needed.')
+  if (opts.rateLimited) {
+    parts.push('GitHub rate limit reached — commit data is partial. Add a GITHUB_TOKEN env var for full data.')
+  }
+  return parts.join(' ')
+}
+
 export default async function Home() {
   let stats: GitHubStats | null = null
-  let error = false
+  let githubUnavailable = false
+  let cacheUnavailable = false
   const communityContextEnabled = isCommunityContextEnabled()
   const contextSummary = communityContextEnabled ? await getContextSummaryBySlug().catch(() => ({})) : {}
   const communityPulse = communityContextEnabled ? buildCommunityPulse(contextSummary) : null
@@ -64,9 +79,12 @@ export default async function Home() {
     getBuildBrief().catch(() => null),
   ])
 
-  const { stats: loadedStats, source: loadedSource } = await loadGitHubStatsForPage()
+  const { stats: loadedStats, source: loadedSource } = await loadGitHubStatsForPage().catch(err => {
+    console.error('[home] GitHub stats load failed', err)
+    return { stats: null as GitHubStats | null, source: 'none' as const }
+  })
   stats = loadedStats
-  if (loadedSource === 'none') error = true
+  if (loadedSource === 'none') githubUnavailable = true
   const trackableLastCommit = stats ? getTrackableLastCommit(stats) : { lastCommitAt: null, lastCommitRepo: null }
 
   const snapshotUpdatedAt = await getGitHubStatsSnapshotUpdatedAt().catch(() => null)
@@ -86,7 +104,12 @@ export default async function Home() {
 
   const trackableGithub = stats?.trackableRepos ?? []
   const cacheSlugs = cacheLookupSlugs(REPOS, trackableGithub, excludedSlugs)
-  const autoScoredRaw = cacheSlugs.length > 0 ? await getCachedAutoScoresForSlugs(cacheSlugs) : []
+  let autoScoredRaw: Awaited<ReturnType<typeof getCachedAutoScoresResult>>['repos'] = []
+  if (cacheSlugs.length > 0) {
+    const cached = await getCachedAutoScoresResult(cacheSlugs)
+    autoScoredRaw = cached.repos
+    if (cached.cacheReadFailed) cacheUnavailable = true
+  }
   const autoScored = autoScoredRaw.filter(r => !shouldSkipRepo(r.githubSlug, { forceInclude: forceIncludeSet }))
 
   const allRepos = filterPublicRepos(applyExcludedToRepos(mergeRepoSources(REPOS, autoScored), excludedMap))
@@ -307,7 +330,7 @@ export default async function Home() {
         />
       </div>
 
-      {(error || stats?.rateLimited) && (
+      {(githubUnavailable || cacheUnavailable || stats?.rateLimited) && (
         <div
           style={{
             background: 'var(--surface-1)',
@@ -319,12 +342,16 @@ export default async function Home() {
             marginBottom: '24px',
           }}
         >
-          {error
-            ? 'GitHub data unavailable — showing scores only.'
-            : 'GitHub rate limit reached — commit data is partial. Add a GITHUB_TOKEN env var for full data.'}{' '}
-          <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
-            Create a free token →
-          </a>
+          {degradedBannerMessage({
+            githubUnavailable,
+            cacheUnavailable,
+            rateLimited: Boolean(stats?.rateLimited),
+          })}{' '}
+          {(githubUnavailable || stats?.rateLimited) && (
+            <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">
+              Create a free token →
+            </a>
+          )}
         </div>
       )}
 
