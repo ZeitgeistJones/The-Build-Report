@@ -29,6 +29,8 @@ import {
 import { SCORE_PAYMENT_ETH } from '@/lib/rescoreBurns'
 import { formatApproxUsdFromEth, formatRescorePriceLabel } from '@/lib/promoUsd'
 import { useEthUsdRate } from '@/components/EthUsdProvider'
+import PromoRewardToast from '@/components/PromoRewardToast'
+import { playPromoRewardChime } from '@/lib/promoRewardFx'
 
 interface Props {
   repoSlug: string
@@ -67,7 +69,11 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
   const [phase, setPhase] = useState<'idle' | 'paying' | 'signing' | 'scoring'>('idle')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [promoQuote, setPromoQuote] = useState<PromoQuote | null>(null)
-  const [payoutTxUrl, setPayoutTxUrl] = useState<string | null>(null)
+  const [promoReward, setPromoReward] = useState<{
+    amountLabel: string
+    pending: boolean
+    txUrl: string | null
+  } | null>(null)
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction()
   const { signMessageAsync } = useSignMessage()
@@ -134,12 +140,13 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
 
     if (data.promo?.payoutTxHash) {
       const amt = formatApproxUsdFromEth(Number(data.promo.rewardEth ?? 0), ethUsdRate)
-      setPayoutTxUrl(`https://basescan.org/tx/${data.promo.payoutTxHash}`)
-      if (data.promo.payoutPending) {
-        setInlineMsg(`Rescore saved — ${amt} reward sent (confirming on Base).`)
-      } else {
-        setInlineMsg(`Rescore saved — ${amt} sent to your wallet.`)
-      }
+      const txUrl = `https://basescan.org/tx/${data.promo.payoutTxHash}`
+      setPromoReward({
+        amountLabel: amt,
+        pending: Boolean(data.promo.payoutPending),
+        txUrl,
+      })
+      playPromoRewardChime()
     } else if (data.promo?.payoutPending) {
       setError(data.promo.payoutError ?? 'Promo rescore saved but reward payout failed.')
     } else if (data.promo) {
@@ -222,7 +229,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     e.preventDefault()
     setError(null)
     setInlineMsg(null)
-    setPayoutTxUrl(null)
+    setPromoReward(null)
 
     if (!isConnected) {
       connectWallet()
@@ -369,23 +376,16 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         </div>
       )}
 
-      {inlineMsg && !confirmOpen && (
+      {promoReward && !confirmOpen && (
+        <PromoRewardToast
+          amountLabel={promoReward.amountLabel}
+          pending={promoReward.pending}
+          txUrl={promoReward.txUrl}
+        />
+      )}
+      {inlineMsg && !confirmOpen && !promoReward && (
         <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '4px', lineHeight: 1.3 }}>
           {inlineMsg}
-          {payoutTxUrl && (
-            <>
-              {' '}
-              <a
-                href={payoutTxUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: 'var(--accent)' }}
-                onClick={e => e.stopPropagation()}
-              >
-                View tx ↗
-              </a>
-            </>
-          )}
         </div>
       )}
       {error && (
