@@ -11,7 +11,7 @@ export const ABOUT_SCORE_TYPES_SECTIONS = [
   },
   {
     title: 'Rescore',
-    body: `Same live AI pass, triggered when someone pays 0.000008 ETH. Result is cached for everyone. First rescore on a baseline card often shifts the letter — different method, not always a repo change overnight.`,
+    body: `Same live AI pass, triggered when someone pays 0.000008 ETH — or, during the limited launch promo, free on stale repos with an ETH reward sent to your wallet (~1¢ per stale commit). Result is cached for everyone. First rescore on a baseline card often shifts the letter — different method, not always a repo change overnight.`,
   },
 ] as const
 
@@ -35,6 +35,9 @@ export const LIVE_AI_CONFIDENCE_TOOLTIP =
 
 export const RESCORE_BUTTON_TOOLTIP =
   'Score this repo using Claude AI. Cost: 0.000008 ETH. Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone.'
+
+export const RESCORE_PROMO_TOOLTIP =
+  'Limited launch promo: on stale repos, rescore is free and we send ~1¢ ETH per stale commit to your wallet from the promo treasury. Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low.'
 
 export const SCORE_TYPE_BASELINE_LABEL = 'Baseline'
 export const SCORE_TYPE_LIVE_AI_LABEL = 'Live AI'

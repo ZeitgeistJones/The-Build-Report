@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSendTransaction } from 'wagmi'
+import { useSendTransaction, useSignMessage } from 'wagmi'
 import { waitForTransactionReceipt } from '@wagmi/core'
 import { base } from 'wagmi/chains'
 import { Repo } from '@/lib/scores'
@@ -20,7 +20,12 @@ import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
 import InfoTooltip from '@/components/InfoTooltip'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
-import { formatScoredDateLabel, isLaunchBaseline, RESCORE_BUTTON_TOOLTIP } from '@/lib/scoringCopy'
+import {
+  formatScoredDateLabel,
+  isLaunchBaseline,
+  RESCORE_BUTTON_TOOLTIP,
+  RESCORE_PROMO_TOOLTIP,
+} from '@/lib/scoringCopy'
 import { SCORE_PAYMENT_ETH } from '@/lib/rescoreBurns'
 
 interface Props {
@@ -30,10 +35,20 @@ interface Props {
   onScored: (repo: Repo, rescoreMeta?: RescoreSummaryRecord | null) => void
 }
 
-function RescoreTooltipContent() {
+type PromoQuote = {
+  promoActive: boolean
+  eligible: boolean
+  staleCommits: number
+  rewardEth: number
+  buttonLabel: string
+  promoBanner: string | null
+  reason: string | null
+}
+
+function RescoreTooltipContent({ promoActive }: { promoActive: boolean }) {
   return (
     <>
-      {RESCORE_BUTTON_TOOLTIP}{' '}
+      {promoActive ? RESCORE_PROMO_TOOLTIP : RESCORE_BUTTON_TOOLTIP}{' '}
       <a href="/about#score-types" style={{ color: 'var(--accent)' }} onClick={e => e.stopPropagation()}>
         About score types ↗
       </a>
@@ -47,18 +62,24 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
   const { isConnected, hasAccess, connectWallet, address, isWrongChain, switchToBase } = useClawdAccess()
   const [inlineMsg, setInlineMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [phase, setPhase] = useState<'idle' | 'paying' | 'scoring'>('idle')
+  const [phase, setPhase] = useState<'idle' | 'paying' | 'signing' | 'scoring'>('idle')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [promoQuote, setPromoQuote] = useState<PromoQuote | null>(null)
 
   const { sendTransactionAsync, isPending: isSending } = useSendTransaction()
+  const { signMessageAsync } = useSignMessage()
 
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
+  const promoEligible = Boolean(promoQuote?.eligible)
   const busy = phase !== 'idle' || isSending
+  const defaultLabel = `${label} (${SCORE_PAYMENT_ETH} ETH)`
   const actionLabel = busy
     ? phase === 'paying' || isSending
       ? 'Paying…'
-      : 'Scoring…'
-    : `${label} (${SCORE_PAYMENT_ETH} ETH)`
+      : phase === 'signing'
+        ? 'Signing…'
+        : 'Scoring…'
+    : promoQuote?.buttonLabel ?? defaultLabel
   const showScoreMeta = scoringStatus === 'scored' && activity.scoredAt
   const { hasNew: hasNewCommitsSinceScore } = countCommitsSinceScore(
     activity.scoredAt,
@@ -69,40 +90,107 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
   const nudgeBaselineRefresh =
     Boolean(showScoreMeta) && isLaunchBaseline(activity.adminNote) && !nudgeRescore && !busy
 
+  useEffect(() => {
+    let cancelled = false
+    const params = new URLSearchParams({ repoSlug })
+    if (address) params.set('wallet', address)
+
+    fetch(`/api/rescore/promo-quote?${params.toString()}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled || !data.ok) return
+        setPromoQuote(data.quote as PromoQuote)
+      })
+      .catch(() => {
+        if (!cancelled) setPromoQuote(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [repoSlug, address, activity.scoredAt, activity.commitTimestamps, activity.lastCommitAt, activity.pushedAt])
+
+  async function submitRescore(body: Record<string, string>) {
+    const res = await fetch('/api/admin/autoscore-single', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!data.ok) {
+      throw new Error(data.error || 'Scoring failed')
+    }
+    const rescoreMeta = data.rescoreMeta as RescoreSummaryRecord | undefined
+    onScored(data.repo as Repo, rescoreMeta ?? null)
+    router.refresh()
+
+    if (data.promo?.payoutTxHash) {
+      setInlineMsg(
+        `Rescore saved — ${data.promo.rewardEth} ETH sent to your wallet.`,
+      )
+    } else if (data.promo?.payoutPending) {
+      setInlineMsg('Rescore saved — reward payout is pending. Contact support if ETH does not arrive.')
+    } else {
+      setInlineMsg('Rescore saved — expand card to see what changed.')
+    }
+  }
+
+  async function runPromoRescore() {
+    if (!address) return
+
+    setPhase('signing')
+    const nonceRes = await fetch('/api/rescore/promo-nonce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repoSlug, walletAddress: address }),
+    })
+    const nonceData = await nonceRes.json()
+    if (!nonceData.ok) {
+      throw new Error(nonceData.error || 'Could not start promo rescore')
+    }
+
+    const signature = await signMessageAsync({ message: nonceData.message })
+    setPhase('scoring')
+    await submitRescore({
+      repoSlug,
+      walletAddress: address,
+      promoNonce: nonceData.nonce,
+      promoSignature: signature,
+    })
+  }
+
+  async function runPaidRescore() {
+    if (!address) return
+
+    setPhase('paying')
+    const hash = await sendTransactionAsync({
+      to: RECEIVER_BUY_AND_BURN,
+      value: SCORE_PAYMENT_WEI,
+      chainId: base.id,
+    })
+    setPhase('scoring')
+
+    const receipt = await waitForTransactionReceipt(wagmiConfig, { hash })
+    if (receipt.status !== 'success') {
+      throw new Error('Transaction failed')
+    }
+
+    await submitRescore({
+      repoSlug,
+      txHash: hash,
+      walletAddress: address,
+    })
+  }
+
   async function runRescore() {
     if (!address) return
 
     try {
-      setPhase('paying')
-      const hash = await sendTransactionAsync({
-        to: RECEIVER_BUY_AND_BURN,
-        value: SCORE_PAYMENT_WEI,
-        chainId: base.id,
-      })
-      setPhase('scoring')
-
-      const receipt = await waitForTransactionReceipt(wagmiConfig, { hash })
-      if (receipt.status !== 'success') {
-        throw new Error('Transaction failed')
+      if (promoEligible) {
+        await runPromoRescore()
+      } else {
+        await runPaidRescore()
       }
-
-      const res = await fetch('/api/admin/autoscore-single', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          repoSlug,
-          txHash: hash,
-          walletAddress: address,
-        }),
-      })
-      const data = await res.json()
-      if (!data.ok) {
-        throw new Error(data.error || 'Scoring failed')
-      }
-      const rescoreMeta = data.rescoreMeta as RescoreSummaryRecord | undefined
-      onScored(data.repo as Repo, rescoreMeta ?? null)
-      router.refresh()
-      setInlineMsg('Rescore saved — expand card to see what changed.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -141,7 +229,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
 
   return (
     <div
-      style={{ position: 'relative', textAlign: 'center', minWidth: '88px', maxWidth: '140px' }}
+      style={{ position: 'relative', textAlign: 'center', minWidth: '88px', maxWidth: promoEligible ? '180px' : '140px' }}
       onClick={e => e.stopPropagation()}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '4px' }}>
@@ -154,9 +242,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
             padding: isMobile ? '8px 12px' : '3px 8px',
             minHeight: isMobile ? MIN_TAP : undefined,
             borderRadius: '99px',
-            border: '1px solid var(--border)',
-            background: 'var(--surface-2)',
-            color: busy ? 'var(--text-muted)' : 'var(--text-secondary)',
+            border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
+            background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
+            color: busy ? 'var(--text-muted)' : promoEligible ? 'var(--accent)' : 'var(--text-secondary)',
             cursor: busy ? 'wait' : 'pointer',
             fontWeight: 500,
           }}
@@ -164,14 +252,20 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           {actionLabel}
         </button>
         <InfoTooltip
-          content={<RescoreTooltipContent />}
+          content={<RescoreTooltipContent promoActive={Boolean(promoQuote?.promoActive)} />}
           ariaLabel="About Score and Rescore"
           icon="question"
           placement="above"
-          width={240}
+          width={260}
           interactive
         />
       </div>
+
+      {promoQuote?.promoBanner && promoQuote.promoActive && (
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: '180px', marginInline: 'auto' }}>
+          {promoQuote.promoBanner}
+        </div>
+      )}
 
       {showScoreMeta && (
         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35 }}>
@@ -200,7 +294,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           }}
         >
           <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-            No new commits and scoring context is up to date since the last score. Rescore anyway?
+            {promoEligible
+              ? `No new commits since the last score, but the launch promo still applies — free rescore plus ~${promoQuote?.rewardEth ?? 0} ETH reward. Continue?`
+              : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'}
           </p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button

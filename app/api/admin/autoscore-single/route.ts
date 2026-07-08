@@ -11,7 +11,20 @@ import { buildRescoreSummaryRecord, saveRescoreSummary } from '@/lib/rescoreSumm
 import { isCommunityContextEnabled, markAcceptedConsumed } from '@/lib/communityContext'
 import { getRedis } from '@/lib/redis'
 import { PAID_TX_KEY_PREFIX } from '@/lib/web3/constants'
-import { verifyPaymentTx } from '@/lib/web3/verifyPayment'
+import { verifyPaymentTx, verifyWalletSignature, walletHasGateAccess } from '@/lib/web3/verifyPayment'
+import {
+  computePromoReward,
+  consumePromoNonce,
+  getPromoConfig,
+  getWalletPromoPayoutCount,
+  hasPromoPayout,
+  isPromoWindowOpen,
+  markPromoPayout,
+  peekPromoNonce,
+  promoSignMessage,
+  repoToActivitySnapshot,
+} from '@/lib/rescorePromo'
+import { sendPromoReward, treasuryCanCover } from '@/lib/rescorePromoTreasury'
 
 export const maxDuration = 60
 
@@ -20,6 +33,41 @@ const ratelimit = new Ratelimit({
   limiter: Ratelimit.slidingWindow(3, '1 h'),
   prefix: 'build-report:rl:rescore',
 })
+
+async function runRescorePipeline(repoSlug: string) {
+  const redis = getRedis()
+  const oldRepo = await resolveRepoBeforeRescore(repoSlug)
+  const [commitMessages, commits30dAtRescore] = await Promise.all([
+    fetchRecentCommitMessages(repoSlug),
+    fetchCommits30dCount(repoSlug),
+  ])
+
+  const repo = await runAutoscoreSingle(repoSlug)
+  if (!repo) {
+    throw new Error('Could not score repo')
+  }
+
+  const { summary: changeSummary, deltaHeader } = await generateRescoreChangeSummary({
+    oldRepo,
+    newRepo: repo,
+    commitMessages,
+  })
+
+  const rescoreMeta = buildRescoreSummaryRecord({
+    oldRepo,
+    newRepo: repo,
+    summary: changeSummary,
+    deltaHeader,
+    commits30dAtRescore,
+  })
+  await saveRescoreSummary(repoSlug, rescoreMeta, redis)
+  await bustOverallSummaryCache(redis)
+  if (isCommunityContextEnabled()) {
+    await markAcceptedConsumed(repoSlug, new Date().toISOString())
+  }
+
+  return { repo, changeSummary, rescoreMeta }
+}
 
 export async function POST(req: NextRequest) {
   const redis = getRedis()
@@ -30,9 +78,16 @@ export async function POST(req: NextRequest) {
     const repoSlug = typeof body.repoSlug === 'string' ? body.repoSlug.trim() : ''
     const txHash = typeof body.txHash === 'string' ? body.txHash.trim() : ''
     const walletAddress = typeof body.walletAddress === 'string' ? body.walletAddress.trim() : ''
+    const promoNonce = typeof body.promoNonce === 'string' ? body.promoNonce.trim() : ''
+    const promoSignature = typeof body.promoSignature === 'string' ? body.promoSignature.trim() : ''
+    const isPromoPath = Boolean(promoNonce && promoSignature && !txHash)
 
-    if (!repoSlug || !txHash || !walletAddress) {
+    if (!repoSlug || !walletAddress) {
       return NextResponse.json({ ok: false, error: 'Missing required fields' }, { status: 400 })
+    }
+
+    if (!isPromoPath && !txHash) {
+      return NextResponse.json({ ok: false, error: 'Missing payment or promo authorization' }, { status: 400 })
     }
 
     if (shouldSkipRepo(repoSlug)) {
@@ -43,58 +98,134 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Repo is excluded from scoring' }, { status: 400 })
     }
 
-    paidKey = `${PAID_TX_KEY_PREFIX}${txHash}`
-    const claimed = await redis.set(paidKey, 'pending', { nx: true, ex: 3600 })
-    if (!claimed) {
-      return NextResponse.json(
-        { ok: false, error: 'Transaction already used or in progress' },
-        { status: 400 },
-      )
+    const hasAccess = await walletHasGateAccess(walletAddress)
+    if (!hasAccess) {
+      return NextResponse.json({ ok: false, error: 'Wallet does not meet CLAWDGate access requirements' }, { status: 403 })
     }
-
-    await verifyPaymentTx(txHash, walletAddress)
 
     const { success } = await ratelimit.limit(walletAddress.toLowerCase())
     if (!success) {
-      await redis.del(paidKey)
       return NextResponse.json({ ok: false, error: 'Rate limit exceeded — max 3 rescores per hour per wallet' }, { status: 429 })
     }
 
-    const oldRepo = await resolveRepoBeforeRescore(repoSlug)
-    const [commitMessages, commits30dAtRescore] = await Promise.all([
-      fetchRecentCommitMessages(repoSlug),
-      fetchCommits30dCount(repoSlug),
-    ])
+    let promoRewardWei = BigInt(0)
+    let promoRewardEth = 0
 
-    const repo = await runAutoscoreSingle(repoSlug)
-    if (!repo) {
-      await redis.del(paidKey)
-      return NextResponse.json({ ok: false, error: 'Could not score repo' }, { status: 500 })
+    if (isPromoPath) {
+      if (!isPromoWindowOpen()) {
+        return NextResponse.json({ ok: false, error: 'Promo is not active' }, { status: 400 })
+      }
+
+      if (await hasPromoPayout(walletAddress, repoSlug, promoNonce)) {
+        return NextResponse.json({ ok: false, error: 'Promo reward already claimed for this attempt' }, { status: 400 })
+      }
+
+      if (!(await peekPromoNonce(walletAddress, repoSlug, promoNonce))) {
+        return NextResponse.json({ ok: false, error: 'Invalid or expired promo authorization' }, { status: 400 })
+      }
+
+      const validSig = await verifyWalletSignature(
+        walletAddress,
+        promoSignMessage(repoSlug, promoNonce),
+        promoSignature,
+      )
+      if (!validSig) {
+        return NextResponse.json({ ok: false, error: 'Promo signature did not match wallet' }, { status: 401 })
+      }
+
+      const nonceOk = await consumePromoNonce(walletAddress, repoSlug, promoNonce)
+      if (!nonceOk) {
+        return NextResponse.json({ ok: false, error: 'Invalid or expired promo authorization' }, { status: 400 })
+      }
+
+      const beforeRepo = await resolveRepoBeforeRescore(repoSlug)
+      if (!beforeRepo?.scoredAt) {
+        return NextResponse.json({ ok: false, error: 'Promo applies to rescored repos with stale commits' }, { status: 400 })
+      }
+
+      const reward = computePromoReward(repoToActivitySnapshot(beforeRepo))
+      promoRewardWei = reward.rewardWei
+      promoRewardEth = reward.rewardEth
+
+      if (promoRewardWei <= BigInt(0)) {
+        return NextResponse.json({ ok: false, error: 'Repo is not eligible for promo reward' }, { status: 400 })
+      }
+
+      const config = getPromoConfig()
+      if (config.maxPayoutsPerWallet) {
+        const used = await getWalletPromoPayoutCount(walletAddress)
+        if (used >= config.maxPayoutsPerWallet) {
+          return NextResponse.json({ ok: false, error: 'Promo payout limit reached for this wallet' }, { status: 400 })
+        }
+      }
+
+      if (!(await treasuryCanCover(promoRewardWei))) {
+        return NextResponse.json({ ok: false, error: 'Promo treasury balance is too low' }, { status: 503 })
+      }
+    } else {
+      paidKey = `${PAID_TX_KEY_PREFIX}${txHash}`
+      const claimed = await redis.set(paidKey, 'pending', { nx: true, ex: 3600 })
+      if (!claimed) {
+        return NextResponse.json(
+          { ok: false, error: 'Transaction already used or in progress' },
+          { status: 400 },
+        )
+      }
+      await verifyPaymentTx(txHash, walletAddress)
     }
 
-    const { summary: changeSummary, deltaHeader } = await generateRescoreChangeSummary({
-      oldRepo,
-      newRepo: repo,
-      commitMessages,
-    })
+    let pipeline
+    try {
+      pipeline = await runRescorePipeline(repoSlug)
+    } catch (err) {
+      if (paidKey) await redis.del(paidKey)
+      throw err
+    }
 
-    const rescoreMeta = buildRescoreSummaryRecord({
-      oldRepo,
-      newRepo: repo,
-      summary: changeSummary,
-      deltaHeader,
-      commits30dAtRescore,
-    })
-    await saveRescoreSummary(repoSlug, rescoreMeta, redis)
+    if (isPromoPath) {
+      let payoutTxHash: `0x${string}`
+      try {
+        payoutTxHash = await sendPromoReward(walletAddress, promoRewardWei)
+      } catch (payoutErr) {
+        console.error('[autoscore-single] promo payout failed after rescore:', payoutErr)
+        return NextResponse.json({
+          ok: true,
+          repo: pipeline.repo,
+          changeSummary: pipeline.changeSummary,
+          rescoreMeta: pipeline.rescoreMeta,
+          promo: {
+            rewardEth: promoRewardEth,
+            payoutTxHash: null,
+            payoutPending: true,
+            payoutError: payoutErr instanceof Error ? payoutErr.message : 'Payout failed',
+          },
+        })
+      }
 
-    await redis.set(paidKey, `complete:${repoSlug}`)
-    await bustOverallSummaryCache(redis)
+      await markPromoPayout(walletAddress, repoSlug, promoNonce, payoutTxHash, promoRewardEth)
+
+      return NextResponse.json({
+        ok: true,
+        repo: pipeline.repo,
+        changeSummary: pipeline.changeSummary,
+        rescoreMeta: pipeline.rescoreMeta,
+        promo: {
+          rewardEth: promoRewardEth,
+          payoutTxHash,
+          payoutPending: false,
+        },
+      })
+    }
+
+    if (paidKey) await redis.set(paidKey, `complete:${repoSlug}`)
     await recordRescoreBurn(redis)
-    if (isCommunityContextEnabled()) {
-      await markAcceptedConsumed(repoSlug, new Date().toISOString())
-    }
 
-    return NextResponse.json({ ok: true, repo, changeSummary, rescoreMeta })
+    return NextResponse.json({
+      ok: true,
+      repo: pipeline.repo,
+      changeSummary: pipeline.changeSummary,
+      rescoreMeta: pipeline.rescoreMeta,
+    })
   } catch (err: unknown) {
     if (paidKey) {
       await redis.del(paidKey).catch(() => {})
