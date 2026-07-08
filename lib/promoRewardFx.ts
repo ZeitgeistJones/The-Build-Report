@@ -1,6 +1,6 @@
 const SOUND_PREF_KEY = 'promo-reward-sound'
 
-export type PromoRewardSoundGroup = 'payoff' | 'glow-payout' | 'glow' | 'soft' | 'combo' | 'drawer' | 'classic'
+export type PromoRewardSoundGroup = 'payoff-final' | 'payoff' | 'glow-payout' | 'glow' | 'soft' | 'combo' | 'drawer' | 'classic'
 
 export type PromoRewardSoundVariant =
   | 'cha-ching'
@@ -37,6 +37,12 @@ export type PromoRewardSoundVariant =
   | 'glow-payout-waited'
   | 'glow-payout-landed'
   | 'glow-payout-payoff-warm'
+  | 'glow-payout-payoff-sweet-landed'
+  | 'glow-payout-payoff-touchdown'
+  | 'glow-payout-payoff-rest'
+  | 'glow-payout-payoff-merge'
+  | 'glow-payout-payoff-landed-hush'
+  | 'glow-payout-payoff-sweet-linger'
   | 'whisper-glow'
   | 'soft-glow'
   | 'gentle-glow'
@@ -47,7 +53,8 @@ export type PromoRewardSoundVariant =
 export const PROMO_REWARD_PREVIEW_WAIT_MS = 5000
 
 export const PROMO_REWARD_SOUND_GROUPS: { id: PromoRewardSoundGroup; label: string }[] = [
-  { id: 'payoff', label: 'After-the-wait payoff (real timing)' },
+  { id: 'payoff-final', label: 'Sweet land + landed (your finalists)' },
+  { id: 'payoff', label: 'Other after-the-wait payoff' },
   { id: 'glow-payout', label: 'Glow payout variants' },
   { id: 'glow', label: 'Glow family' },
   { id: 'soft', label: 'Soft earn & gentle payout' },
@@ -63,53 +70,100 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   group: PromoRewardSoundGroup
   live?: boolean
   pick?: boolean
+  finalist?: boolean
 }[] = [
   {
     id: 'glow-payout-payoff',
     label: 'Payoff · sweet land',
-    hint: 'Sweet-spot tones, slower landing — built for post-scoring wait.',
-    group: 'payoff',
+    hint: 'Your finalist — sweet tones, slower landing after the wait.',
+    group: 'payoff-final',
     pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-landed',
+    label: 'Payoff · landed',
+    hint: 'Your finalist — light rustle, warm pings, lingering finish.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-sweet-landed',
+    label: 'Payoff · sweet + landed',
+    hint: 'Blend of your two picks — balanced rustle, tone, and linger.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-merge',
+    label: 'Payoff · merge',
+    hint: 'Exact midpoint between sweet land and landed.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-touchdown',
+    label: 'Payoff · touchdown',
+    hint: 'Landed’s light rustle + sweet land’s brighter tone shape.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-rest',
+    label: 'Payoff · rest',
+    hint: 'Quietest rustle, sweet tones, longest settle on the last note.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-sweet-linger',
+    label: 'Payoff · sweet linger',
+    hint: 'Sweet land with landed’s longer tail decay.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-landed-hush',
+    label: 'Payoff · landed hush',
+    hint: 'Landed turned down a notch — even softer payoff.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
   },
   {
     id: 'glow-payout-arrival',
     label: 'Payoff · arrival',
     hint: 'Rustle, brief pause, then warm pings — “result showed up”.',
     group: 'payoff',
-    pick: true,
   },
   {
     id: 'glow-payout-payoff-warm',
     label: 'Payoff · warm land',
     hint: 'Warm glow payout with space to breathe after the wait.',
     group: 'payoff',
-    pick: true,
   },
   {
     id: 'glow-payout-settle',
     label: 'Payoff · settle',
     hint: 'Warm cascade + soft tail — money landed and settled.',
     group: 'payoff',
-    pick: true,
   },
   {
     id: 'glow-payout-rewarded',
     label: 'Payoff · rewarded',
     hint: 'Mid-warm tones, unhurried rhythm, stronger final note.',
     group: 'payoff',
-    pick: true,
   },
   {
     id: 'glow-payout-waited',
     label: 'Payoff · waited',
     hint: 'For the “I sat through Scoring…” moment — cozy, not snappy.',
-    group: 'payoff',
-    pick: true,
-  },
-  {
-    id: 'glow-payout-landed',
-    label: 'Payoff · landed',
-    hint: 'Light rustle, warm pings, lingering last tone.',
     group: 'payoff',
   },
   {
@@ -841,6 +895,72 @@ function playGlowPayoutLanded(synth: Synth) {
   })
 }
 
+function playGlowPayoutPayoffSweetLanded(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.75,
+    pingOffset: 0.12,
+    pingGap: 0.105,
+    freqs: [600, 902, 1071],
+    peaks: [0.1, 0.12, 0.071],
+    decays: [0.16, 0.22, 0.255],
+  })
+}
+
+function playGlowPayoutPayoffMerge(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.725,
+    pingOffset: 0.12,
+    pingGap: 0.102,
+    freqs: [600, 902, 1071],
+    peaks: [0.1, 0.12, 0.071],
+    decays: [0.16, 0.22, 0.262],
+  })
+}
+
+function playGlowPayoutPayoffTouchdown(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.65,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.1, 0.12, 0.07],
+    decays: [0.16, 0.22, 0.24],
+  })
+}
+
+function playGlowPayoutPayoffRest(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.58,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.095, 0.115, 0.068],
+    decays: [0.17, 0.24, 0.3],
+  })
+}
+
+function playGlowPayoutPayoffSweetLinger(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.85,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.1, 0.12, 0.07],
+    decays: [0.16, 0.22, 0.28],
+  })
+}
+
+function playGlowPayoutPayoffLandedHush(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.65,
+    pingOffset: 0.12,
+    pingGap: 0.1,
+    freqs: [580, 870, 1034],
+    peaks: [0.085, 0.1, 0.06],
+    decays: [0.17, 0.23, 0.28],
+  })
+}
+
 function playWhisperGlow(synth: Synth) {
   const { now } = synth
   playRegisterGlowRustle(synth, now, 0.55)
@@ -939,6 +1059,12 @@ const VARIANT_PLAYERS: Record<PromoRewardSoundVariant, (synth: Synth) => void> =
   'glow-payout-waited': playGlowPayoutWaited,
   'glow-payout-landed': playGlowPayoutLanded,
   'glow-payout-payoff-warm': playGlowPayoutPayoffWarm,
+  'glow-payout-payoff-sweet-landed': playGlowPayoutPayoffSweetLanded,
+  'glow-payout-payoff-touchdown': playGlowPayoutPayoffTouchdown,
+  'glow-payout-payoff-rest': playGlowPayoutPayoffRest,
+  'glow-payout-payoff-merge': playGlowPayoutPayoffMerge,
+  'glow-payout-payoff-landed-hush': playGlowPayoutPayoffLandedHush,
+  'glow-payout-payoff-sweet-linger': playGlowPayoutPayoffSweetLinger,
   'whisper-glow': playWhisperGlow,
   'soft-glow': playSoftGlow,
   'gentle-glow': playGentleGlow,

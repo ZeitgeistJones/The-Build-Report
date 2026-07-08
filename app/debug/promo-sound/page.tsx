@@ -37,9 +37,11 @@ const pickButtonStyle = {
   background: 'color-mix(in srgb, var(--green) 10%, var(--surface-2))',
 }
 
-const payoffButtonStyle = {
+const finalistButtonStyle = {
   ...pickButtonStyle,
-  border: '1px solid color-mix(in srgb, var(--green) 55%, transparent)',
+  border: '1px solid color-mix(in srgb, var(--green) 65%, transparent)',
+  background: 'color-mix(in srgb, var(--green) 16%, var(--surface-2))',
+  fontWeight: 600,
 }
 
 export default function PromoSoundPreviewPage() {
@@ -115,7 +117,7 @@ export default function PromoSoundPreviewPage() {
     >
       <h1 style={{ fontSize: '20px', fontWeight: 600 }}>Promo reward sound preview</h1>
       <p style={{ fontSize: '14px', color: 'var(--text-muted)', maxWidth: '480px', textAlign: 'center', lineHeight: 1.5 }}>
-        Real promo plays after Signing → Scoring → payout. Use the 5s wait toggle to feel that payoff moment.
+        Sweet land + landed at the top. Keep 5s wait on — pick one to ship live.
       </p>
 
       <label
@@ -175,8 +177,8 @@ export default function PromoSoundPreviewPage() {
                     style={
                       variant.live
                         ? { ...liveButtonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }
-                        : variant.group === 'payoff'
-                          ? { ...payoffButtonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }
+                        : variant.finalist
+                          ? { ...finalistButtonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }
                           : variant.pick
                             ? { ...pickButtonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }
                             : { ...buttonStyle, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }
@@ -185,7 +187,7 @@ export default function PromoSoundPreviewPage() {
                     <div>
                       {variant.label}
                       {variant.live ? ' · live now' : ''}
-                      {variant.pick && !variant.live && variant.group !== 'payoff' ? ' · your pick' : ''}
+                      {variant.finalist ? ' · finalist' : variant.pick && !variant.live ? ' · your pick' : ''}
                     </div>
                     <div style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '3px', lineHeight: 1.35 }}>
                       {variant.hint}
