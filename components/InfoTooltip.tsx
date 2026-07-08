@@ -19,6 +19,8 @@ interface Props {
   interactive?: boolean
   /** Smaller trigger for nested badges; keeps 14px on mobile. */
   compact?: boolean
+  /** Accent link-style label instead of the ⓘ / ? icon. */
+  textTrigger?: string
 }
 
 export default function InfoTooltip({
@@ -29,6 +31,7 @@ export default function InfoTooltip({
   width = 260,
   interactive = false,
   compact = false,
+  textTrigger,
 }: Props) {
   const isMobile = useIsMobile()
   const [show, setShow] = useState(false)
@@ -66,7 +69,7 @@ export default function InfoTooltip({
   }
 
   useEffect(() => {
-    if (!show || !interactive) return
+    if (!show || (!interactive && !textTrigger)) return
     function onDocClick() {
       setShow(false)
     }
@@ -77,7 +80,7 @@ export default function InfoTooltip({
       clearTimeout(timer)
       document.removeEventListener('click', onDocClick)
     }
-  }, [show, interactive])
+  }, [show, interactive, textTrigger])
 
   useLayoutEffect(() => {
     if (!show || !anchorRef.current) {
@@ -87,17 +90,20 @@ export default function InfoTooltip({
 
     const rect = anchorRef.current.getBoundingClientRect()
     const panelWidth = isMobile ? Math.min(width, window.innerWidth - 32) : width
-    const left = Math.max(8, Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8))
+    const left = textTrigger
+      ? Math.max(8, Math.min(rect.left, window.innerWidth - panelWidth - 8))
+      : Math.max(8, Math.min(rect.right - panelWidth, window.innerWidth - panelWidth - 8))
 
     if (placement === 'above') {
       setPos({ top: rect.top - 6, left })
     } else {
       setPos({ top: rect.bottom + 6, left })
     }
-  }, [show, isMobile, width, placement])
+  }, [show, isMobile, width, placement, textTrigger])
 
   const hitSize = isMobile ? MIN_TAP : compact ? 24 : 14
   const iconSize = compact ? 9 : icon === 'question' ? 9 : 11
+  const panelInteractive = interactive || Boolean(textTrigger)
 
   const panelStyle = {
     background: 'var(--surface-3)',
@@ -120,25 +126,40 @@ export default function InfoTooltip({
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
         aria-label={ariaLabel}
-        style={{
-          width: hitSize,
-          height: hitSize,
-          minWidth: hitSize,
-          minHeight: hitSize,
-          borderRadius: '50%',
-          background: icon === 'question' ? 'var(--surface-3)' : 'transparent',
-          color: 'var(--text-muted)',
-          fontSize: iconSize,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          cursor: 'default',
-          padding: 0,
-          border: 'none',
-        }}
+        style={
+          textTrigger
+            ? {
+                fontSize: '12px',
+                color: 'var(--accent)',
+                background: 'transparent',
+                border: 'none',
+                padding: isMobile ? '8px 0' : 0,
+                minHeight: isMobile ? MIN_TAP : undefined,
+                cursor: 'pointer',
+                fontWeight: 400,
+                lineHeight: 1.4,
+                textAlign: 'left',
+              }
+            : {
+                width: hitSize,
+                height: hitSize,
+                minWidth: hitSize,
+                minHeight: hitSize,
+                borderRadius: '50%',
+                background: icon === 'question' ? 'var(--surface-3)' : 'transparent',
+                color: 'var(--text-muted)',
+                fontSize: iconSize,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                cursor: 'default',
+                padding: 0,
+                border: 'none',
+              }
+        }
       >
-        {icon === 'question' ? '?' : 'ⓘ'}
+        {textTrigger ?? (icon === 'question' ? '?' : 'ⓘ')}
       </button>
       {show && pos && createPortal(
         <div
@@ -150,7 +171,7 @@ export default function InfoTooltip({
             left: pos.left,
             transform: placement === 'above' ? 'translateY(-100%)' : undefined,
             zIndex: 9999,
-            pointerEvents: interactive ? 'auto' : 'none',
+            pointerEvents: panelInteractive ? 'auto' : 'none',
             width: isMobile ? Math.min(width, window.innerWidth - 32) : width,
           }}
         >

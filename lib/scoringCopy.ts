@@ -39,6 +39,9 @@ export const RESCORE_BUTTON_TOOLTIP =
 export const RESCORE_PROMO_TOOLTIP =
   'Limited launch promo: on stale repos, rescore is free and we send ~1¢ ETH per stale commit to your wallet from the promo treasury. Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low.'
 
+export const ECOSYSTEM_ADD_CONTEXT_TOOLTIP =
+  'Holders can add real-world context on individual repo cards — onchain facts, governance, or utility GitHub activity alone won’t show. Enough net upvotes auto-accepts it; the AI reads accepted context on the next rescore. Submitting burns a small amount of CLAWD; voting is free for holders.'
+
 export const RESCORE_PROMO_SITE_BANNER = {
   title: 'Limited-time rescore promo',
   summary:

@@ -22,6 +22,8 @@ import {
   type GradeCardId,
 } from '@/lib/gradeCardCopy'
 import { useIsMobile } from '@/hooks/useIsMobile'
+import InfoTooltip from '@/components/InfoTooltip'
+import { ECOSYSTEM_ADD_CONTEXT_TOOLTIP } from '@/lib/scoringCopy'
 import RubricBlockPanel from '@/components/RubricBlockPanel'
 
 type CardId = GradeCardId
@@ -770,17 +772,28 @@ export default function GradesPanel({
           gap: isMobile ? '10px' : '16px',
         }}
       >
-        <span
-          style={{
-            fontSize: '11px',
-            fontWeight: 600,
-            color: 'var(--text-muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-          }}
-        >
-          Ecosystem Grades
-        </span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: isMobile ? '10px' : '16px', flexWrap: 'wrap', minWidth: 0 }}>
+          <span
+            style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--text-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+            }}
+          >
+            Ecosystem Grades
+          </span>
+          {communityContextEnabled && (
+            <InfoTooltip
+              textTrigger="Think we're missing something? Add context →"
+              content={ECOSYSTEM_ADD_CONTEXT_TOOLTIP}
+              ariaLabel="About community context"
+              width={280}
+              placement="below"
+            />
+          )}
+        </div>
         <div style={isMobile ? { width: '100%', display: 'flex' } : { flexShrink: 0 }}>
           <PeriodToggle />
         </div>
