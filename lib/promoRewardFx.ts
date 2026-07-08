@@ -43,6 +43,14 @@ export type PromoRewardSoundVariant =
   | 'glow-payout-payoff-merge'
   | 'glow-payout-payoff-landed-hush'
   | 'glow-payout-payoff-sweet-linger'
+  | 'glow-payout-payoff-touchdown-sweet'
+  | 'glow-payout-payoff-touchdown-merge'
+  | 'glow-payout-payoff-sweet-soft-rustle'
+  | 'glow-payout-payoff-touchdown-settle'
+  | 'glow-payout-payoff-sweet-breathe'
+  | 'glow-payout-payoff-touchdown-warm'
+  | 'glow-payout-payoff-touchdown-lift'
+  | 'glow-payout-payoff-sweet-touch'
   | 'whisper-glow'
   | 'soft-glow'
   | 'gentle-glow'
@@ -53,7 +61,7 @@ export type PromoRewardSoundVariant =
 export const PROMO_REWARD_PREVIEW_WAIT_MS = 5000
 
 export const PROMO_REWARD_SOUND_GROUPS: { id: PromoRewardSoundGroup; label: string }[] = [
-  { id: 'payoff-final', label: 'Sweet land + landed (your finalists)' },
+  { id: 'payoff-final', label: 'Touchdown + sweet land (your finalists)' },
   { id: 'payoff', label: 'Other after-the-wait payoff' },
   { id: 'glow-payout', label: 'Glow payout variants' },
   { id: 'glow', label: 'Glow family' },
@@ -75,31 +83,7 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   {
     id: 'glow-payout-payoff',
     label: 'Payoff · sweet land',
-    hint: 'Your finalist — sweet tones, slower landing after the wait.',
-    group: 'payoff-final',
-    pick: true,
-    finalist: true,
-  },
-  {
-    id: 'glow-payout-landed',
-    label: 'Payoff · landed',
-    hint: 'Your finalist — light rustle, warm pings, lingering finish.',
-    group: 'payoff-final',
-    pick: true,
-    finalist: true,
-  },
-  {
-    id: 'glow-payout-payoff-sweet-landed',
-    label: 'Payoff · sweet + landed',
-    hint: 'Blend of your two picks — balanced rustle, tone, and linger.',
-    group: 'payoff-final',
-    pick: true,
-    finalist: true,
-  },
-  {
-    id: 'glow-payout-payoff-merge',
-    label: 'Payoff · merge',
-    hint: 'Exact midpoint between sweet land and landed.',
+    hint: 'Your finalist — fuller rustle, sweet payout tones after the wait.',
     group: 'payoff-final',
     pick: true,
     finalist: true,
@@ -107,34 +91,110 @@ export const PROMO_REWARD_SOUND_VARIANTS: {
   {
     id: 'glow-payout-payoff-touchdown',
     label: 'Payoff · touchdown',
-    hint: 'Landed’s light rustle + sweet land’s brighter tone shape.',
+    hint: 'Your finalist — lighter rustle, same sweet payout shape.',
     group: 'payoff-final',
     pick: true,
     finalist: true,
   },
   {
-    id: 'glow-payout-payoff-rest',
-    label: 'Payoff · rest',
-    hint: 'Quietest rustle, sweet tones, longest settle on the last note.',
+    id: 'glow-payout-payoff-touchdown-sweet',
+    label: 'Payoff · touchdown + sweet',
+    hint: 'Blend — medium rustle between touchdown and sweet land.',
     group: 'payoff-final',
     pick: true,
     finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-touchdown-merge',
+    label: 'Payoff · touchdown merge',
+    hint: 'Mid rustle + longer final settle from sweet land.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-sweet-soft-rustle',
+    label: 'Payoff · sweet soft rustle',
+    hint: 'Sweet land with rustle pulled toward touchdown.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-touchdown-settle',
+    label: 'Payoff · touchdown settle',
+    hint: 'Touchdown rustle + longer decay on the last ping.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-sweet-breathe',
+    label: 'Payoff · sweet breathe',
+    hint: 'Sweet land slowed slightly — more air between pings.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-touchdown-warm',
+    label: 'Payoff · touchdown warm',
+    hint: 'Touchdown’s light rustle + slightly warmer note shape.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-touchdown-lift',
+    label: 'Payoff · touchdown lift',
+    hint: 'Touchdown with a touch more presence on the middle ping.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-payoff-sweet-touch',
+    label: 'Payoff · sweet touch',
+    hint: 'Sweet land softened — rustle between touchdown and sweet.',
+    group: 'payoff-final',
+    pick: true,
+    finalist: true,
+  },
+  {
+    id: 'glow-payout-landed',
+    label: 'Payoff · landed',
+    hint: 'Light rustle, warm pings, lingering finish.',
+    group: 'payoff',
+  },
+  {
+    id: 'glow-payout-payoff-sweet-landed',
+    label: 'Payoff · sweet + landed',
+    hint: 'Blend of sweet land and landed.',
+    group: 'payoff',
+  },
+  {
+    id: 'glow-payout-payoff-merge',
+    label: 'Payoff · merge',
+    hint: 'Midpoint between sweet land and landed.',
+    group: 'payoff',
+  },
+  {
+    id: 'glow-payout-payoff-rest',
+    label: 'Payoff · rest',
+    hint: 'Quietest rustle, sweet tones, longest settle.',
+    group: 'payoff',
   },
   {
     id: 'glow-payout-payoff-sweet-linger',
     label: 'Payoff · sweet linger',
     hint: 'Sweet land with landed’s longer tail decay.',
-    group: 'payoff-final',
-    pick: true,
-    finalist: true,
+    group: 'payoff',
   },
   {
     id: 'glow-payout-payoff-landed-hush',
     label: 'Payoff · landed hush',
-    hint: 'Landed turned down a notch — even softer payoff.',
-    group: 'payoff-final',
-    pick: true,
-    finalist: true,
+    hint: 'Landed turned down a notch.',
+    group: 'payoff',
   },
   {
     id: 'glow-payout-arrival',
@@ -928,6 +988,94 @@ function playGlowPayoutPayoffTouchdown(synth: Synth) {
   })
 }
 
+function playGlowPayoutPayoffTouchdownSweet(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.75,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.1, 0.12, 0.07],
+    decays: [0.16, 0.22, 0.24],
+  })
+}
+
+function playGlowPayoutPayoffTouchdownMerge(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.75,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.1, 0.12, 0.07],
+    decays: [0.16, 0.22, 0.27],
+  })
+}
+
+function playGlowPayoutPayoffSweetSoftRustle(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.78,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.1, 0.12, 0.07],
+    decays: [0.16, 0.22, 0.24],
+  })
+}
+
+function playGlowPayoutPayoffTouchdownSettle(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.65,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.1, 0.12, 0.072],
+    decays: [0.16, 0.23, 0.28],
+  })
+}
+
+function playGlowPayoutPayoffSweetBreathe(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.85,
+    pingOffset: 0.12,
+    pingGap: 0.115,
+    freqs: [620, 934, 1108],
+    peaks: [0.098, 0.118, 0.068],
+    decays: [0.17, 0.23, 0.26],
+  })
+}
+
+function playGlowPayoutPayoffTouchdownWarm(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.65,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [610, 920, 1095],
+    peaks: [0.1, 0.12, 0.07],
+    decays: [0.16, 0.22, 0.25],
+  })
+}
+
+function playGlowPayoutPayoffTouchdownLift(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.68,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.1, 0.125, 0.072],
+    decays: [0.16, 0.22, 0.25],
+  })
+}
+
+function playGlowPayoutPayoffSweetTouch(synth: Synth) {
+  playGlowPayoutBase(synth, {
+    rustleScale: 0.72,
+    pingOffset: 0.12,
+    pingGap: 0.11,
+    freqs: [620, 934, 1108],
+    peaks: [0.098, 0.118, 0.068],
+    decays: [0.16, 0.22, 0.25],
+  })
+}
+
 function playGlowPayoutPayoffRest(synth: Synth) {
   playGlowPayoutBase(synth, {
     rustleScale: 0.58,
@@ -1065,6 +1213,14 @@ const VARIANT_PLAYERS: Record<PromoRewardSoundVariant, (synth: Synth) => void> =
   'glow-payout-payoff-merge': playGlowPayoutPayoffMerge,
   'glow-payout-payoff-landed-hush': playGlowPayoutPayoffLandedHush,
   'glow-payout-payoff-sweet-linger': playGlowPayoutPayoffSweetLinger,
+  'glow-payout-payoff-touchdown-sweet': playGlowPayoutPayoffTouchdownSweet,
+  'glow-payout-payoff-touchdown-merge': playGlowPayoutPayoffTouchdownMerge,
+  'glow-payout-payoff-sweet-soft-rustle': playGlowPayoutPayoffSweetSoftRustle,
+  'glow-payout-payoff-touchdown-settle': playGlowPayoutPayoffTouchdownSettle,
+  'glow-payout-payoff-sweet-breathe': playGlowPayoutPayoffSweetBreathe,
+  'glow-payout-payoff-touchdown-warm': playGlowPayoutPayoffTouchdownWarm,
+  'glow-payout-payoff-touchdown-lift': playGlowPayoutPayoffTouchdownLift,
+  'glow-payout-payoff-sweet-touch': playGlowPayoutPayoffSweetTouch,
   'whisper-glow': playWhisperGlow,
   'soft-glow': playSoftGlow,
   'gentle-glow': playGentleGlow,

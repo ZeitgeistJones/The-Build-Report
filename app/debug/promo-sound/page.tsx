@@ -117,7 +117,7 @@ export default function PromoSoundPreviewPage() {
     >
       <h1 style={{ fontSize: '20px', fontWeight: 600 }}>Promo reward sound preview</h1>
       <p style={{ fontSize: '14px', color: 'var(--text-muted)', maxWidth: '480px', textAlign: 'center', lineHeight: 1.5 }}>
-        Sweet land + landed at the top. Keep 5s wait on — pick one to ship live.
+        Touchdown + sweet land at the top. Keep 5s wait on.
       </p>
 
       <label
