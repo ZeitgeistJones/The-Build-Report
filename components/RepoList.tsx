@@ -537,7 +537,24 @@ export default function RepoList({
   }, [filterControl])
 
   useEffect(() => {
-    setRepoItems(repos)
+    setRepoItems(prev => {
+      const prevBySlug = new Map(prev.map(r => [r.githubSlug, r]))
+      return repos.map(r => {
+        const local = prevBySlug.get(r.githubSlug)
+        if (!local?.scoredAt) return r
+
+        const localScored = Date.parse(local.scoredAt)
+        const serverScored = r.scoredAt ? Date.parse(r.scoredAt) : 0
+        if (!Number.isFinite(localScored) || localScored <= serverScored) return r
+
+        return {
+          ...r,
+          ...local,
+          id: r.id,
+          githubSlug: r.githubSlug,
+        }
+      })
+    })
   }, [repos])
 
   function handleScored(updated: Repo, rescoreMeta?: RescoreSummaryRecord | null) {

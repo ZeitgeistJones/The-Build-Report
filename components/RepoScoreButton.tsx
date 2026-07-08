@@ -30,7 +30,7 @@ import { SCORE_PAYMENT_ETH } from '@/lib/rescoreBurns'
 import { formatApproxUsdFromEth, formatRescorePriceLabel } from '@/lib/promoUsd'
 import { useEthUsdRate } from '@/components/EthUsdProvider'
 import PromoRewardToast from '@/components/PromoRewardToast'
-import { playPromoRewardChime } from '@/lib/promoRewardFx'
+import { playPromoRewardChime, primePromoRewardAudio } from '@/lib/promoRewardFx'
 
 interface Props {
   repoSlug: string
@@ -136,7 +136,6 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     }
     const rescoreMeta = data.rescoreMeta as RescoreSummaryRecord | undefined
     onScored(data.repo as Repo, rescoreMeta ?? null)
-    router.refresh()
 
     if (data.promo?.payoutTxHash) {
       const amt = formatApproxUsdFromEth(Number(data.promo.rewardEth ?? 0), ethUsdRate)
@@ -149,11 +148,16 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       playPromoRewardChime()
     } else if (data.promo?.payoutPending) {
       setError(data.promo.payoutError ?? 'Promo rescore saved but reward payout failed.')
+      setInlineMsg('Rescore saved — expand card to see what changed.')
     } else if (data.promo) {
       setInlineMsg('Rescore saved — expand card to see what changed.')
     } else {
       setInlineMsg('Rescore saved — expand card to see what changed.')
     }
+
+    window.setTimeout(() => {
+      router.refresh()
+    }, 1200)
   }
 
   async function runPromoRescore() {
@@ -205,6 +209,8 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
 
   async function runRescore() {
     if (!address) return
+
+    primePromoRewardAudio()
 
     try {
       const freshQuote = await fetchPromoQuote(repoSlug, address)

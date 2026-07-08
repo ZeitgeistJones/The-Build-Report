@@ -1,5 +1,7 @@
 const SOUND_PREF_KEY = 'promo-reward-sound'
 
+let primedAudioContext: AudioContext | null = null
+
 export function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return false
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -15,15 +17,30 @@ export function setPromoRewardSoundEnabled(enabled: boolean) {
   localStorage.setItem(SOUND_PREF_KEY, enabled ? 'on' : 'off')
 }
 
-/** Short coin-like chime — no audio file, respects reduced motion + mute pref. */
-export function playPromoRewardChime() {
+/** Call on button click so the later chime isn't blocked after async scoring. */
+export function primePromoRewardAudio() {
   if (typeof window === 'undefined') return
   if (prefersReducedMotion() || !isPromoRewardSoundEnabled()) return
 
   const AudioCtx = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
   if (!AudioCtx) return
 
-  const ctx = new AudioCtx()
+  if (!primedAudioContext || primedAudioContext.state === 'closed') {
+    primedAudioContext = new AudioCtx()
+  }
+  if (primedAudioContext.state === 'suspended') {
+    void primedAudioContext.resume()
+  }
+}
+
+/** Short coin-like chime — no audio file, respects reduced motion + mute pref. */
+export function playPromoRewardChime() {
+  if (typeof window === 'undefined') return
+  if (prefersReducedMotion() || !isPromoRewardSoundEnabled()) return
+
+  const ctx = primedAudioContext
+  if (!ctx || ctx.state === 'closed') return
+
   const now = ctx.currentTime
   const gain = ctx.createGain()
   gain.gain.setValueAtTime(0.32, now)
@@ -41,8 +58,4 @@ export function playPromoRewardChime() {
 
   tone(880, now, 0.09)
   tone(1318.5, now + 0.07, 0.16)
-
-  window.setTimeout(() => {
-    void ctx.close()
-  }, 400)
 }
