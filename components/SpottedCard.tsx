@@ -25,6 +25,7 @@ export default function SpottedCard({ spotted }: Props) {
       style={{
         marginBottom: '20px',
         padding: '14px 16px',
+        maxWidth: '620px',
         background: 'var(--surface-1)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
