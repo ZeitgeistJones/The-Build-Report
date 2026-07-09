@@ -54,7 +54,7 @@ export type OverheardEntry = {
   episodePublishedAt: string | null
   quotes: OverheardQuote[]
   writeup: string
-  status: 'candidate' | 'pending' | 'published'
+  status: 'candidate' | 'pending' | 'published' | 'taken_down'
   userContext: string | null
   scannedAt: string | null
   confirmedAt: string | null
@@ -85,7 +85,10 @@ export function normalizeOverheardEntry(raw: unknown): OverheardEntry | null {
       episodePublishedAt: typeof r.episodePublishedAt === 'string' ? r.episodePublishedAt : null,
       quotes: r.quotes as OverheardQuote[],
       writeup: typeof r.writeup === 'string' ? r.writeup : '',
-      status: r.status === 'candidate' || r.status === 'pending' || r.status === 'published' ? r.status : 'candidate',
+      status:
+        r.status === 'candidate' || r.status === 'pending' || r.status === 'published' || r.status === 'taken_down'
+          ? r.status
+          : 'candidate',
       userContext: typeof r.userContext === 'string' ? r.userContext : null,
       scannedAt: typeof r.scannedAt === 'string' ? r.scannedAt : null,
       confirmedAt: typeof r.confirmedAt === 'string' ? r.confirmedAt : null,
@@ -110,7 +113,10 @@ export function normalizeOverheardEntry(raw: unknown): OverheardEntry | null {
         candidateId: r.id,
       }],
       writeup: typeof r.writeup === 'string' ? r.writeup : '',
-      status: r.status === 'candidate' || r.status === 'pending' || r.status === 'published' ? r.status : 'candidate',
+      status:
+        r.status === 'candidate' || r.status === 'pending' || r.status === 'published' || r.status === 'taken_down'
+          ? r.status
+          : 'candidate',
       userContext: typeof r.userContext === 'string' ? r.userContext : null,
       scannedAt: legacyConfirmed,
       confirmedAt: r.status === 'pending' || r.status === 'published' ? legacyConfirmed : null,
@@ -625,10 +631,14 @@ async function getMentionsFromSet(setKey: string): Promise<OverheardEntry[]> {
       .filter((v): v is OverheardEntry => Boolean(v))
 
     if (setKey === PUBLISHED_SET_KEY) {
-      return entries.sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
+      return entries
+        .filter(e => e.status === 'published')
+        .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
     }
     if (setKey === PENDING_SET_KEY) {
-      return entries.sort((a, b) => (b.confirmedAt ?? '').localeCompare(a.confirmedAt ?? ''))
+      return entries
+        .filter(e => e.status === 'pending')
+        .sort((a, b) => (b.confirmedAt ?? '').localeCompare(a.confirmedAt ?? ''))
     }
     return entries.sort((a, b) => (b.scannedAt ?? '').localeCompare(a.scannedAt ?? ''))
   } catch {
@@ -756,13 +766,72 @@ export async function regeneratePendingWriteup(id: string): Promise<string | nul
   }
 }
 
-export async function updatePendingWriteup(id: string, writeup: string): Promise<boolean> {
+export type MentionEditPayload = {
+  writeup?: string
+  quotes?: OverheardQuote[]
+  userContext?: string | null
+  repoSlug?: string
+}
+
+export async function updateMentionEntry(id: string, payload: MentionEditPayload): Promise<boolean> {
   try {
     const redis = getRedis()
     const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
-    if (!mention || mention.status !== 'pending') return false
-    const updated: OverheardEntry = { ...mention, writeup: writeup.trim() }
+    if (!mention || (mention.status !== 'pending' && mention.status !== 'published')) return false
+
+    const quotes = payload.quotes ?? mention.quotes
+    const updated: OverheardEntry = {
+      ...mention,
+      writeup: payload.writeup !== undefined ? payload.writeup.trim() : mention.writeup,
+      quotes,
+      userContext:
+        payload.userContext !== undefined
+          ? (payload.userContext?.trim() || null)
+          : mention.userContext,
+      repoSlug: payload.repoSlug?.trim() || mention.repoSlug,
+      kind: quotes.length > 1 ? 'thread' : 'single',
+    }
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function updatePendingWriteup(id: string, writeup: string): Promise<boolean> {
+  return updateMentionEntry(id, { writeup })
+}
+
+async function invalidateOverheardPublicCache(): Promise<void> {
+  const { generateAndCacheOverheard } = await import('@/lib/overheard')
+  await generateAndCacheOverheard().catch(() => null)
+}
+
+export async function takeDownMention(id: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
+    if (!mention || mention.status !== 'published') return false
+    const updated: OverheardEntry = { ...mention, status: 'taken_down' }
+    await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    await redis.srem(PUBLISHED_SET_KEY, id)
+    await invalidateOverheardPublicCache()
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function movePublishedToPending(id: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
+    if (!mention || mention.status !== 'published') return false
+    const updated: OverheardEntry = { ...mention, status: 'pending' }
+    await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    await redis.srem(PUBLISHED_SET_KEY, id)
+    await redis.sadd(PENDING_SET_KEY, id)
+    await invalidateOverheardPublicCache()
     return true
   } catch {
     return false
@@ -796,6 +865,8 @@ export async function publishMention(id: string, writeup?: string): Promise<bool
 export async function dismissMention(id: string): Promise<boolean> {
   try {
     const redis = getRedis()
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
+    if (!mention || mention.status !== 'pending' || mention.publishedAt) return false
     await redis.srem(PENDING_SET_KEY, id)
     await redis.srem(CANDIDATE_SET_KEY, id)
     await redis.del(mentionKey(id))

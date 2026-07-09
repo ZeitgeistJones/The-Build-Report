@@ -6,6 +6,7 @@ import { BULK_REGEN_DEFAULT_BATCH } from '@/lib/bulkRegenConfig'
 import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
 import type { CommunityContextSubmission } from '@/lib/communityContextTypes'
 import type { OverheardEntry } from '@/lib/podcastMentions'
+import OverheardAdminEntryCard, { mentionToEditDraft, type MentionEditDraft } from '@/components/OverheardAdminEntryCard'
 
 type AdminContextSubmission = CommunityContextSubmission
 
@@ -33,11 +34,13 @@ export default function AdminPage() {
   const [modeSaving, setModeSaving] = useState(false)
   const [candidateMentions, setCandidateMentions] = useState<OverheardEntry[]>([])
   const [pendingMentions, setPendingMentions] = useState<OverheardEntry[]>([])
+  const [publishedMentions, setPublishedMentions] = useState<OverheardEntry[]>([])
   const [mentionsListLoading, setMentionsListLoading] = useState(false)
   const [mentionActionBusy, setMentionActionBusy] = useState<string | null>(null)
   const [candidateContextDrafts, setCandidateContextDrafts] = useState<Record<string, string>>({})
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([])
-  const [pendingWriteupDrafts, setPendingWriteupDrafts] = useState<Record<string, string>>({})
+  const [mentionEditDrafts, setMentionEditDrafts] = useState<Record<string, MentionEditDraft>>({})
+  const [editingMentionIds, setEditingMentionIds] = useState<string[]>([])
   const [groupThreadError, setGroupThreadError] = useState<string | null>(null)
   const [spottedTweetUrl, setSpottedTweetUrl] = useState('')
   const [spottedTweetText, setSpottedTweetText] = useState('')
@@ -145,13 +148,15 @@ export default function AdminPage() {
       if (data.ok) {
         setCandidateMentions(data.candidates ?? [])
         setPendingMentions(data.pending ?? [])
+        setPublishedMentions(data.published ?? [])
         setOverheardModeState(data.mode ?? 'automatic')
         setSelectedCandidateIds([])
-        const drafts: Record<string, string> = {}
-        for (const p of (data.pending ?? []) as OverheardEntry[]) {
-          drafts[p.id] = p.writeup ?? ''
+        const drafts: Record<string, MentionEditDraft> = {}
+        for (const entry of [...(data.pending ?? []), ...(data.published ?? [])] as OverheardEntry[]) {
+          drafts[entry.id] = mentionToEditDraft(entry)
         }
-        setPendingWriteupDrafts(drafts)
+        setMentionEditDrafts(drafts)
+        setEditingMentionIds(prev => prev.filter(id => drafts[id]))
       }
     } catch {
       // ignore
@@ -235,14 +240,66 @@ export default function AdminPage() {
     )
   }
 
-  async function savePendingWriteup(id: string) {
+  function toggleMentionEdit(id: string, entry: OverheardEntry) {
+    setEditingMentionIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id)
+      setMentionEditDrafts(drafts => ({ ...drafts, [id]: mentionToEditDraft(entry) }))
+      return [...prev, id]
+    })
+  }
+
+  async function saveMentionEdit(id: string) {
+    const draft = mentionEditDrafts[id]
+    if (!draft) return
     setMentionActionBusy(`save:${id}`)
     try {
-      const writeup = pendingWriteupDrafts[id] ?? ''
       const res = await fetch('/api/admin/podcast-mentions-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, action: 'updateWriteup', id, writeup }),
+        body: JSON.stringify({
+          password,
+          action: 'updateEntry',
+          id,
+          writeup: draft.writeup,
+          repoSlug: draft.repoSlug,
+          userContext: draft.userContext,
+          quotes: draft.quotes,
+        }),
+      })
+      const data = await res.json()
+      if (data.ok) void loadMentionsReview()
+    } catch {
+      // ignore
+    }
+    setMentionActionBusy(null)
+  }
+
+  async function takeDownPublished(id: string) {
+    setMentionActionBusy(id)
+    try {
+      const res = await fetch('/api/admin/podcast-mentions-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'takeDown', id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setPublishedMentions(prev => prev.filter(m => m.id !== id))
+        setEditingMentionIds(prev => prev.filter(x => x !== id))
+      }
+    } catch {
+      // ignore
+    }
+    setMentionActionBusy(null)
+  }
+
+  async function movePublishedToPending(id: string) {
+    setMentionActionBusy(id)
+    try {
+      const res = await fetch('/api/admin/podcast-mentions-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'moveToPending', id }),
       })
       const data = await res.json()
       if (data.ok) void loadMentionsReview()
@@ -262,7 +319,11 @@ export default function AdminPage() {
       })
       const data = await res.json()
       if (data.ok && typeof data.writeup === 'string') {
-        setPendingWriteupDrafts(prev => ({ ...prev, [id]: data.writeup }))
+        setMentionEditDrafts(prev => {
+          const current = prev[id]
+          if (!current) return prev
+          return { ...prev, [id]: { ...current, writeup: data.writeup } }
+        })
       }
     } catch {
       // ignore
@@ -273,7 +334,23 @@ export default function AdminPage() {
   async function actOnPendingMention(id: string, action: 'publish' | 'dismiss') {
     setMentionActionBusy(id)
     try {
-      const writeup = action === 'publish' ? pendingWriteupDrafts[id] : undefined
+      const draft = mentionEditDrafts[id]
+      if (action === 'publish' && draft) {
+        await fetch('/api/admin/podcast-mentions-review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password,
+            action: 'updateEntry',
+            id,
+            writeup: draft.writeup,
+            repoSlug: draft.repoSlug,
+            userContext: draft.userContext,
+            quotes: draft.quotes,
+          }),
+        })
+      }
+      const writeup = action === 'publish' ? draft?.writeup : undefined
       await fetch('/api/admin/podcast-mentions-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -284,7 +361,7 @@ export default function AdminPage() {
           ...(writeup !== undefined ? { writeup } : {}),
         }),
       })
-      setPendingMentions(prev => prev.filter(m => m.id !== id))
+      void loadMentionsReview()
     } catch {
       // ignore
     }
@@ -1039,8 +1116,32 @@ export default function AdminPage() {
             marginBottom: '16px',
           }}
         >
-          {mentionsListLoading ? 'Loading…' : 'Load candidates & pending'}
+          {mentionsListLoading ? 'Loading…' : 'Load candidates, pending & published'}
         </button>
+
+        {publishedMentions.length > 0 && (
+          <>
+            <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
+              Published live ({publishedMentions.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              {publishedMentions.map(m => (
+                <OverheardAdminEntryCard
+                  key={m.id}
+                  entry={m}
+                  editing={editingMentionIds.includes(m.id)}
+                  draft={mentionEditDrafts[m.id] ?? mentionToEditDraft(m)}
+                  busyKey={mentionActionBusy}
+                  onDraftChange={draft => setMentionEditDrafts(prev => ({ ...prev, [m.id]: draft }))}
+                  onToggleEdit={() => toggleMentionEdit(m.id, m)}
+                  onSave={() => void saveMentionEdit(m.id)}
+                  onTakeDown={() => void takeDownPublished(m.id)}
+                  onMoveToPending={() => void movePublishedToPending(m.id)}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         {candidateMentions.length > 0 && (
           <>
@@ -1134,7 +1235,7 @@ export default function AdminPage() {
           </>
         )}
 
-        {pendingMentions.length === 0 && candidateMentions.length === 0 && !mentionsListLoading && (
+        {pendingMentions.length === 0 && candidateMentions.length === 0 && publishedMentions.length === 0 && !mentionsListLoading && (
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Nothing loaded. Click the button above.</p>
         )}
 
@@ -1145,70 +1246,22 @@ export default function AdminPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {pendingMentions.map(m => (
-                <div key={m.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong>
-                    {m.kind === 'thread' ? ` · thread (${m.quotes.length} quotes)` : ''} · {m.episodeName}
-                  </div>
-                  {m.episodeUrl && (
-                    <a
-                      href={m.episodeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: '11px', color: 'var(--accent)', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}
-                    >
-                      Episode link ↗
-                    </a>
-                  )}
-                  <textarea
-                    value={pendingWriteupDrafts[m.id] ?? m.writeup}
-                    onChange={e => setPendingWriteupDrafts(prev => ({ ...prev, [m.id]: e.target.value }))}
-                    rows={4}
-                    style={{
-                      width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius)', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px',
-                      fontFamily: 'var(--font-sans)', resize: 'vertical', marginBottom: '10px', lineHeight: 1.55,
-                    }}
-                  />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
-                    {m.quotes.map((q, i) => (
-                      <div key={`${m.id}-${i}`} style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5, padding: '6px 8px', background: 'var(--surface-2)', borderRadius: 'var(--radius)' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{q.speaker}: </span>
-                        &ldquo;{q.text}&rdquo;
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => void savePendingWriteup(m.id)}
-                      disabled={mentionActionBusy === `save:${m.id}`}
-                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-3)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                    >
-                      {mentionActionBusy === `save:${m.id}` ? 'Saving…' : 'Save writeup'}
-                    </button>
-                    <button
-                      onClick={() => void regeneratePendingWriteup(m.id)}
-                      disabled={mentionActionBusy === `regen:${m.id}`}
-                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-3)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                    >
-                      {mentionActionBusy === `regen:${m.id}` ? 'Regenerating…' : 'Regenerate writeup'}
-                    </button>
-                    <button
-                      onClick={() => void actOnPendingMention(m.id, 'publish')}
-                      disabled={mentionActionBusy === m.id}
-                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
-                    >
-                      {mentionActionBusy === m.id ? 'Publishing…' : 'Publish'}
-                    </button>
-                    <button
-                      onClick={() => void actOnPendingMention(m.id, 'dismiss')}
-                      disabled={mentionActionBusy === m.id}
-                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
+                <OverheardAdminEntryCard
+                  key={m.id}
+                  entry={m}
+                  editing={editingMentionIds.includes(m.id)}
+                  draft={mentionEditDrafts[m.id] ?? mentionToEditDraft(m)}
+                  busyKey={mentionActionBusy}
+                  onDraftChange={draft => setMentionEditDrafts(prev => ({ ...prev, [m.id]: draft }))}
+                  onToggleEdit={() => toggleMentionEdit(m.id, m)}
+                  onSave={() => void saveMentionEdit(m.id)}
+                  onPublish={() => void actOnPendingMention(m.id, 'publish')}
+                  onDismiss={() => void actOnPendingMention(m.id, 'dismiss')}
+                  onRegenerateWriteup={() => void regeneratePendingWriteup(m.id)}
+                  showPublish
+                  showDismiss
+                  showRegenerate
+                />
               ))}
             </div>
           </>
