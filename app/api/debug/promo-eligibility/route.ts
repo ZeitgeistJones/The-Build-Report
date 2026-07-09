@@ -48,6 +48,7 @@ async function diagnoseSlug(slug: string, treasuryBalanceEth: number | null) {
   return {
     slug,
     scoredAt: mergedActivity?.scoredAt ?? null,
+    createdAt: mergedActivity?.createdAt ?? null,
     commitTimestampsCount: mergedActivity?.commitTimestamps?.length ?? 0,
     sinceScore,
     cachedStaleCommits: cachedStale,

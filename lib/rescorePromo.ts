@@ -7,6 +7,7 @@ import { formatApproxUsdFromEth, formatPerCommitRewardUsd, formatRescorePriceLab
 import { getEthUsdRateCached } from '@/lib/ethUsdRate'
 import { APPROX_USD_NOTE_SHORT } from '@/lib/scoringCopy'
 import { resolveRepoBeforeRescore } from '@/lib/autoscore'
+import { fetchRepoBySlug } from '@/lib/github'
 import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 import { isUnscoredRecent } from '@/lib/recentRepos'
 import { COMMIT_CAP } from '@/lib/commitsSinceScore'
@@ -118,17 +119,36 @@ export function isUnscoredPromoActivity(activity: RepoActivitySnapshot): boolean
   return !activity.scoredAt?.trim()
 }
 
+/** Commits after GitHub repo creation — drops inherited fork history for first-Score earn. */
+export function countCommitsAfterRepoCreated(activity: RepoActivitySnapshot): number {
+  const createdMs = activity.createdAt ? new Date(activity.createdAt).getTime() : NaN
+  const hasCreated = Number.isFinite(createdMs)
+
+  if (activity.commitTimestamps?.length) {
+    const count = activity.commitTimestamps.filter(ts => {
+      const ms = new Date(ts).getTime()
+      if (!Number.isFinite(ms)) return false
+      // Strictly after fork/create so parent history at/before create doesn't pay.
+      return !hasCreated || ms > createdMs
+    }).length
+    return Math.min(count, COMMIT_CAP)
+  }
+
+  // No timestamp scan — only credit activity that landed after the repo existed.
+  for (const raw of [activity.lastCommitAt, activity.pushedAt]) {
+    if (!raw) continue
+    const ms = new Date(raw).getTime()
+    if (!Number.isFinite(ms)) continue
+    if (!hasCreated || ms > createdMs) return 1
+  }
+  return 0
+}
+
 /** Commits that count toward the launch promo earn reward. */
 export function computeStaleCommitCount(activity: RepoActivitySnapshot): number {
-  // First Score: credit known GitHub commits (capped), not "since last score".
+  // First Score: only commits after this GitHub repo was created (not fork parent history).
   if (isUnscoredPromoActivity(activity)) {
-    if (activity.commitTimestamps?.length) {
-      return Math.min(activity.commitTimestamps.length, COMMIT_CAP)
-    }
-    const windowCount = Math.max(activity.commits30d ?? 0, activity.commits7d ?? 0)
-    if (windowCount > 0) return Math.min(windowCount, COMMIT_CAP)
-    if (activity.lastCommitAt || activity.pushedAt) return 1
-    return 0
+    return countCommitsAfterRepoCreated(activity)
   }
 
   const { count, exact, hasNew } = countCommitsSinceScore(
@@ -308,7 +328,7 @@ export async function buildPromoQuote(
   const perCommitUsd = formatPerCommitRewardUsd(config.walletRewardEth, ethUsdRate)
   const promoBanner = eligible
     ? firstScore
-      ? `Launch promo: first Score on new repos with commits — ${perCommitUsd} to your wallet; half fuels CLAWD burns. ${APPROX_USD_NOTE_SHORT}`
+      ? `Launch promo: first Score — earn on commits after this repo was created (forks: after the fork) — ${perCommitUsd} to your wallet; half fuels CLAWD burns. ${APPROX_USD_NOTE_SHORT}`
       : `Launch promo: rescore on stale repos — ${perCommitUsd} to your wallet; half fuels CLAWD burns. ${APPROX_USD_NOTE_SHORT}`
     : null
 
@@ -333,6 +353,7 @@ export function repoToActivitySnapshot(repo: {
   commits7d?: number | null
   commits30d?: number | null
   commitTimestamps?: string[] | null
+  createdAt?: string | null
   adminNote?: string | null
   scoringContextVersion?: number
 }): RepoActivitySnapshot {
@@ -343,6 +364,7 @@ export function repoToActivitySnapshot(repo: {
     commits7d: repo.commits7d ?? null,
     commits30d: repo.commits30d ?? null,
     commitTimestamps: repo.commitTimestamps ?? null,
+    createdAt: repo.createdAt ?? null,
     adminNote: repo.adminNote ?? null,
     scoringContextVersion: repo.scoringContextVersion,
   }
@@ -355,9 +377,14 @@ export async function resolvePromoActivitySnapshot(
   const repo = await resolveRepoBeforeRescore(repoSlug)
   const stats = await getGitHubStatsForDisplay()
   const activity = stats?.repoActivity[repoSlug]
-  const githubRepo =
+  let githubRepo =
     stats?.trackableRepos?.find(r => r.name === repoSlug) ??
-    stats?.repos?.find(r => r.name === repoSlug)
+    stats?.repos?.find(r => r.name === repoSlug) ??
+    null
+  // Need created_at to exclude fork parent history from first-Score earn.
+  if (!githubRepo?.createdAt) {
+    githubRepo = (await fetchRepoBySlug(repoSlug)) ?? githubRepo
+  }
 
   // Awaiting-score repos are not in Redis yet — still promo-eligible from GitHub activity.
   if (!repo) {
@@ -369,19 +396,21 @@ export async function resolvePromoActivitySnapshot(
       commits7d: activity?.commits7d ?? null,
       commits30d: activity?.commits30d ?? null,
       commitTimestamps: activity?.commitTimestamps ?? null,
+      createdAt: githubRepo?.createdAt ?? null,
       adminNote: 'Unscored — visible because it was recently pushed on GitHub.',
     })
   }
 
   const unscored = isUnscoredRecent(repo)
   return repoToActivitySnapshot({
-    // Ignore placeholder scoredAt on unscored cards so earn counts all known commits.
+    // Ignore placeholder scoredAt on unscored cards so earn counts post-create commits.
     scoredAt: unscored ? null : repo.scoredAt,
     lastCommitAt: activity?.lastCommitAt ?? null,
     pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
     commits7d: activity?.commits7d ?? null,
     commits30d: activity?.commits30d ?? null,
     commitTimestamps: activity?.commitTimestamps ?? null,
+    createdAt: githubRepo?.createdAt ?? null,
     adminNote: repo.adminNote ?? (unscored ? 'Unscored — visible because it was recently pushed on GitHub.' : null),
     scoringContextVersion: repo.scoringContextVersion,
   })

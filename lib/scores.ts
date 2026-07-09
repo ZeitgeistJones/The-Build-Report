@@ -521,6 +521,6 @@ export const CHANGELOG = [
   },
   {
     date: 'Jul 8, 2026',
-    note: 'Launch rescore promo: earn on first Score for new repos with commits, and on Rescore for stale scored repos — ~$0.01 per commit to your wallet, plus a matching treasury subsidy for CLAWD burn fuel (50/50 split). Paid Score/Rescore paused during the promo so earn vs pay is not confused. Approx USD labels refresh weekly from ETH price; on-chain rewards are still ETH.',
+    note: 'Launch rescore promo: earn on first Score for commits after the repo was created (forks: after the fork), and on Rescore for stale scored repos — ~$0.01 per commit to your wallet, plus a matching treasury subsidy for CLAWD burn fuel (50/50 split). Paid Score/Rescore paused during the promo so earn vs pay is not confused. Approx USD labels refresh weekly from ETH price; on-chain rewards are still ETH.',
   },
 ]

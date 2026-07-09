@@ -10,6 +10,8 @@ export interface RepoActivitySnapshot {
   commits7d: number | null
   commits30d: number | null
   commitTimestamps?: string[] | null
+  /** GitHub repo created_at — used to exclude inherited fork history from first-Score earn. */
+  createdAt?: string | null
   adminNote?: string | null
   scoringContextVersion?: number
 }
