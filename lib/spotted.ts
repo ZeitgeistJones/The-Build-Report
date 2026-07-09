@@ -117,12 +117,18 @@ export async function getDraftEntries(): Promise<SpottedEntry[]> {
   }
 }
 
-export async function publishEntry(id: string): Promise<boolean> {
+export async function publishEntry(id: string, writeup?: string): Promise<boolean> {
   try {
     const redis = getRedis()
     const entry = await redis.get<SpottedEntry>(entryKey(id))
     if (!entry) return false
-    const updated: SpottedEntry = { ...entry, status: 'published', publishedAt: new Date().toISOString() }
+    const nextWriteup = typeof writeup === 'string' && writeup.trim() ? writeup.trim() : entry.writeup
+    const updated: SpottedEntry = {
+      ...entry,
+      writeup: nextWriteup,
+      status: 'published',
+      publishedAt: new Date().toISOString(),
+    }
     await redis.set(entryKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     await redis.srem(PENDING_SET_KEY, id)
     await redis.sadd(PUBLISHED_SET_KEY, id)

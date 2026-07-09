@@ -255,10 +255,12 @@ export default function AdminPage() {
   async function actOnSpottedDraft(id: string, action: 'publish' | 'dismiss') {
     setSpottedActionBusy(id)
     try {
+      const writeup =
+        action === 'publish' && spottedDraft?.id === id ? spottedDraft.writeup : undefined
       await fetch('/api/admin/spotted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, action, id }),
+        body: JSON.stringify({ password, action, id, ...(writeup !== undefined ? { writeup } : {}) }),
       })
       setSpottedDraftsList(prev => prev.filter(d => d.id !== id))
       if (spottedDraft?.id === id) setSpottedDraft(null)
@@ -268,21 +270,40 @@ export default function AdminPage() {
     setSpottedActionBusy(null)
   }
 
-  async function scanPodcastMentions() {
+  async function runPodcastScan(action: 'scanOne' | 'scanAll' | 'rescanAll' | 'clearHistory') {
     setPodcastScanRunning(true)
     setPodcastScanResult(null)
     try {
       const res = await fetch('/api/admin/podcast-mentions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, action }),
       })
       const data = await res.json()
       if (data.ok) {
-        setPodcastScanResult(
-          `Scanned ${data.scanned} episode${data.scanned === 1 ? '' : 's'} — ${data.mentionsFound} mention${data.mentionsFound === 1 ? '' : 's'} found (${data.mode ?? overheardMode} mode).`,
-        )
-        if (data.mentionsFound > 0) void loadMentionsReview()
+        if (action === 'clearHistory') {
+          setPodcastScanResult(
+            `Cleared scan history for ${data.cleared ?? 0} episode${data.cleared === 1 ? '' : 's'}. Use Scan next / Scan all new to reprocess.`,
+          )
+        } else if (action === 'scanOne') {
+          if (!data.scanned) {
+            setPodcastScanResult(
+              `No unscanned episodes left (${data.totalEpisodes ?? 0} on-chain). Clear scan history to start over.`,
+            )
+          } else {
+            setPodcastScanResult(
+              `Scanned: ${data.episodeName ?? data.episodeSlug} — ${data.mentionsFound} mention${data.mentionsFound === 1 ? '' : 's'} (${data.remaining} of ${data.totalEpisodes} remaining, ${data.mode} mode).`,
+            )
+          }
+        } else {
+          const skipped = data.skippedAlreadyScanned ?? 0
+          setPodcastScanResult(
+            `Scanned ${data.scanned}/${data.totalEpisodes ?? '?'} episode${data.scanned === 1 ? '' : 's'}` +
+              (skipped ? ` (${skipped} already scanned, skipped)` : '') +
+              ` — ${data.mentionsFound} mention${data.mentionsFound === 1 ? '' : 's'} found (${data.mode ?? overheardMode} mode).`,
+          )
+        }
+        if ((data.mentionsFound ?? 0) > 0) void loadMentionsReview()
       } else {
         setPodcastScanResult(data.error ?? 'Podcast scan failed')
       }
@@ -777,7 +798,7 @@ export default function AdminPage() {
           {needleRunning ? 'Generating…' : 'Regenerate needle'}
         </button>
         <button
-          onClick={scanPodcastMentions}
+          onClick={() => void runPodcastScan('scanOne')}
           disabled={podcastScanRunning}
           style={{
             fontSize: '12px',
@@ -788,7 +809,7 @@ export default function AdminPage() {
             border: '1px solid var(--border-strong)',
           }}
         >
-          {podcastScanRunning ? 'Scanning…' : 'Scan podcast mentions'}
+          {podcastScanRunning ? 'Scanning…' : 'Scan next episode'}
         </button>
       </div>
 
@@ -1458,21 +1479,54 @@ export default function AdminPage() {
               Scans new Slop.Computer episode transcripts for mentions of tracked repos. Runs automatically daily at 5:20am ET; use this to scan immediately.
             </p>
           </div>
-          <button
-            onClick={scanPodcastMentions}
-            disabled={podcastScanRunning}
-            style={{
-              fontSize: '12px',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius)',
-              background: 'var(--surface-3)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-strong)',
-              flexShrink: 0,
-            }}
-          >
-            {podcastScanRunning ? 'Scanning…' : 'Scan podcast mentions'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => void runPodcastScan('scanOne')}
+              disabled={podcastScanRunning}
+              style={{
+                fontSize: '12px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius)',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              {podcastScanRunning ? 'Scanning…' : 'Scan next episode'}
+            </button>
+            <button
+              onClick={() => void runPodcastScan('scanAll')}
+              disabled={podcastScanRunning}
+              style={{
+                fontSize: '12px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius)',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              {podcastScanRunning ? 'Scanning…' : 'Scan all new'}
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Clear the scanned-episode cache? Episodes will be treated as unscanned again. Does not delete pending/published mentions.')) {
+                  void runPodcastScan('clearHistory')
+                }
+              }}
+              disabled={podcastScanRunning}
+              style={{
+                fontSize: '12px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius)',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              Clear scan history
+            </button>
+          </div>
         </div>
         {podcastScanResult && (
           <div style={{
@@ -1696,7 +1750,25 @@ export default function AdminPage() {
 
         {spottedDraft && (
           <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px', marginBottom: '16px', maxWidth: '620px' }}>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '10px' }}>{spottedDraft.writeup}</p>
+            <textarea
+              value={spottedDraft.writeup}
+              onChange={e => setSpottedDraft(prev => prev ? { ...prev, writeup: e.target.value } : null)}
+              rows={4}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: '8px 12px',
+                color: 'var(--text-primary)',
+                fontSize: '14px',
+                lineHeight: 1.6,
+                fontFamily: 'var(--font-sans)',
+                resize: 'vertical',
+                marginBottom: '10px',
+              }}
+            />
             <div dangerouslySetInnerHTML={{ __html: spottedDraft.embedHtml }} />
             <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
               <button

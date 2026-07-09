@@ -111,7 +111,39 @@ export async function fetchAllEpisodes(maxAmount = 200): Promise<SlopEpisode[]> 
   }))
 }
 
-export function ipfsToGatewayUrl(ipfsUri: string): string {
-  const cid = ipfsUri.replace(/^ipfs:\/\//, '')
-  return `https://ipfs.io/ipfs/${cid}`
+const IPFS_GATEWAYS = [
+  'https://dweb.link/ipfs/',
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://ipfs.io/ipfs/',
+]
+
+export function ipfsCid(ipfsUri: string): string {
+  return ipfsUri.replace(/^ipfs:\/\//, '')
+}
+
+export function ipfsToGatewayUrl(ipfsUri: string, gatewayIndex = 0): string {
+  const cid = ipfsCid(ipfsUri)
+  const base = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0]
+  return `${base}${cid}`
+}
+
+/** Fetch IPFS content trying multiple gateways (ipfs.io alone often times out). */
+export async function fetchIpfsText(
+  ipfsUri: string,
+  timeoutMs = 20_000,
+): Promise<string | null> {
+  const cid = ipfsCid(ipfsUri)
+  for (const base of IPFS_GATEWAYS) {
+    try {
+      const res = await fetch(`${base}${cid}`, { signal: AbortSignal.timeout(timeoutMs) })
+      if (!res.ok) continue
+      const text = await res.text()
+      // Gateways sometimes return HTML error pages with 200
+      if (text.trimStart().startsWith('<!DOCTYPE') || text.trimStart().startsWith('<html')) continue
+      return text
+    } catch {
+      // try next gateway
+    }
+  }
+  return null
 }

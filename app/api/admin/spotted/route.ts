@@ -37,7 +37,8 @@ export async function POST(req: NextRequest) {
   if (action === 'publish') {
     const id = body?.id as string
     if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
-    const success = await publishEntry(id)
+    const writeup = typeof body?.writeup === 'string' ? body.writeup : undefined
+    const success = await publishEntry(id, writeup)
     return NextResponse.json({ ok: success })
   }
 

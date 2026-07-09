@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createHash } from 'crypto'
 import { getRedis } from '@/lib/redis'
-import { fetchAllEpisodes, ipfsToGatewayUrl, type SlopEpisode } from '@/lib/web3/slopComputer'
+import { fetchAllEpisodes, fetchIpfsText, type SlopEpisode } from '@/lib/web3/slopComputer'
 import { REPOS } from '@/lib/scores'
 
 const MENTION_KEY_PREFIX = 'build-report:podcast-mention:'
@@ -51,11 +51,11 @@ function candidateKeywords(repoSlug: string, repoName: string): string[] {
   return Array.from(variants).filter(v => v.length >= 4)
 }
 
-async function fetchJson<T>(url: string): Promise<T | null> {
+async function fetchJsonFromIpfs<T>(ipfsUri: string): Promise<T | null> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
-    if (!res.ok) return null
-    return (await res.json()) as T
+    const text = await fetchIpfsText(ipfsUri, 15_000)
+    if (!text) return null
+    return JSON.parse(text) as T
   } catch {
     return null
   }
@@ -63,10 +63,8 @@ async function fetchJson<T>(url: string): Promise<T | null> {
 
 async function fetchTranscriptLines(transcriptUri: string): Promise<TranscriptLine[]> {
   try {
-    const url = ipfsToGatewayUrl(transcriptUri)
-    const res = await fetch(url, { signal: AbortSignal.timeout(20_000) })
-    if (!res.ok) return []
-    const text = await res.text()
+    const text = await fetchIpfsText(transcriptUri, 20_000)
+    if (!text) return []
     const lines: TranscriptLine[] = []
     for (const raw of text.split('\n')) {
       const trimmed = raw.trim()
@@ -93,9 +91,8 @@ async function fetchTranscriptLines(transcriptUri: string): Promise<TranscriptLi
 }
 
 /**
- * Manifest field names are unconfirmed — never fetched a real manifest JSON,
- * only a transcript file directly. Try several likely key names defensively;
- * if mentionsFound stays 0 across many episodes, log a raw manifest fetch.
+ * Slop.Computer manifests store transcript as `{ cid, segmentCount }` (confirmed
+ * via IPFS probe). Also accept legacy string / alternate key shapes.
  */
 function extractTranscriptUri(manifest: Record<string, unknown>): string | null {
   const candidates = ['transcript', 'transcriptCid', 'transcriptUri', 'transcript_cid']
@@ -103,6 +100,12 @@ function extractTranscriptUri(manifest: Record<string, unknown>): string | null 
     const val = manifest[key]
     if (typeof val === 'string' && val.length > 0) {
       return val.startsWith('ipfs://') ? val : `ipfs://${val}`
+    }
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const cid = (val as { cid?: unknown }).cid
+      if (typeof cid === 'string' && cid.length > 0) {
+        return cid.startsWith('ipfs://') ? cid : `ipfs://${cid}`
+      }
     }
   }
   return null
@@ -163,7 +166,7 @@ export async function scanEpisodeForMentions(
 ): Promise<PodcastMention[]> {
   if (!episode.manifest) return []
 
-  const manifest = await fetchJson<Record<string, unknown>>(ipfsToGatewayUrl(episode.manifest))
+  const manifest = await fetchJsonFromIpfs<Record<string, unknown>>(episode.manifest)
   if (!manifest) return []
 
   const transcriptUri = extractTranscriptUri(manifest)
@@ -225,10 +228,78 @@ export async function scanEpisodeForMentions(
   return results
 }
 
-export async function scanNewEpisodes(): Promise<{ scanned: number; mentionsFound: number; mode: OverheardMode }> {
+export async function clearScannedEpisodes(): Promise<number> {
+  const redis = getRedis()
+  const ids = (await redis.smembers<string[]>(SCANNED_EPISODES_KEY).catch(() => [])) ?? []
+  await redis.del(SCANNED_EPISODES_KEY)
+  return ids.length
+}
+
+async function persistMentions(mentions: PodcastMention[]): Promise<number> {
+  const redis = getRedis()
+  let mentionsFound = 0
+  for (const mention of mentions) {
+    await redis.set(mentionKey(mention.id), mention, { ex: 60 * 60 * 24 * 365 })
+    await redis.sadd(mention.status === 'candidate' ? CANDIDATE_SET_KEY : PENDING_SET_KEY, mention.id)
+    mentionsFound++
+  }
+  return mentionsFound
+}
+
+export async function scanNextUnscanned(): Promise<{
+  scanned: number
+  mentionsFound: number
+  mode: OverheardMode
+  episodeName: string | null
+  episodeSlug: string | null
+  remaining: number
+  totalEpisodes: number
+}> {
   const redis = getRedis()
   const mode = await getOverheardMode()
   const episodes = await fetchAllEpisodes()
+  const scannedIds = new Set<string>(
+    (await redis.smembers<string[]>(SCANNED_EPISODES_KEY).catch(() => [])) ?? [],
+  )
+  const next = episodes.find(ep => !scannedIds.has(ep.id))
+  if (!next) {
+    return {
+      scanned: 0,
+      mentionsFound: 0,
+      mode,
+      episodeName: null,
+      episodeSlug: null,
+      remaining: 0,
+      totalEpisodes: episodes.length,
+    }
+  }
+
+  const mentions = await scanEpisodeForMentions(next, mode)
+  const mentionsFound = await persistMentions(mentions)
+  await redis.sadd(SCANNED_EPISODES_KEY, next.id)
+  const remaining = episodes.filter(ep => ep.id !== next.id && !scannedIds.has(ep.id)).length
+
+  return {
+    scanned: 1,
+    mentionsFound,
+    mode,
+    episodeName: next.name,
+    episodeSlug: next.slug,
+    remaining,
+    totalEpisodes: episodes.length,
+  }
+}
+
+export async function scanNewEpisodes(opts?: {
+  rescanAll?: boolean
+}): Promise<{ scanned: number; mentionsFound: number; mode: OverheardMode; totalEpisodes: number; skippedAlreadyScanned: number }> {
+  const redis = getRedis()
+  const mode = await getOverheardMode()
+  const episodes = await fetchAllEpisodes()
+
+  if (opts?.rescanAll) {
+    await redis.del(SCANNED_EPISODES_KEY)
+  }
 
   const scannedIds = new Set<string>(
     (await redis.smembers<string[]>(SCANNED_EPISODES_KEY).catch(() => [])) ?? [],
@@ -238,15 +309,17 @@ export async function scanNewEpisodes(): Promise<{ scanned: number; mentionsFoun
 
   for (const episode of unscanned) {
     const mentions = await scanEpisodeForMentions(episode, mode)
-    for (const mention of mentions) {
-      await redis.set(mentionKey(mention.id), mention, { ex: 60 * 60 * 24 * 365 })
-      await redis.sadd(mention.status === 'candidate' ? CANDIDATE_SET_KEY : PENDING_SET_KEY, mention.id)
-      mentionsFound++
-    }
+    mentionsFound += await persistMentions(mentions)
     await redis.sadd(SCANNED_EPISODES_KEY, episode.id)
   }
 
-  return { scanned: unscanned.length, mentionsFound, mode }
+  return {
+    scanned: unscanned.length,
+    mentionsFound,
+    mode,
+    totalEpisodes: episodes.length,
+    skippedAlreadyScanned: episodes.length - unscanned.length,
+  }
 }
 
 async function getMentionsFromSet(setKey: string): Promise<PodcastMention[]> {
