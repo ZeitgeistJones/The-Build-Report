@@ -19,7 +19,7 @@ function handleFromTweetUrl(tweetUrl: string): string | null {
 
 export default function SpottedCard({ spotted }: Props) {
   const [writeupExpanded, setWriteupExpanded] = useState(false)
-  const [tweetExpanded, setTweetExpanded] = useState(false)
+  const [tweetExpanded, setTweetExpanded] = useState(true)
 
   useEffect(() => {
     if (!spotted || !tweetExpanded) return
