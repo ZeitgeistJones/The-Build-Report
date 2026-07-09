@@ -66,12 +66,160 @@ function makeMentionId(repoSlug: string, episodeSlug: string, text: string): str
   return createHash('sha256').update(`${repoSlug}:${episodeSlug}:${text}`).digest('hex').slice(0, 16)
 }
 
+/** Bare common words that must never match alone — too many false positives in normal conversation. */
+const GENERIC_SINGLE_WORDS = new Set([
+  'agent',
+  'agents',
+  'app',
+  'apps',
+  'bot',
+  'bots',
+  'builder',
+  'builders',
+  'cli',
+  'client',
+  'cloud',
+  'code',
+  'core',
+  'data',
+  'dev',
+  'engine',
+  'framework',
+  'helper',
+  'hub',
+  'kit',
+  'lib',
+  'market',
+  'platform',
+  'plugin',
+  'sdk',
+  'server',
+  'service',
+  'services',
+  'skill',
+  'skills',
+  'tool',
+  'tools',
+  'util',
+  'utils',
+  'wallet',
+  'web',
+])
+
+/**
+ * Manual per-repo keyword blocklist. Keys are github slugs; values are lowercase
+ * keywords/phrases to suppress even if the automated matcher would accept them.
+ */
+export const KEYWORD_BLOCKLIST: Record<string, string[]> = {
+  // Example: 'yet-another-builder-agent': ['builder', 'agent'],
+}
+
+/** Extra context tokens that make an ambiguous keyword count as a real mention. */
+const ECOSYSTEM_CONTEXT_TOKENS = ['clawd', 'clawdbot', 'clawdbotatg', '$clawd', 'leftclaw']
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function containsPhrase(haystack: string, phrase: string): boolean {
+  const escaped = escapeRegExp(phrase).replace(/\s+/g, '\\s+')
+  return new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, 'i').test(haystack)
+}
+
+function isGenericSingleWord(keyword: string): boolean {
+  const trimmed = keyword.trim().toLowerCase()
+  if (!trimmed || trimmed.includes(' ') || trimmed.includes('-')) return false
+  return GENERIC_SINGLE_WORDS.has(trimmed)
+}
+
+function isAmbiguousKeyword(keyword: string): boolean {
+  const trimmed = keyword.trim().toLowerCase()
+  if (!trimmed) return true
+  if (isGenericSingleWord(trimmed)) return true
+  // Short single tokens and common 2-word phrases need nearby ecosystem context
+  const words = trimmed.split(/[\s-]+/).filter(Boolean)
+  if (words.length === 1) return trimmed.length < 8 || GENERIC_SINGLE_WORDS.has(trimmed)
+  if (words.length === 2 && words.every(w => GENERIC_SINGLE_WORDS.has(w) || w.length <= 4)) return true
+  return false
+}
+
 function candidateKeywords(repoSlug: string, repoName: string): string[] {
+  const slug = repoSlug.toLowerCase()
+  const spaced = slug.replace(/-/g, ' ')
   const variants = new Set<string>()
-  variants.add(repoSlug.toLowerCase())
-  variants.add(repoSlug.toLowerCase().replace(/-/g, ' '))
+  variants.add(slug)
+  variants.add(spaced)
   if (repoName) variants.add(repoName.toLowerCase())
-  return Array.from(variants).filter(v => v.length >= 4)
+
+  const blocked = new Set(
+    (KEYWORD_BLOCKLIST[repoSlug] ?? KEYWORD_BLOCKLIST[slug] ?? []).map(k => k.toLowerCase()),
+  )
+
+  return Array.from(variants).filter(v => {
+    if (v.length < 4) return false
+    if (blocked.has(v)) return false
+    // Drop bare generic singles entirely — they never match alone
+    if (isGenericSingleWord(v)) return false
+    return true
+  })
+}
+
+function contextTokensForRepo(repoSlug: string): string[] {
+  const slug = repoSlug.toLowerCase()
+  const spaced = slug.replace(/-/g, ' ')
+  const tokens = new Set<string>(ECOSYSTEM_CONTEXT_TOKENS)
+  tokens.add(slug)
+  tokens.add(spaced)
+  // Distinctive slug parts (skip generic fillers)
+  for (const part of slug.split('-')) {
+    if (part.length >= 4 && !GENERIC_SINGLE_WORDS.has(part)) tokens.add(part)
+  }
+  return Array.from(tokens)
+}
+
+/**
+ * True if `line` (optionally with neighbors) is a real mention of this repo keyword.
+ * Distinctive multi-word / slug matches pass alone; ambiguous terms need nearby context.
+ */
+function lineMatchesKeyword(
+  lineText: string,
+  keyword: string,
+  repoSlug: string,
+  neighborTexts: string[],
+): boolean {
+  const blocked = new Set(
+    (KEYWORD_BLOCKLIST[repoSlug] ?? KEYWORD_BLOCKLIST[repoSlug.toLowerCase()] ?? []).map(k =>
+      k.toLowerCase(),
+    ),
+  )
+  const kw = keyword.toLowerCase()
+  if (blocked.has(kw)) return false
+  if (!containsPhrase(lineText, kw)) return false
+  if (!isAmbiguousKeyword(kw)) return true
+
+  const windowText = [lineText, ...neighborTexts].join(' ')
+  const contextTokens = contextTokensForRepo(repoSlug).filter(t => t !== kw && t !== kw.replace(/-/g, ' '))
+  return contextTokens.some(token => containsPhrase(windowText, token))
+}
+
+function findMentionCandidates(
+  lines: TranscriptLine[],
+  repoSlug: string,
+  repoName: string,
+): { text: string; handle: string | null; ts: number }[] {
+  const keywords = candidateKeywords(repoSlug, repoName)
+  if (!keywords.length) return []
+
+  const out: { text: string; handle: string | null; ts: number }[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const neighbors = [lines[i - 1]?.text, lines[i + 1]?.text].filter(
+      (t): t is string => typeof t === 'string' && t.length > 0,
+    )
+    const hit = keywords.some(kw => lineMatchesKeyword(line.text, kw, repoSlug, neighbors))
+    if (hit) out.push({ text: line.text, handle: line.handle, ts: line.ts })
+  }
+  return out
 }
 
 async function fetchJsonFromIpfs<T>(ipfsUri: string): Promise<T | null> {
@@ -203,10 +351,7 @@ export async function scanEpisodeForMentions(
   const repos = await getReposForMentionScan()
 
   for (const repo of repos) {
-    const keywords = candidateKeywords(repo.githubSlug, repo.name)
-    const candidates = lines
-      .filter(line => keywords.some(kw => line.text.toLowerCase().includes(kw)))
-      .map(line => ({ text: line.text, handle: line.handle, ts: line.ts }))
+    const candidates = findMentionCandidates(lines, repo.githubSlug, repo.name)
 
     if (!candidates.length) continue
 
