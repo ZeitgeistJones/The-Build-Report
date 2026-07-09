@@ -351,7 +351,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         >
           <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
             {promoEligible
-              ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — free rescore plus ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)} reward. Continue?`
+              ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — earn ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)}. Continue?`
               : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'}
           </p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>

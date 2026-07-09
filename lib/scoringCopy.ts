@@ -42,7 +42,7 @@ export const RESCORE_BUTTON_TOOLTIP =
   `Score this repo using Claude AI. Cost: ~$0.01 (0.000008 ETH). Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone. ${APPROX_USD_NOTE}`
 
 export const RESCORE_PROMO_TOOLTIP =
-  `Limited launch promo: on stale repos, rescore is free — ~$0.01 per stale commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy). Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
+  `Limited launch promo: on stale repos, earn ~$0.01 per stale commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy). Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
 
 export const ECOSYSTEM_ADD_CONTEXT_LABEL =
   'Disagree with a grade? Holders can add context →'
@@ -53,7 +53,7 @@ export const ECOSYSTEM_ADD_CONTEXT_TOOLTIP =
 export const RESCORE_PROMO_SITE_BANNER = {
   title: 'Limited-time rescore promo',
   summary:
-    'On eligible stale repos, rescore is free — ~$0.01 per stale commit to your wallet and the same to the burn queue (50/50 treasury subsidy). Approx USD refreshes weekly from ETH price.',
+    'On eligible stale repos, earn ~$0.01 per stale commit to your wallet and the same to the burn queue (50/50 treasury subsidy). Approx USD refreshes weekly from ETH price.',
   bullets: [
     'Hold 10M $CLAWD and connect on Base to use Score / Rescore.',
     'Promo applies to rescored repos with commits since the last score — not every card qualifies.',
@@ -64,7 +64,7 @@ export const RESCORE_PROMO_SITE_BANNER = {
     'Experimental launch promo — no guarantee of eligibility, reward amount, payout timing, or continued availability. Bugs, treasury limits, rate limits, or manual shutdown can change or end rewards without notice. Approx USD labels use a weekly ETH price check. Not financial advice.',
   minimizeLabel: 'Minimize',
   expandLabel: 'Show promo details',
-  minimizedHint: 'Launch promo active — free stale rescore + ~$ rewards & burn fuel on eligible repos',
+  minimizedHint: 'Launch promo active — stale rescore earns ~$ rewards & burn fuel on eligible repos',
 } as const
 
 export const SCORE_TYPE_BASELINE_LABEL = 'Baseline'

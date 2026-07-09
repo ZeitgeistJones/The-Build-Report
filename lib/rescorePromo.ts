@@ -282,12 +282,12 @@ export async function buildPromoQuote(
   const feeEth = Number(SCORE_PAYMENT_WEI) / 1e18
   let buttonLabel = `Rescore (${formatRescorePriceLabel(feeEth, ethUsdRate)})`
   if (eligible) {
-    buttonLabel = `Rescore free · earn ${formatApproxUsdFromEth(rewardEth, ethUsdRate)}`
+    buttonLabel = `Rescore · earn ${formatApproxUsdFromEth(rewardEth, ethUsdRate)}`
   }
 
   const perCommitUsd = formatPerCommitRewardUsd(config.walletRewardEth, ethUsdRate)
   const promoBanner = eligible
-    ? `Launch promo: free rescore on stale repos — ${perCommitUsd} to your wallet; half fuels CLAWD burns. ${APPROX_USD_NOTE_SHORT}`
+    ? `Launch promo: rescore on stale repos — ${perCommitUsd} to your wallet; half fuels CLAWD burns. ${APPROX_USD_NOTE_SHORT}`
     : null
 
   return {
