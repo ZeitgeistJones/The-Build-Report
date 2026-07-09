@@ -9,6 +9,7 @@ import {
   confirmCandidate,
   groupCandidatesIntoThread,
   updatePendingWriteup,
+  regeneratePendingWriteup,
   getOverheardMode,
   setOverheardMode,
 } from '@/lib/podcastMentions'
@@ -68,6 +69,14 @@ export async function POST(req: NextRequest) {
     if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
     const success = await updatePendingWriteup(id, writeup)
     return NextResponse.json({ ok: success })
+  }
+
+  if (action === 'regenerateWriteup') {
+    const id = body?.id as string
+    if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
+    const writeup = await regeneratePendingWriteup(id)
+    if (!writeup) return NextResponse.json({ ok: false, error: 'Regenerate failed' }, { status: 400 })
+    return NextResponse.json({ ok: true, writeup })
   }
 
   if (action === 'publish') {

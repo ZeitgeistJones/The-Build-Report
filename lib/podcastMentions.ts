@@ -145,8 +145,27 @@ function buildCandidateEntry(params: {
     status: params.status,
     userContext: null,
     scannedAt: now,
-    confirmedAt: params.status === 'pending' ? now : null,
+    confirmedAt: null,
     publishedAt: null,
+  }
+}
+
+/** Generate writeup and set confirmedAt once an entry is in pending. */
+async function populatePendingWriteup(id: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
+    if (!mention || mention.status !== 'pending') return false
+    const writeup = await generateOverheardWriteup(mention)
+    const updated: OverheardEntry = {
+      ...mention,
+      writeup,
+      confirmedAt: mention.confirmedAt ?? new Date().toISOString(),
+    }
+    await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    return Boolean(writeup)
+  } catch {
+    return false
   }
 }
 
@@ -468,7 +487,6 @@ export async function scanEpisodeForMentions(
           approxTimestampSec: Math.max(0, Math.round((c.ts - startTs) / 1000)),
           status: 'pending',
         })
-        entry.writeup = await generateOverheardWriteup(entry)
         results.push(entry)
       }
     } else {
@@ -500,10 +518,17 @@ export async function clearScannedEpisodes(): Promise<number> {
 async function persistMentions(mentions: OverheardEntry[]): Promise<number> {
   const redis = getRedis()
   let mentionsFound = 0
+  const pendingNeedWriteup: string[] = []
   for (const mention of mentions) {
     await redis.set(mentionKey(mention.id), mention, { ex: 60 * 60 * 24 * 365 })
     await redis.sadd(mention.status === 'candidate' ? CANDIDATE_SET_KEY : PENDING_SET_KEY, mention.id)
+    if (mention.status === 'pending' && !mention.writeup.trim()) {
+      pendingNeedWriteup.push(mention.id)
+    }
     mentionsFound++
+  }
+  if (pendingNeedWriteup.length) {
+    void Promise.all(pendingNeedWriteup.map(id => populatePendingWriteup(id)))
   }
   return mentionsFound
 }
@@ -591,14 +616,17 @@ async function getMentionsFromSet(setKey: string): Promise<OverheardEntry[]> {
     if (!ids.length) return []
     const keys = ids.map(mentionKey)
     const values = await redis.mget<unknown[]>(...keys)
-    return values
+    const entries = values
       .map(normalizeOverheardEntry)
       .filter((v): v is OverheardEntry => Boolean(v))
-      .sort((a, b) => {
-        const aTs = a.confirmedAt ?? a.scannedAt ?? ''
-        const bTs = b.confirmedAt ?? b.scannedAt ?? ''
-        return bTs.localeCompare(aTs)
-      })
+
+    if (setKey === PUBLISHED_SET_KEY) {
+      return entries.sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
+    }
+    if (setKey === PENDING_SET_KEY) {
+      return entries.sort((a, b) => (b.confirmedAt ?? '').localeCompare(a.confirmedAt ?? ''))
+    }
+    return entries.sort((a, b) => (b.scannedAt ?? '').localeCompare(a.scannedAt ?? ''))
   } catch {
     return []
   }
@@ -630,18 +658,18 @@ export async function confirmCandidate(id: string): Promise<boolean> {
     const redis = getRedis()
     const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
     if (!mention || mention.status !== 'candidate') return false
-    const writeup = await generateOverheardWriteup(mention)
     const now = new Date().toISOString()
     const updated: OverheardEntry = {
       ...mention,
       kind: 'single',
       status: 'pending',
-      writeup,
+      writeup: '',
       confirmedAt: now,
     }
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     await redis.srem(CANDIDATE_SET_KEY, id)
     await redis.sadd(PENDING_SET_KEY, id)
+    await populatePendingWriteup(id)
     return true
   } catch {
     return false
@@ -661,7 +689,10 @@ export async function groupCandidatesIntoThread(ids: string[]): Promise<{ ok: tr
     if (entries.some(e => e.status !== 'candidate')) return { ok: false, error: 'All selected items must be candidates' }
 
     const repoSlug = entries[0]!.repoSlug
-    if (entries.some(e => e.repoSlug !== repoSlug)) return { ok: false, error: 'All candidates must share the same repo' }
+    const episodeSlug = entries[0]!.episodeSlug
+    if (entries.some(e => e.repoSlug !== repoSlug) || entries.some(e => e.episodeSlug !== episodeSlug)) {
+      return { ok: false, error: 'Threads must be same repo and same episode' }
+    }
 
     const quotes: OverheardQuote[] = entries
       .flatMap(e => e.quotes)
@@ -684,7 +715,6 @@ export async function groupCandidatesIntoThread(ids: string[]): Promise<{ ok: tr
       confirmedAt: new Date().toISOString(),
       publishedAt: null,
     }
-    draft.writeup = await generateOverheardWriteup(draft)
 
     await redis.set(mentionKey(threadId), draft, { ex: 60 * 60 * 24 * 365 })
     await redis.sadd(PENDING_SET_KEY, threadId)
@@ -694,9 +724,30 @@ export async function groupCandidatesIntoThread(ids: string[]): Promise<{ ok: tr
       await redis.del(mentionKey(id))
     }
 
+    await populatePendingWriteup(threadId)
+
     return { ok: true, id: threadId }
   } catch {
     return { ok: false, error: 'Failed to group thread' }
+  }
+}
+
+export async function regeneratePendingWriteup(id: string): Promise<string | null> {
+  try {
+    const redis = getRedis()
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
+    if (!mention || mention.status !== 'pending') return null
+    const writeup = await generateOverheardWriteup(mention)
+    if (!writeup) return null
+    const updated: OverheardEntry = {
+      ...mention,
+      writeup,
+      confirmedAt: mention.confirmedAt ?? new Date().toISOString(),
+    }
+    await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    return writeup
+  } catch {
+    return null
   }
 }
 

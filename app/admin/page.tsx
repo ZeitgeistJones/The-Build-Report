@@ -38,6 +38,7 @@ export default function AdminPage() {
   const [candidateContextDrafts, setCandidateContextDrafts] = useState<Record<string, string>>({})
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([])
   const [pendingWriteupDrafts, setPendingWriteupDrafts] = useState<Record<string, string>>({})
+  const [groupThreadError, setGroupThreadError] = useState<string | null>(null)
   const [spottedTweetUrl, setSpottedTweetUrl] = useState('')
   const [spottedTweetText, setSpottedTweetText] = useState('')
   const [spottedAccountContext, setSpottedAccountContext] = useState('')
@@ -206,6 +207,7 @@ export default function AdminPage() {
 
   async function groupSelectedCandidates() {
     if (selectedCandidateIds.length < 2) return
+    setGroupThreadError(null)
     setMentionActionBusy('group-thread')
     try {
       const res = await fetch('/api/admin/podcast-mentions-review', {
@@ -217,17 +219,55 @@ export default function AdminPage() {
       if (data.ok) {
         setSelectedCandidateIds([])
         void loadMentionsReview()
+      } else {
+        setGroupThreadError(typeof data.error === 'string' ? data.error : 'Threads must be same repo and same episode')
       }
+    } catch {
+      setGroupThreadError('Threads must be same repo and same episode')
+    }
+    setMentionActionBusy(null)
+  }
+
+  function toggleCandidateSelection(id: string) {
+    setGroupThreadError(null)
+    setSelectedCandidateIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
+    )
+  }
+
+  async function savePendingWriteup(id: string) {
+    setMentionActionBusy(`save:${id}`)
+    try {
+      const writeup = pendingWriteupDrafts[id] ?? ''
+      const res = await fetch('/api/admin/podcast-mentions-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'updateWriteup', id, writeup }),
+      })
+      const data = await res.json()
+      if (data.ok) void loadMentionsReview()
     } catch {
       // ignore
     }
     setMentionActionBusy(null)
   }
 
-  function toggleCandidateSelection(id: string) {
-    setSelectedCandidateIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
-    )
+  async function regeneratePendingWriteup(id: string) {
+    setMentionActionBusy(`regen:${id}`)
+    try {
+      const res = await fetch('/api/admin/podcast-mentions-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'regenerateWriteup', id }),
+      })
+      const data = await res.json()
+      if (data.ok && typeof data.writeup === 'string') {
+        setPendingWriteupDrafts(prev => ({ ...prev, [id]: data.writeup }))
+      }
+    } catch {
+      // ignore
+    }
+    setMentionActionBusy(null)
   }
 
   async function actOnPendingMention(id: string, action: 'publish' | 'dismiss') {
@@ -1026,6 +1066,9 @@ export default function AdminPage() {
                 </button>
               )}
             </div>
+            {groupThreadError && (
+              <p style={{ fontSize: '12px', color: 'var(--red)', marginBottom: '8px' }}>{groupThreadError}</p>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
               {candidateMentions.map(m => {
                 const quote = m.quotes[0]
@@ -1115,7 +1158,21 @@ export default function AdminPage() {
                       </div>
                     ))}
                   </div>
-                  <div style={{ display: 'flex', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => void savePendingWriteup(m.id)}
+                      disabled={mentionActionBusy === `save:${m.id}`}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-3)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                    >
+                      {mentionActionBusy === `save:${m.id}` ? 'Saving…' : 'Save writeup'}
+                    </button>
+                    <button
+                      onClick={() => void regeneratePendingWriteup(m.id)}
+                      disabled={mentionActionBusy === `regen:${m.id}`}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-3)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                    >
+                      {mentionActionBusy === `regen:${m.id}` ? 'Regenerating…' : 'Regenerate writeup'}
+                    </button>
                     <button
                       onClick={() => void actOnPendingMention(m.id, 'publish')}
                       disabled={mentionActionBusy === m.id}
