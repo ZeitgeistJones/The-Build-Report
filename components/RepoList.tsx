@@ -86,7 +86,7 @@ type RepoSort = 'recent' | 'commits' | 'needs-rescore' | 'grade'
 export type RepoFilter = 'all' | 'needs-rescore' | 'burn-apps' | 'leverage' | 'clawd-cv-perks' | 'community-context' | Tag
 
 const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20, metricLabel: 9, pctLabel: 10 } as const
-const METRIC_COL_WIDTH = { holder: 52, builder: 44, commits: 40 } as const
+const METRIC_COL_WIDTH = { holder: 52, builder: 44, commits: 32 } as const
 
 function metricColStyle(isMobile: boolean, width: number) {
   return isMobile
@@ -1050,7 +1050,7 @@ export default function RepoList({
                     {periodCommitsLabel}
                   </div>
                   <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                    commits<br />{periodKeyLabel(repoPeriod)}
+                    commits
                   </div>
                 </RepoBadge>
                 </>
@@ -1102,7 +1102,7 @@ export default function RepoList({
                   {periodCommitsLabel}
                 </div>
                 <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                  commits<br />{periodKeyLabel(repoPeriod)}
+                  commits
                 </div>
               </RepoBadge>
 
