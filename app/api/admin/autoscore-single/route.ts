@@ -26,6 +26,8 @@ import {
 } from '@/lib/rescorePromo'
 import { incrementEthPendingOptimistic, scheduleBurnSnapshotSync } from '@/lib/burnSnapshot'
 import { sendPromoSplitReward, treasuryCanCover } from '@/lib/rescorePromoTreasury'
+import { appendScoreHistory } from '@/lib/scoreHistory'
+import { getShippingLeverage, getTokenMechanicForDisplay, showsEconomicNa } from '@/lib/economicGrade'
 
 export const maxDuration = 60
 
@@ -62,6 +64,20 @@ async function runRescorePipeline(repoSlug: string) {
     commits30dAtRescore,
   })
   await saveRescoreSummary(repoSlug, rescoreMeta, redis)
+  
+  const economicScore = showsEconomicNa(repo)
+    ? getShippingLeverage(repo)
+    : getTokenMechanicForDisplay(repo)
+
+  await appendScoreHistory(repoSlug, {
+    scoredAt: repo.scoredAt ?? new Date().toISOString(),
+    builderIntegrityLetter: repo.builderIntegrity.letter,
+    builderIntegrityPct: repo.builderIntegrity.pct,
+    economicLetter: economicScore?.letter ?? null,
+    economicPct: economicScore?.pct ?? null,
+    economicLabel: showsEconomicNa(repo) ? 'shipping leverage' : 'holder economics',
+  }, redis)
+
   await bustOverallSummaryCache(redis)
   if (isCommunityContextEnabled()) {
     await markAcceptedConsumed(repoSlug, new Date().toISOString())
@@ -172,7 +188,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Promo treasury balance is too low' }, { status: 503 })
       }
     } else {
-      // Paid path paused for everyone during the launch promo — use the earn (promo) path instead.
       if (isPromoWindowOpen()) {
         return NextResponse.json(
           { ok: false, error: 'Paid rescore is paused during the launch promo' },
