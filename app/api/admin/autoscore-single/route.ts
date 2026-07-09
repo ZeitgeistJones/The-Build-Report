@@ -170,11 +170,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Repo is not eligible for promo reward' }, { status: 400 })
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'promo-lock',hypothesisId:'A',location:'app/api/admin/autoscore-single/route.ts',message:'paying locked promo reward',data:{repoSlug,staleCommits:locked.staleCommits,rewardEth:promoRewardEth,totalWei:locked.totalWei},timestamp:Date.now()})}).catch(()=>{});
-      console.log('[promo-lock]', JSON.stringify({event:'payout-locked',repoSlug,staleCommits:locked.staleCommits,rewardEth:promoRewardEth}))
-      // #endregion
-
       const config = getPromoConfig()
       if (config.maxPayoutsPerWallet) {
         const used = await getWalletPromoPayoutCount(walletAddress)

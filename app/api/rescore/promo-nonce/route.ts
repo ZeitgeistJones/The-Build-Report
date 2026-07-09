@@ -58,10 +58,6 @@ export async function POST(req: NextRequest) {
       burnFundWei: reward.burnFundWei,
       rewardEth: reward.rewardEth,
     })
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'promo-lock',hypothesisId:'A',location:'app/api/rescore/promo-nonce/route.ts',message:'locked promo reward into nonce',data:{repoSlug,staleCommits:reward.staleCommits,rewardEth:reward.rewardEth,scoredAt:activity.scoredAt,unscored:!activity.scoredAt},timestamp:Date.now()})}).catch(()=>{});
-    console.log('[promo-lock]', JSON.stringify({event:'nonce-lock',repoSlug,staleCommits:reward.staleCommits,rewardEth:reward.rewardEth}))
-    // #endregion
     return NextResponse.json({ ok: true, ...issued })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Request failed'
