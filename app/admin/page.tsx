@@ -256,7 +256,11 @@ export default function AdminPage() {
     setSpottedActionBusy(id)
     try {
       const writeup =
-        action === 'publish' && spottedDraft?.id === id ? spottedDraft.writeup : undefined
+        action === 'publish'
+          ? spottedDraft?.id === id
+            ? spottedDraft.writeup
+            : spottedDraftsList.find(d => d.id === id)?.writeup
+          : undefined
       await fetch('/api/admin/spotted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1538,7 +1542,25 @@ export default function AdminPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
             {spottedDraftsList.map(d => (
               <div key={d.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{d.writeup}</p>
+                <textarea
+                  value={d.writeup}
+                  onChange={e => setSpottedDraftsList(prev => prev.map(item => item.id === d.id ? { ...item, writeup: e.target.value } : item))}
+                  rows={5}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    padding: '8px 12px',
+                    color: 'var(--text-primary)',
+                    fontSize: '14px',
+                    lineHeight: 1.6,
+                    fontFamily: 'var(--font-sans)',
+                    resize: 'vertical',
+                    marginBottom: '8px',
+                  }}
+                />
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button
                     onClick={() => void actOnSpottedDraft(d.id, 'publish')}
