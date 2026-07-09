@@ -35,6 +35,8 @@ import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 import HomeHeader from '@/components/HomeHeader'
 import BuildBriefCard from '@/components/BuildBriefCard'
+import NeedleCard from '@/components/NeedleCard'
+import { getNeedle } from '@/lib/needle'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 import { getRescoreSummaries } from '@/lib/rescoreSummaries'
@@ -353,6 +355,7 @@ export default async function Home() {
       )}
 
       <BuildBriefCard brief={buildBrief} />
+      <NeedleCard needle={needle} />
 
       <div style={{ marginBottom: '32px' }}>
       <GradesPanel
