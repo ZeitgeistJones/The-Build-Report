@@ -17,6 +17,10 @@
       "schedule": "20 5 * * *"
     },
     {
+      "path": "/api/cron/overheard",
+      "schedule": "30 5 * * *"
+    },
+    {
       "path": "/api/cron/warm-cache",
       "schedule": "0 6 * * *"
     }

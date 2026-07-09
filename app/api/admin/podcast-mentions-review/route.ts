@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
     const id = body?.id as string
     if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
     const success = await publishMention(id)
+    if (success) {
+      const { generateAndCacheOverheard } = await import('@/lib/overheard')
+      await generateAndCacheOverheard().catch(() => null)
+    }
     return NextResponse.json({ ok: success })
   }
 

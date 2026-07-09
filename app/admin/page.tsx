@@ -28,6 +28,16 @@ export default function AdminPage() {
   const [needleResult, setNeedleResult] = useState<string | null>(null)
   const [podcastScanRunning, setPodcastScanRunning] = useState(false)
   const [podcastScanResult, setPodcastScanResult] = useState<string | null>(null)
+  const [pendingMentions, setPendingMentions] = useState<Array<{
+    id: string
+    repoSlug: string
+    episodeName: string
+    speaker: string
+    text: string
+    confirmedAt: string
+  }>>([])
+  const [pendingMentionsLoading, setPendingMentionsLoading] = useState(false)
+  const [mentionActionBusy, setMentionActionBusy] = useState<string | null>(null)
   const [refreshRunning, setRefreshRunning] = useState(false)
   const [refreshResult, setRefreshResult] = useState<string | null>(null)
   const [ecosystemContext, setEcosystemContextText] = useState('')
@@ -132,6 +142,37 @@ export default function AdminPage() {
       setPodcastScanResult('Podcast scan request failed')
     }
     setPodcastScanRunning(false)
+  }
+
+  async function loadPendingMentions() {
+    setPendingMentionsLoading(true)
+    try {
+      const res = await fetch('/api/admin/podcast-mentions-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'list' }),
+      })
+      const data = await res.json()
+      if (data.ok) setPendingMentions(data.pending ?? [])
+    } catch {
+      // ignore
+    }
+    setPendingMentionsLoading(false)
+  }
+
+  async function actOnMention(id: string, action: 'publish' | 'dismiss') {
+    setMentionActionBusy(id)
+    try {
+      await fetch('/api/admin/podcast-mentions-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action, id }),
+      })
+      setPendingMentions(prev => prev.filter(m => m.id !== id))
+    } catch {
+      // ignore
+    }
+    setMentionActionBusy(null)
   }
 
   async function regenerateNeedle() {
@@ -1329,6 +1370,91 @@ export default function AdminPage() {
             {podcastScanResult}
           </div>
         )}
+      </div>
+
+      {/* Pending podcast mentions review */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Pending podcast mentions</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Confirmed matches waiting for review. Publish to surface on the repo card and today's Overheard digest; Dismiss to discard.
+            </p>
+          </div>
+          <button
+            onClick={loadPendingMentions}
+            disabled={pendingMentionsLoading}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {pendingMentionsLoading ? 'Loading…' : 'Load pending mentions'}
+          </button>
+        </div>
+
+        {pendingMentions.length === 0 && !pendingMentionsLoading && (
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            No pending mentions loaded. Click the button above to check.
+          </p>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {pendingMentions.map(m => (
+            <div
+              key={m.id}
+              style={{
+                background: 'var(--surface-1)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '12px 16px',
+              }}
+            >
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
+                "{m.text}"
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  onClick={() => actOnMention(m.id, 'publish')}
+                  disabled={mentionActionBusy === m.id}
+                  style={{
+                    fontSize: '11px',
+                    padding: '5px 12px',
+                    borderRadius: '99px',
+                    border: '1px solid var(--accent-border)',
+                    background: 'var(--accent-dim)',
+                    color: 'var(--accent)',
+                    fontWeight: 500,
+                  }}
+                >
+                  Publish
+                </button>
+                <button
+                  onClick={() => actOnMention(m.id, 'dismiss')}
+                  disabled={mentionActionBusy === m.id}
+                  style={{
+                    fontSize: '11px',
+                    padding: '5px 12px',
+                    borderRadius: '99px',
+                    border: '1px solid var(--border)',
+                    background: 'transparent',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Auto-scored repos */}
