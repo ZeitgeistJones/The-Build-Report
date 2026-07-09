@@ -61,6 +61,7 @@ import {
 } from '@/lib/repoCollections'
 import {
   AWAITING_SCORE_TOOLTIP,
+  BUILDER_STANDARDS_COLUMN_TOOLTIP,
   criticalPathTooltip,
   HOLDER_ECONOMICS_COLUMN_TOOLTIP,
   LIFECYCLE_TOOLTIPS,
@@ -1095,13 +1096,16 @@ export default function RepoList({
 
               <MetricDivider show={!isMobile} />
 
-              <div style={metricColStyle(isMobile, METRIC_COL_WIDTH.builder)}>
+              <RepoBadge
+                tooltip={BUILDER_STANDARDS_COLUMN_TOOLTIP}
+                style={{ ...metricColStyle(isMobile, METRIC_COL_WIDTH.builder), display: 'block' }}
+              >
                 <div style={gradeLetterStyle(d.gradeLetter, gradeColor(repo.builderIntegrity.letter))}>
                   {repo.builderIntegrity.letter}
                 </div>
                 <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
                 <div style={{ fontSize: `${d.pctLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2 }}>builder<br />standards</div>
-              </div>
+              </RepoBadge>
 
               <MetricDivider show={!isMobile} />
 

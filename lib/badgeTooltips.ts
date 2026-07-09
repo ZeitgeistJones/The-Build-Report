@@ -55,6 +55,9 @@ export const AWAITING_SCORE_TOOLTIP =
 export const HOLDER_ECONOMICS_COLUMN_TOOLTIP =
   'This repo\'s holder economic impact. Burn apps and supply-lock repos are scored on their direct CLAWD burn or lock mechanic and feed the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage instead — they feed the separate Shipping leverage Ecosystem Grade, the second lens on holder value at the top.'
 
+export const BUILDER_STANDARDS_COLUMN_TOOLTIP =
+  'Observable safety, testing, and transparency for this repo — scored on every tracked project. Rubric rows vary by repo type (consumer apps vs infra/tooling). Feeds the Builder standards Ecosystem Grade at the top.'
+
 export function criticalPathTooltip(roleBadge: string): string {
   return `${roleBadge} — locked tag on the builder critical path. Floor grades at C when functioning as designed.`
 }
