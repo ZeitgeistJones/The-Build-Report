@@ -56,7 +56,7 @@ export const RESCORE_PROMO_SITE_BANNER = {
     'On eligible stale repos, earn ~$0.01 per stale commit to your wallet and the same to the burn queue (50/50 treasury subsidy). Approx USD refreshes weekly from ETH price.',
   bullets: [
     'Hold 10M $CLAWD and connect on Base to use Score / Rescore.',
-    'Promo applies to rescored repos with commits since the last score — not every card qualifies.',
+    'Earn path: rescored repos with commits since the last score. New unscored repos can still pay ~$0.01 to Score.',
     '{{perCommit}} to your wallet; the other half fuels CLAWD burns when someone runs Execute burn.',
     'Promo ends when funds run low or we turn it off.',
   ],

@@ -962,7 +962,6 @@ export default function RepoList({
                     <Link
                       key="scoring-ctx"
                       href="/how-we-score#context"
-                      title={scoringContextTooltip(repo.scoringContextVersion)}
                       style={{ textDecoration: 'none' }}
                     >
                       <RepoBadge

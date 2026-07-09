@@ -119,6 +119,8 @@ export async function GET(req: NextRequest) {
     rescoreSummaryCount: Object.keys(rescoreSummaries).length,
     hasBurns: Boolean(rescoreBurns?.clawdBurnedOnChain),
     hasBrief: Boolean(buildBrief?.text),
+    briefDateKey: buildBrief?.dateKey ?? null,
+    briefGeneratedAt: buildBrief?.generatedAt ?? null,
     hasAdminNotes: Object.keys(adminNotes).length,
     lastCommitDebug,
   })

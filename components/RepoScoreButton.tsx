@@ -252,10 +252,12 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       const freshQuote = await fetchPromoQuote(repoSlug, address)
       if (freshQuote) setPromoQuote(freshQuote)
       const usePromo = Boolean(freshQuote?.eligible)
+      // First-time Score on unscored repos stays paid during the promo — earn path is for stale rescored repos only.
+      const allowPaidFirstScore = scoringStatus === 'unscored'
 
       if (usePromo) {
         await runPromoRescore()
-      } else if (freshQuote?.promoActive) {
+      } else if (freshQuote?.promoActive && !allowPaidFirstScore) {
         throw new Error('Paid rescore is paused during the launch promo')
       } else {
         await runPaidRescore()
