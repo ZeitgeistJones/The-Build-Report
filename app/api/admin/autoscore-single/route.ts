@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { resolveRepoBeforeRescore, runAutoscoreSingle } from '@/lib/autoscore'
-import { isUnscoredRecent } from '@/lib/recentRepos'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { isRepoExcluded } from '@/lib/repoExclude'
 import { fetchRecentCommitMessages, fetchCommits30dCount } from '@/lib/github'
@@ -145,8 +144,8 @@ export async function POST(req: NextRequest) {
       }
 
       const beforeActivity = await resolvePromoActivitySnapshot(repoSlug)
-      if (!beforeActivity?.scoredAt) {
-        return NextResponse.json({ ok: false, error: 'Promo applies to rescored repos with commits since the last score' }, { status: 400 })
+      if (!beforeActivity) {
+        return NextResponse.json({ ok: false, error: 'Repo not found' }, { status: 404 })
       }
 
       const reward = computePromoReward(beforeActivity)
@@ -173,11 +172,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Promo treasury balance is too low' }, { status: 503 })
       }
     } else {
-      // Paid path: allow first-time Score on never-scored repos during the promo; block paid Rescore.
-      const existingRepo = await resolveRepoBeforeRescore(repoSlug)
-      const isUnscoredFirstScore = !existingRepo || isUnscoredRecent(existingRepo)
-
-      if (isPromoWindowOpen() && !isUnscoredFirstScore) {
+      // Paid path paused for everyone during the launch promo — use the earn (promo) path instead.
+      if (isPromoWindowOpen()) {
         return NextResponse.json(
           { ok: false, error: 'Paid rescore is paused during the launch promo' },
           { status: 400 },

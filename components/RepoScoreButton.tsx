@@ -72,7 +72,7 @@ function RescoreTooltipContent({
     <>
       {promoEligible && (
         <div style={{ marginBottom: '6px' }}>
-          Earn {formatApproxUsdFromEth(rewardEth, ethUsdRate)} for {staleCommits} stale commit
+          Earn {formatApproxUsdFromEth(rewardEth, ethUsdRate)} for {staleCommits} commit
           {staleCommits === 1 ? '' : 's'} on this repo.
         </div>
       )}
@@ -252,13 +252,16 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       const freshQuote = await fetchPromoQuote(repoSlug, address)
       if (freshQuote) setPromoQuote(freshQuote)
       const usePromo = Boolean(freshQuote?.eligible)
-      // First-time Score on unscored repos stays paid during the promo — earn path is for stale rescored repos only.
-      const allowPaidFirstScore = scoringStatus === 'unscored'
 
       if (usePromo) {
         await runPromoRescore()
-      } else if (freshQuote?.promoActive && !allowPaidFirstScore) {
-        throw new Error('Paid rescore is paused during the launch promo')
+      } else if (freshQuote?.promoActive) {
+        // Promo window: earn path only. Unscored repos with commits should quote as eligible.
+        throw new Error(
+          scoringStatus === 'unscored'
+            ? (freshQuote.reason ?? 'Promo earn needs commits on this repo — paid Score is paused during the launch promo')
+            : 'Paid rescore is paused during the launch promo',
+        )
       } else {
         await runPaidRescore()
       }
@@ -417,7 +420,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         >
           <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
             {promoEligible
-              ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — earn ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)}. Continue?`
+              ? scoringStatus === 'unscored'
+                ? `First Score on this repo — earn ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)} for ${promoQuote?.staleCommits ?? 0} commit${promoQuote?.staleCommits === 1 ? '' : 's'}. Continue?`
+                : `This repo has ${promoQuote?.staleCommits ?? 0} commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — earn ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)}. Continue?`
               : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'}
           </p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>

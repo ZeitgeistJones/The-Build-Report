@@ -18,13 +18,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Repo not eligible' }, { status: 400 })
   }
 
-  const repo = await resolvePromoActivitySnapshot(repoSlug)
-  if (!repo?.scoredAt) {
+  const activity = await resolvePromoActivitySnapshot(repoSlug)
+  if (!activity) {
     return NextResponse.json({ ok: false, error: 'Repo not found' }, { status: 404 })
   }
 
   const treasuryBalanceEth = await getTreasuryBalanceEth()
-  const quote = await buildPromoQuote(repo, treasuryBalanceEth, walletAddress)
+  const quote = await buildPromoQuote(activity, treasuryBalanceEth, walletAddress)
 
   return NextResponse.json({
     ok: true,

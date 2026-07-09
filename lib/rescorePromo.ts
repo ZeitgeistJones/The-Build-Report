@@ -8,6 +8,8 @@ import { getEthUsdRateCached } from '@/lib/ethUsdRate'
 import { APPROX_USD_NOTE_SHORT } from '@/lib/scoringCopy'
 import { resolveRepoBeforeRescore } from '@/lib/autoscore'
 import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
+import { isUnscoredRecent } from '@/lib/recentRepos'
+import { COMMIT_CAP } from '@/lib/commitsSinceScore'
 
 const NONCE_PREFIX = 'build-report:promo-nonce:'
 const PAYOUT_PREFIX = 'build-report:promo-payout:'
@@ -110,8 +112,25 @@ export function getPromoStatusForDisplay(): {
   }
 }
 
+/** True when this snapshot is a never-scored / awaiting-score repo. */
+export function isUnscoredPromoActivity(activity: RepoActivitySnapshot): boolean {
+  if ((activity.adminNote ?? '').startsWith('Unscored — visible because')) return true
+  return !activity.scoredAt?.trim()
+}
+
+/** Commits that count toward the launch promo earn reward. */
 export function computeStaleCommitCount(activity: RepoActivitySnapshot): number {
-  if (!activity.scoredAt) return 0
+  // First Score: credit known GitHub commits (capped), not "since last score".
+  if (isUnscoredPromoActivity(activity)) {
+    if (activity.commitTimestamps?.length) {
+      return Math.min(activity.commitTimestamps.length, COMMIT_CAP)
+    }
+    const windowCount = Math.max(activity.commits30d ?? 0, activity.commits7d ?? 0)
+    if (windowCount > 0) return Math.min(windowCount, COMMIT_CAP)
+    if (activity.lastCommitAt || activity.pushedAt) return 1
+    return 0
+  }
+
   const { count, exact, hasNew } = countCommitsSinceScore(
     activity.scoredAt,
     activity.commitTimestamps,
@@ -257,16 +276,16 @@ export async function buildPromoQuote(
     treasuryBalanceEth !== null && treasuryBalanceEth >= config.minTreasuryEth &&
     treasuryBalanceEth * 1e18 >= Number(totalWei) + 0.0001 * 1e18
 
+  const firstScore = isUnscoredPromoActivity(activity)
   let eligible = promoActive && staleCommits >= config.minStale && rewardWei > BigInt(0) && treasuryFunded
   let reason: string | null = null
 
   if (!promoActive) {
     reason = 'Promo is not active'
-  } else if (!activity.scoredAt) {
-    reason = 'Promo applies to rescored repos with stale commits'
-    eligible = false
   } else if (staleCommits < config.minStale) {
-    reason = 'No commits since last score'
+    reason = firstScore
+      ? 'No commits yet — promo earn needs at least one commit on this repo'
+      : 'No commits since last score'
     eligible = false
   } else if (!treasuryFunded) {
     reason = 'Promo treasury is low — try again later'
@@ -280,14 +299,17 @@ export async function buildPromoQuote(
   }
 
   const feeEth = Number(SCORE_PAYMENT_WEI) / 1e18
-  let buttonLabel = `Rescore (${formatRescorePriceLabel(feeEth, ethUsdRate)})`
+  const actionWord = firstScore ? 'Score' : 'Rescore'
+  let buttonLabel = `${actionWord} (${formatRescorePriceLabel(feeEth, ethUsdRate)})`
   if (eligible) {
-    buttonLabel = `Rescore · earn ${formatApproxUsdFromEth(rewardEth, ethUsdRate)}`
+    buttonLabel = `${actionWord} · earn ${formatApproxUsdFromEth(rewardEth, ethUsdRate)}`
   }
 
   const perCommitUsd = formatPerCommitRewardUsd(config.walletRewardEth, ethUsdRate)
   const promoBanner = eligible
-    ? `Launch promo: rescore on stale repos — ${perCommitUsd} to your wallet; half fuels CLAWD burns. ${APPROX_USD_NOTE_SHORT}`
+    ? firstScore
+      ? `Launch promo: first Score on new repos with commits — ${perCommitUsd} to your wallet; half fuels CLAWD burns. ${APPROX_USD_NOTE_SHORT}`
+      : `Launch promo: rescore on stale repos — ${perCommitUsd} to your wallet; half fuels CLAWD burns. ${APPROX_USD_NOTE_SHORT}`
     : null
 
   return {
@@ -331,22 +353,36 @@ export async function resolvePromoActivitySnapshot(
   repoSlug: string,
 ): Promise<RepoActivitySnapshot | null> {
   const repo = await resolveRepoBeforeRescore(repoSlug)
-  if (!repo) return null
-
   const stats = await getGitHubStatsForDisplay()
   const activity = stats?.repoActivity[repoSlug]
   const githubRepo =
     stats?.trackableRepos?.find(r => r.name === repoSlug) ??
     stats?.repos?.find(r => r.name === repoSlug)
 
+  // Awaiting-score repos are not in Redis yet — still promo-eligible from GitHub activity.
+  if (!repo) {
+    if (!githubRepo && !activity) return null
+    return repoToActivitySnapshot({
+      scoredAt: null,
+      lastCommitAt: activity?.lastCommitAt ?? null,
+      pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
+      commits7d: activity?.commits7d ?? null,
+      commits30d: activity?.commits30d ?? null,
+      commitTimestamps: activity?.commitTimestamps ?? null,
+      adminNote: 'Unscored — visible because it was recently pushed on GitHub.',
+    })
+  }
+
+  const unscored = isUnscoredRecent(repo)
   return repoToActivitySnapshot({
-    scoredAt: repo.scoredAt,
+    // Ignore placeholder scoredAt on unscored cards so earn counts all known commits.
+    scoredAt: unscored ? null : repo.scoredAt,
     lastCommitAt: activity?.lastCommitAt ?? null,
     pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
     commits7d: activity?.commits7d ?? null,
     commits30d: activity?.commits30d ?? null,
     commitTimestamps: activity?.commitTimestamps ?? null,
-    adminNote: repo.adminNote ?? null,
+    adminNote: repo.adminNote ?? (unscored ? 'Unscored — visible because it was recently pushed on GitHub.' : null),
     scoringContextVersion: repo.scoringContextVersion,
   })
 }

@@ -42,7 +42,7 @@ export const RESCORE_BUTTON_TOOLTIP =
   `Score this repo using Claude AI. Cost: ~$0.01 (0.000008 ETH). Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone. ${APPROX_USD_NOTE}`
 
 export const RESCORE_PROMO_TOOLTIP =
-  `Limited launch promo: on stale repos, earn ~$0.01 per stale commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy). Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
+  `Limited launch promo: earn ~$0.01 per commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy) — first Score on new repos with commits, or Rescore on stale scored repos. Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
 
 export const ECOSYSTEM_ADD_CONTEXT_LABEL =
   'Disagree with a grade? Holders can add context →'
@@ -53,10 +53,10 @@ export const ECOSYSTEM_ADD_CONTEXT_TOOLTIP =
 export const RESCORE_PROMO_SITE_BANNER = {
   title: 'Limited-time rescore promo',
   summary:
-    'On eligible stale repos, earn ~$0.01 per stale commit to your wallet and the same to the burn queue (50/50 treasury subsidy). Approx USD refreshes weekly from ETH price.',
+    'Earn ~$0.01 per commit to your wallet and the same to the burn queue (50/50 treasury subsidy) — first Score on new repos with commits, or Rescore on stale scored repos. Approx USD refreshes weekly from ETH price.',
   bullets: [
     'Hold 10M $CLAWD and connect on Base to use Score / Rescore.',
-    'Earn path: rescored repos with commits since the last score. New unscored repos can still pay ~$0.01 to Score.',
+    'Earn on first Score for new repos with commits, and on Rescore when a scored repo has commits since last score.',
     '{{perCommit}} to your wallet; the other half fuels CLAWD burns when someone runs Execute burn.',
     'Promo ends when funds run low or we turn it off.',
   ],
@@ -64,7 +64,7 @@ export const RESCORE_PROMO_SITE_BANNER = {
     'Experimental launch promo — no guarantee of eligibility, reward amount, payout timing, or continued availability. Bugs, treasury limits, rate limits, or manual shutdown can change or end rewards without notice. Approx USD labels use a weekly ETH price check. Not financial advice.',
   minimizeLabel: 'Minimize',
   expandLabel: 'Show promo details',
-  minimizedHint: 'Launch promo active — stale rescore earns ~$ rewards & burn fuel on eligible repos',
+  minimizedHint: 'Launch promo active — Score / Rescore earns ~$ rewards & burn fuel on eligible repos',
 } as const
 
 export const SCORE_TYPE_BASELINE_LABEL = 'Baseline'

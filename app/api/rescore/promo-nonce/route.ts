@@ -31,18 +31,15 @@ export async function POST(req: NextRequest) {
     }
 
     const activity = await resolvePromoActivitySnapshot(repoSlug)
-    if (!activity?.scoredAt) {
-      return NextResponse.json(
-        { ok: false, error: 'Promo applies to rescored repos with commits since the last score' },
-        { status: 400 },
-      )
+    if (!activity) {
+      return NextResponse.json({ ok: false, error: 'Repo not found' }, { status: 404 })
     }
 
     const treasuryBalanceEth = await getTreasuryBalanceEth()
     const quote = await buildPromoQuote(activity, treasuryBalanceEth, walletAddress)
     if (!quote.eligible) {
       return NextResponse.json(
-        { ok: false, error: quote.reason ?? 'Repo is not eligible for promo rescore' },
+        { ok: false, error: quote.reason ?? 'Repo is not eligible for promo score' },
         { status: 400 },
       )
     }
