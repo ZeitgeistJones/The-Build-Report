@@ -1094,6 +1094,9 @@ export default function RepoList({
           <RepoScoreButton
             repoSlug={repo.githubSlug}
             scoringStatus={getScoringStatus(repo)}
+            contextAcceptedPending={
+              communityContextEnabled && contextSummary[repo.githubSlug]?.state === 'accepted'
+            }
             activity={{
               scoredAt: repo.scoredAt,
               lastCommitAt: repo.lastCommitAt,

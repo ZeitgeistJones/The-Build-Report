@@ -36,6 +36,7 @@ interface Props {
   repoSlug: string
   scoringStatus: ScoringStatus
   activity: RepoActivitySnapshot
+  contextAcceptedPending?: boolean
   onScored: (repo: Repo, rescoreMeta?: RescoreSummaryRecord | null) => void
 }
 
@@ -49,10 +50,23 @@ type PromoQuote = {
   reason: string | null
 }
 
-function RescoreTooltipContent({ promoActive }: { promoActive: boolean }) {
+function RescoreTooltipContent({
+  promoActive,
+  promoBanner,
+}: {
+  promoActive: boolean
+  promoBanner: string | null
+}) {
   return (
     <>
-      {promoActive ? RESCORE_PROMO_TOOLTIP : RESCORE_BUTTON_TOOLTIP}{' '}
+      {promoActive ? (
+        <>
+          {RESCORE_PROMO_TOOLTIP}
+          {promoBanner ? <> {promoBanner}</> : null}
+        </>
+      ) : (
+        RESCORE_BUTTON_TOOLTIP
+      )}{' '}
       <a href="/about#score-types" style={{ color: 'var(--accent)' }} onClick={e => e.stopPropagation()}>
         About score types ↗
       </a>
@@ -60,7 +74,13 @@ function RescoreTooltipContent({ promoActive }: { promoActive: boolean }) {
   )
 }
 
-export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onScored }: Props) {
+export default function RepoScoreButton({
+  repoSlug,
+  scoringStatus,
+  activity,
+  contextAcceptedPending = false,
+  onScored,
+}: Props) {
   const router = useRouter()
   const isMobile = useIsMobile()
   const { isConnected, hasAccess, connectWallet, address, isWrongChain, switchToBase } = useClawdAccess()
@@ -81,10 +101,15 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
   const ethUsdRate = useEthUsdRate()
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
   const promoEligible = Boolean(promoQuote?.eligible)
-  const paidRescorePaused =
-    scoringStatus === 'scored' && Boolean(promoQuote?.promoActive) && !promoEligible
+  const promoReady = promoQuote !== null
+  const promoActive = Boolean(promoQuote?.promoActive)
+  const showAction =
+    scoringStatus === 'unscored' ||
+    contextAcceptedPending ||
+    (promoReady && promoEligible) ||
+    (promoReady && !promoActive)
   const busy = phase !== 'idle' || isSending
-  const buttonDisabled = busy || paidRescorePaused
+  const buttonDisabled = busy
   const defaultLabel = `${label} (${formatRescorePriceLabel(SCORE_PAYMENT_ETH, ethUsdRate)})`
   const actionLabel = busy
     ? phase === 'paying' || isSending
@@ -92,8 +117,6 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       : phase === 'signing'
         ? 'Signing…'
         : 'Scoring…'
-    : paidRescorePaused
-      ? 'Rescore paused'
     : promoEligible
       ? (promoQuote?.buttonLabel ?? defaultLabel)
       : defaultLabel
@@ -107,13 +130,13 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     Boolean(showScoreMeta) &&
     hasNewCommitsSinceScore &&
     !busy &&
-    (promoEligible || !promoQuote?.promoActive)
+    (promoEligible || !promoActive)
   const nudgeBaselineRefresh =
     Boolean(showScoreMeta) &&
     isLaunchBaseline(activity.adminNote) &&
     !nudgeRescore &&
     !busy &&
-    (promoEligible || !promoQuote?.promoActive)
+    (promoEligible || !promoActive)
 
   useEffect(() => {
     let cancelled = false
@@ -232,7 +255,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
 
       if (usePromo) {
         await runPromoRescore()
-      } else if (freshQuote?.promoActive) {
+      } else if (freshQuote?.promoActive && !contextAcceptedPending) {
         throw new Error('Paid rescore is paused during the launch promo')
       } else {
         await runPaidRescore()
@@ -265,15 +288,34 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       return
     }
     if (!address) return
-    if (paidRescorePaused) return
 
-    if (scoringStatus === 'scored' && shouldConfirmRescore(activity) && !confirmOpen && promoEligible) {
-      setConfirmOpen(true)
-      return
+    if (scoringStatus === 'scored' && !confirmOpen) {
+      if (promoEligible) {
+        setConfirmOpen(true)
+        return
+      }
+      if (contextAcceptedPending) {
+        setConfirmOpen(true)
+        return
+      }
+      if (shouldConfirmRescore(activity)) {
+        setConfirmOpen(true)
+        return
+      }
     }
 
     await runRescore()
   }
+
+  if (!showAction && !busy && !confirmOpen && !promoReward && !inlineMsg && !error) {
+    return null
+  }
+
+  const confirmMessage = promoEligible
+    ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — free rescore plus ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)} reward. Continue?`
+    : contextAcceptedPending
+      ? `Accepted holder context will be applied on this rescore (${formatRescorePriceLabel(SCORE_PAYMENT_ETH, ethUsdRate)}). Continue?`
+      : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'
 
   return (
     <div
@@ -292,16 +334,20 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
             borderRadius: '99px',
             border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
             background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
-            color: busy || paidRescorePaused ? 'var(--text-muted)' : promoEligible ? 'var(--accent)' : 'var(--text-secondary)',
+            color: busy ? 'var(--text-muted)' : promoEligible ? 'var(--accent)' : 'var(--text-secondary)',
             cursor: buttonDisabled ? 'not-allowed' : 'pointer',
             fontWeight: 500,
-            opacity: paidRescorePaused ? 0.7 : 1,
           }}
         >
           {actionLabel}
         </button>
         <InfoTooltip
-          content={<RescoreTooltipContent promoActive={Boolean(promoQuote?.promoActive)} />}
+          content={
+            <RescoreTooltipContent
+              promoActive={promoActive}
+              promoBanner={promoQuote?.promoBanner ?? null}
+            />
+          }
           ariaLabel="About Score and Rescore"
           icon="question"
           placement="above"
@@ -310,20 +356,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         />
       </div>
 
-      {promoQuote?.promoBanner && promoEligible && (
-        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: '180px', marginInline: 'auto' }}>
-          {promoQuote.promoBanner}
-        </div>
-      )}
-
-      {promoQuote?.promoActive && !promoEligible && (
-        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: '180px', marginInline: 'auto' }}>
-          {paidRescorePaused && <div>Paid rescore paused during launch promo.</div>}
-          {promoQuote.reason && <div>{promoQuote.reason}</div>}
-        </div>
-      )}
-
-      {showScoreMeta && (
+      {showScoreMeta && showAction && (
         <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35 }}>
           <div>Last scored {formatScoredDateLabel(activity.scoredAt)}</div>
           <div style={nudgeRescore ? { color: 'var(--accent)', fontWeight: 500 } : undefined}>
@@ -350,9 +383,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           }}
         >
           <p style={{ margin: '0 0 8px', fontSize: '10px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-            {promoEligible
-              ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — free rescore plus ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)} reward. Continue?`
-              : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'}
+            {confirmMessage}
           </p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button

@@ -42,7 +42,7 @@ export const RESCORE_BUTTON_TOOLTIP =
   `Score this repo using Claude AI. Cost: ~$0.01 (0.000008 ETH). Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone. ${APPROX_USD_NOTE}`
 
 export const RESCORE_PROMO_TOOLTIP =
-  `Limited launch promo: on stale repos, rescore is free — ~$0.01 per stale commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy). Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
+  `Limited launch promo: on stale repos, rescore is free — ~$0.01 per stale commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy). Hold 10M $CLAWD to qualify. Accepted holder context can still be rescored anytime. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
 
 export const ECOSYSTEM_ADD_CONTEXT_LABEL =
   'Disagree with a grade? Holders can add context →'
