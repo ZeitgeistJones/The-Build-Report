@@ -1,12 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { createHash } from 'crypto'
 import { getRedis } from '@/lib/redis'
 import { fetchAllEpisodes, ipfsToGatewayUrl, type SlopEpisode } from '@/lib/web3/slopComputer'
 import { REPOS } from '@/lib/scores'
 
-const MENTIONS_KEY_PREFIX = 'build-report:podcast-mentions:'
+const MENTION_KEY_PREFIX = 'build-report:podcast-mention:'
+const PENDING_SET_KEY = 'build-report:podcast-mentions-pending'
+const PUBLISHED_SET_KEY = 'build-report:podcast-mentions-published'
 const SCANNED_EPISODES_KEY = 'build-report:podcast-scanned-episodes'
 
 export type PodcastMention = {
+  id: string
   repoSlug: string
   episodeName: string
   episodeSlug: string
@@ -14,6 +18,8 @@ export type PodcastMention = {
   text: string
   approxTimestampSec: number
   confirmedAt: string
+  status: 'pending' | 'published'
+  publishedAt: string | null
 }
 
 type TranscriptLine = {
@@ -22,6 +28,14 @@ type TranscriptLine = {
   handle: string | null
   text: string
   source: string
+}
+
+function mentionKey(id: string) {
+  return `${MENTION_KEY_PREFIX}${id}`
+}
+
+function makeMentionId(repoSlug: string, episodeSlug: string, text: string): string {
+  return createHash('sha256').update(`${repoSlug}:${episodeSlug}:${text}`).digest('hex').slice(0, 16)
 }
 
 function candidateKeywords(repoSlug: string, repoName: string): string[] {
@@ -76,7 +90,8 @@ async function fetchTranscriptLines(transcriptUri: string): Promise<TranscriptLi
 /**
  * Manifest field names are unconfirmed — this repo has never fetched a real
  * manifest JSON, only a transcript file directly. Try several likely key
- * names defensively; log if none match so this can be tightened later.
+ * names defensively; if mentionsFound stays 0 across many episodes, this is
+ * the first thing to check by logging a raw manifest fetch.
  */
 function extractTranscriptUri(manifest: Record<string, unknown>): string | null {
   const candidates = ['transcript', 'transcriptCid', 'transcriptUri', 'transcript_cid']
@@ -91,17 +106,15 @@ function extractTranscriptUri(manifest: Record<string, unknown>): string | null 
 
 async function confirmMentionsWithHaiku(
   repoSlug: string,
-  repoDescription: string,
+  repoContext: string,
   candidates: { text: string; handle: string | null; ts: number }[],
 ): Promise<{ text: string; handle: string | null; ts: number }[]> {
   if (!candidates.length) return []
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const lines = candidates
-    .map((c, i) => `${i}: ${c.text}`)
-    .join('\n')
+  const lines = candidates.map((c, i) => `${i}: ${c.text}`).join('\n')
 
-  const prompt = `A podcast transcript contains these lines that mention a word matching the GitHub project "${repoSlug}" (${repoDescription || 'no description available'}). Some may be coincidental word matches, not actual references to this specific project.
+  const prompt = `A podcast transcript contains these lines that mention a word matching the GitHub project "${repoSlug}" (${repoContext || 'no description available'}). Some may be coincidental word matches, not actual references to this specific project.
 
 ${lines}
 
@@ -149,23 +162,17 @@ export async function scanEpisodeForMentions(episode: SlopEpisode): Promise<Podc
   for (const repo of REPOS) {
     const keywords = candidateKeywords(repo.githubSlug, repo.name)
     const candidates = lines
-      .filter(line => {
-        const lower = line.text.toLowerCase()
-        return keywords.some(kw => lower.includes(kw))
-      })
-      .map(line => ({
-        text: line.text,
-        handle: line.handle,
-        ts: line.ts,
-      }))
+      .filter(line => keywords.some(kw => line.text.toLowerCase().includes(kw)))
+      .map(line => ({ text: line.text, handle: line.handle, ts: line.ts }))
 
     if (!candidates.length) continue
 
-    // Repo has no description field — pass verdict as lightweight context for Haiku.
     const confirmed = await confirmMentionsWithHaiku(repo.githubSlug, repo.verdict ?? '', candidates)
 
     for (const c of confirmed) {
+      const id = makeMentionId(repo.githubSlug, episode.slug, c.text)
       results.push({
+        id,
         repoSlug: repo.githubSlug,
         episodeName: episode.name,
         episodeSlug: episode.slug,
@@ -173,6 +180,8 @@ export async function scanEpisodeForMentions(episode: SlopEpisode): Promise<Podc
         text: c.text,
         approxTimestampSec: Math.max(0, Math.round((c.ts - startTs) / 1000)),
         confirmedAt: new Date().toISOString(),
+        status: 'pending',
+        publishedAt: null,
       })
     }
   }
@@ -187,17 +196,14 @@ export async function scanNewEpisodes(): Promise<{ scanned: number; mentionsFoun
   const scannedIds = new Set<string>(
     (await redis.smembers<string[]>(SCANNED_EPISODES_KEY).catch(() => [])) ?? [],
   )
-
   const unscanned = episodes.filter(ep => !scannedIds.has(ep.id))
   let mentionsFound = 0
 
   for (const episode of unscanned) {
     const mentions = await scanEpisodeForMentions(episode)
     for (const mention of mentions) {
-      const key = `${MENTIONS_KEY_PREFIX}${mention.repoSlug}`
-      await redis.lpush(key, mention)
-      await redis.ltrim(key, 0, 19)
-      await redis.expire(key, 60 * 60 * 24 * 365)
+      await redis.set(mentionKey(mention.id), mention, { ex: 60 * 60 * 24 * 365 })
+      await redis.sadd(PENDING_SET_KEY, mention.id)
       mentionsFound++
     }
     await redis.sadd(SCANNED_EPISODES_KEY, episode.id)
@@ -206,12 +212,68 @@ export async function scanNewEpisodes(): Promise<{ scanned: number; mentionsFoun
   return { scanned: unscanned.length, mentionsFound }
 }
 
-export async function getPodcastMentions(repoSlug: string): Promise<PodcastMention[]> {
+export async function getPendingMentions(): Promise<PodcastMention[]> {
   try {
     const redis = getRedis()
-    const raw = await redis.lrange<PodcastMention>(`${MENTIONS_KEY_PREFIX}${repoSlug}`, 0, 19)
-    return raw ?? []
+    const ids = (await redis.smembers<string[]>(PENDING_SET_KEY)) ?? []
+    if (!ids.length) return []
+    const keys = ids.map(mentionKey)
+    const values = await redis.mget<(PodcastMention | null)[]>(...keys)
+    return values
+      .filter((v): v is PodcastMention => Boolean(v))
+      .sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt))
   } catch {
     return []
   }
+}
+
+export async function publishMention(id: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const mention = await redis.get<PodcastMention>(mentionKey(id))
+    if (!mention) return false
+    const updated: PodcastMention = { ...mention, status: 'published', publishedAt: new Date().toISOString() }
+    await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    await redis.srem(PENDING_SET_KEY, id)
+    await redis.sadd(PUBLISHED_SET_KEY, id)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function dismissMention(id: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    await redis.srem(PENDING_SET_KEY, id)
+    await redis.del(mentionKey(id))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function getPublishedMentions(): Promise<PodcastMention[]> {
+  try {
+    const redis = getRedis()
+    const ids = (await redis.smembers<string[]>(PUBLISHED_SET_KEY)) ?? []
+    if (!ids.length) return []
+    const keys = ids.map(mentionKey)
+    const values = await redis.mget<(PodcastMention | null)[]>(...keys)
+    return values.filter((v): v is PodcastMention => Boolean(v))
+  } catch {
+    return []
+  }
+}
+
+export async function getFreshMentionsForRepo(repoSlug: string, withinDays = 30): Promise<PodcastMention[]> {
+  const all = await getPublishedMentions()
+  const cutoff = Date.now() - withinDays * 24 * 60 * 60 * 1000
+  return all.filter(m => m.repoSlug === repoSlug && m.publishedAt && Date.parse(m.publishedAt) >= cutoff)
+}
+
+export async function getArchivedMentionsForRepo(repoSlug: string, withinDays = 30): Promise<PodcastMention[]> {
+  const all = await getPublishedMentions()
+  const cutoff = Date.now() - withinDays * 24 * 60 * 60 * 1000
+  return all.filter(m => m.repoSlug === repoSlug && m.publishedAt && Date.parse(m.publishedAt) < cutoff)
 }
