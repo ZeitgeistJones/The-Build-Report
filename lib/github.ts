@@ -212,6 +212,18 @@ export function commitInActivityWindow(
   return isWithinDays(dateStr, 60)
 }
 
+/** Whether a GitHub repo was created inside the selected activity window. */
+export function isCreatedInPeriod(
+  createdAt: string | null | undefined,
+  period: '24h' | '7d' | '30d' | '60d',
+): boolean {
+  if (!createdAt) return false
+  if (period === '24h') return isWithinHours(createdAt, 24)
+  if (period === '7d') return isWithinDays(createdAt, 7)
+  if (period === '30d') return isWithinDays(createdAt, 30)
+  return isWithinDays(createdAt, 60)
+}
+
 function isCreatedInDayRange(dateStr: string, minExclusive: number, maxInclusive: number) {
   return isInDayRange(dateStr, minExclusive, maxInclusive)
 }

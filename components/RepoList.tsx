@@ -16,7 +16,7 @@ import {
   computeRepoLifecycle,
   lifecycleHint,
 } from '@/lib/repoLifecycle'
-import { timeAgo } from '@/lib/github'
+import { isCreatedInPeriod, timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { isUnscoredRecent } from '@/lib/recentRepos'
 import { isAutoInferredNote } from '@/lib/repoFilters'
@@ -84,7 +84,15 @@ import {
 
 type ActivityScope = 'active' | 'all'
 type RepoSort = 'recent' | 'commits' | 'needs-rescore' | 'grade'
-export type RepoFilter = 'all' | 'needs-rescore' | 'burn-apps' | 'leverage' | 'clawd-cv-perks' | 'community-context' | Tag
+export type RepoFilter =
+  | 'all'
+  | 'needs-rescore'
+  | 'new-arrivals'
+  | 'holder-economics'
+  | 'shipping-leverage'
+  | 'clawd-cv-perks'
+  | 'community-context'
+  | Tag
 
 const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20, metricLabel: 9, pctLabel: 10 } as const
 const METRIC_COL_WIDTH = { holder: 52, builder: 44, commits: 38 } as const
@@ -160,6 +168,7 @@ function repoMatchesFilter(
   collectionSets: Record<RepoCollectionId, Set<string>>,
   contextSummary: Record<string, RepoContextSummary>,
   pinnedNeedsRescoreSlugs: readonly string[] = [],
+  period: Period = '24h',
 ): boolean {
   const slug = repo.githubSlug
   const tag = getEffectiveTag(repo)
@@ -171,8 +180,9 @@ function repoMatchesFilter(
       pushedAt: repo.pushedAt,
     })
   }
-  if (filter === 'burn-apps') return tag === 'direct' || tag === 'supply-lock'
-  if (filter === 'leverage') return hasShippingLeverageTag(tag)
+  if (filter === 'new-arrivals') return isCreatedInPeriod(repo.createdAt, period)
+  if (filter === 'holder-economics') return tag === 'direct' || tag === 'supply-lock'
+  if (filter === 'shipping-leverage') return hasShippingLeverageTag(tag)
   if (filter === 'clawd-cv-perks') {
     return collectionSets['cv-related'].has(slug) || collectionSets['clawd-gated'].has(slug)
   }
@@ -450,6 +460,12 @@ function repoRecentTimestamp(repo: RepoWithLive): number {
   return Number.isNaN(t) ? 0 : t
 }
 
+function repoCreatedTimestamp(repo: RepoWithLive): number {
+  if (!repo.createdAt) return 0
+  const t = new Date(repo.createdAt).getTime()
+  return Number.isNaN(t) ? 0 : t
+}
+
 function repoGradeSortKey(repo: RepoWithLive): number {
   if (isUnscoredRecent(repo)) return -1
   const bi = repo.builderIntegrity?.pct ?? 0
@@ -521,6 +537,7 @@ function commitsSinceScoredColor(count: number): string {
 
 interface RepoWithLive extends Repo {
   description: string | null
+  createdAt: string | null
   lastCommitAt: string | null
   pushedAt: string | null
   commitsScanned?: boolean | null
@@ -616,8 +633,10 @@ export default function RepoList({
               scoredAt: updated.scoredAt,
               adminNote: updated.adminNote,
               description: r.description,
+              createdAt: r.createdAt,
               lastCommitAt: r.lastCommitAt,
               pushedAt: r.pushedAt,
+              commits24h: r.commits24h,
               commits30d: r.commits30d,
               commits7d: r.commits7d,
               commits7_14: r.commits7_14,
@@ -633,10 +652,11 @@ export default function RepoList({
   const filters: { key: RepoFilter; label: string; tooltip?: string }[] = [
     { key: 'all', label: 'All', tooltip: REPO_FILTER_TOOLTIPS.all },
     { key: 'needs-rescore', label: 'Needs rescore', tooltip: REPO_FILTER_TOOLTIPS['needs-rescore'] },
-    { key: 'burn-apps', label: 'Burn apps', tooltip: REPO_FILTER_TOOLTIPS['burn-apps'] },
+    { key: 'new-arrivals', label: 'New arrivals', tooltip: REPO_FILTER_TOOLTIPS['new-arrivals'] },
     { key: 'clawd-cv-perks', label: 'Clawd/CV perks', tooltip: REPO_FILTER_TOOLTIPS['clawd-cv-perks'] },
-    { key: 'leverage', label: 'Leverage', tooltip: REPO_FILTER_TOOLTIPS.leverage },
-    { key: 'direct', label: 'Direct', tooltip: TAG_TOOLTIPS.direct },
+    { key: 'holder-economics', label: 'Holder economics', tooltip: REPO_FILTER_TOOLTIPS['holder-economics'] },
+    { key: 'shipping-leverage', label: 'Shipping leverage', tooltip: REPO_FILTER_TOOLTIPS['shipping-leverage'] },
+    { key: 'direct', label: 'Direct burn', tooltip: TAG_TOOLTIPS.direct },
     { key: 'supply-lock', label: 'Supply lock', tooltip: TAG_TOOLTIPS['supply-lock'] },
     { key: 'indirect', label: 'Indirect', tooltip: TAG_TOOLTIPS.indirect },
     { key: 'infrastructure', label: 'Infrastructure', tooltip: TAG_TOOLTIPS.infrastructure },
@@ -647,19 +667,19 @@ export default function RepoList({
   if (communityContextEnabled) {
     filters.splice(3, 0, {
       key: 'community-context',
-      label: contextRepoCount > 0 ? `Discussion (${contextRepoCount})` : 'Discussion',
+      label: contextRepoCount > 0 ? `Community context (${contextRepoCount})` : 'Community context',
       tooltip: REPO_FILTER_TOOLTIPS['community-context'],
     })
   }
 
   const tagFiltered = repoItems.filter(r =>
-    repoMatchesFilter(r, activeFilter, collectionSets, contextSummary, pinnedNeedsRescoreSlugs),
+    repoMatchesFilter(r, activeFilter, collectionSets, contextSummary, pinnedNeedsRescoreSlugs, repoPeriod),
   )
   const activeInPeriod = tagFiltered.filter(r => {
     const c = repoCommitsForPeriodKey(r, repoPeriod)
     return c != null && c > 0
   })
-  const skipActiveScope = activeFilter === 'needs-rescore'
+  const skipActiveScope = activeFilter === 'needs-rescore' || activeFilter === 'new-arrivals'
   const filtered = (activityScope === 'active' && !skipActiveScope ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
       if (activeFilter === 'needs-rescore' && pinnedNeedsRescoreSlugs.length) {
@@ -670,6 +690,11 @@ export default function RepoList({
           if (bPinned === -1) return -1
           return aPinned - bPinned
         }
+      }
+
+      if (activeFilter === 'new-arrivals') {
+        const createdDiff = repoCreatedTimestamp(b) - repoCreatedTimestamp(a)
+        if (createdDiff !== 0) return createdDiff
       }
 
       if (activeFilter === 'community-context') {
@@ -714,6 +739,8 @@ export default function RepoList({
 
   const repoCountLabel = activeFilter === 'needs-rescore'
     ? ` · ${filtered.length} need rescore`
+    : activeFilter === 'new-arrivals'
+      ? ` · ${filtered.length} new arrival${filtered.length === 1 ? '' : 's'} (${periodKeyLabel(repoPeriod)})`
     : activityScope === 'active'
       ? activeFilter === 'all'
         ? ` · ${filtered.length} active (${periodKeyLabel(repoPeriod)})`
@@ -1070,7 +1097,7 @@ export default function RepoList({
               <RepoBadge
                 tooltip={
                   showsEconomicNa(repo)
-                    ? REPO_FILTER_TOOLTIPS.leverage
+                    ? REPO_FILTER_TOOLTIPS['shipping-leverage']
                     : HOLDER_ECONOMICS_COLUMN_TOOLTIP
                 }
                 style={{ ...metricColStyle(isMobile, METRIC_COL_WIDTH.holder), display: 'block' }}

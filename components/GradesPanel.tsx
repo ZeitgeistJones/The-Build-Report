@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { BuilderGrade, TokenMechanicGrade, ShippingLeverageGrade, IntegrityGrade, formatTrendDelta, TrendExplanation, Period } from '@/lib/grades'
-import type { GradeNewArrival } from '@/lib/gradeNewArrivals'
-import { timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { rubricBlockById } from '@/lib/rubricReference'
 import { PeriodToggle, useGradePeriod } from './GradePeriodContext'
@@ -176,105 +174,6 @@ function RubricBreakdownTray({
   )
 }
 
-type ArrivalsCardId = 'economic' | 'integrity'
-
-function NewArrivalsTray({
-  cardId,
-  arrivals,
-  onClose,
-  isMobile,
-}: {
-  cardId: ArrivalsCardId
-  arrivals: GradeNewArrival[]
-  onClose: () => void
-  isMobile: boolean
-}) {
-  const label = cardId === 'economic' ? 'Holder economics' : 'Builder standards'
-
-  return (
-    <div
-      style={{
-        marginTop: '12px',
-        background: 'var(--surface-2)',
-        border: '1px solid var(--accent-border)',
-        borderRadius: 'var(--radius-lg)',
-        padding: isMobile ? '14px 16px' : '20px 24px',
-        animation: 'fadeTray 0.15s ease',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px',
-        }}
-      >
-        <span
-          style={{
-            fontSize: '11px',
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            color: 'var(--text-muted)',
-          }}
-        >
-          New arrivals — {label}
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-muted)',
-            cursor: 'pointer',
-            fontSize: '13px',
-            padding: 0,
-          }}
-        >
-          ✕
-        </button>
-      </div>
-      <p style={{ margin: '0 0 10px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        First time in this grade&apos;s sample — shown once per project, even if you change the period toggle.
-      </p>
-      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-        {arrivals.map(a => (
-          <li
-            key={a.slug}
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '6px 12px',
-              alignItems: 'baseline',
-              padding: '8px 0',
-              borderBottom: '1px solid var(--border)',
-              fontSize: '12px',
-              color: 'var(--text-secondary)',
-            }}
-          >
-            <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{a.name}</span>
-            {a.kind === 'category_entry' && (
-              <span
-                style={{ color: 'var(--text-muted)', fontSize: '11px' }}
-                title="Already active elsewhere — newly counted in this grade's sample."
-              >
-                · existing project
-              </span>
-            )}
-            <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-              {a.firstCommitAt ? `first commit ${timeAgo(a.firstCommitAt)}` : 'first commit —'}
-              {' · '}
-              {a.commits} commit{a.commits === 1 ? '' : 's'}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
 function TrendDetailTray({
   cardId,
   explanation,
@@ -354,9 +253,6 @@ function GradeCard({
   onSelectTrend,
   isRubricSelected,
   onSelectRubric,
-  newArrivalsCount = 0,
-  isArrivalsSelected = false,
-  onSelectArrivals,
   isMobile,
 }: {
   cardId: CardId
@@ -375,21 +271,15 @@ function GradeCard({
   onSelectTrend: (id: CardId | null) => void
   isRubricSelected: boolean
   onSelectRubric: (id: CardId | null) => void
-  newArrivalsCount?: number
-  isArrivalsSelected?: boolean
-  onSelectArrivals?: () => void
   isMobile: boolean
 }) {
   const canShowTrend = Boolean(trendExplanation && period !== '60d')
-  const canShowArrivals = Boolean(
-    onSelectArrivals && newArrivalsCount > 0 && period !== '60d',
-  )
 
   return (
     <div
       style={{
-        background: isSelected || isRubricSelected || isArrivalsSelected ? 'var(--surface-2)' : 'var(--surface-1)',
-        border: `1px solid ${isSelected || isRubricSelected || isArrivalsSelected ? 'var(--accent-border)' : 'var(--border)'}`,
+        background: isSelected || isRubricSelected ? 'var(--surface-2)' : 'var(--surface-1)',
+        border: `1px solid ${isSelected || isRubricSelected ? 'var(--accent-border)' : 'var(--border)'}`,
         borderRadius: 'var(--radius-lg)',
         padding: '16px',
         display: 'flex',
@@ -494,23 +384,6 @@ function GradeCard({
             {isSelected ? 'Close ✕' : 'Why this trend? →'}
           </button>
         )}
-        {canShowArrivals && (
-          <button
-            type="button"
-            onClick={onSelectArrivals}
-            style={{
-              fontSize: '12px',
-              color: 'var(--accent)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              padding: '8px 0 0',
-            }}
-          >
-            {isArrivalsSelected ? 'Close ✕' : `New arrivals (${newArrivalsCount}) →`}
-          </button>
-        )}
         <button
           type="button"
           onClick={() => onSelectRubric(isRubricSelected ? null : cardId)}
@@ -563,28 +436,15 @@ export default function GradesPanel({
   const footerSize = isMobile ? '11px' : '10px'
   const [selectedCard, setSelectedCard] = useState<CardId | null>(null)
   const [rubricCard, setRubricCard] = useState<CardId | null>(null)
-  const [arrivalsCard, setArrivalsCard] = useState<ArrivalsCardId | null>(null)
 
   function handleSelectTrend(id: CardId | null) {
     setSelectedCard(id)
-    if (id) {
-      setRubricCard(null)
-      setArrivalsCard(null)
-    }
+    if (id) setRubricCard(null)
   }
 
   function handleSelectRubric(id: CardId | null) {
     setRubricCard(id)
-    if (id) {
-      setSelectedCard(null)
-      setArrivalsCard(null)
-    }
-  }
-
-  function handleSelectArrivals(id: ArrivalsCardId) {
-    setArrivalsCard(prev => (prev === id ? null : id))
-    setSelectedCard(null)
-    setRubricCard(null)
+    if (id) setSelectedCard(null)
   }
 
   const periodGrades = {
@@ -861,9 +721,6 @@ export default function GradesPanel({
           onSelectTrend={handleSelectTrend}
           isRubricSelected={rubricCard === 'integrity'}
           onSelectRubric={handleSelectRubric}
-          newArrivalsCount={ig?.newArrivals?.length ?? 0}
-          isArrivalsSelected={arrivalsCard === 'integrity'}
-          onSelectArrivals={() => handleSelectArrivals('integrity')}
         />
 
         {isMobile && (
@@ -903,9 +760,6 @@ export default function GradesPanel({
           onSelectTrend={handleSelectTrend}
           isRubricSelected={rubricCard === 'economic'}
           onSelectRubric={handleSelectRubric}
-          newArrivalsCount={tg?.newArrivals?.length ?? 0}
-          isArrivalsSelected={arrivalsCard === 'economic'}
-          onSelectArrivals={() => handleSelectArrivals('economic')}
         />
 
         <GradeCard
@@ -941,24 +795,6 @@ export default function GradesPanel({
           cardId={selectedCard}
           explanation={selectedExplanation}
           onClose={() => setSelectedCard(null)}
-          isMobile={isMobile}
-        />
-      )}
-
-      {arrivalsCard === 'economic' && tg?.newArrivals && tg.newArrivals.length > 0 && period !== '60d' && (
-        <NewArrivalsTray
-          cardId="economic"
-          arrivals={tg.newArrivals}
-          onClose={() => setArrivalsCard(null)}
-          isMobile={isMobile}
-        />
-      )}
-
-      {arrivalsCard === 'integrity' && ig?.newArrivals && ig.newArrivals.length > 0 && period !== '60d' && (
-        <NewArrivalsTray
-          cardId="integrity"
-          arrivals={ig.newArrivals}
-          onClose={() => setArrivalsCard(null)}
           isMobile={isMobile}
         />
       )}

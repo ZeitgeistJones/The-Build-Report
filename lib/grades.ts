@@ -32,7 +32,6 @@ import {
   reposActiveInWindow,
   selectSampleWithFallback,
 } from './scoringShared'
-import type { GradeNewArrival } from './gradeNewArrivals'
 import type { PathToCHint } from './gradePathToC'
 
 export { pctToLetter }
@@ -144,7 +143,6 @@ export interface TokenMechanicGrade {
   trendPct: number | null
   trend: TrendDirection
   trendExplanation?: TrendExplanation
-  newArrivals?: GradeNewArrival[]
 }
 
 export interface ShippingLeverageGrade {
@@ -157,7 +155,6 @@ export interface ShippingLeverageGrade {
   trendPct: number | null
   trend: TrendDirection
   trendExplanation?: TrendExplanation
-  newArrivals?: GradeNewArrival[]
 }
 
 export interface IntegrityDragRepo {
@@ -178,7 +175,6 @@ export interface IntegrityGrade {
   trendPct: number | null
   trend: TrendDirection
   trendExplanation?: TrendExplanation
-  newArrivals?: GradeNewArrival[]
   pathToC?: PathToCHint | null
 }
 

@@ -4,16 +4,18 @@ import type { RepoLifecycle } from './repoLifecycle'
 export const CLAWD_CV_PERKS_TOOLTIP =
   'Repos where holders need CLAWD or CV to unlock perks — staking, governance, gated apps, and access flows.'
 
-export const DISCUSSION_FILTER_TOOLTIP =
-  'Repos where holders left a note or voted on context. Newest talk rises to the top.'
+export const COMMUNITY_CONTEXT_FILTER_TOOLTIP =
+  'Repos where holders left community context or voted on it. Newest activity rises to the top.'
 
 export const REPO_FILTER_TOOLTIPS = {
   all: 'Every tracked repo in the ecosystem.',
   'needs-rescore': 'Scored repos with new GitHub commits since the last score — rescore (or promo) may apply.',
-  'burn-apps': 'Apps that burn or lock CLAWD when you use them.',
-  leverage: 'Indirect repos scored on how much they help other burn apps ship.',
+  'new-arrivals': 'Repos created on GitHub in the selected window.',
+  'holder-economics': 'Direct-burn and supply-lock repos — the Holder economics sample.',
+  'shipping-leverage':
+    'Indirect, infrastructure, and theoretical repos scored on how much they help holder-facing apps ship.',
   'clawd-cv-perks': CLAWD_CV_PERKS_TOOLTIP,
-  'community-context': DISCUSSION_FILTER_TOOLTIP,
+  'community-context': COMMUNITY_CONTEXT_FILTER_TOOLTIP,
 } as const
 
 export const REPO_SORT_TOOLTIPS = {
@@ -53,7 +55,7 @@ export const AWAITING_SCORE_TOOLTIP =
   'Recently pushed on GitHub but not scored yet. Pay to run Live AI for rubric grades.'
 
 export const HOLDER_ECONOMICS_COLUMN_TOOLTIP =
-  'This repo\'s holder economic impact. Burn apps and supply-lock repos are scored on their direct CLAWD burn or lock mechanic and feed the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage instead — they feed the separate Shipping leverage Ecosystem Grade, the second lens on holder value at the top.'
+  'This repo\'s holder economic impact. Direct-burn and supply-lock repos are scored on their direct CLAWD burn or lock mechanic and feed the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage instead — they feed the separate Shipping leverage Ecosystem Grade, the second lens on holder value at the top.'
 
 export const BUILDER_STANDARDS_COLUMN_TOOLTIP =
   'Observable safety, testing, and transparency for this repo — scored on every tracked project. Rubric rows vary by repo type (consumer apps vs infra/tooling). Feeds the Builder standards Ecosystem Grade at the top.'

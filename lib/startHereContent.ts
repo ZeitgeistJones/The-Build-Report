@@ -70,7 +70,7 @@ export const START_HERE_CHECKLIST = {
   intro: 'New here? Try these three things:',
   items: [
     'Set the time window to 7d',
-    'Try the Burn apps filter',
+    'Try the Holder economics filter',
     'Open one repo card and read its full scorecard',
   ],
 } as const
@@ -104,7 +104,10 @@ export const START_HERE_GLOSSARY: { term: string; definition: string }[] = [
     term: 'Chronicle',
     definition: 'The site\'s reference doc summarizing a repo\'s history, purpose, and stated lifecycle',
   },
-  { term: 'Discussion', definition: 'A repo filter showing projects with community-submitted context notes' },
+  {
+    term: 'Community context',
+    definition: 'A repo filter showing projects with holder-submitted context the AI can read on the next rescore',
+  },
   {
     term: 'Rescore',
     definition: 'A paid action that triggers a fresh Live AI score; the fee goes toward buying and burning $CLAWD',
@@ -113,7 +116,18 @@ export const START_HERE_GLOSSARY: { term: string; definition: string }[] = [
     term: 'Clawd/CV Perks',
     definition: 'A repo filter showing projects that gate features behind holding $CLAWD or staked CV',
   },
-  { term: 'Burn Apps', definition: 'A repo filter showing projects tied to $CLAWD burn events or mechanics' },
+  {
+    term: 'Holder economics (filter)',
+    definition: 'A repo filter for direct-burn and supply-lock repos — the same sample as the Holder economics Ecosystem Grade',
+  },
+  {
+    term: 'Shipping leverage (filter)',
+    definition: 'A repo filter for indirect, infrastructure, and theoretical repos scored on shipping leverage',
+  },
+  {
+    term: 'New arrivals',
+    definition: 'A repo filter for projects created on GitHub in the selected time window',
+  },
   {
     term: '24h / 7d / 30d / 60d window',
     definition: 'The time range for counting commits — toggle to change what "recent" means',
@@ -136,7 +150,7 @@ export const START_HERE_DISCLAIMER = [
   'This site is a community project, not an official product of any company or development team.',
   'Scores shown here — whether Live AI or Launch baseline — are interpretive assessments, not audits, guarantees, or professional financial evaluations. They reflect one methodology applied at a point in time and may not capture every relevant factor.',
   'Nothing on this site is financial advice. Holding, buying, or selling $CLAWD or any other token involves risk. Do your own research and consult a qualified financial professional before making investment decisions.',
-  'Community context submissions are user-generated and have not been independently verified. Discussion notes reflect community sentiment, not factual endorsement.',
+  'Community context submissions are user-generated and have not been independently verified. They reflect community sentiment, not factual endorsement.',
   'The Build Report is not affiliated with, endorsed by, or responsible for the clawdbotatg organization or any of its projects.',
 ] as const
 
@@ -219,7 +233,7 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
       },
       {
         title: 'Step 3 — The repo list',
-        body: 'Each row is one project. Each card shows two Repo Grades — Holder economics and Builder standards — plus that repo\'s commit count for the window, its last-activity timestamp, and a status badge (Shipping, Stable, or Done). Use the filters above the list to narrow things down: Burn apps for repos tied to $CLAWD burns, Clawd/CV perks for repos that gate features behind holding, Discussion for repos with community-submitted notes. Sort by Recent, Most active, or Grades. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Most active, set the window to 7d, and start there.',
+        body: 'Each row is one project. Each card shows two Repo Grades — Holder economics and Builder standards — plus that repo\'s commit count for the window, its last-activity timestamp, and a status badge (Shipping, Stable, or Done). Use the filters above the list to narrow things down: Holder economics for direct-burn and supply-lock repos, Shipping leverage for infra/tooling, New arrivals for repos created in the selected window, Clawd/CV perks for holder-gated apps, Community context for repos with holder-submitted context. Sort by Recent, Most active, or Grades. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Most active, set the window to 7d, and start there.',
       },
     ],
   },
