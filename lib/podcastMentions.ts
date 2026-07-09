@@ -6,8 +6,12 @@ import { REPOS } from '@/lib/scores'
 
 const MENTION_KEY_PREFIX = 'build-report:podcast-mention:'
 const PENDING_SET_KEY = 'build-report:podcast-mentions-pending'
+const CANDIDATE_SET_KEY = 'build-report:podcast-mentions-candidate'
 const PUBLISHED_SET_KEY = 'build-report:podcast-mentions-published'
 const SCANNED_EPISODES_KEY = 'build-report:podcast-scanned-episodes'
+const MODE_KEY = 'build-report:overheard-mode'
+
+export type OverheardMode = 'automatic' | 'manual'
 
 export type PodcastMention = {
   id: string
@@ -18,7 +22,8 @@ export type PodcastMention = {
   text: string
   approxTimestampSec: number
   confirmedAt: string
-  status: 'pending' | 'published'
+  status: 'candidate' | 'pending' | 'published'
+  userContext: string | null
   publishedAt: string | null
 }
 
@@ -88,10 +93,9 @@ async function fetchTranscriptLines(transcriptUri: string): Promise<TranscriptLi
 }
 
 /**
- * Manifest field names are unconfirmed — this repo has never fetched a real
- * manifest JSON, only a transcript file directly. Try several likely key
- * names defensively; if mentionsFound stays 0 across many episodes, this is
- * the first thing to check by logging a raw manifest fetch.
+ * Manifest field names are unconfirmed — never fetched a real manifest JSON,
+ * only a transcript file directly. Try several likely key names defensively;
+ * if mentionsFound stays 0 across many episodes, log a raw manifest fetch.
  */
 function extractTranscriptUri(manifest: Record<string, unknown>): string | null {
   const candidates = ['transcript', 'transcriptCid', 'transcriptUri', 'transcript_cid']
@@ -126,25 +130,37 @@ Reply with ONLY a comma-separated list of the line numbers (e.g. "0,2") that are
       max_tokens: 100,
       messages: [{ role: 'user', content: prompt }],
     })
-    const text = response.content
-      .map(b => (b.type === 'text' ? b.text : ''))
-      .join('')
-      .trim()
-
+    const text = response.content.map(b => (b.type === 'text' ? b.text : '')).join('').trim()
     if (text.toLowerCase().includes('none')) return []
-
     const indices = text
       .split(',')
       .map(s => Number(s.trim()))
       .filter(n => Number.isInteger(n) && n >= 0 && n < candidates.length)
-
     return indices.map(i => candidates[i])
   } catch {
     return []
   }
 }
 
-export async function scanEpisodeForMentions(episode: SlopEpisode): Promise<PodcastMention[]> {
+export async function getOverheardMode(): Promise<OverheardMode> {
+  try {
+    const redis = getRedis()
+    const mode = await redis.get<string>(MODE_KEY)
+    return mode === 'manual' ? 'manual' : 'automatic'
+  } catch {
+    return 'automatic'
+  }
+}
+
+export async function setOverheardMode(mode: OverheardMode): Promise<void> {
+  const redis = getRedis()
+  await redis.set(MODE_KEY, mode)
+}
+
+export async function scanEpisodeForMentions(
+  episode: SlopEpisode,
+  mode: OverheardMode,
+): Promise<PodcastMention[]> {
   if (!episode.manifest) return []
 
   const manifest = await fetchJson<Record<string, unknown>>(ipfsToGatewayUrl(episode.manifest))
@@ -167,30 +183,51 @@ export async function scanEpisodeForMentions(episode: SlopEpisode): Promise<Podc
 
     if (!candidates.length) continue
 
-    const confirmed = await confirmMentionsWithHaiku(repo.githubSlug, repo.verdict ?? '', candidates)
-
-    for (const c of confirmed) {
-      const id = makeMentionId(repo.githubSlug, episode.slug, c.text)
-      results.push({
-        id,
-        repoSlug: repo.githubSlug,
-        episodeName: episode.name,
-        episodeSlug: episode.slug,
-        speaker: c.handle ?? 'unknown',
-        text: c.text,
-        approxTimestampSec: Math.max(0, Math.round((c.ts - startTs) / 1000)),
-        confirmedAt: new Date().toISOString(),
-        status: 'pending',
-        publishedAt: null,
-      })
+    if (mode === 'automatic') {
+      const confirmed = await confirmMentionsWithHaiku(repo.githubSlug, repo.verdict ?? '', candidates)
+      for (const c of confirmed) {
+        const id = makeMentionId(repo.githubSlug, episode.slug, c.text)
+        results.push({
+          id,
+          repoSlug: repo.githubSlug,
+          episodeName: episode.name,
+          episodeSlug: episode.slug,
+          speaker: c.handle ?? 'unknown',
+          text: c.text,
+          approxTimestampSec: Math.max(0, Math.round((c.ts - startTs) / 1000)),
+          confirmedAt: new Date().toISOString(),
+          status: 'pending',
+          userContext: null,
+          publishedAt: null,
+        })
+      }
+    } else {
+      // manual mode — skip Haiku, surface every raw keyword hit as a candidate for human review
+      for (const c of candidates) {
+        const id = makeMentionId(repo.githubSlug, episode.slug, c.text)
+        results.push({
+          id,
+          repoSlug: repo.githubSlug,
+          episodeName: episode.name,
+          episodeSlug: episode.slug,
+          speaker: c.handle ?? 'unknown',
+          text: c.text,
+          approxTimestampSec: Math.max(0, Math.round((c.ts - startTs) / 1000)),
+          confirmedAt: new Date().toISOString(),
+          status: 'candidate',
+          userContext: null,
+          publishedAt: null,
+        })
+      }
     }
   }
 
   return results
 }
 
-export async function scanNewEpisodes(): Promise<{ scanned: number; mentionsFound: number }> {
+export async function scanNewEpisodes(): Promise<{ scanned: number; mentionsFound: number; mode: OverheardMode }> {
   const redis = getRedis()
+  const mode = await getOverheardMode()
   const episodes = await fetchAllEpisodes()
 
   const scannedIds = new Set<string>(
@@ -200,22 +237,22 @@ export async function scanNewEpisodes(): Promise<{ scanned: number; mentionsFoun
   let mentionsFound = 0
 
   for (const episode of unscanned) {
-    const mentions = await scanEpisodeForMentions(episode)
+    const mentions = await scanEpisodeForMentions(episode, mode)
     for (const mention of mentions) {
       await redis.set(mentionKey(mention.id), mention, { ex: 60 * 60 * 24 * 365 })
-      await redis.sadd(PENDING_SET_KEY, mention.id)
+      await redis.sadd(mention.status === 'candidate' ? CANDIDATE_SET_KEY : PENDING_SET_KEY, mention.id)
       mentionsFound++
     }
     await redis.sadd(SCANNED_EPISODES_KEY, episode.id)
   }
 
-  return { scanned: unscanned.length, mentionsFound }
+  return { scanned: unscanned.length, mentionsFound, mode }
 }
 
-export async function getPendingMentions(): Promise<PodcastMention[]> {
+async function getMentionsFromSet(setKey: string): Promise<PodcastMention[]> {
   try {
     const redis = getRedis()
-    const ids = (await redis.smembers<string[]>(PENDING_SET_KEY)) ?? []
+    const ids = (await redis.smembers<string[]>(setKey)) ?? []
     if (!ids.length) return []
     const keys = ids.map(mentionKey)
     const values = await redis.mget<(PodcastMention | null)[]>(...keys)
@@ -224,6 +261,42 @@ export async function getPendingMentions(): Promise<PodcastMention[]> {
       .sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt))
   } catch {
     return []
+  }
+}
+
+export async function getCandidateMentions(): Promise<PodcastMention[]> {
+  return getMentionsFromSet(CANDIDATE_SET_KEY)
+}
+
+export async function getPendingMentions(): Promise<PodcastMention[]> {
+  return getMentionsFromSet(PENDING_SET_KEY)
+}
+
+export async function addContextToCandidate(id: string, context: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const mention = await redis.get<PodcastMention>(mentionKey(id))
+    if (!mention || mention.status !== 'candidate') return false
+    const updated: PodcastMention = { ...mention, userContext: context }
+    await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function confirmCandidate(id: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const mention = await redis.get<PodcastMention>(mentionKey(id))
+    if (!mention || mention.status !== 'candidate') return false
+    const updated: PodcastMention = { ...mention, status: 'pending' }
+    await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    await redis.srem(CANDIDATE_SET_KEY, id)
+    await redis.sadd(PENDING_SET_KEY, id)
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -246,6 +319,7 @@ export async function dismissMention(id: string): Promise<boolean> {
   try {
     const redis = getRedis()
     await redis.srem(PENDING_SET_KEY, id)
+    await redis.srem(CANDIDATE_SET_KEY, id)
     await redis.del(mentionKey(id))
     return true
   } catch {
@@ -254,26 +328,5 @@ export async function dismissMention(id: string): Promise<boolean> {
 }
 
 export async function getPublishedMentions(): Promise<PodcastMention[]> {
-  try {
-    const redis = getRedis()
-    const ids = (await redis.smembers<string[]>(PUBLISHED_SET_KEY)) ?? []
-    if (!ids.length) return []
-    const keys = ids.map(mentionKey)
-    const values = await redis.mget<(PodcastMention | null)[]>(...keys)
-    return values.filter((v): v is PodcastMention => Boolean(v))
-  } catch {
-    return []
-  }
-}
-
-export async function getFreshMentionsForRepo(repoSlug: string, withinDays = 30): Promise<PodcastMention[]> {
-  const all = await getPublishedMentions()
-  const cutoff = Date.now() - withinDays * 24 * 60 * 60 * 1000
-  return all.filter(m => m.repoSlug === repoSlug && m.publishedAt && Date.parse(m.publishedAt) >= cutoff)
-}
-
-export async function getArchivedMentionsForRepo(repoSlug: string, withinDays = 30): Promise<PodcastMention[]> {
-  const all = await getPublishedMentions()
-  const cutoff = Date.now() - withinDays * 24 * 60 * 60 * 1000
-  return all.filter(m => m.repoSlug === repoSlug && m.publishedAt && Date.parse(m.publishedAt) < cutoff)
+  return getMentionsFromSet(PUBLISHED_SET_KEY)
 }

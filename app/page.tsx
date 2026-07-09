@@ -39,6 +39,8 @@ import NeedleCard from '@/components/NeedleCard'
 import { getNeedle } from '@/lib/needle'
 import OverheardCard from '@/components/OverheardCard'
 import { getOverheard } from '@/lib/overheard'
+import SpottedCard from '@/components/SpottedCard'
+import { getLatestPublished } from '@/lib/spotted'
 import { GradePeriodProvider } from '@/components/GradePeriodContext'
 import { getRescoreBurnStats } from '@/lib/rescoreBurns'
 import { getRescoreSummaries } from '@/lib/rescoreSummaries'
@@ -71,11 +73,12 @@ export default async function Home() {
   const contextSummary = communityContextEnabled ? await getContextSummaryBySlug().catch(() => ({})) : {}
   const communityPulse = communityContextEnabled ? buildCommunityPulse(contextSummary) : null
 
- const [rescoreBurns, buildBrief, needle, overheard] = await Promise.all([
+ const [rescoreBurns, buildBrief, needle, overheard, spotted] = await Promise.all([
   getRescoreBurnStats().catch(() => null),
   getBuildBrief().catch(() => null),
   getNeedle().catch(() => null),
   getOverheard().catch(() => null),
+  getLatestPublished().catch(() => null),
 ])
 
   const { stats: loadedStats, source: loadedSource } = await loadGitHubStatsForPage().catch(err => {
@@ -361,6 +364,7 @@ export default async function Home() {
       <BuildBriefCard brief={buildBrief} />
       <NeedleCard needle={needle} />
       <OverheardCard overheard={overheard} />
+      <SpottedCard spotted={spotted} />
 
       <div style={{ marginBottom: '32px' }}>
       <GradesPanel

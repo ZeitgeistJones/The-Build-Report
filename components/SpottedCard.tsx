@@ -1,15 +1,24 @@
-import type { OverheardData } from '@/lib/overheard'
+'use client'
+
+import { useEffect } from 'react'
+import type { SpottedEntry } from '@/lib/spotted'
 
 interface Props {
-  overheard: OverheardData | null
+  spotted: SpottedEntry | null
 }
 
-export default function OverheardCard({ overheard }: Props) {
-  if (!overheard) return null
+export default function SpottedCard({ spotted }: Props) {
+  useEffect(() => {
+    if (!spotted) return
+    if (document.getElementById('twitter-wjs')) return
+    const script = document.createElement('script')
+    script.id = 'twitter-wjs'
+    script.src = 'https://platform.twitter.com/widgets.js'
+    script.async = true
+    document.body.appendChild(script)
+  }, [spotted])
 
-  const lines = overheard.format === 'list'
-    ? overheard.text.split('\n').filter(Boolean)
-    : [overheard.text]
+  if (!spotted) return null
 
   return (
     <div
@@ -41,30 +50,18 @@ export default function OverheardCard({ overheard }: Props) {
             letterSpacing: '0.08em',
           }}
         >
-          Overheard
+          Spotted
         </span>
         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          {overheard.mentionCount} mention{overheard.mentionCount === 1 ? '' : 's'} on Slop.Computer
+          {spotted.authorName} on X
         </span>
       </div>
 
-      {lines.map((line, i) => (
-        <p
-          key={i}
-          style={{
-            margin: i === 0 ? 0 : '6px 0 0',
-            fontSize: '14px',
-            color: 'var(--text-secondary)',
-            lineHeight: 1.65,
-          }}
-        >
-          {line}
-        </p>
-      ))}
-
-      <p style={{ margin: '10px 0 0', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-        Reflects mentions published in the last 24 hours
+      <p style={{ margin: '0 0 10px', fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+        {spotted.writeup}
       </p>
+
+      <div dangerouslySetInnerHTML={{ __html: spotted.embedHtml }} />
     </div>
   )
 }
