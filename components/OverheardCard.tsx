@@ -84,6 +84,16 @@ export default function OverheardCard({ entry, digest }: Props) {
         <p className="overheard-card__featured-kicker">Featured repo</p>
         <p className="overheard-card__repo">{entry.repoSlug}</p>
         <p className="overheard-card__meta">{buildEpisodeMeta(entry)}</p>
+        {entry.episodeUrl && (
+          <a
+            href={entry.episodeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="overheard-card__episode-link"
+          >
+            Episode link ↗
+          </a>
+        )}
       </header>
 
       <p className={`spotted-writeup${writeupExpanded || !writeupLong ? '' : ' spotted-writeup--clamped'}`}>

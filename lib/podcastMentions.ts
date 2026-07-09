@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createHash, randomUUID } from 'crypto'
 import { getRedis } from '@/lib/redis'
-import { fetchAllEpisodes, fetchIpfsText, type SlopEpisode } from '@/lib/web3/slopComputer'
+import { fetchAllEpisodes, fetchIpfsText, episodePublicUrl, type SlopEpisode } from '@/lib/web3/slopComputer'
 import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 import { generateOverheardWriteup } from '@/lib/overheardWriteup'
 import { REPOS } from '@/lib/scores'
@@ -50,6 +50,7 @@ export type OverheardEntry = {
   repoSlug: string
   episodeName: string
   episodeSlug: string
+  episodeUrl: string | null
   episodePublishedAt: string | null
   quotes: OverheardQuote[]
   writeup: string
@@ -80,6 +81,7 @@ export function normalizeOverheardEntry(raw: unknown): OverheardEntry | null {
       repoSlug: r.repoSlug,
       episodeName: String(r.episodeName ?? ''),
       episodeSlug: String(r.episodeSlug ?? ''),
+      episodeUrl: typeof r.episodeUrl === 'string' ? r.episodeUrl : null,
       episodePublishedAt: typeof r.episodePublishedAt === 'string' ? r.episodePublishedAt : null,
       quotes: r.quotes as OverheardQuote[],
       writeup: typeof r.writeup === 'string' ? r.writeup : '',
@@ -99,6 +101,7 @@ export function normalizeOverheardEntry(raw: unknown): OverheardEntry | null {
       repoSlug: r.repoSlug,
       episodeName: String(r.episodeName ?? ''),
       episodeSlug: String(r.episodeSlug ?? ''),
+      episodeUrl: typeof r.episodeUrl === 'string' ? r.episodeUrl : null,
       episodePublishedAt: typeof r.episodePublishedAt === 'string' ? r.episodePublishedAt : null,
       quotes: [{
         speaker: r.speaker,
@@ -134,6 +137,7 @@ function buildCandidateEntry(params: {
     repoSlug: params.repoSlug,
     episodeName: params.episode.name,
     episodeSlug: params.episode.slug,
+    episodeUrl: episodePublicUrl(params.episode.slug),
     episodePublishedAt: episodePublishedAtIso(params.episode),
     quotes: [{
       speaker: params.speaker,
@@ -706,6 +710,7 @@ export async function groupCandidatesIntoThread(ids: string[]): Promise<{ ok: tr
       repoSlug,
       episodeName: entries[0]!.episodeName,
       episodeSlug: entries[0]!.episodeSlug,
+      episodeUrl: entries[0]!.episodeUrl,
       episodePublishedAt: entries[0]!.episodePublishedAt,
       quotes,
       writeup: '',

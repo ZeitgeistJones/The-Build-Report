@@ -659,6 +659,19 @@ button {
   word-break: break-word;
 }
 
+.overheard-card__episode-link {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.overheard-card__episode-link:hover {
+  text-decoration: underline;
+  color: var(--accent);
+}
+
 .overheard-quote {
   padding: 8px 10px;
   background: var(--surface-2);

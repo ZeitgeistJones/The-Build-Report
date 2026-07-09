@@ -1087,6 +1087,16 @@ export default function AdminPage() {
                       <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {quote?.speaker ?? 'unknown'}
                     </div>
                   </div>
+                  {m.episodeUrl && (
+                    <a
+                      href={m.episodeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: '11px', color: 'var(--accent)', textDecoration: 'none', display: 'block', marginBottom: '8px', paddingLeft: '26px' }}
+                    >
+                      Episode link ↗
+                    </a>
+                  )}
                   <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5, paddingLeft: '26px' }}>
                     &ldquo;{quote?.text ?? ''}&rdquo;
                   </div>
@@ -1140,6 +1150,16 @@ export default function AdminPage() {
                     <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong>
                     {m.kind === 'thread' ? ` · thread (${m.quotes.length} quotes)` : ''} · {m.episodeName}
                   </div>
+                  {m.episodeUrl && (
+                    <a
+                      href={m.episodeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: '11px', color: 'var(--accent)', textDecoration: 'none', display: 'inline-block', marginBottom: '8px' }}
+                    >
+                      Episode link ↗
+                    </a>
+                  )}
                   <textarea
                     value={pendingWriteupDrafts[m.id] ?? m.writeup}
                     onChange={e => setPendingWriteupDrafts(prev => ({ ...prev, [m.id]: e.target.value }))}

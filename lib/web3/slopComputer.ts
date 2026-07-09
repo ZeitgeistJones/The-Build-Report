@@ -80,6 +80,13 @@ export type SlopEpisode = {
   nextId: string
 }
 
+const SLOP_COMPUTER_ORIGIN = 'https://slop.computer'
+
+/** Canonical public page URL for a Slop.Computer episode (e.g. https://slop.computer/auryn-macmillan). */
+export function episodePublicUrl(slug: string): string {
+  return `${SLOP_COMPUTER_ORIGIN}/${slug}`
+}
+
 export async function fetchAllEpisodes(maxAmount = 200): Promise<SlopEpisode[]> {
   const client = createMainnetClient()
   const count = await client.readContract({
