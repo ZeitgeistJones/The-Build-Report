@@ -908,6 +908,304 @@ export default function AdminPage() {
         )}
       </div>
 
+      {/* Podcast mentions review */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Podcast mentions review</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
+              <strong>Automatic</strong>: Haiku auto-confirms matches, they land directly in the pending queue below. <strong>Manual</strong>: raw keyword matches show as candidates first — add context and confirm yourself before they reach pending.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              onClick={() => void setOverheardMode('automatic')}
+              disabled={modeSaving}
+              style={{
+                fontSize: '12px',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius)',
+                background: overheardMode === 'automatic' ? 'var(--accent-dim)' : 'var(--surface-3)',
+                color: overheardMode === 'automatic' ? 'var(--accent)' : 'var(--text-secondary)',
+                border: `1px solid ${overheardMode === 'automatic' ? 'var(--accent-border)' : 'var(--border)'}`,
+              }}
+            >
+              Automatic
+            </button>
+            <button
+              onClick={() => void setOverheardMode('manual')}
+              disabled={modeSaving}
+              style={{
+                fontSize: '12px',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius)',
+                background: overheardMode === 'manual' ? 'var(--accent-dim)' : 'var(--surface-3)',
+                color: overheardMode === 'manual' ? 'var(--accent)' : 'var(--text-secondary)',
+                border: `1px solid ${overheardMode === 'manual' ? 'var(--accent-border)' : 'var(--border)'}`,
+              }}
+            >
+              Manual
+            </button>
+          </div>
+        </div>
+
+        <button
+          onClick={() => void loadMentionsReview()}
+          disabled={mentionsListLoading}
+          style={{
+            fontSize: '12px',
+            padding: '6px 14px',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface-2)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border)',
+            marginBottom: '16px',
+          }}
+        >
+          {mentionsListLoading ? 'Loading…' : 'Load candidates & pending'}
+        </button>
+
+        {candidateMentions.length > 0 && (
+          <>
+            <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
+              Candidates awaiting context ({candidateMentions.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              {candidateMentions.map(m => (
+                <div key={m.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
+                    "{m.text}"
+                  </div>
+                  <textarea
+                    value={candidateContextDrafts[m.id] ?? ''}
+                    onChange={e => setCandidateContextDrafts(prev => ({ ...prev, [m.id]: e.target.value }))}
+                    placeholder="Add context (optional)..."
+                    rows={2}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px',
+                      fontFamily: 'var(--font-sans)', resize: 'vertical', marginBottom: '8px',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      onClick={() => void addContextToCandidate(m.id)}
+                      disabled={mentionActionBusy === m.id}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-3)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                    >
+                      Save context
+                    </button>
+                    <button
+                      onClick={() => void confirmCandidate(m.id)}
+                      disabled={mentionActionBusy === m.id}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
+                    >
+                      Confirm → pending
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {pendingMentions.length === 0 && candidateMentions.length === 0 && !mentionsListLoading && (
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Nothing loaded. Click the button above.</p>
+        )}
+
+        {pendingMentions.length > 0 && (
+          <>
+            <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
+              Pending publish ({pendingMentions.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {pendingMentions.map(m => (
+                <div key={m.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
+                    "{m.text}"
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      onClick={() => void actOnPendingMention(m.id, 'publish')}
+                      disabled={mentionActionBusy === m.id}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
+                    >
+                      Publish
+                    </button>
+                    <button
+                      onClick={() => void actOnPendingMention(m.id, 'dismiss')}
+                      disabled={mentionActionBusy === m.id}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Spotted — X mentions */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Spotted (X mentions)</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
+            Paste a tweet manually. Generate a draft, review the write-up and embed, then publish separately.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '620px', marginBottom: '16px' }}>
+          <input
+            value={spottedTweetUrl}
+            onChange={e => setSpottedTweetUrl(e.target.value)}
+            placeholder="Tweet URL"
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
+          />
+          <textarea
+            value={spottedTweetText}
+            onChange={e => setSpottedTweetText(e.target.value)}
+            placeholder="Tweet text (paste manually)"
+            rows={2}
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', resize: 'vertical' }}
+          />
+          <textarea
+            value={spottedAccountContext}
+            onChange={e => setSpottedAccountContext(e.target.value)}
+            placeholder="Who is this account? (from Grok or your own research)"
+            rows={2}
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', resize: 'vertical' }}
+          />
+          <textarea
+            value={spottedExtraContext}
+            onChange={e => setSpottedExtraContext(e.target.value)}
+            placeholder="Add context (optional — anything else worth including)"
+            rows={2}
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', resize: 'vertical' }}
+          />
+          <select
+            value={spottedRepoSlug}
+            onChange={e => setSpottedRepoSlug(e.target.value)}
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
+          >
+            <option value="">No specific repo</option>
+            {REPOS.map(r => (
+              <option key={r.githubSlug} value={r.githubSlug}>{r.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => void generateSpottedDraft()}
+            disabled={spottedGenerating || !spottedTweetUrl || !spottedTweetText}
+            style={{
+              fontSize: '12px', padding: '8px 16px', borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)',
+              alignSelf: 'flex-start',
+            }}
+          >
+            {spottedGenerating ? 'Generating…' : 'Generate draft'}
+          </button>
+        </div>
+
+        {spottedDraft && (
+          <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px', marginBottom: '16px', maxWidth: '620px' }}>
+            <textarea
+              value={spottedDraft.writeup}
+              onChange={e => setSpottedDraft(prev => prev ? { ...prev, writeup: e.target.value } : null)}
+              rows={5}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: '8px 12px',
+                color: 'var(--text-primary)',
+                fontSize: '14px',
+                lineHeight: 1.6,
+                fontFamily: 'var(--font-sans)',
+                resize: 'vertical',
+                marginBottom: '10px',
+              }}
+            />
+            <div dangerouslySetInnerHTML={{ __html: spottedDraft.embedHtml }} />
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+              <button
+                onClick={() => void actOnSpottedDraft(spottedDraft.id, 'publish')}
+                disabled={spottedActionBusy === spottedDraft.id}
+                style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
+              >
+                Publish
+              </button>
+              <button
+                onClick={() => void actOnSpottedDraft(spottedDraft.id, 'dismiss')}
+                disabled={spottedActionBusy === spottedDraft.id}
+                style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => void loadSpottedDrafts()}
+          style={{ fontSize: '12px', padding: '6px 14px', borderRadius: 'var(--radius)', background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+        >
+          Load saved drafts
+        </button>
+
+        {spottedDraftsList.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+            {spottedDraftsList.map(d => (
+              <div key={d.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
+                <textarea
+                  value={d.writeup}
+                  onChange={e => setSpottedDraftsList(prev => prev.map(item => item.id === d.id ? { ...item, writeup: e.target.value } : item))}
+                  rows={5}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    padding: '8px 12px',
+                    color: 'var(--text-primary)',
+                    fontSize: '14px',
+                    lineHeight: 1.6,
+                    fontFamily: 'var(--font-sans)',
+                    resize: 'vertical',
+                    marginBottom: '8px',
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    onClick={() => void actOnSpottedDraft(d.id, 'publish')}
+                    disabled={spottedActionBusy === d.id}
+                    style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
+                  >
+                    Publish
+                  </button>
+                  <button
+                    onClick={() => void actOnSpottedDraft(d.id, 'dismiss')}
+                    disabled={spottedActionBusy === d.id}
+                    style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Scoring context (Chronicle-grounded) */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
@@ -1283,304 +1581,6 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Podcast mentions review */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Podcast mentions review</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
-              <strong>Automatic</strong>: Haiku auto-confirms matches, they land directly in the pending queue below. <strong>Manual</strong>: raw keyword matches show as candidates first — add context and confirm yourself before they reach pending.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-            <button
-              onClick={() => void setOverheardMode('automatic')}
-              disabled={modeSaving}
-              style={{
-                fontSize: '12px',
-                padding: '6px 14px',
-                borderRadius: 'var(--radius)',
-                background: overheardMode === 'automatic' ? 'var(--accent-dim)' : 'var(--surface-3)',
-                color: overheardMode === 'automatic' ? 'var(--accent)' : 'var(--text-secondary)',
-                border: `1px solid ${overheardMode === 'automatic' ? 'var(--accent-border)' : 'var(--border)'}`,
-              }}
-            >
-              Automatic
-            </button>
-            <button
-              onClick={() => void setOverheardMode('manual')}
-              disabled={modeSaving}
-              style={{
-                fontSize: '12px',
-                padding: '6px 14px',
-                borderRadius: 'var(--radius)',
-                background: overheardMode === 'manual' ? 'var(--accent-dim)' : 'var(--surface-3)',
-                color: overheardMode === 'manual' ? 'var(--accent)' : 'var(--text-secondary)',
-                border: `1px solid ${overheardMode === 'manual' ? 'var(--accent-border)' : 'var(--border)'}`,
-              }}
-            >
-              Manual
-            </button>
-          </div>
-        </div>
-
-        <button
-          onClick={() => void loadMentionsReview()}
-          disabled={mentionsListLoading}
-          style={{
-            fontSize: '12px',
-            padding: '6px 14px',
-            borderRadius: 'var(--radius)',
-            background: 'var(--surface-2)',
-            color: 'var(--text-secondary)',
-            border: '1px solid var(--border)',
-            marginBottom: '16px',
-          }}
-        >
-          {mentionsListLoading ? 'Loading…' : 'Load candidates & pending'}
-        </button>
-
-        {candidateMentions.length > 0 && (
-          <>
-            <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
-              Candidates awaiting context ({candidateMentions.length})
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-              {candidateMentions.map(m => (
-                <div key={m.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
-                  </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
-                    "{m.text}"
-                  </div>
-                  <textarea
-                    value={candidateContextDrafts[m.id] ?? ''}
-                    onChange={e => setCandidateContextDrafts(prev => ({ ...prev, [m.id]: e.target.value }))}
-                    placeholder="Add context (optional)..."
-                    rows={2}
-                    style={{
-                      width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius)', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px',
-                      fontFamily: 'var(--font-sans)', resize: 'vertical', marginBottom: '8px',
-                    }}
-                  />
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      onClick={() => void addContextToCandidate(m.id)}
-                      disabled={mentionActionBusy === m.id}
-                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-3)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-                    >
-                      Save context
-                    </button>
-                    <button
-                      onClick={() => void confirmCandidate(m.id)}
-                      disabled={mentionActionBusy === m.id}
-                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
-                    >
-                      Confirm → pending
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {pendingMentions.length === 0 && candidateMentions.length === 0 && !mentionsListLoading && (
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Nothing loaded. Click the button above.</p>
-        )}
-
-        {pendingMentions.length > 0 && (
-          <>
-            <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
-              Pending publish ({pendingMentions.length})
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {pendingMentions.map(m => (
-                <div key={m.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
-                  </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
-                    "{m.text}"
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      onClick={() => void actOnPendingMention(m.id, 'publish')}
-                      disabled={mentionActionBusy === m.id}
-                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
-                    >
-                      Publish
-                    </button>
-                    <button
-                      onClick={() => void actOnPendingMention(m.id, 'dismiss')}
-                      disabled={mentionActionBusy === m.id}
-                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Spotted — X mentions */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Spotted (X mentions)</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
-            Paste a tweet manually. Generate a draft, review the write-up and embed, then publish separately.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '620px', marginBottom: '16px' }}>
-          <input
-            value={spottedTweetUrl}
-            onChange={e => setSpottedTweetUrl(e.target.value)}
-            placeholder="Tweet URL"
-            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
-          />
-          <textarea
-            value={spottedTweetText}
-            onChange={e => setSpottedTweetText(e.target.value)}
-            placeholder="Tweet text (paste manually)"
-            rows={2}
-            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', resize: 'vertical' }}
-          />
-          <textarea
-            value={spottedAccountContext}
-            onChange={e => setSpottedAccountContext(e.target.value)}
-            placeholder="Who is this account? (from Grok or your own research)"
-            rows={2}
-            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', resize: 'vertical' }}
-          />
-          <textarea
-            value={spottedExtraContext}
-            onChange={e => setSpottedExtraContext(e.target.value)}
-            placeholder="Add context (optional — anything else worth including)"
-            rows={2}
-            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', resize: 'vertical' }}
-          />
-          <select
-            value={spottedRepoSlug}
-            onChange={e => setSpottedRepoSlug(e.target.value)}
-            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
-          >
-            <option value="">No specific repo</option>
-            {REPOS.map(r => (
-              <option key={r.githubSlug} value={r.githubSlug}>{r.name}</option>
-            ))}
-          </select>
-          <button
-            onClick={() => void generateSpottedDraft()}
-            disabled={spottedGenerating || !spottedTweetUrl || !spottedTweetText}
-            style={{
-              fontSize: '12px', padding: '8px 16px', borderRadius: 'var(--radius)',
-              background: 'var(--surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)',
-              alignSelf: 'flex-start',
-            }}
-          >
-            {spottedGenerating ? 'Generating…' : 'Generate draft'}
-          </button>
-        </div>
-
-        {spottedDraft && (
-          <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px', marginBottom: '16px', maxWidth: '620px' }}>
-            <textarea
-              value={spottedDraft.writeup}
-              onChange={e => setSpottedDraft(prev => prev ? { ...prev, writeup: e.target.value } : null)}
-              rows={5}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                background: 'var(--surface-2)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: '8px 12px',
-                color: 'var(--text-primary)',
-                fontSize: '14px',
-                lineHeight: 1.6,
-                fontFamily: 'var(--font-sans)',
-                resize: 'vertical',
-                marginBottom: '10px',
-              }}
-            />
-            <div dangerouslySetInnerHTML={{ __html: spottedDraft.embedHtml }} />
-            <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-              <button
-                onClick={() => void actOnSpottedDraft(spottedDraft.id, 'publish')}
-                disabled={spottedActionBusy === spottedDraft.id}
-                style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
-              >
-                Publish
-              </button>
-              <button
-                onClick={() => void actOnSpottedDraft(spottedDraft.id, 'dismiss')}
-                disabled={spottedActionBusy === spottedDraft.id}
-                style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
-
-        <button
-          onClick={() => void loadSpottedDrafts()}
-          style={{ fontSize: '12px', padding: '6px 14px', borderRadius: 'var(--radius)', background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
-        >
-          Load saved drafts
-        </button>
-
-        {spottedDraftsList.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-            {spottedDraftsList.map(d => (
-              <div key={d.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
-                <textarea
-                  value={d.writeup}
-                  onChange={e => setSpottedDraftsList(prev => prev.map(item => item.id === d.id ? { ...item, writeup: e.target.value } : item))}
-                  rows={5}
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius)',
-                    padding: '8px 12px',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px',
-                    lineHeight: 1.6,
-                    fontFamily: 'var(--font-sans)',
-                    resize: 'vertical',
-                    marginBottom: '8px',
-                  }}
-                />
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    onClick={() => void actOnSpottedDraft(d.id, 'publish')}
-                    disabled={spottedActionBusy === d.id}
-                    style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
-                  >
-                    Publish
-                  </button>
-                  <button
-                    onClick={() => void actOnSpottedDraft(d.id, 'dismiss')}
-                    disabled={spottedActionBusy === d.id}
-                    style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Scoring v2 — bulk regenerate */}
