@@ -150,7 +150,7 @@ export async function generateAndCacheNeedle(): Promise<NeedleData | null> {
       biNew: meta.newBuilderIntegrity,
       ecOld: meta.oldTokenMechanic,
       ecNew: meta.newTokenMechanic,
-      deltaHeader: meta.deltaHeader,
+      deltaHeader: meta.deltaHeader ?? null,
     }))
 
   if (!qualifying.length) return null
