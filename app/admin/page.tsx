@@ -507,6 +507,94 @@ export default function AdminPage() {
 
   return (
     <div>
+      {/* Quick actions — sticky */}
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          marginBottom: '24px',
+          padding: '12px 16px',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border-strong)',
+          borderRadius: 'var(--radius)',
+          display: 'flex',
+          gap: '8px',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          boxShadow: 'var(--card-elevated)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginRight: '4px',
+          }}
+        >
+          Quick actions
+        </span>
+        <button
+          onClick={refreshGitHubData}
+          disabled={refreshRunning}
+          style={{
+            fontSize: '12px',
+            padding: '6px 12px',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface-3)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-strong)',
+          }}
+        >
+          {refreshRunning ? 'Refreshing…' : 'Refresh GitHub data'}
+        </button>
+        <button
+          onClick={runAutoscore}
+          disabled={autoscoreRunning}
+          style={{
+            fontSize: '12px',
+            padding: '6px 12px',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface-3)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-strong)',
+          }}
+        >
+          {autoscoreRunning ? 'Running…' : 'Run autoscore now'}
+        </button>
+        <button
+          onClick={regenerateBuildBrief}
+          disabled={briefRunning}
+          style={{
+            fontSize: '12px',
+            padding: '6px 12px',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface-3)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-strong)',
+          }}
+        >
+          {briefRunning ? 'Generating…' : 'Regenerate build brief'}
+        </button>
+        <button
+          onClick={regenerateNeedle}
+          disabled={needleRunning}
+          style={{
+            fontSize: '12px',
+            padding: '6px 12px',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface-3)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-strong)',
+          }}
+        >
+          {needleRunning ? 'Generating…' : 'Regenerate needle'}
+        </button>
+      </div>
+
       {/* GitHub data refresh */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
