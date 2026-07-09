@@ -32,6 +32,11 @@ import { useEthUsdRate } from '@/components/EthUsdProvider'
 import PromoRewardToast from '@/components/PromoRewardToast'
 import { playPromoRewardChime, primePromoRewardAudio } from '@/lib/promoRewardFx'
 
+/** Fixed action column so grade metrics line up across cards. */
+const ACTION_SLOT_WIDTH = 176
+const RESCORE_BUTTON_WIDTH = 154
+const RESCORE_BUTTON_MIN_HEIGHT = 22
+
 interface Props {
   repoSlug: string
   scoringStatus: ScoringStatus
@@ -277,18 +282,35 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
 
   return (
     <div
-      style={{ position: 'relative', textAlign: 'center', minWidth: '88px', maxWidth: promoEligible ? '180px' : '140px' }}
+      style={{
+        position: 'relative',
+        width: isMobile ? '100%' : ACTION_SLOT_WIDTH,
+        flexShrink: 0,
+        alignSelf: 'flex-start',
+        paddingTop: '3px',
+        textAlign: 'center',
+      }}
       onClick={e => e.stopPropagation()}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '4px' }}>
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          minHeight: isMobile ? MIN_TAP : RESCORE_BUTTON_MIN_HEIGHT,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
         <button
           type="button"
           onClick={handleClick}
           disabled={buttonDisabled}
           style={{
+            width: isMobile ? '100%' : RESCORE_BUTTON_WIDTH,
+            minHeight: isMobile ? MIN_TAP : RESCORE_BUTTON_MIN_HEIGHT,
             fontSize: '11px',
-            padding: isMobile ? '8px 12px' : '3px 8px',
-            minHeight: isMobile ? MIN_TAP : undefined,
+            padding: isMobile ? '8px 12px' : '0 8px',
             borderRadius: '99px',
             border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
             background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
@@ -296,28 +318,37 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
             cursor: buttonDisabled ? 'not-allowed' : 'pointer',
             fontWeight: 500,
             opacity: paidRescorePaused ? 0.7 : 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1.2,
+            textAlign: 'center',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
           }}
         >
           {actionLabel}
         </button>
-        <InfoTooltip
-          content={<RescoreTooltipContent promoActive={Boolean(promoQuote?.promoActive)} />}
-          ariaLabel="About Score and Rescore"
-          icon="question"
-          placement="above"
-          width={260}
-          interactive
-        />
+        <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
+          <InfoTooltip
+            content={<RescoreTooltipContent promoActive={Boolean(promoQuote?.promoActive)} />}
+            ariaLabel="About Score and Rescore"
+            icon="question"
+            placement="above"
+            width={260}
+            interactive
+          />
+        </div>
       </div>
 
       {promoQuote?.promoBanner && promoEligible && (
-        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: '180px', marginInline: 'auto' }}>
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: ACTION_SLOT_WIDTH, marginInline: 'auto' }}>
           {promoQuote.promoBanner}
         </div>
       )}
 
       {promoQuote?.promoActive && !promoEligible && (
-        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: '180px', marginInline: 'auto' }}>
+        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: ACTION_SLOT_WIDTH, marginInline: 'auto' }}>
           {paidRescorePaused && <div>Paid rescore paused during launch promo.</div>}
           {promoQuote.reason && <div>{promoQuote.reason}</div>}
         </div>
