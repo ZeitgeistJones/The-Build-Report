@@ -54,6 +54,10 @@ export default function NeedleCard({ needle }: Props) {
       <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
         {text}
       </p>
+
+      <p style={{ margin: '10px 0 0', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+        Refreshes daily overnight Eastern
+      </p>
     </div>
   )
 }

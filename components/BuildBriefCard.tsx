@@ -128,7 +128,7 @@ export default function BuildBriefCard({ brief }: Props) {
       )}
 
       <p style={{ margin: '10px 0 0', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-        Plain-English summary · refreshes daily overnight Eastern
+        Refreshes daily overnight Eastern
       </p>
     </div>
   )
