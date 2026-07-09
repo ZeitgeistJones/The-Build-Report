@@ -69,3 +69,22 @@ export async function getSlugsRescoredSince(sinceMs: number): Promise<string[]> 
     return []
   }
 }
+
+export async function backfillRescoreTimeline(
+  slugRescoreAt: { slug: string; rescoreAt: string }[],
+): Promise<number> {
+  if (!slugRescoreAt.length) return 0
+  try {
+    const r = getRedis()
+    let count = 0
+    for (const { slug, rescoreAt } of slugRescoreAt) {
+      const ts = new Date(rescoreAt).getTime()
+      if (Number.isNaN(ts)) continue
+      await r.zadd(TIMELINE_KEY, { score: ts, member: slug })
+      count++
+    }
+    return count
+  } catch {
+    return 0
+  }
+}

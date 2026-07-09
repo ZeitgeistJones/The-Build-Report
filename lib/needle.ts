@@ -47,18 +47,8 @@ function extractPct(label: string | null | undefined): number | null {
   return match ? Number(match[1]) : null
 }
 
-function qualifyingChange(meta: RescoreSummaryRecord): boolean {
-  const biOldPct = extractPct(meta.oldBuilderIntegrity)
-  const biNewPct = extractPct(meta.newBuilderIntegrity)
-  if (biOldPct !== null && biNewPct !== null && biOldPct !== biNewPct) return true
-  if (biOldPct === null && biNewPct !== null) return true
-
-  const ecOldPct = extractPct(meta.oldTokenMechanic)
-  const ecNewPct = extractPct(meta.newTokenMechanic)
-  if (ecOldPct !== null && ecNewPct !== null && ecOldPct !== ecNewPct) return true
-  if (ecOldPct === null && ecNewPct !== null) return true
-
-  return false
+function qualifyingChange(_meta: RescoreSummaryRecord): boolean {
+  return true
 }
 
 function formatMoveLines(qualifying: QualifyingMove[]): string {
