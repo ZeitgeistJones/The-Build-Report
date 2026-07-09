@@ -519,4 +519,8 @@ export const CHANGELOG = [
     date: 'Jul 6, 2026',
     note: 'Live AI scores now ground builder-integrity rows in GitHub repo evidence (README, root files, CI/tests flags). Paid rescores persist without cache TTL. Builder-activity signals reconciled: active days and longest dry spell now measure different things; rolling-baseline targets planned for a follow-up.',
   },
+  {
+    date: 'Jul 8, 2026',
+    note: 'Launch rescore promo: free rescore on stale repos — ~$0.01 per stale commit to your wallet, plus a matching treasury subsidy for CLAWD burn fuel (50/50 split). Paid rescore paused during the promo so earn vs pay is not confused. Approx USD labels refresh weekly from ETH price; on-chain rewards are still ETH. Needs rescore filter surfaces eligible cards.',
+  },
 ]
