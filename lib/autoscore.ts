@@ -592,7 +592,8 @@ export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null>
   const chronicleContext = await getChronicleContext().catch(() => null)
   const communityContext = await formatAcceptedCommunityContext(repoSlug).catch(() => undefined)
 
-  await flushAutoScore(repoSlug)
+  // Do not flush the prior score before infer succeeds — a failed AI parse used to wipe Redis
+  // and make the next promo attempt look like a first Score (25-commit cap overpay).
   return inferAndCacheRepo(raw, {
     chronicleContext: chronicleContext ?? undefined,
     communityContext,

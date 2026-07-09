@@ -13,7 +13,6 @@ import { getRedis } from '@/lib/redis'
 import { PAID_TX_KEY_PREFIX } from '@/lib/web3/constants'
 import { verifyPaymentTx, verifyWalletSignature, walletHasGateAccess } from '@/lib/web3/verifyPayment'
 import {
-  computePromoReward,
   consumePromoNonce,
   getPromoConfig,
   getWalletPromoPayoutCount,
@@ -22,7 +21,6 @@ import {
   markPromoPayout,
   peekPromoNonce,
   promoSignMessage,
-  resolvePromoActivitySnapshot,
 } from '@/lib/rescorePromo'
 import { incrementEthPendingOptimistic, scheduleBurnSnapshotSync } from '@/lib/burnSnapshot'
 import { sendPromoSplitReward, treasuryCanCover } from '@/lib/rescorePromoTreasury'
@@ -125,40 +123,41 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Promo reward already claimed for this attempt' }, { status: 400 })
       }
 
-      if (!(await peekPromoNonce(walletAddress, repoSlug, promoNonce))) {
+      const lockedPeek = await peekPromoNonce(walletAddress, repoSlug, promoNonce)
+      if (!lockedPeek) {
         return NextResponse.json({ ok: false, error: 'Invalid or expired promo authorization' }, { status: 400 })
       }
 
       const validSig = await verifyWalletSignature(
         walletAddress,
-        promoSignMessage(repoSlug, promoNonce),
+        promoSignMessage(repoSlug, promoNonce, lockedPeek.rewardEth),
         promoSignature,
       )
       if (!validSig) {
         return NextResponse.json({ ok: false, error: 'Promo signature did not match wallet' }, { status: 401 })
       }
 
-      const nonceOk = await consumePromoNonce(walletAddress, repoSlug, promoNonce)
-      if (!nonceOk) {
+      const locked = await consumePromoNonce(walletAddress, repoSlug, promoNonce)
+      if (!locked) {
         return NextResponse.json({ ok: false, error: 'Invalid or expired promo authorization' }, { status: 400 })
       }
 
-      const beforeActivity = await resolvePromoActivitySnapshot(repoSlug)
-      if (!beforeActivity) {
-        return NextResponse.json({ ok: false, error: 'Repo not found' }, { status: 404 })
-      }
+      // Pay the amount locked at nonce issue (matches button quote) — do not recompute from live Redis.
+      promoTotalWei = BigInt(locked.totalWei)
+      promoRewardWei = BigInt(locked.rewardWei)
+      promoRewardEth = locked.rewardEth
+      promoBurnFundWei = BigInt(locked.burnFundWei)
+      promoBurnFundEth = Number(promoBurnFundWei) / 1e18
+      promoTotalEth = Number(promoTotalWei) / 1e18
 
-      const reward = computePromoReward(beforeActivity)
-      promoTotalWei = reward.totalWei
-      promoRewardWei = reward.rewardWei
-      promoRewardEth = reward.rewardEth
-      promoBurnFundWei = reward.burnFundWei
-      promoBurnFundEth = reward.burnFundEth
-      promoTotalEth = reward.totalEth
-
-      if (promoTotalWei <= BigInt(0)) {
+      if (promoTotalWei <= BigInt(0) || promoRewardWei <= BigInt(0)) {
         return NextResponse.json({ ok: false, error: 'Repo is not eligible for promo reward' }, { status: 400 })
       }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'promo-lock',hypothesisId:'A',location:'app/api/admin/autoscore-single/route.ts',message:'paying locked promo reward',data:{repoSlug,staleCommits:locked.staleCommits,rewardEth:promoRewardEth,totalWei:locked.totalWei},timestamp:Date.now()})}).catch(()=>{});
+      console.log('[promo-lock]', JSON.stringify({event:'payout-locked',repoSlug,staleCommits:locked.staleCommits,rewardEth:promoRewardEth}))
+      // #endregion
 
       const config = getPromoConfig()
       if (config.maxPayoutsPerWallet) {

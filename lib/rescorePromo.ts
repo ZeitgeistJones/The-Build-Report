@@ -200,23 +200,79 @@ export function computePromoReward(
   }
 }
 
-export function promoSignMessage(repoSlug: string, nonce: string): string {
-  return `The Build Report rescore promo\nRepo: ${repoSlug}\nNonce: ${nonce}`
+/** Locked at nonce issue time so payout matches the button quote even if Redis score state changes mid-score. */
+export type PromoNoncePayload = {
+  repoSlug: string
+  staleCommits: number
+  totalWei: string
+  rewardWei: string
+  burnFundWei: string
+  rewardEth: number
 }
 
-export async function issuePromoNonce(walletAddress: string, repoSlug: string): Promise<{
+export function promoSignMessage(repoSlug: string, nonce: string, rewardEth: number): string {
+  return `The Build Report rescore promo\nRepo: ${repoSlug}\nNonce: ${nonce}\nRewardEth: ${rewardEth}`
+}
+
+function parsePromoNoncePayload(stored: unknown, repoSlug: string): PromoNoncePayload | null {
+  if (!stored) return null
+  // Legacy: nonce value was just the repo slug string.
+  if (typeof stored === 'string') {
+    if (stored === repoSlug) return null
+    try {
+      const parsed = JSON.parse(stored) as PromoNoncePayload
+      if (parsed?.repoSlug === repoSlug && parsed.totalWei && parsed.rewardWei && parsed.burnFundWei) {
+        return parsed
+      }
+    } catch {
+      return null
+    }
+    return null
+  }
+  if (typeof stored === 'object' && stored !== null) {
+    const parsed = stored as PromoNoncePayload
+    if (parsed.repoSlug === repoSlug && parsed.totalWei && parsed.rewardWei && parsed.burnFundWei) {
+      return parsed
+    }
+  }
+  return null
+}
+
+export async function issuePromoNonce(
+  walletAddress: string,
+  repoSlug: string,
+  locked: {
+    staleCommits: number
+    totalWei: bigint
+    rewardWei: bigint
+    burnFundWei: bigint
+    rewardEth: number
+  },
+): Promise<{
   nonce: string
   message: string
   expiresInSec: number
+  rewardEth: number
+  staleCommits: number
 }> {
   const nonce = randomBytes(16).toString('hex')
   const key = `${NONCE_PREFIX}${walletAddress.toLowerCase()}:${nonce}`
+  const payload: PromoNoncePayload = {
+    repoSlug,
+    staleCommits: locked.staleCommits,
+    totalWei: locked.totalWei.toString(),
+    rewardWei: locked.rewardWei.toString(),
+    burnFundWei: locked.burnFundWei.toString(),
+    rewardEth: locked.rewardEth,
+  }
   const r = getRedis()
-  await r.set(key, repoSlug, { ex: NONCE_TTL_SEC })
+  await r.set(key, JSON.stringify(payload), { ex: NONCE_TTL_SEC })
   return {
     nonce,
-    message: promoSignMessage(repoSlug, nonce),
+    message: promoSignMessage(repoSlug, nonce, locked.rewardEth),
     expiresInSec: NONCE_TTL_SEC,
+    rewardEth: locked.rewardEth,
+    staleCommits: locked.staleCommits,
   }
 }
 
@@ -224,24 +280,25 @@ export async function peekPromoNonce(
   walletAddress: string,
   repoSlug: string,
   nonce: string,
-): Promise<boolean> {
+): Promise<PromoNoncePayload | null> {
   const key = `${NONCE_PREFIX}${walletAddress.toLowerCase()}:${nonce}`
   const r = getRedis()
-  const stored = await r.get<string>(key)
-  return stored === repoSlug
+  const stored = await r.get(key)
+  return parsePromoNoncePayload(stored, repoSlug)
 }
 
 export async function consumePromoNonce(
   walletAddress: string,
   repoSlug: string,
   nonce: string,
-): Promise<boolean> {
+): Promise<PromoNoncePayload | null> {
   const key = `${NONCE_PREFIX}${walletAddress.toLowerCase()}:${nonce}`
   const r = getRedis()
-  const stored = await r.get<string>(key)
-  if (!stored || stored !== repoSlug) return false
+  const stored = await r.get(key)
+  const payload = parsePromoNoncePayload(stored, repoSlug)
+  if (!payload) return null
   await r.del(key)
-  return true
+  return payload
 }
 
 export async function markPromoPayout(
