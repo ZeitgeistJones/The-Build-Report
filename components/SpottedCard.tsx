@@ -51,7 +51,7 @@ export default function SpottedCard({ spotted }: Props) {
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
         boxShadow: 'var(--card-elevated)',
-        height: '100%',
+        alignSelf: 'start',
       }}
     >
       <div
