@@ -355,7 +355,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
               padding: isMobile ? '8px 4px' : '4px 4px',
             }}
           >
-            Rescore paused
+            Up to date
           </span>
         ) : (
           <button
