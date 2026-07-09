@@ -2,7 +2,30 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createHash } from 'crypto'
 import { getRedis } from '@/lib/redis'
 import { fetchAllEpisodes, fetchIpfsText, type SlopEpisode } from '@/lib/web3/slopComputer'
+import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 import { REPOS } from '@/lib/scores'
+
+/** Prefer the full clawdbotatg trackable set from the GitHub snapshot; fall back to scored REPOS. */
+async function getReposForMentionScan(): Promise<Array<{ githubSlug: string; name: string; context: string }>> {
+  try {
+    const stats = await getGitHubStatsForDisplay()
+    const trackable = stats?.trackableRepos ?? []
+    if (trackable.length > 0) {
+      return trackable.map(r => ({
+        githubSlug: r.name,
+        name: r.name,
+        context: r.description ?? '',
+      }))
+    }
+  } catch {
+    // fall through
+  }
+  return REPOS.map(r => ({
+    githubSlug: r.githubSlug,
+    name: r.name,
+    context: r.verdict ?? '',
+  }))
+}
 
 const MENTION_KEY_PREFIX = 'build-report:podcast-mention:'
 const PENDING_SET_KEY = 'build-report:podcast-mentions-pending'
@@ -177,8 +200,9 @@ export async function scanEpisodeForMentions(
 
   const startTs = lines[0]?.ts ?? Number(episode.datetime) * 1000
   const results: PodcastMention[] = []
+  const repos = await getReposForMentionScan()
 
-  for (const repo of REPOS) {
+  for (const repo of repos) {
     const keywords = candidateKeywords(repo.githubSlug, repo.name)
     const candidates = lines
       .filter(line => keywords.some(kw => line.text.toLowerCase().includes(kw)))
@@ -187,7 +211,7 @@ export async function scanEpisodeForMentions(
     if (!candidates.length) continue
 
     if (mode === 'automatic') {
-      const confirmed = await confirmMentionsWithHaiku(repo.githubSlug, repo.verdict ?? '', candidates)
+      const confirmed = await confirmMentionsWithHaiku(repo.githubSlug, repo.context, candidates)
       for (const c of confirmed) {
         const id = makeMentionId(repo.githubSlug, episode.slug, c.text)
         results.push({
