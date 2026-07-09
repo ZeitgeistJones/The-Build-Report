@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { REPOS } from '@/lib/scores'
-import type { SpottedEntry } from '@/lib/spotted'
 import { BULK_REGEN_DEFAULT_BATCH } from '@/lib/bulkRegenConfig'
 import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
 import type { CommunityContextSubmission } from '@/lib/communityContextTypes'
@@ -29,38 +28,28 @@ export default function AdminPage() {
   const [needleResult, setNeedleResult] = useState<string | null>(null)
   const [podcastScanRunning, setPodcastScanRunning] = useState(false)
   const [podcastScanResult, setPodcastScanResult] = useState<string | null>(null)
-  const [pendingMentions, setPendingMentions] = useState<Array<{
-    id: string
-    repoSlug: string
-    episodeName: string
-    speaker: string
-    text: string
-    confirmedAt: string
-  }>>([])
+  const [overheardMode, setOverheardModeState] = useState<'automatic' | 'manual'>('automatic')
+  const [modeSaving, setModeSaving] = useState(false)
   const [candidateMentions, setCandidateMentions] = useState<Array<{
-    id: string
-    repoSlug: string
-    episodeName: string
-    speaker: string
-    text: string
-    userContext: string | null
+    id: string; repoSlug: string; episodeName: string; speaker: string; text: string; userContext: string | null
   }>>([])
-  const [candidateContextDrafts, setCandidateContextDrafts] = useState<Record<string, string>>({})
-  const [overheardMode, setOverheardMode] = useState<'automatic' | 'manual'>('automatic')
-  const [modeToggleBusy, setModeToggleBusy] = useState(false)
-  const [pendingMentionsLoading, setPendingMentionsLoading] = useState(false)
+  const [pendingMentions, setPendingMentions] = useState<Array<{
+    id: string; repoSlug: string; episodeName: string; speaker: string; text: string
+  }>>([])
+  const [mentionsListLoading, setMentionsListLoading] = useState(false)
   const [mentionActionBusy, setMentionActionBusy] = useState<string | null>(null)
+  const [candidateContextDrafts, setCandidateContextDrafts] = useState<Record<string, string>>({})
   const [spottedTweetUrl, setSpottedTweetUrl] = useState('')
   const [spottedTweetText, setSpottedTweetText] = useState('')
   const [spottedAccountContext, setSpottedAccountContext] = useState('')
   const [spottedExtraContext, setSpottedExtraContext] = useState('')
   const [spottedRepoSlug, setSpottedRepoSlug] = useState('')
   const [spottedGenerating, setSpottedGenerating] = useState(false)
-  const [spottedDraft, setSpottedDraft] = useState<SpottedEntry | null>(null)
-  const [spottedDrafts, setSpottedDrafts] = useState<SpottedEntry[]>([])
-  const [spottedDraftsLoading, setSpottedDraftsLoading] = useState(false)
+  const [spottedDraft, setSpottedDraft] = useState<{ id: string; writeup: string; embedHtml: string; authorName: string } | null>(null)
+  const [spottedDraftsList, setSpottedDraftsList] = useState<Array<{
+    id: string; writeup: string; embedHtml: string; authorName: string; tweetUrl: string
+  }>>([])
   const [spottedActionBusy, setSpottedActionBusy] = useState<string | null>(null)
-  const [spottedResult, setSpottedResult] = useState<string | null>(null)
   const [refreshRunning, setRefreshRunning] = useState(false)
   const [refreshResult, setRefreshResult] = useState<string | null>(null)
   const [ecosystemContext, setEcosystemContextText] = useState('')
@@ -144,32 +133,8 @@ export default function AdminPage() {
     setAutoscoreRunning(false)
   }
 
-  async function scanPodcastMentions() {
-    setPodcastScanRunning(true)
-    setPodcastScanResult(null)
-    try {
-      const res = await fetch('/api/admin/podcast-mentions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      })
-      const data = await res.json()
-      if (data.ok) {
-        setPodcastScanResult(
-          `Scanned ${data.scanned} episode${data.scanned === 1 ? '' : 's'} — ${data.mentionsFound} mention${data.mentionsFound === 1 ? '' : 's'} found (${data.mode ?? overheardMode} mode).`,
-        )
-        if (data.mentionsFound > 0) void loadPendingMentions()
-      } else {
-        setPodcastScanResult(data.error ?? 'Podcast scan failed')
-      }
-    } catch {
-      setPodcastScanResult('Podcast scan request failed')
-    }
-    setPodcastScanRunning(false)
-  }
-
-  async function loadPendingMentions() {
-    setPendingMentionsLoading(true)
+  async function loadMentionsReview() {
+    setMentionsListLoading(true)
     try {
       const res = await fetch('/api/admin/podcast-mentions-review', {
         method: 'POST',
@@ -178,94 +143,63 @@ export default function AdminPage() {
       })
       const data = await res.json()
       if (data.ok) {
-        setPendingMentions(data.pending ?? [])
         setCandidateMentions(data.candidates ?? [])
-        setOverheardMode(data.mode === 'manual' ? 'manual' : 'automatic')
-        setCandidateContextDrafts(prev => {
-          const next = { ...prev }
-          for (const c of data.candidates ?? []) {
-            if (next[c.id] === undefined) next[c.id] = c.userContext ?? ''
-          }
-          return next
-        })
+        setPendingMentions(data.pending ?? [])
+        setOverheardModeState(data.mode ?? 'automatic')
       }
     } catch {
       // ignore
     }
-    setPendingMentionsLoading(false)
+    setMentionsListLoading(false)
   }
 
-  async function toggleOverheardMode() {
-    setModeToggleBusy(true)
-    const nextMode = overheardMode === 'automatic' ? 'manual' : 'automatic'
+  async function setOverheardMode(mode: 'automatic' | 'manual') {
+    setModeSaving(true)
     try {
       const res = await fetch('/api/admin/podcast-mentions-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, action: 'setMode', mode: nextMode }),
+        body: JSON.stringify({ password, action: 'setMode', mode }),
       })
       const data = await res.json()
-      if (data.ok) setOverheardMode(data.mode === 'manual' ? 'manual' : 'automatic')
+      if (data.ok) setOverheardModeState(data.mode)
     } catch {
       // ignore
     }
-    setModeToggleBusy(false)
+    setModeSaving(false)
   }
 
-  async function saveCandidateContext(id: string) {
+  async function addContextToCandidate(id: string) {
     setMentionActionBusy(id)
-    const context = candidateContextDrafts[id] ?? ''
     try {
-      const res = await fetch('/api/admin/podcast-mentions-review', {
+      await fetch('/api/admin/podcast-mentions-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, action: 'addContext', id, context }),
+        body: JSON.stringify({ password, action: 'addContext', id, context: candidateContextDrafts[id] ?? '' }),
       })
-      const data = await res.json()
-      if (data.ok) {
-        setCandidateMentions(prev =>
-          prev.map(m => (m.id === id ? { ...m, userContext: context } : m)),
-        )
-      }
     } catch {
       // ignore
     }
     setMentionActionBusy(null)
   }
 
-  async function confirmCandidateMention(id: string) {
+  async function confirmCandidate(id: string) {
     setMentionActionBusy(id)
     try {
-      const res = await fetch('/api/admin/podcast-mentions-review', {
+      await fetch('/api/admin/podcast-mentions-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password, action: 'confirm', id }),
       })
-      const data = await res.json()
-      if (data.ok) {
-        const candidate = candidateMentions.find(m => m.id === id)
-        if (candidate) {
-          setPendingMentions(prev => [
-            {
-              id: candidate.id,
-              repoSlug: candidate.repoSlug,
-              episodeName: candidate.episodeName,
-              speaker: candidate.speaker,
-              text: candidate.text,
-              confirmedAt: new Date().toISOString(),
-            },
-            ...prev,
-          ])
-        }
-        setCandidateMentions(prev => prev.filter(m => m.id !== id))
-      }
+      setCandidateMentions(prev => prev.filter(m => m.id !== id))
+      void loadMentionsReview()
     } catch {
       // ignore
     }
     setMentionActionBusy(null)
   }
 
-  async function actOnMention(id: string, action: 'publish' | 'dismiss') {
+  async function actOnPendingMention(id: string, action: 'publish' | 'dismiss') {
     setMentionActionBusy(id)
     try {
       await fetch('/api/admin/podcast-mentions-review', {
@@ -274,7 +208,6 @@ export default function AdminPage() {
         body: JSON.stringify({ password, action, id }),
       })
       setPendingMentions(prev => prev.filter(m => m.id !== id))
-      setCandidateMentions(prev => prev.filter(m => m.id !== id))
     } catch {
       // ignore
     }
@@ -283,8 +216,6 @@ export default function AdminPage() {
 
   async function generateSpottedDraft() {
     setSpottedGenerating(true)
-    setSpottedResult(null)
-    setSpottedDraft(null)
     try {
       const res = await fetch('/api/admin/spotted', {
         method: 'POST',
@@ -300,21 +231,14 @@ export default function AdminPage() {
         }),
       })
       const data = await res.json()
-      if (data.ok && data.entry) {
-        setSpottedDraft(data.entry)
-        setSpottedDrafts(prev => [data.entry, ...prev.filter(d => d.id !== data.entry.id)])
-        setSpottedResult('Draft generated — review below, then Publish or Dismiss.')
-      } else {
-        setSpottedResult(data.error ?? 'Draft generation failed')
-      }
+      if (data.ok) setSpottedDraft(data.entry)
     } catch {
-      setSpottedResult('Spotted request failed')
+      // ignore
     }
     setSpottedGenerating(false)
   }
 
   async function loadSpottedDrafts() {
-    setSpottedDraftsLoading(true)
     try {
       const res = await fetch('/api/admin/spotted', {
         method: 'POST',
@@ -322,31 +246,50 @@ export default function AdminPage() {
         body: JSON.stringify({ password, action: 'list' }),
       })
       const data = await res.json()
-      if (data.ok) setSpottedDrafts(data.drafts ?? [])
+      if (data.ok) setSpottedDraftsList(data.drafts ?? [])
     } catch {
       // ignore
     }
-    setSpottedDraftsLoading(false)
   }
 
-  async function actOnSpotted(id: string, action: 'publish' | 'dismiss') {
+  async function actOnSpottedDraft(id: string, action: 'publish' | 'dismiss') {
     setSpottedActionBusy(id)
     try {
-      const res = await fetch('/api/admin/spotted', {
+      await fetch('/api/admin/spotted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password, action, id }),
       })
-      const data = await res.json()
-      if (data.ok) {
-        setSpottedDrafts(prev => prev.filter(d => d.id !== id))
-        if (spottedDraft?.id === id) setSpottedDraft(null)
-        setSpottedResult(action === 'publish' ? 'Published — visible on homepage.' : 'Draft dismissed.')
-      }
+      setSpottedDraftsList(prev => prev.filter(d => d.id !== id))
+      if (spottedDraft?.id === id) setSpottedDraft(null)
     } catch {
       // ignore
     }
     setSpottedActionBusy(null)
+  }
+
+  async function scanPodcastMentions() {
+    setPodcastScanRunning(true)
+    setPodcastScanResult(null)
+    try {
+      const res = await fetch('/api/admin/podcast-mentions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setPodcastScanResult(
+          `Scanned ${data.scanned} episode${data.scanned === 1 ? '' : 's'} — ${data.mentionsFound} mention${data.mentionsFound === 1 ? '' : 's'} found (${data.mode ?? overheardMode} mode).`,
+        )
+        if (data.mentionsFound > 0) void loadMentionsReview()
+      } else {
+        setPodcastScanResult(data.error ?? 'Podcast scan failed')
+      }
+    } catch {
+      setPodcastScanResult('Podcast scan request failed')
+    }
+    setPodcastScanRunning(false)
   }
 
   async function regenerateNeedle() {
@@ -1512,39 +1455,24 @@ export default function AdminPage() {
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Overheard (podcast mentions)</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Scans new Slop.Computer episode transcripts for mentions of tracked repos. Automatic mode uses Haiku to confirm matches; Manual mode surfaces raw keyword hits for your review first.
+              Scans new Slop.Computer episode transcripts for mentions of tracked repos. Runs automatically daily at 5:20am ET; use this to scan immediately.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', flexShrink: 0 }}>
-            <button
-              onClick={toggleOverheardMode}
-              disabled={modeToggleBusy}
-              style={{
-                fontSize: '12px',
-                padding: '8px 16px',
-                borderRadius: 'var(--radius)',
-                background: overheardMode === 'manual' ? 'var(--accent-dim)' : 'var(--surface-3)',
-                color: overheardMode === 'manual' ? 'var(--accent)' : 'var(--text-primary)',
-                border: overheardMode === 'manual' ? '1px solid var(--accent-border)' : '1px solid var(--border-strong)',
-              }}
-            >
-              {modeToggleBusy ? '…' : overheardMode === 'automatic' ? 'Mode: Automatic' : 'Mode: Manual'}
-            </button>
-            <button
-              onClick={scanPodcastMentions}
-              disabled={podcastScanRunning}
-              style={{
-                fontSize: '12px',
-                padding: '8px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'var(--surface-3)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-strong)',
-              }}
-            >
-              {podcastScanRunning ? 'Scanning…' : 'Scan podcast mentions'}
-            </button>
-          </div>
+          <button
+            onClick={scanPodcastMentions}
+            disabled={podcastScanRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {podcastScanRunning ? 'Scanning…' : 'Scan podcast mentions'}
+          </button>
         </div>
         {podcastScanResult && (
           <div style={{
@@ -1561,392 +1489,258 @@ export default function AdminPage() {
         )}
       </div>
 
-      {overheardMode === 'manual' && (
-        <div style={{ marginBottom: '32px' }}>
-          <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-            <div>
-              <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Candidate mentions (manual review)</h2>
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-                Raw keyword hits from the latest scan. Add optional context, then Confirm to move into the publish queue — or Dismiss false positives.
-              </p>
-            </div>
-            <button
-              onClick={loadPendingMentions}
-              disabled={pendingMentionsLoading}
-              style={{
-                fontSize: '12px',
-                padding: '8px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'var(--surface-3)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-strong)',
-                flexShrink: 0,
-              }}
-            >
-              {pendingMentionsLoading ? 'Loading…' : 'Load candidates'}
-            </button>
-          </div>
-
-          {candidateMentions.length === 0 && !pendingMentionsLoading && (
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              No candidates loaded. Scan episodes, then load candidates.
-            </p>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {candidateMentions.map(m => (
-              <div
-                key={m.id}
-                style={{
-                  background: 'var(--surface-1)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '12px 16px',
-                }}
-              >
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                  <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
-                </div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
-                  "{m.text}"
-                </div>
-                <textarea
-                  value={candidateContextDrafts[m.id] ?? ''}
-                  onChange={e => setCandidateContextDrafts(prev => ({ ...prev, [m.id]: e.target.value }))}
-                  placeholder="Optional context for why this mention matters…"
-                  rows={2}
-                  style={{
-                    width: '100%',
-                    marginBottom: '10px',
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius)',
-                    padding: '8px 12px',
-                    color: 'var(--text-primary)',
-                    fontSize: '13px',
-                    resize: 'vertical',
-                  }}
-                />
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => saveCandidateContext(m.id)}
-                    disabled={mentionActionBusy === m.id}
-                    style={{
-                      fontSize: '11px',
-                      padding: '5px 12px',
-                      borderRadius: '99px',
-                      border: '1px solid var(--border-strong)',
-                      background: 'var(--surface-3)',
-                      color: 'var(--text-primary)',
-                    }}
-                  >
-                    Save context
-                  </button>
-                  <button
-                    onClick={() => confirmCandidateMention(m.id)}
-                    disabled={mentionActionBusy === m.id}
-                    style={{
-                      fontSize: '11px',
-                      padding: '5px 12px',
-                      borderRadius: '99px',
-                      border: '1px solid var(--accent-border)',
-                      background: 'var(--accent-dim)',
-                      color: 'var(--accent)',
-                      fontWeight: 500,
-                    }}
-                  >
-                    Confirm
-                  </button>
-                  <button
-                    onClick={() => actOnMention(m.id, 'dismiss')}
-                    disabled={mentionActionBusy === m.id}
-                    style={{
-                      fontSize: '11px',
-                      padding: '5px 12px',
-                      borderRadius: '99px',
-                      border: '1px solid var(--border)',
-                      background: 'transparent',
-                      color: 'var(--text-muted)',
-                    }}
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Pending podcast mentions review */}
+      {/* Podcast mentions review */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Pending podcast mentions</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Confirmed matches waiting for review. Publish to surface on the repo card and today's Overheard digest; Dismiss to discard.
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Podcast mentions review</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
+              <strong>Automatic</strong>: Haiku auto-confirms matches, they land directly in the pending queue below. <strong>Manual</strong>: raw keyword matches show as candidates first — add context and confirm yourself before they reach pending.
             </p>
           </div>
-          <button
-            onClick={loadPendingMentions}
-            disabled={pendingMentionsLoading}
-            style={{
-              fontSize: '12px',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius)',
-              background: 'var(--surface-3)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-strong)',
-              flexShrink: 0,
-            }}
-          >
-            {pendingMentionsLoading ? 'Loading…' : 'Load pending mentions'}
-          </button>
-        </div>
-
-        {pendingMentions.length === 0 && !pendingMentionsLoading && (
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-            No pending mentions loaded. Click the button above to check.
-          </p>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {pendingMentions.map(m => (
-            <div
-              key={m.id}
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button
+              onClick={() => void setOverheardMode('automatic')}
+              disabled={modeSaving}
               style={{
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-lg)',
-                padding: '12px 16px',
+                fontSize: '12px',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius)',
+                background: overheardMode === 'automatic' ? 'var(--accent-dim)' : 'var(--surface-3)',
+                color: overheardMode === 'automatic' ? 'var(--accent)' : 'var(--text-secondary)',
+                border: `1px solid ${overheardMode === 'automatic' ? 'var(--accent-border)' : 'var(--border)'}`,
               }}
             >
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
-              </div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
-                "{m.text}"
-              </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  onClick={() => actOnMention(m.id, 'publish')}
-                  disabled={mentionActionBusy === m.id}
-                  style={{
-                    fontSize: '11px',
-                    padding: '5px 12px',
-                    borderRadius: '99px',
-                    border: '1px solid var(--accent-border)',
-                    background: 'var(--accent-dim)',
-                    color: 'var(--accent)',
-                    fontWeight: 500,
-                  }}
-                >
-                  Publish
-                </button>
-                <button
-                  onClick={() => actOnMention(m.id, 'dismiss')}
-                  disabled={mentionActionBusy === m.id}
-                  style={{
-                    fontSize: '11px',
-                    padding: '5px 12px',
-                    borderRadius: '99px',
-                    border: '1px solid var(--border)',
-                    background: 'transparent',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          ))}
+              Automatic
+            </button>
+            <button
+              onClick={() => void setOverheardMode('manual')}
+              disabled={modeSaving}
+              style={{
+                fontSize: '12px',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius)',
+                background: overheardMode === 'manual' ? 'var(--accent-dim)' : 'var(--surface-3)',
+                color: overheardMode === 'manual' ? 'var(--accent)' : 'var(--text-secondary)',
+                border: `1px solid ${overheardMode === 'manual' ? 'var(--accent-border)' : 'var(--border)'}`,
+              }}
+            >
+              Manual
+            </button>
+          </div>
         </div>
+
+        <button
+          onClick={() => void loadMentionsReview()}
+          disabled={mentionsListLoading}
+          style={{
+            fontSize: '12px',
+            padding: '6px 14px',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface-2)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border)',
+            marginBottom: '16px',
+          }}
+        >
+          {mentionsListLoading ? 'Loading…' : 'Load candidates & pending'}
+        </button>
+
+        {candidateMentions.length > 0 && (
+          <>
+            <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
+              Candidates awaiting context ({candidateMentions.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              {candidateMentions.map(m => (
+                <div key={m.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
+                    "{m.text}"
+                  </div>
+                  <textarea
+                    value={candidateContextDrafts[m.id] ?? ''}
+                    onChange={e => setCandidateContextDrafts(prev => ({ ...prev, [m.id]: e.target.value }))}
+                    placeholder="Add context (optional)..."
+                    rows={2}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px',
+                      fontFamily: 'var(--font-sans)', resize: 'vertical', marginBottom: '8px',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      onClick={() => void addContextToCandidate(m.id)}
+                      disabled={mentionActionBusy === m.id}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-3)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                    >
+                      Save context
+                    </button>
+                    <button
+                      onClick={() => void confirmCandidate(m.id)}
+                      disabled={mentionActionBusy === m.id}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
+                    >
+                      Confirm → pending
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {pendingMentions.length === 0 && candidateMentions.length === 0 && !mentionsListLoading && (
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Nothing loaded. Click the button above.</p>
+        )}
+
+        {pendingMentions.length > 0 && (
+          <>
+            <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
+              Pending publish ({pendingMentions.length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {pendingMentions.map(m => (
+                <div key={m.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
+                    "{m.text}"
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      onClick={() => void actOnPendingMention(m.id, 'publish')}
+                      disabled={mentionActionBusy === m.id}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
+                    >
+                      Publish
+                    </button>
+                    <button
+                      onClick={() => void actOnPendingMention(m.id, 'dismiss')}
+                      disabled={mentionActionBusy === m.id}
+                      style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Spotted — X mentions */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Spotted (X mentions)</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-            Generate a draft column from a tweet URL. Publish to show the latest Spotted card on the homepage.
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
+            Paste a tweet manually. Generate a draft, review the write-up and embed, then publish separately.
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px', maxWidth: '640px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '620px', marginBottom: '16px' }}>
           <input
-            type="url"
             value={spottedTweetUrl}
             onChange={e => setSpottedTweetUrl(e.target.value)}
-            placeholder="Tweet URL (https://x.com/…)"
-            style={{
-              width: '100%',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: '8px 12px',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }}
+            placeholder="Tweet URL"
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
           />
           <textarea
             value={spottedTweetText}
             onChange={e => setSpottedTweetText(e.target.value)}
-            placeholder="Tweet text (paste verbatim)"
-            rows={3}
-            style={{
-              width: '100%',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: '8px 12px',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-              resize: 'vertical',
-            }}
+            placeholder="Tweet text (paste manually)"
+            rows={2}
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', resize: 'vertical' }}
           />
-          <input
-            type="text"
+          <textarea
             value={spottedAccountContext}
             onChange={e => setSpottedAccountContext(e.target.value)}
-            placeholder="Who is this account? (e.g. core contributor, VC, anon builder)"
-            style={{
-              width: '100%',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: '8px 12px',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }}
+            placeholder="Who is this account? (from Grok or your own research)"
+            rows={2}
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', resize: 'vertical' }}
           />
-          <input
-            type="text"
+          <textarea
             value={spottedExtraContext}
             onChange={e => setSpottedExtraContext(e.target.value)}
-            placeholder="Extra context (optional)"
-            style={{
-              width: '100%',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: '8px 12px',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }}
+            placeholder="Add context (optional — anything else worth including)"
+            rows={2}
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)', resize: 'vertical' }}
           />
           <select
             value={spottedRepoSlug}
             onChange={e => setSpottedRepoSlug(e.target.value)}
-            style={{
-              width: '100%',
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
-              padding: '8px 12px',
-              color: 'var(--text-primary)',
-              fontSize: '13px',
-            }}
+            style={{ fontSize: '13px', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text-primary)' }}
           >
-            <option value="">No specific repo (ecosystem mention)</option>
-            {REPOS.map(repo => (
-              <option key={repo.id} value={repo.githubSlug}>{repo.name}</option>
+            <option value="">No specific repo</option>
+            {REPOS.map(r => (
+              <option key={r.githubSlug} value={r.githubSlug}>{r.name}</option>
             ))}
           </select>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              onClick={generateSpottedDraft}
-              disabled={spottedGenerating || !spottedTweetUrl.trim() || !spottedTweetText.trim()}
-              style={{
-                fontSize: '12px',
-                padding: '8px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'var(--surface-3)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-strong)',
-              }}
-            >
-              {spottedGenerating ? 'Generating…' : 'Generate draft'}
-            </button>
-            <button
-              onClick={loadSpottedDrafts}
-              disabled={spottedDraftsLoading}
-              style={{
-                fontSize: '12px',
-                padding: '8px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'var(--surface-3)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-strong)',
-              }}
-            >
-              {spottedDraftsLoading ? 'Loading…' : 'Load drafts'}
-            </button>
-          </div>
+          <button
+            onClick={() => void generateSpottedDraft()}
+            disabled={spottedGenerating || !spottedTweetUrl || !spottedTweetText}
+            style={{
+              fontSize: '12px', padding: '8px 16px', borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border-strong)',
+              alignSelf: 'flex-start',
+            }}
+          >
+            {spottedGenerating ? 'Generating…' : 'Generate draft'}
+          </button>
         </div>
 
-        {spottedResult && (
-          <div style={{
-            marginBottom: '12px',
-            padding: '10px 14px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-          }}>
-            {spottedResult}
+        {spottedDraft && (
+          <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px', marginBottom: '16px', maxWidth: '620px' }}>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '10px' }}>{spottedDraft.writeup}</p>
+            <div dangerouslySetInnerHTML={{ __html: spottedDraft.embedHtml }} />
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+              <button
+                onClick={() => void actOnSpottedDraft(spottedDraft.id, 'publish')}
+                disabled={spottedActionBusy === spottedDraft.id}
+                style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
+              >
+                Publish
+              </button>
+              <button
+                onClick={() => void actOnSpottedDraft(spottedDraft.id, 'dismiss')}
+                disabled={spottedActionBusy === spottedDraft.id}
+                style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
-        {(spottedDraft || spottedDrafts.length > 0) && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {(spottedDraft ? [spottedDraft, ...spottedDrafts.filter(d => d.id !== spottedDraft.id)] : spottedDrafts).map(draft => (
-              <div
-                key={draft.id}
-                style={{
-                  background: 'var(--surface-1)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '14px 16px',
-                }}
-              >
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  {draft.authorName}{draft.repoSlug ? ` · ${draft.repoSlug}` : ''}
-                </div>
-                <p style={{ margin: '0 0 10px', fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-                  {draft.writeup}
-                </p>
-                <div
-                  style={{ marginBottom: '10px' }}
-                  dangerouslySetInnerHTML={{ __html: draft.embedHtml }}
-                />
+        <button
+          onClick={() => void loadSpottedDrafts()}
+          style={{ fontSize: '12px', padding: '6px 14px', borderRadius: 'var(--radius)', background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+        >
+          Load saved drafts
+        </button>
+
+        {spottedDraftsList.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+            {spottedDraftsList.map(d => (
+              <div key={d.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>{d.writeup}</p>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button
-                    onClick={() => actOnSpotted(draft.id, 'publish')}
-                    disabled={spottedActionBusy === draft.id}
-                    style={{
-                      fontSize: '11px',
-                      padding: '5px 12px',
-                      borderRadius: '99px',
-                      border: '1px solid var(--accent-border)',
-                      background: 'var(--accent-dim)',
-                      color: 'var(--accent)',
-                      fontWeight: 500,
-                    }}
+                    onClick={() => void actOnSpottedDraft(d.id, 'publish')}
+                    disabled={spottedActionBusy === d.id}
+                    style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
                   >
                     Publish
                   </button>
                   <button
-                    onClick={() => actOnSpotted(draft.id, 'dismiss')}
-                    disabled={spottedActionBusy === draft.id}
-                    style={{
-                      fontSize: '11px',
-                      padding: '5px 12px',
-                      borderRadius: '99px',
-                      border: '1px solid var(--border)',
-                      background: 'transparent',
-                      color: 'var(--text-muted)',
-                    }}
+                    onClick={() => void actOnSpottedDraft(d.id, 'dismiss')}
+                    disabled={spottedActionBusy === d.id}
+                    style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)' }}
                   >
                     Dismiss
                   </button>
