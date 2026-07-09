@@ -94,14 +94,14 @@ function metricColStyle(isMobile: boolean, width: number) {
     : { textAlign: 'center' as const, width, flexShrink: 0, paddingTop: '3px' }
 }
 
-function gradeLetterStyle(d: typeof CARD, color: string) {
+function gradeLetterStyle(gradeLetter: number, color: string) {
   return {
-    fontSize: `${d.gradeLetter}px`,
+    fontSize: `${gradeLetter}px`,
     fontWeight: 600,
     fontFamily: 'var(--font-mono)',
     color,
     lineHeight: 1,
-    minHeight: `${d.gradeLetter}px`,
+    minHeight: `${gradeLetter}px`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1046,7 +1046,7 @@ export default function RepoList({
                   tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits, periodCommitsCapped)}
                   style={{ ...metricColStyle(isMobile, METRIC_COL_WIDTH.commits), display: 'block' }}
                 >
-                  <div style={gradeLetterStyle(d, commitCountColor(periodCommits))}>
+                  <div style={gradeLetterStyle(d.gradeLetter, commitCountColor(periodCommits))}>
                     {periodCommitsLabel}
                   </div>
                   <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
@@ -1062,7 +1062,7 @@ export default function RepoList({
               >
                 {economicScore ? (
                   <>
-                    <div style={gradeLetterStyle(d, gradeColor(economicScore.letter))}>
+                    <div style={gradeLetterStyle(d.gradeLetter, gradeColor(economicScore.letter))}>
                       {economicScore.letter}
                     </div>
                     <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{economicScore.pct}%</div>
@@ -1085,7 +1085,7 @@ export default function RepoList({
               <MetricDivider show={!isMobile} />
 
               <div style={metricColStyle(isMobile, METRIC_COL_WIDTH.builder)}>
-                <div style={gradeLetterStyle(d, gradeColor(repo.builderIntegrity.letter))}>
+                <div style={gradeLetterStyle(d.gradeLetter, gradeColor(repo.builderIntegrity.letter))}>
                   {repo.builderIntegrity.letter}
                 </div>
                 <div style={{ fontSize: `${d.pctLabel}px`, fontWeight: 600, color: 'var(--text-muted)' }}>{repo.builderIntegrity.pct}%</div>
@@ -1098,7 +1098,7 @@ export default function RepoList({
                 tooltip={commitsColumnTooltip(PERIOD_WINDOW_LABEL[repoPeriod], periodCommits, periodCommitsCapped)}
                 style={{ ...metricColStyle(isMobile, METRIC_COL_WIDTH.commits), display: 'block' }}
               >
-                <div style={gradeLetterStyle(d, commitCountColor(periodCommits))}>
+                <div style={gradeLetterStyle(d.gradeLetter, commitCountColor(periodCommits))}>
                   {periodCommitsLabel}
                 </div>
                 <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
