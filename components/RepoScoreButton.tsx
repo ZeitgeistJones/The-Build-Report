@@ -115,9 +115,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         ? 'Signing…'
         : 'Scoring…'
     : paidRescorePaused
-      ? 'Rescore paused'
+      ? 'Up to date'
     : promoEligible
-      ? (promoQuote?.buttonLabel ?? defaultLabel)
+      ? `${label} · earn ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)}`
       : defaultLabel
   const showScoreMeta = scoringStatus === 'scored' && activity.scoredAt
   const { hasNew: hasNewCommitsSinceScore } = countCommitsSinceScore(
