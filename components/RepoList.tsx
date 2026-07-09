@@ -746,9 +746,6 @@ export default function RepoList({
     const pending = isUnscoredRecent(repo)
     const effectiveVerdict =
       normie && repo.normieVerdict?.trim() ? repo.normieVerdict : repo.verdict
-    // In normie mode, prefer our plain-English verdict over the GitHub description
-    // (which is usually written for developers). Fall back to description only when
-    // there is no normie verdict and no regular verdict either.
     const blurbDescription =
       normie && repo.normieVerdict?.trim() ? null : repo.description
     const blurb = pickRepoBlurb(blurbDescription, effectiveVerdict, pending)

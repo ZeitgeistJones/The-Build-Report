@@ -12,7 +12,6 @@ import { ScoringStatus } from '@/lib/scoringStatus'
 import { useClawdAccess } from './wallet/ClawdAccessContext'
 import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
 import {
-  commitsSinceScoreLabel,
   shouldConfirmRescore,
   type RepoActivitySnapshot,
 } from '@/lib/rescoreGuards'
@@ -21,7 +20,6 @@ import InfoTooltip from '@/components/InfoTooltip'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 import {
-  formatScoredDateLabel,
   isLaunchBaseline,
   RESCORE_BUTTON_TOOLTIP,
   RESCORE_PROMO_TOOLTIP,
@@ -33,7 +31,7 @@ import PromoRewardToast from '@/components/PromoRewardToast'
 import { playPromoRewardChime, primePromoRewardAudio } from '@/lib/promoRewardFx'
 
 /** Fixed action column so grade metrics line up across cards. */
-const ACTION_SLOT_WIDTH = 172
+const ACTION_SLOT_WIDTH = 188
 const RESCORE_BUTTON_MIN_HEIGHT = 22
 
 interface Props {
@@ -56,14 +54,18 @@ type PromoQuote = {
 function RescoreTooltipContent({
   promoActive,
   promoEligible,
+  paused,
   staleCommits,
   rewardEth,
+  pausedReason,
   ethUsdRate,
 }: {
   promoActive: boolean
   promoEligible: boolean
+  paused: boolean
   staleCommits: number
   rewardEth: number
+  pausedReason: string | null
   ethUsdRate: number
 }) {
   return (
@@ -72,6 +74,12 @@ function RescoreTooltipContent({
         <div style={{ marginBottom: '6px' }}>
           Earn {formatApproxUsdFromEth(rewardEth, ethUsdRate)} for {staleCommits} stale commit
           {staleCommits === 1 ? '' : 's'} on this repo.
+        </div>
+      )}
+      {paused && (
+        <div style={{ marginBottom: '6px' }}>
+          Paid rescore is paused during the launch promo.
+          {pausedReason ? ` ${pausedReason}` : ' No stale commits to trigger a free promo rescore either.'}
         </div>
       )}
       {promoActive ? RESCORE_PROMO_TOOLTIP : RESCORE_BUTTON_TOOLTIP}{' '}
@@ -119,23 +127,16 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     : promoEligible
       ? `${label} · earn ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)}`
       : defaultLabel
-  const showScoreMeta = scoringStatus === 'scored' && activity.scoredAt
   const { hasNew: hasNewCommitsSinceScore } = countCommitsSinceScore(
     activity.scoredAt,
     activity.commitTimestamps,
     { lastCommitAt: activity.lastCommitAt, pushedAt: activity.pushedAt },
   )
-  const nudgeRescore =
-    Boolean(showScoreMeta) &&
-    hasNewCommitsSinceScore &&
-    !busy &&
-    (promoEligible || !promoQuote?.promoActive)
+  const scoredAndReady = scoringStatus === 'scored' && Boolean(activity.scoredAt)
+  const canRescore = !buttonDisabled && (promoEligible || !promoQuote?.promoActive)
+  const nudgeRescore = scoredAndReady && hasNewCommitsSinceScore && canRescore
   const nudgeBaselineRefresh =
-    Boolean(showScoreMeta) &&
-    isLaunchBaseline(activity.adminNote) &&
-    !nudgeRescore &&
-    !busy &&
-    (promoEligible || !promoQuote?.promoActive)
+    scoredAndReady && isLaunchBaseline(activity.adminNote) && !nudgeRescore && canRescore
 
   useEffect(() => {
     let cancelled = false
@@ -297,6 +298,28 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     await runRescore()
   }
 
+  const tooltip = (
+    <InfoTooltip
+      content={
+        <RescoreTooltipContent
+          promoActive={Boolean(promoQuote?.promoActive)}
+          promoEligible={promoEligible}
+          paused={paidRescorePaused}
+          staleCommits={promoQuote?.staleCommits ?? 0}
+          rewardEth={promoQuote?.rewardEth ?? 0}
+          pausedReason={promoQuote?.reason ?? null}
+          ethUsdRate={ethUsdRate}
+        />
+      }
+      ariaLabel="About Score and Rescore"
+      icon="question"
+      placement="above"
+      width={260}
+      interactive
+      compact
+    />
+  )
+
   return (
     <div
       style={{
@@ -319,80 +342,63 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           minHeight: isMobile ? MIN_TAP : RESCORE_BUTTON_MIN_HEIGHT,
         }}
       >
-        <button
-          type="button"
-          onClick={handleClick}
-          disabled={buttonDisabled}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            minHeight: isMobile ? MIN_TAP : RESCORE_BUTTON_MIN_HEIGHT,
-            fontSize: '11px',
-            padding: isMobile ? '8px 8px' : '4px 8px',
-            borderRadius: '99px',
-            border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
-            background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
-            color: busy || paidRescorePaused ? 'var(--text-muted)' : promoEligible ? 'var(--accent)' : 'var(--text-secondary)',
-            cursor: buttonDisabled ? 'not-allowed' : 'pointer',
-            fontWeight: 500,
-            opacity: paidRescorePaused ? 0.7 : 1,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            lineHeight: 1.2,
-            textAlign: 'center',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            boxSizing: 'border-box',
-          }}
-        >
-          {actionLabel}
-        </button>
-        <InfoTooltip
-          content={
-            <RescoreTooltipContent
-              promoActive={Boolean(promoQuote?.promoActive)}
-              promoEligible={promoEligible}
-              staleCommits={promoQuote?.staleCommits ?? 0}
-              rewardEth={promoQuote?.rewardEth ?? 0}
-              ethUsdRate={ethUsdRate}
-            />
-          }
-          ariaLabel="About Score and Rescore"
-          icon="question"
-          placement="above"
-          width={260}
-          interactive
-          compact
-        />
+        {paidRescorePaused ? (
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontSize: '11px',
+              color: 'var(--text-muted)',
+              fontStyle: 'italic',
+              lineHeight: 1.3,
+              textAlign: 'center',
+              padding: isMobile ? '8px 4px' : '4px 4px',
+            }}
+          >
+            Rescore paused
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={handleClick}
+            disabled={buttonDisabled}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: isMobile ? MIN_TAP : RESCORE_BUTTON_MIN_HEIGHT,
+              fontSize: '11px',
+              padding: isMobile ? '8px 8px' : '4px 8px',
+              borderRadius: '99px',
+              border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
+              background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
+              color: busy ? 'var(--text-muted)' : promoEligible ? 'var(--accent)' : 'var(--text-secondary)',
+              cursor: buttonDisabled ? 'not-allowed' : 'pointer',
+              fontWeight: 500,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1.2,
+              textAlign: 'center',
+              whiteSpace: isMobile ? 'nowrap' : 'normal',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              wordBreak: 'break-word',
+            }}
+          >
+            {actionLabel}
+          </button>
+        )}
+        {tooltip}
       </div>
 
-      {promoQuote?.promoBanner && promoEligible && (
-        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: ACTION_SLOT_WIDTH, marginInline: 'auto' }}>
-          {promoQuote.promoBanner}
+      {nudgeRescore && (
+        <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 500, marginTop: '5px', lineHeight: 1.3 }}>
+          Rescore to update ↑
         </div>
       )}
-
-      {promoQuote?.promoActive && !promoEligible && (
-        <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: ACTION_SLOT_WIDTH, marginInline: 'auto' }}>
-          {paidRescorePaused && <div>Paid rescore paused during launch promo.</div>}
-          {promoQuote.reason && <div>{promoQuote.reason}</div>}
-        </div>
-      )}
-
-      {showScoreMeta && (
-        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35 }}>
-          <div>Last scored {formatScoredDateLabel(activity.scoredAt)}</div>
-          <div style={nudgeRescore ? { color: 'var(--accent)', fontWeight: 500 } : undefined}>
-            {commitsSinceScoreLabel(activity)}
-          </div>
-          {nudgeRescore && (
-            <div style={{ color: 'var(--accent)', fontWeight: 500 }}>Rescore to update ↑</div>
-          )}
-          {nudgeBaselineRefresh && (
-            <div style={{ color: 'var(--accent)', fontWeight: 500 }}>Rescore to refresh ↑</div>
-          )}
+      {nudgeBaselineRefresh && (
+        <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 500, marginTop: '5px', lineHeight: 1.3 }}>
+          Rescore to refresh ↑
         </div>
       )}
 
