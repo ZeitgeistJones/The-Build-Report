@@ -711,108 +711,6 @@ export default function AdminPage() {
 
   return (
     <div>
-      {/* Quick actions — sticky */}
-      <div
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          marginBottom: '24px',
-          padding: '12px 16px',
-          background: 'var(--surface-2)',
-          border: '1px solid var(--border-strong)',
-          borderRadius: 'var(--radius)',
-          display: 'flex',
-          gap: '8px',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          boxShadow: 'var(--card-elevated)',
-        }}
-      >
-        <span
-          style={{
-            fontSize: '11px',
-            fontWeight: 600,
-            color: 'var(--text-muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            marginRight: '4px',
-          }}
-        >
-          Quick actions
-        </span>
-        <button
-          onClick={refreshGitHubData}
-          disabled={refreshRunning}
-          style={{
-            fontSize: '12px',
-            padding: '6px 12px',
-            borderRadius: 'var(--radius)',
-            background: 'var(--surface-3)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border-strong)',
-          }}
-        >
-          {refreshRunning ? 'Refreshing…' : 'Refresh GitHub data'}
-        </button>
-        <button
-          onClick={runAutoscore}
-          disabled={autoscoreRunning}
-          style={{
-            fontSize: '12px',
-            padding: '6px 12px',
-            borderRadius: 'var(--radius)',
-            background: 'var(--surface-3)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border-strong)',
-          }}
-        >
-          {autoscoreRunning ? 'Running…' : 'Run autoscore now'}
-        </button>
-        <button
-          onClick={regenerateBuildBrief}
-          disabled={briefRunning}
-          style={{
-            fontSize: '12px',
-            padding: '6px 12px',
-            borderRadius: 'var(--radius)',
-            background: 'var(--surface-3)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border-strong)',
-          }}
-        >
-          {briefRunning ? 'Generating…' : 'Regenerate build brief'}
-        </button>
-        <button
-          onClick={regenerateNeedle}
-          disabled={needleRunning}
-          style={{
-            fontSize: '12px',
-            padding: '6px 12px',
-            borderRadius: 'var(--radius)',
-            background: 'var(--surface-3)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border-strong)',
-          }}
-        >
-          {needleRunning ? 'Generating…' : 'Regenerate needle'}
-        </button>
-        <button
-          onClick={() => void runPodcastScan('scanOne')}
-          disabled={podcastScanRunning}
-          style={{
-            fontSize: '12px',
-            padding: '6px 12px',
-            borderRadius: 'var(--radius)',
-            background: 'var(--surface-3)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border-strong)',
-          }}
-        >
-          {podcastScanRunning ? 'Scanning…' : 'Scan next episode'}
-        </button>
-      </div>
-
       {/* GitHub data refresh */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
@@ -849,6 +747,159 @@ export default function AdminPage() {
             color: 'var(--text-secondary)',
           }}>
             {refreshResult}
+          </div>
+        )}
+      </div>
+
+      {/* Build brief */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Build brief</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Daily AI summary of what got worked on in the last 24h (sampled repos). Regenerates automatically after the daily autoscore cron; use this to refresh immediately after a GitHub scan.
+            </p>
+          </div>
+          <button
+            onClick={regenerateBuildBrief}
+            disabled={briefRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {briefRunning ? 'Generating…' : 'Regenerate build brief'}
+          </button>
+        </div>
+        {briefResult && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {briefResult}
+          </div>
+        )}
+      </div>
+
+      {/* Needle */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>The Needle</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Short daily column on rescore movement. Regenerates automatically at 5:10am ET; use this to refresh immediately after testing a rescore.
+            </p>
+          </div>
+          <button
+            onClick={regenerateNeedle}
+            disabled={needleRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {needleRunning ? 'Generating…' : 'Regenerate needle'}
+          </button>
+        </div>
+        {needleResult && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {needleResult}
+          </div>
+        )}
+      </div>
+
+      {/* Overheard — podcast mentions */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Overheard (podcast mentions)</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Scans new Slop.Computer episode transcripts for mentions of tracked repos. Runs automatically daily at 5:20am ET; use this to scan immediately.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+            <button
+              onClick={() => void runPodcastScan('scanOne')}
+              disabled={podcastScanRunning}
+              style={{
+                fontSize: '12px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius)',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              {podcastScanRunning ? 'Scanning…' : 'Scan next episode'}
+            </button>
+            <button
+              onClick={() => void runPodcastScan('scanAll')}
+              disabled={podcastScanRunning}
+              style={{
+                fontSize: '12px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius)',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              {podcastScanRunning ? 'Scanning…' : 'Scan all new'}
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('Clear the scanned-episode cache? Episodes will be treated as unscanned again. Does not delete pending/published mentions.')) {
+                  void runPodcastScan('clearHistory')
+                }
+              }}
+              disabled={podcastScanRunning}
+              style={{
+                fontSize: '12px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius)',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              Clear scan history
+            </button>
+          </div>
+        </div>
+        {podcastScanResult && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {podcastScanResult}
           </div>
         )}
       </div>
@@ -1230,319 +1281,6 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Context notes */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '16px' }}>
-          <h1 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '6px' }}>Admin — context notes</h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            Add context notes to any repo card. Notes appear publicly below the verdict. Scores cannot be changed here.
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {REPOS.map(repo => {
-            const isExcluded = excluded[repo.githubSlug] === true
-            return (
-            <div key={repo.id} style={{
-              background: 'var(--surface-1)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '14px 16px',
-              opacity: isExcluded ? 0.55 : 1,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 500, fontFamily: 'var(--font-mono)', color: isExcluded ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                  {repo.name}
-                  {isExcluded && <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>excluded</span>}
-                </div>
-                <button
-                  onClick={() => toggleExclude(repo.githubSlug, isExcluded)}
-                  disabled={togglingExclude === repo.githubSlug}
-                  style={{
-                    fontSize: '12px',
-                    padding: '5px 14px',
-                    borderRadius: 'var(--radius)',
-                    background: 'var(--surface-3)',
-                    color: isExcluded ? 'var(--accent)' : 'var(--text-secondary)',
-                    border: '1px solid var(--border)',
-                    flexShrink: 0,
-                  }}
-                >
-                  {togglingExclude === repo.githubSlug ? '…' : isExcluded ? 'Include' : 'Exclude'}
-                </button>
-              </div>
-              <textarea
-                value={notes[repo.id] ?? ''}
-                onChange={e => setNotes(prev => ({ ...prev, [repo.id]: e.target.value }))}
-                placeholder="Add a context note (leave blank to remove)..."
-                rows={2}
-                style={{
-                  width: '100%',
-                  background: 'var(--surface-2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  padding: '8px 12px',
-                  color: 'var(--text-primary)',
-                  fontSize: '13px',
-                  fontFamily: 'var(--font-sans)',
-                  resize: 'vertical',
-                  marginBottom: '8px',
-                }}
-              />
-              <button
-                onClick={() => saveNote(repo.id)}
-                disabled={saving === repo.id}
-                style={{
-                  fontSize: '12px',
-                  padding: '5px 14px',
-                  borderRadius: 'var(--radius)',
-                  background: saved === repo.id ? 'var(--accent-dim)' : 'var(--surface-3)',
-                  color: saved === repo.id ? 'var(--accent)' : 'var(--text-secondary)',
-                  border: `1px solid ${saved === repo.id ? 'var(--accent-border)' : 'var(--border)'}`,
-                }}
-              >
-                {saving === repo.id ? 'Saving...' : saved === repo.id ? 'Saved ✓' : 'Save note'}
-              </button>
-            </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Scoring v2 — bulk regenerate */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Bulk regenerate (Live AI)</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
-            Download a baseline backup before flushing. Scores {BULK_REGEN_DEFAULT_BATCH} repos per request to avoid server timeouts — the button runs until all are done.
-            Bulk flush replaces cached Live AI scores with the current v3 prompt and rubrics.
-          </p>
-          {bulkStatus && (
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-              {bulkStatus.trackableCount} trackable repos · {bulkStatus.cachedCount} cached Live AI · {bulkStatus.handScoredBaselineCount} hand-scored baselines in code
-            </p>
-          )}
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
-          <button
-            onClick={() => void downloadBaselineBackup()}
-            style={{
-              fontSize: '12px',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius)',
-              background: 'var(--surface-3)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-strong)',
-            }}
-          >
-            Download baseline backup
-          </button>
-          <button
-            onClick={() => void runBulkRegenBatch(false)}
-            disabled={bulkRunning}
-            style={{
-              fontSize: '12px',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius)',
-              background: 'var(--surface-3)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            {bulkRunning ? 'Running…' : 'Score uncached only (no flush)'}
-          </button>
-        </div>
-        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', maxWidth: '520px' }}>
-          <input
-            type="checkbox"
-            checked={bulkFlushAck}
-            onChange={e => setBulkFlushAck(e.target.checked)}
-            style={{ marginTop: '3px' }}
-          />
-          <span>I downloaded the baseline backup and approve flushing all cached scores before bulk regen.</span>
-        </label>
-        <button
-          onClick={() => void runBulkRegenBatch(true)}
-          disabled={bulkRunning || !bulkFlushAck || !backupDownloaded}
-          style={{
-            fontSize: '12px',
-            padding: '8px 16px',
-            borderRadius: 'var(--radius)',
-            background: bulkFlushAck && backupDownloaded ? 'var(--accent-dim)' : 'var(--surface-3)',
-            color: bulkFlushAck && backupDownloaded ? 'var(--accent)' : 'var(--text-muted)',
-            border: `1px solid ${bulkFlushAck && backupDownloaded ? 'var(--accent-border)' : 'var(--border)'}`,
-          }}
-        >
-          {bulkRunning ? 'Bulk regenerating…' : 'Flush all & bulk regenerate'}
-        </button>
-        {bulkResult && (
-          <div style={{
-            marginTop: '12px',
-            padding: '10px 14px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-          }}>
-            {bulkResult}
-          </div>
-        )}
-      </div>
-
-      {/* Build brief */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Build brief</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Daily AI summary of what got worked on in the last 24h (sampled repos). Regenerates automatically after the daily autoscore cron; use this to refresh immediately after a GitHub scan.
-            </p>
-          </div>
-          <button
-            onClick={regenerateBuildBrief}
-            disabled={briefRunning}
-            style={{
-              fontSize: '12px',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius)',
-              background: 'var(--surface-3)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-strong)',
-              flexShrink: 0,
-            }}
-          >
-            {briefRunning ? 'Generating…' : 'Regenerate build brief'}
-          </button>
-        </div>
-        {briefResult && (
-          <div style={{
-            marginBottom: '12px',
-            padding: '10px 14px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-          }}>
-            {briefResult}
-          </div>
-        )}
-      </div>
-
-      {/* Needle */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>The Needle</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Short daily column on rescore movement. Regenerates automatically at 5:10am ET; use this to refresh immediately after testing a rescore.
-            </p>
-          </div>
-          <button
-            onClick={regenerateNeedle}
-            disabled={needleRunning}
-            style={{
-              fontSize: '12px',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius)',
-              background: 'var(--surface-3)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-strong)',
-              flexShrink: 0,
-            }}
-          >
-            {needleRunning ? 'Generating…' : 'Regenerate needle'}
-          </button>
-        </div>
-        {needleResult && (
-          <div style={{
-            marginBottom: '12px',
-            padding: '10px 14px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-          }}>
-            {needleResult}
-          </div>
-        )}
-      </div>
-
-      {/* Overheard — podcast mentions */}
-      <div style={{ marginBottom: '32px' }}>
-        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Overheard (podcast mentions)</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Scans new Slop.Computer episode transcripts for mentions of tracked repos. Runs automatically daily at 5:20am ET; use this to scan immediately.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => void runPodcastScan('scanOne')}
-              disabled={podcastScanRunning}
-              style={{
-                fontSize: '12px',
-                padding: '8px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'var(--surface-3)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-strong)',
-              }}
-            >
-              {podcastScanRunning ? 'Scanning…' : 'Scan next episode'}
-            </button>
-            <button
-              onClick={() => void runPodcastScan('scanAll')}
-              disabled={podcastScanRunning}
-              style={{
-                fontSize: '12px',
-                padding: '8px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'var(--surface-3)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-strong)',
-              }}
-            >
-              {podcastScanRunning ? 'Scanning…' : 'Scan all new'}
-            </button>
-            <button
-              onClick={() => {
-                if (window.confirm('Clear the scanned-episode cache? Episodes will be treated as unscanned again. Does not delete pending/published mentions.')) {
-                  void runPodcastScan('clearHistory')
-                }
-              }}
-              disabled={podcastScanRunning}
-              style={{
-                fontSize: '12px',
-                padding: '8px 16px',
-                borderRadius: 'var(--radius)',
-                background: 'var(--surface-3)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-strong)',
-              }}
-            >
-              Clear scan history
-            </button>
-          </div>
-        </div>
-        {podcastScanResult && (
-          <div style={{
-            marginBottom: '12px',
-            padding: '10px 14px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-          }}>
-            {podcastScanResult}
-          </div>
-        )}
-      </div>
-
       {/* Podcast mentions review */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
@@ -1823,6 +1561,87 @@ export default function AdminPage() {
         )}
       </div>
 
+      {/* Scoring v2 — bulk regenerate */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Bulk regenerate (Live AI)</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
+            Download a baseline backup before flushing. Scores {BULK_REGEN_DEFAULT_BATCH} repos per request to avoid server timeouts — the button runs until all are done.
+            Bulk flush replaces cached Live AI scores with the current v3 prompt and rubrics.
+          </p>
+          {bulkStatus && (
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+              {bulkStatus.trackableCount} trackable repos · {bulkStatus.cachedCount} cached Live AI · {bulkStatus.handScoredBaselineCount} hand-scored baselines in code
+            </p>
+          )}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+          <button
+            onClick={() => void downloadBaselineBackup()}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+            }}
+          >
+            Download baseline backup
+          </button>
+          <button
+            onClick={() => void runBulkRegenBatch(false)}
+            disabled={bulkRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            {bulkRunning ? 'Running…' : 'Score uncached only (no flush)'}
+          </button>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', maxWidth: '520px' }}>
+          <input
+            type="checkbox"
+            checked={bulkFlushAck}
+            onChange={e => setBulkFlushAck(e.target.checked)}
+            style={{ marginTop: '3px' }}
+          />
+          <span>I downloaded the baseline backup and approve flushing all cached scores before bulk regen.</span>
+        </label>
+        <button
+          onClick={() => void runBulkRegenBatch(true)}
+          disabled={bulkRunning || !bulkFlushAck || !backupDownloaded}
+          style={{
+            fontSize: '12px',
+            padding: '8px 16px',
+            borderRadius: 'var(--radius)',
+            background: bulkFlushAck && backupDownloaded ? 'var(--accent-dim)' : 'var(--surface-3)',
+            color: bulkFlushAck && backupDownloaded ? 'var(--accent)' : 'var(--text-muted)',
+            border: `1px solid ${bulkFlushAck && backupDownloaded ? 'var(--accent-border)' : 'var(--border)'}`,
+          }}
+        >
+          {bulkRunning ? 'Bulk regenerating…' : 'Flush all & bulk regenerate'}
+        </button>
+        {bulkResult && (
+          <div style={{
+            marginTop: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {bulkResult}
+          </div>
+        )}
+      </div>
+
       {/* Auto-scored repos */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
@@ -1941,6 +1760,85 @@ export default function AdminPage() {
           No auto-inferred scores cached yet. Use Run autoscore now to score unscored repos from GitHub.
         </div>
       )}
+
+      {/* Context notes */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h1 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '6px' }}>Admin — context notes</h1>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            Add context notes to any repo card. Notes appear publicly below the verdict. Scores cannot be changed here.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {REPOS.map(repo => {
+            const isExcluded = excluded[repo.githubSlug] === true
+            return (
+            <div key={repo.id} style={{
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '14px 16px',
+              opacity: isExcluded ? 0.55 : 1,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 500, fontFamily: 'var(--font-mono)', color: isExcluded ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+                  {repo.name}
+                  {isExcluded && <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>excluded</span>}
+                </div>
+                <button
+                  onClick={() => toggleExclude(repo.githubSlug, isExcluded)}
+                  disabled={togglingExclude === repo.githubSlug}
+                  style={{
+                    fontSize: '12px',
+                    padding: '5px 14px',
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--surface-3)',
+                    color: isExcluded ? 'var(--accent)' : 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    flexShrink: 0,
+                  }}
+                >
+                  {togglingExclude === repo.githubSlug ? '…' : isExcluded ? 'Include' : 'Exclude'}
+                </button>
+              </div>
+              <textarea
+                value={notes[repo.id] ?? ''}
+                onChange={e => setNotes(prev => ({ ...prev, [repo.id]: e.target.value }))}
+                placeholder="Add a context note (leave blank to remove)..."
+                rows={2}
+                style={{
+                  width: '100%',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  padding: '8px 12px',
+                  color: 'var(--text-primary)',
+                  fontSize: '13px',
+                  fontFamily: 'var(--font-sans)',
+                  resize: 'vertical',
+                  marginBottom: '8px',
+                }}
+              />
+              <button
+                onClick={() => saveNote(repo.id)}
+                disabled={saving === repo.id}
+                style={{
+                  fontSize: '12px',
+                  padding: '5px 14px',
+                  borderRadius: 'var(--radius)',
+                  background: saved === repo.id ? 'var(--accent-dim)' : 'var(--surface-3)',
+                  color: saved === repo.id ? 'var(--accent)' : 'var(--text-secondary)',
+                  border: `1px solid ${saved === repo.id ? 'var(--accent-border)' : 'var(--border)'}`,
+                }}
+              >
+                {saving === repo.id ? 'Saving...' : saved === repo.id ? 'Saved ✓' : 'Save note'}
+              </button>
+            </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
