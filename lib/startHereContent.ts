@@ -129,6 +129,10 @@ export const START_HERE_GLOSSARY: { term: string; definition: string }[] = [
     definition: 'A repo filter for projects created on GitHub in the selected time window',
   },
   {
+    term: 'Recently rescored',
+    definition: 'A repo filter for projects that received a live Score or Rescore in the selected time window',
+  },
+  {
     term: '24h / 7d / 30d / 60d window',
     definition: 'The time range for counting commits — toggle to change what "recent" means',
   },
@@ -233,7 +237,7 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
       },
       {
         title: 'Step 3 — The repo list',
-        body: 'Each row is one project. Each card shows two Repo Grades — Holder economics and Builder standards — plus that repo\'s commit count for the window, its last-activity timestamp, and a status badge (Shipping, Stable, or Done). Use the filters above the list to narrow things down: Holder economics for direct-burn and supply-lock repos, Shipping leverage for infra/tooling, New arrivals for repos created in the selected window, Clawd/CV perks for holder-gated apps, Community context for repos with holder-submitted context. Sort by Recent, Most active, or Grades. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Most active, set the window to 7d, and start there.',
+        body: 'Each row is one project. Each card shows two Repo Grades — Holder economics and Builder standards — plus that repo\'s commit count for the window, its last-activity timestamp, and a status badge (Shipping, Stable, or Done). Use the filters above the list to narrow things down: Holder economics for direct-burn and supply-lock repos, Shipping leverage for infra/tooling, New arrivals for repos created in the selected window, Recently rescored for live Score/Rescore activity (what can feed The Needle), Clawd/CV perks for holder-gated apps, Community context for repos with holder-submitted context. Sort by Recent, Most active, or Grades. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Most active, set the window to 7d, and start there.',
       },
     ],
   },

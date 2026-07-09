@@ -10,6 +10,8 @@ export const COMMUNITY_CONTEXT_FILTER_TOOLTIP =
 export const REPO_FILTER_TOOLTIPS = {
   all: 'Every tracked repo in the ecosystem.',
   'needs-rescore': 'Scored repos with new GitHub commits since the last score — rescore (or promo) may apply.',
+  'recently-rescored':
+    'Repos that received a live Score or Rescore in the selected window — useful for checking what fed The Needle.',
   'new-arrivals': 'Repos created on GitHub in the selected window.',
   'holder-economics': 'Direct-burn and supply-lock repos — the Holder economics sample.',
   'shipping-leverage':

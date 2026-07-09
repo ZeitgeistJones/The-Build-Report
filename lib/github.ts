@@ -224,6 +224,14 @@ export function isCreatedInPeriod(
   return isWithinDays(createdAt, 60)
 }
 
+/** True when an ISO/locale timestamp falls in the selected rolling window. */
+export function isTimestampInPeriod(
+  timestamp: string | null | undefined,
+  period: '24h' | '7d' | '30d' | '60d',
+): boolean {
+  return isCreatedInPeriod(timestamp, period)
+}
+
 function isCreatedInDayRange(dateStr: string, minExclusive: number, maxInclusive: number) {
   return isInDayRange(dateStr, minExclusive, maxInclusive)
 }

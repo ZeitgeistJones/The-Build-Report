@@ -16,7 +16,7 @@ import {
   computeRepoLifecycle,
   lifecycleHint,
 } from '@/lib/repoLifecycle'
-import { isCreatedInPeriod, timeAgo } from '@/lib/github'
+import { isCreatedInPeriod, isTimestampInPeriod, timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { isUnscoredRecent } from '@/lib/recentRepos'
 import { isAutoInferredNote } from '@/lib/repoFilters'
@@ -87,6 +87,7 @@ type RepoSort = 'recent' | 'commits' | 'needs-rescore' | 'grade'
 export type RepoFilter =
   | 'all'
   | 'needs-rescore'
+  | 'recently-rescored'
   | 'new-arrivals'
   | 'holder-economics'
   | 'shipping-leverage'
@@ -162,6 +163,19 @@ type ScoreAgeDisplay =
   | { kind: 'auto_new' }
   | { kind: 'auto_age'; days: number }
 
+function repoRescoredAt(
+  repo: RepoWithLive,
+  rescoreSummaries: Record<string, RescoreSummaryRecord>,
+): string | null {
+  const fromSummary = rescoreSummaries[repo.githubSlug]?.rescoreAt
+  if (fromSummary) return fromSummary
+  // Live AI scores without a summary still count; skip launch baselines / unscored cards.
+  if (isUnscoredRecent(repo) || isLaunchBaseline(repo.adminNote) || looksLikeBaselineDate(repo.scoredAt)) {
+    return null
+  }
+  return repo.scoredAt ?? null
+}
+
 function repoMatchesFilter(
   repo: RepoWithLive,
   filter: RepoFilter,
@@ -169,6 +183,7 @@ function repoMatchesFilter(
   contextSummary: Record<string, RepoContextSummary>,
   pinnedNeedsRescoreSlugs: readonly string[] = [],
   period: Period = '24h',
+  rescoreSummaries: Record<string, RescoreSummaryRecord> = {},
 ): boolean {
   const slug = repo.githubSlug
   const tag = getEffectiveTag(repo)
@@ -179,6 +194,9 @@ function repoMatchesFilter(
       lastCommitAt: repo.lastCommitAt,
       pushedAt: repo.pushedAt,
     })
+  }
+  if (filter === 'recently-rescored') {
+    return isTimestampInPeriod(repoRescoredAt(repo, rescoreSummaries), period)
   }
   if (filter === 'new-arrivals') return isCreatedInPeriod(repo.createdAt, period)
   if (filter === 'holder-economics') return tag === 'direct' || tag === 'supply-lock'
@@ -652,6 +670,7 @@ export default function RepoList({
   const filters: { key: RepoFilter; label: string; tooltip?: string }[] = [
     { key: 'all', label: 'All', tooltip: REPO_FILTER_TOOLTIPS.all },
     { key: 'needs-rescore', label: 'Needs rescore', tooltip: REPO_FILTER_TOOLTIPS['needs-rescore'] },
+    { key: 'recently-rescored', label: 'Recently rescored', tooltip: REPO_FILTER_TOOLTIPS['recently-rescored'] },
     { key: 'new-arrivals', label: 'New arrivals', tooltip: REPO_FILTER_TOOLTIPS['new-arrivals'] },
     { key: 'clawd-cv-perks', label: 'Clawd/CV perks', tooltip: REPO_FILTER_TOOLTIPS['clawd-cv-perks'] },
     { key: 'holder-economics', label: 'Holder economics', tooltip: REPO_FILTER_TOOLTIPS['holder-economics'] },
@@ -665,7 +684,8 @@ export default function RepoList({
 
   const contextRepoCount = Object.keys(contextSummary).length
   if (communityContextEnabled) {
-    filters.splice(3, 0, {
+    // After New arrivals (all / needs-rescore / recently-rescored / new-arrivals).
+    filters.splice(4, 0, {
       key: 'community-context',
       label: contextRepoCount > 0 ? `Community context (${contextRepoCount})` : 'Community context',
       tooltip: REPO_FILTER_TOOLTIPS['community-context'],
@@ -673,13 +693,24 @@ export default function RepoList({
   }
 
   const tagFiltered = repoItems.filter(r =>
-    repoMatchesFilter(r, activeFilter, collectionSets, contextSummary, pinnedNeedsRescoreSlugs, repoPeriod),
+    repoMatchesFilter(
+      r,
+      activeFilter,
+      collectionSets,
+      contextSummary,
+      pinnedNeedsRescoreSlugs,
+      repoPeriod,
+      rescoreSummaries,
+    ),
   )
   const activeInPeriod = tagFiltered.filter(r => {
     const c = repoCommitsForPeriodKey(r, repoPeriod)
     return c != null && c > 0
   })
-  const skipActiveScope = activeFilter === 'needs-rescore' || activeFilter === 'new-arrivals'
+  const skipActiveScope =
+    activeFilter === 'needs-rescore' ||
+    activeFilter === 'new-arrivals' ||
+    activeFilter === 'recently-rescored'
   const filtered = (activityScope === 'active' && !skipActiveScope ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
       if (activeFilter === 'needs-rescore' && pinnedNeedsRescoreSlugs.length) {
@@ -690,6 +721,12 @@ export default function RepoList({
           if (bPinned === -1) return -1
           return aPinned - bPinned
         }
+      }
+
+      if (activeFilter === 'recently-rescored') {
+        const aAt = Date.parse(repoRescoredAt(a, rescoreSummaries) ?? '') || 0
+        const bAt = Date.parse(repoRescoredAt(b, rescoreSummaries) ?? '') || 0
+        if (aAt !== bAt) return bAt - aAt
       }
 
       if (activeFilter === 'new-arrivals') {
@@ -739,6 +776,8 @@ export default function RepoList({
 
   const repoCountLabel = activeFilter === 'needs-rescore'
     ? ` · ${filtered.length} need rescore`
+    : activeFilter === 'recently-rescored'
+      ? ` · ${filtered.length} rescored (${periodKeyLabel(repoPeriod)})`
     : activeFilter === 'new-arrivals'
       ? ` · ${filtered.length} new arrival${filtered.length === 1 ? '' : 's'} (${periodKeyLabel(repoPeriod)})`
     : activityScope === 'active'
