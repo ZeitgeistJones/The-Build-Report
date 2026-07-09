@@ -19,8 +19,8 @@ export default function NormieToggle({ compact, header }: { compact?: boolean; h
       onClick={handleClick}
       role="switch"
       aria-checked={normie}
-      aria-label="Plain English mode"
-      title={normie ? 'Plain English: on' : 'Plain English: off'}
+      aria-label="Plain English mode — rewrite verdicts and digests without jargon"
+      title="Rewrites verdicts, grade blurbs, and digests in plain English — same facts, no jargon. Toggle off for the original technical wording."
       style={{
         fontSize: header ? '10px' : '11px',
         color: normie ? 'var(--accent)' : 'var(--text-muted)',
