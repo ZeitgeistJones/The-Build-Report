@@ -792,6 +792,7 @@ export async function updateMentionEntry(id: string, payload: MentionEditPayload
       kind: quotes.length > 1 ? 'thread' : 'single',
     }
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    if (mention.status === 'published') await invalidateOverheardPublicCache()
     return true
   } catch {
     return false
