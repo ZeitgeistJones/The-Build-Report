@@ -1753,7 +1753,7 @@ export default function AdminPage() {
             <textarea
               value={spottedDraft.writeup}
               onChange={e => setSpottedDraft(prev => prev ? { ...prev, writeup: e.target.value } : null)}
-              rows={4}
+              rows={5}
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
