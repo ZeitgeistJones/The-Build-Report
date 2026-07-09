@@ -404,15 +404,8 @@ export async function cacheDailyDigest(dateKey: string, payload: DailyDigestCach
   try {
     const r = getRedis()
     await r.set(digestRedisKey(dateKey), JSON.stringify(payload), { ex: DIGEST_TTL_SEC })
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'brief-debug',hypothesisId:'B',location:'lib/buildBrief.ts:cacheDailyDigest',message:'digest cached to redis',data:{dateKey,repoCount:payload.repoCount,commitCount:payload.commitCount,generatedAt:payload.generatedAt},timestamp:Date.now()})}).catch(()=>{});
-    console.log('[brief-debug]', JSON.stringify({hypothesisId:'B',location:'cacheDailyDigest',dateKey,repoCount:payload.repoCount,commitCount:payload.commitCount}))
-    // #endregion
-  } catch (err) {
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'brief-debug',hypothesisId:'B',location:'lib/buildBrief.ts:cacheDailyDigest:error',message:'digest redis write failed',data:{dateKey,error:err instanceof Error ? err.message : String(err)},timestamp:Date.now()})}).catch(()=>{});
-    console.log('[brief-debug]', JSON.stringify({hypothesisId:'B',location:'cacheDailyDigest:error',dateKey,error:err instanceof Error ? err.message : String(err)}))
-    // #endregion
+  } catch {
+    // non-fatal
   }
 }
 
@@ -424,11 +417,6 @@ export async function generateAndCacheDailyDigest(
   const activity = collectBuildActivityForEasternDay(stats, repos, easternDateKey)
   const commitCount = activity.reduce((n, a) => n + a.commits.length, 0)
   const gradeContext = formatGradeContext(stats, repos)
-
-  // #region agent log
-  fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'brief-debug',hypothesisId:'B',location:'lib/buildBrief.ts:generateAndCacheDailyDigest:start',message:'digest generation started',data:{easternDateKey,todayEastern:dateKeyEastern(),activityRepos:activity.length,commitCount,hasAnthropic:Boolean(process.env.ANTHROPIC_API_KEY)},timestamp:Date.now()})}).catch(()=>{});
-  console.log('[brief-debug]', JSON.stringify({hypothesisId:'B',location:'generateAndCacheDailyDigest:start',easternDateKey,todayEastern:dateKeyEastern(),activityRepos:activity.length,commitCount}))
-  // #endregion
 
   const ai = await generateDigestWithAi(activity, gradeContext, easternDateKey)
   const fallback = buildFallbackDigest(stats, repos, activity, easternDateKey)
@@ -503,30 +491,14 @@ function toBuildBriefData(digest: DailyDigestCache): BuildBriefData {
 export async function getBuildBrief(): Promise<BuildBriefData | null> {
   const targetKey = yesterdayEasternDateKey()
   const digest = await readCachedDigest(targetKey)
-  if (digest) {
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'brief-debug',hypothesisId:'C',location:'lib/buildBrief.ts:getBuildBrief',message:'served target digest',data:{source:'target',targetKey,servedDateKey:digest.dateKey,generatedAt:digest.generatedAt,repoCount:digest.repoCount,commitCount:digest.commitCount},timestamp:Date.now()})}).catch(()=>{});
-    console.log('[brief-debug]', JSON.stringify({hypothesisId:'C',location:'getBuildBrief',source:'target',targetKey,servedDateKey:digest.dateKey}))
-    // #endregion
-    return toBuildBriefData(digest)
-  }
+  if (digest) return toBuildBriefData(digest)
 
   const priorKey = yesterdayEasternDateKey(new Date(Date.now() - 86400000))
   const priorDigest = await readCachedDigest(priorKey)
-  if (priorDigest) {
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'brief-debug',hypothesisId:'C',location:'lib/buildBrief.ts:getBuildBrief',message:'served prior-day fallback digest',data:{source:'prior',targetKey,priorKey,servedDateKey:priorDigest.dateKey,generatedAt:priorDigest.generatedAt},timestamp:Date.now()})}).catch(()=>{});
-    console.log('[brief-debug]', JSON.stringify({hypothesisId:'C',location:'getBuildBrief',source:'prior',targetKey,priorKey,servedDateKey:priorDigest.dateKey}))
-    // #endregion
-    return toBuildBriefData(priorDigest)
-  }
+  if (priorDigest) return toBuildBriefData(priorDigest)
 
   const legacy = await readLegacyBrief(targetKey)
   if (legacy) {
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'brief-debug',hypothesisId:'C',location:'lib/buildBrief.ts:getBuildBrief',message:'served legacy brief',data:{source:'legacy',targetKey,generatedAt:legacy.generatedAt},timestamp:Date.now()})}).catch(()=>{});
-    console.log('[brief-debug]', JSON.stringify({hypothesisId:'C',location:'getBuildBrief',source:'legacy',targetKey}))
-    // #endregion
     return {
       text: legacy.text,
       general: legacy.text,
@@ -539,69 +511,7 @@ export async function getBuildBrief(): Promise<BuildBriefData | null> {
     }
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'brief-debug',hypothesisId:'C',location:'lib/buildBrief.ts:getBuildBrief',message:'no brief found',data:{source:'none',targetKey,priorKey,todayEastern:dateKeyEastern()},timestamp:Date.now()})}).catch(()=>{});
-  console.log('[brief-debug]', JSON.stringify({hypothesisId:'C',location:'getBuildBrief',source:'none',targetKey,priorKey}))
-  // #endregion
   return null
-}
-
-/** Probe Redis digest keys for debug — which Eastern days exist vs what homepage expects. */
-export async function getBuildBriefDebugSnapshot(): Promise<{
-  nowIso: string
-  todayEastern: string
-  targetKey: string
-  priorKey: string
-  served: { source: string; dateKey: string | null; generatedAt: string | null; repoCount: number | null; commitCount: number | null }
-  redisKeys: Record<string, { exists: boolean; dateKey: string | null; generatedAt: string | null; repoCount: number | null; commitCount: number | null }>
-}> {
-  const todayEastern = dateKeyEastern()
-  const targetKey = yesterdayEasternDateKey()
-  const priorKey = yesterdayEasternDateKey(new Date(Date.now() - 86400000))
-  const probeKeys = [targetKey, priorKey]
-  // Also probe a few nearby days so we can see how far back Redis still has digests.
-  for (let i = 2; i <= 5; i++) {
-    const k = yesterdayEasternDateKey(new Date(Date.now() - i * 86400000))
-    if (!probeKeys.includes(k)) probeKeys.push(k)
-  }
-
-  const redisKeys: Record<string, { exists: boolean; dateKey: string | null; generatedAt: string | null; repoCount: number | null; commitCount: number | null }> = {}
-  for (const key of probeKeys) {
-    const digest = await readCachedDigest(key)
-    redisKeys[key] = {
-      exists: Boolean(digest),
-      dateKey: digest?.dateKey ?? null,
-      generatedAt: digest?.generatedAt ?? null,
-      repoCount: digest?.repoCount ?? null,
-      commitCount: digest?.commitCount ?? null,
-    }
-  }
-
-  const brief = await getBuildBrief()
-  let source = 'none'
-  if (brief?.dateKey === targetKey && redisKeys[targetKey]?.exists) source = 'target'
-  else if (brief && redisKeys[priorKey]?.exists && brief.dateKey === priorKey) source = 'prior'
-  else if (brief) source = 'other'
-
-  // #region agent log
-  fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'brief-debug',hypothesisId:'A',location:'lib/buildBrief.ts:getBuildBriefDebugSnapshot',message:'brief redis probe',data:{todayEastern,targetKey,priorKey,source,servedDateKey:brief?.dateKey ?? null,redisKeys},timestamp:Date.now()})}).catch(()=>{});
-  console.log('[brief-debug]', JSON.stringify({hypothesisId:'A',location:'getBuildBriefDebugSnapshot',todayEastern,targetKey,priorKey,source,servedDateKey:brief?.dateKey ?? null,redisExists:Object.fromEntries(Object.entries(redisKeys).map(([k,v])=>[k,v.exists]))}))
-  // #endregion
-
-  return {
-    nowIso: new Date().toISOString(),
-    todayEastern,
-    targetKey,
-    priorKey,
-    served: {
-      source,
-      dateKey: brief?.dateKey ?? null,
-      generatedAt: brief?.generatedAt ?? null,
-      repoCount: brief?.repoCount ?? null,
-      commitCount: brief?.commitCount ?? null,
-    },
-    redisKeys,
-  }
 }
 
 export function cardCopyForPeriod(
