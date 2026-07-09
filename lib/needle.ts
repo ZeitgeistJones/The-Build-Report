@@ -26,6 +26,7 @@ type QualifyingMove = {
   ecOld: string | null
   ecNew: string | null
   deltaHeader: string | null
+  summary: string | null
 }
 
 function dateKeyEastern(d = new Date()): string {
@@ -54,12 +55,13 @@ function qualifyingChange(_meta: RescoreSummaryRecord): boolean {
 function formatMoveLines(qualifying: QualifyingMove[]): string {
   return qualifying
     .map(q => {
+      const gradeMoved = q.biOld !== q.biNew || q.ecOld !== q.ecNew
       const parts: string[] = []
-      if (q.biOld !== q.biNew) parts.push(`builder standards ${q.biOld} → ${q.biNew}`)
-      if (q.ecOld !== q.ecNew) parts.push(`holder economics ${q.ecOld ?? '—'} → ${q.ecNew}`)
-      return `${q.name}: ${parts.join(', ')}${q.deltaHeader ? ` (${q.deltaHeader})` : ''}`
+      parts.push(`builder standards ${q.biOld} → ${q.biNew}`)
+      parts.push(`holder economics ${q.ecOld ?? '—'} → ${q.ecNew ?? '—'}`)
+      return `${q.name} (overall ${gradeMoved ? 'MOVED' : 'flat'}): ${parts.join(', ')}. Rubric detail: ${q.deltaHeader || 'none'}. Rescore notes: ${q.summary || 'none'}`
     })
-    .join('\n')
+    .join('\n\n')
 }
 
 function buildFallbackNeedle(qualifying: QualifyingMove[]): { text: string; textNormie: string } {
@@ -87,15 +89,15 @@ async function generateNeedleCopy(
 
   const lines = formatMoveLines(qualifying)
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  const prompt = `You write a very short daily column called "The Needle" for a crypto ecosystem scoring site. It highlights which repos had a grade change today and why.
-
-Here are today's qualifying grade changes:
+  const prompt = `You write a very short daily column called "The Needle" for a crypto ecosystem scoring site. It reports on today's rescores — sometimes the overall grade moved, sometimes it held flat even though specific rubric rows changed underneath. Here is today's rescore data:
 
 ${lines}
 
+Write 2-3 sentences total, no more. Pick the single most interesting thing that happened — this could be an overall grade move, OR a specific rubric row that improved/declined even though the overall grade held flat. If nothing moved overall, explain specifically what DID change at the rubric level and why it wasn't enough to shift the letter grade or percentage yet. Be specific — name the actual thing that changed (a security audit, a new test, a dependency, whatever the rescore notes mention), not just "held steady." Casual, direct, no fluff, no headers, no bullet points. Just plain prose.
+
 Return ONLY valid JSON (no markdown fences) with this shape:
 {
-  "text": "2-3 sentences. Casual, direct, no fluff, no headers, no bullet points. Mention the most significant move by name and why it moved.",
+  "text": "2-3 sentences following the instructions above.",
   "textNormie": "Same facts and repo names as text, rewritten for someone who knows nothing about code or crypto."
 }
 
@@ -148,6 +150,7 @@ export async function generateAndCacheNeedle(): Promise<NeedleData | null> {
       ecOld: meta.oldTokenMechanic,
       ecNew: meta.newTokenMechanic,
       deltaHeader: meta.deltaHeader ?? null,
+      summary: meta.summary ?? null,
     }))
 
   if (!qualifying.length) return null
