@@ -24,6 +24,8 @@ export default function AdminPage() {
   const [autoscoreResult, setAutoscoreResult] = useState<string | null>(null)
   const [briefRunning, setBriefRunning] = useState(false)
   const [briefResult, setBriefResult] = useState<string | null>(null)
+  const [needleRunning, setNeedleRunning] = useState(false)
+  const [needleResult, setNeedleResult] = useState<string | null>(null)
   const [refreshRunning, setRefreshRunning] = useState(false)
   const [refreshResult, setRefreshResult] = useState<string | null>(null)
   const [ecosystemContext, setEcosystemContextText] = useState('')
@@ -105,6 +107,31 @@ export default function AdminPage() {
       setAutoscoreResult('Autoscore request failed')
     }
     setAutoscoreRunning(false)
+  }
+
+  async function regenerateNeedle() {
+    setNeedleRunning(true)
+    setNeedleResult(null)
+    try {
+      const res = await fetch('/api/admin/needle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setNeedleResult(
+          data.generated
+            ? `Needle saved — ${data.repoCount} repos. ${String(data.text).slice(0, 140)}…`
+            : 'No qualifying rescores in the last 24h — Needle not generated.',
+        )
+      } else {
+        setNeedleResult(data.error ?? 'Needle generation failed')
+      }
+    } catch {
+      setNeedleResult('Needle request failed')
+    }
+    setNeedleRunning(false)
   }
 
   async function regenerateBuildBrief() {
@@ -1093,6 +1120,46 @@ export default function AdminPage() {
             color: 'var(--text-secondary)',
           }}>
             {briefResult}
+          </div>
+        )}
+      </div>
+
+      {/* Needle */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>The Needle</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Short daily column on rescore movement. Regenerates automatically at 5:10am ET; use this to refresh immediately after testing a rescore.
+            </p>
+          </div>
+          <button
+            onClick={regenerateNeedle}
+            disabled={needleRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {needleRunning ? 'Generating…' : 'Regenerate needle'}
+          </button>
+        </div>
+        {needleResult && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {needleResult}
           </div>
         )}
       </div>
