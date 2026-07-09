@@ -13,6 +13,10 @@
       "schedule": "10 5 * * *"
     },
     {
+      "path": "/api/cron/podcast-mentions",
+      "schedule": "20 5 * * *"
+    },
+    {
       "path": "/api/cron/warm-cache",
       "schedule": "0 6 * * *"
     }
