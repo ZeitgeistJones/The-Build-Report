@@ -172,6 +172,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Promo treasury balance is too low' }, { status: 503 })
       }
     } else {
+      if (isPromoWindowOpen()) {
+        return NextResponse.json(
+          { ok: false, error: 'Paid rescore is paused during the launch promo' },
+          { status: 400 },
+        )
+      }
+
       paidKey = `${PAID_TX_KEY_PREFIX}${txHash}`
       const claimed = await redis.set(paidKey, 'pending', { nx: true, ex: 3600 })
       if (!claimed) {

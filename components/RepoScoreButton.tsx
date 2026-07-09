@@ -81,7 +81,10 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
   const ethUsdRate = useEthUsdRate()
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
   const promoEligible = Boolean(promoQuote?.eligible)
+  const paidRescorePaused =
+    scoringStatus === 'scored' && Boolean(promoQuote?.promoActive) && !promoEligible
   const busy = phase !== 'idle' || isSending
+  const buttonDisabled = busy || paidRescorePaused
   const defaultLabel = `${label} (${formatRescorePriceLabel(SCORE_PAYMENT_ETH, ethUsdRate)})`
   const actionLabel = busy
     ? phase === 'paying' || isSending
@@ -89,6 +92,8 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       : phase === 'signing'
         ? 'Signing…'
         : 'Scoring…'
+    : paidRescorePaused
+      ? 'Rescore paused'
     : promoEligible
       ? (promoQuote?.buttonLabel ?? defaultLabel)
       : defaultLabel
@@ -98,9 +103,17 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     activity.commitTimestamps,
     { lastCommitAt: activity.lastCommitAt, pushedAt: activity.pushedAt },
   )
-  const nudgeRescore = Boolean(showScoreMeta) && hasNewCommitsSinceScore && !busy
+  const nudgeRescore =
+    Boolean(showScoreMeta) &&
+    hasNewCommitsSinceScore &&
+    !busy &&
+    (promoEligible || !promoQuote?.promoActive)
   const nudgeBaselineRefresh =
-    Boolean(showScoreMeta) && isLaunchBaseline(activity.adminNote) && !nudgeRescore && !busy
+    Boolean(showScoreMeta) &&
+    isLaunchBaseline(activity.adminNote) &&
+    !nudgeRescore &&
+    !busy &&
+    (promoEligible || !promoQuote?.promoActive)
 
   useEffect(() => {
     let cancelled = false
@@ -219,6 +232,8 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
 
       if (usePromo) {
         await runPromoRescore()
+      } else if (freshQuote?.promoActive) {
+        throw new Error('Paid rescore is paused during the launch promo')
       } else {
         await runPaidRescore()
       }
@@ -250,8 +265,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       return
     }
     if (!address) return
+    if (paidRescorePaused) return
 
-    if (scoringStatus === 'scored' && shouldConfirmRescore(activity) && !confirmOpen) {
+    if (scoringStatus === 'scored' && shouldConfirmRescore(activity) && !confirmOpen && promoEligible) {
       setConfirmOpen(true)
       return
     }
@@ -268,7 +284,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         <button
           type="button"
           onClick={handleClick}
-          disabled={busy}
+          disabled={buttonDisabled}
           style={{
             fontSize: '11px',
             padding: isMobile ? '8px 12px' : '3px 8px',
@@ -276,9 +292,10 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
             borderRadius: '99px',
             border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
             background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
-            color: busy ? 'var(--text-muted)' : promoEligible ? 'var(--accent)' : 'var(--text-secondary)',
-            cursor: busy ? 'wait' : 'pointer',
+            color: busy || paidRescorePaused ? 'var(--text-muted)' : promoEligible ? 'var(--accent)' : 'var(--text-secondary)',
+            cursor: buttonDisabled ? 'not-allowed' : 'pointer',
             fontWeight: 500,
+            opacity: paidRescorePaused ? 0.7 : 1,
           }}
         >
           {actionLabel}
@@ -299,9 +316,10 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         </div>
       )}
 
-      {promoQuote?.promoActive && !promoEligible && promoQuote.reason && (
+      {promoQuote?.promoActive && !promoEligible && (
         <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35, maxWidth: '180px', marginInline: 'auto' }}>
-          {promoQuote.reason}
+          {paidRescorePaused && <div>Paid rescore paused during launch promo.</div>}
+          {promoQuote.reason && <div>{promoQuote.reason}</div>}
         </div>
       )}
 

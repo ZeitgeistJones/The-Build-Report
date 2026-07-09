@@ -269,7 +269,7 @@ export async function buildPromoQuote(
     reason = 'No commits since last score'
     eligible = false
   } else if (!treasuryFunded) {
-    reason = 'Promo treasury is low — paid rescore still available'
+    reason = 'Promo treasury is low — try again later'
     eligible = false
   } else if (walletAddress && config.maxPayoutsPerWallet) {
     const used = await getWalletPromoPayoutCount(walletAddress)
