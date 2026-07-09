@@ -2,6 +2,7 @@ import { getRedis } from '@/lib/redis'
 import type { Redis } from '@upstash/redis'
 
 const KEY_PREFIX = 'build-report:score-history:'
+const TIMELINE_KEY = 'build-report:rescore-timeline'
 const MAX_ENTRIES = 10
 
 export type ScoreHistoryEntry = {
@@ -26,7 +27,8 @@ export async function appendScoreHistory(
   const key = historyKey(slug)
   await r.lpush(key, entry)
   await r.ltrim(key, 0, MAX_ENTRIES - 1)
-  await r.expire(key, 60 * 60 * 24 * 180) // 180 days
+  await r.expire(key, 60 * 60 * 24 * 180)
+  await r.zadd(TIMELINE_KEY, { score: Date.now(), member: slug })
 }
 
 export async function getScoreHistory(slug: string): Promise<ScoreHistoryEntry[]> {
@@ -55,5 +57,15 @@ export async function getScoreHistories(
     return results
   } catch {
     return {}
+  }
+}
+
+export async function getSlugsRescoredSince(sinceMs: number): Promise<string[]> {
+  try {
+    const r = getRedis()
+    const members = await r.zrange<string[]>(TIMELINE_KEY, sinceMs, Date.now(), { byScore: true })
+    return Array.from(new Set(members ?? []))
+  } catch {
+    return []
   }
 }
