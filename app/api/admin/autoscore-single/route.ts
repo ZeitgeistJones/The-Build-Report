@@ -8,7 +8,7 @@ import { bustOverallSummaryCache } from '@/lib/overallSummary'
 import { recordRescoreBurn } from '@/lib/rescoreBurns'
 import { generateRescoreChangeSummary } from '@/lib/rescoreChangeSummary'
 import { buildRescoreSummaryRecord, saveRescoreSummary } from '@/lib/rescoreSummaries'
-import { isCommunityContextEnabled, markAcceptedConsumed, formatAcceptedCommunityContext } from '@/lib/communityContext'
+import { isCommunityContextEnabled, markAcceptedConsumed } from '@/lib/communityContext'
 import { getRedis } from '@/lib/redis'
 import { PAID_TX_KEY_PREFIX } from '@/lib/web3/constants'
 import { verifyPaymentTx, verifyWalletSignature, walletHasGateAccess } from '@/lib/web3/verifyPayment'
@@ -173,17 +173,10 @@ export async function POST(req: NextRequest) {
       }
     } else {
       if (isPromoWindowOpen()) {
-        const beforeActivity = await resolvePromoActivitySnapshot(repoSlug)
-        const isFirstScore = !beforeActivity?.scoredAt
-        const acceptedContext = isCommunityContextEnabled()
-          ? await formatAcceptedCommunityContext(repoSlug)
-          : undefined
-        if (!isFirstScore && !acceptedContext) {
-          return NextResponse.json(
-            { ok: false, error: 'Paid rescore is paused during the launch promo' },
-            { status: 400 },
-          )
-        }
+        return NextResponse.json(
+          { ok: false, error: 'Paid rescore is paused during the launch promo' },
+          { status: 400 },
+        )
       }
 
       paidKey = `${PAID_TX_KEY_PREFIX}${txHash}`
