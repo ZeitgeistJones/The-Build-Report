@@ -26,6 +26,8 @@ export default function AdminPage() {
   const [briefResult, setBriefResult] = useState<string | null>(null)
   const [needleRunning, setNeedleRunning] = useState(false)
   const [needleResult, setNeedleResult] = useState<string | null>(null)
+  const [podcastScanRunning, setPodcastScanRunning] = useState(false)
+  const [podcastScanResult, setPodcastScanResult] = useState<string | null>(null)
   const [refreshRunning, setRefreshRunning] = useState(false)
   const [refreshResult, setRefreshResult] = useState<string | null>(null)
   const [ecosystemContext, setEcosystemContextText] = useState('')
@@ -107,6 +109,29 @@ export default function AdminPage() {
       setAutoscoreResult('Autoscore request failed')
     }
     setAutoscoreRunning(false)
+  }
+
+  async function scanPodcastMentions() {
+    setPodcastScanRunning(true)
+    setPodcastScanResult(null)
+    try {
+      const res = await fetch('/api/admin/podcast-mentions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setPodcastScanResult(
+          `Scanned ${data.scanned} episode${data.scanned === 1 ? '' : 's'} — ${data.mentionsFound} mention${data.mentionsFound === 1 ? '' : 's'} found.`,
+        )
+      } else {
+        setPodcastScanResult(data.error ?? 'Podcast scan failed')
+      }
+    } catch {
+      setPodcastScanResult('Podcast scan request failed')
+    }
+    setPodcastScanRunning(false)
   }
 
   async function regenerateNeedle() {
@@ -592,6 +617,20 @@ export default function AdminPage() {
           }}
         >
           {needleRunning ? 'Generating…' : 'Regenerate needle'}
+        </button>
+        <button
+          onClick={scanPodcastMentions}
+          disabled={podcastScanRunning}
+          style={{
+            fontSize: '12px',
+            padding: '6px 12px',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface-3)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-strong)',
+          }}
+        >
+          {podcastScanRunning ? 'Scanning…' : 'Scan podcast mentions'}
         </button>
       </div>
 
@@ -1248,6 +1287,46 @@ export default function AdminPage() {
             color: 'var(--text-secondary)',
           }}>
             {needleResult}
+          </div>
+        )}
+      </div>
+
+      {/* Overheard — podcast mentions */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Overheard (podcast mentions)</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Scans new Slop.Computer episode transcripts for mentions of tracked repos. Runs automatically daily at 5:20am ET; use this to scan immediately.
+            </p>
+          </div>
+          <button
+            onClick={scanPodcastMentions}
+            disabled={podcastScanRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {podcastScanRunning ? 'Scanning…' : 'Scan podcast mentions'}
+          </button>
+        </div>
+        {podcastScanResult && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {podcastScanResult}
           </div>
         )}
       </div>
