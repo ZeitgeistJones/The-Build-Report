@@ -69,10 +69,11 @@ export default async function Home() {
   const contextSummary = communityContextEnabled ? await getContextSummaryBySlug().catch(() => ({})) : {}
   const communityPulse = communityContextEnabled ? buildCommunityPulse(contextSummary) : null
 
-  const [rescoreBurns, buildBrief] = await Promise.all([
-    getRescoreBurnStats().catch(() => null),
-    getBuildBrief().catch(() => null),
-  ])
+ const [rescoreBurns, buildBrief, needle] = await Promise.all([
+  getRescoreBurnStats().catch(() => null),
+  getBuildBrief().catch(() => null),
+  getNeedle().catch(() => null),
+])
 
   const { stats: loadedStats, source: loadedSource } = await loadGitHubStatsForPage().catch(err => {
     console.error('[home] GitHub stats load failed', err)
