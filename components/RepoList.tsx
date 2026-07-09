@@ -1419,14 +1419,6 @@ export default function RepoList({
             Most active
           </PillButton>
           <PillButton
-            active={sortBy === 'needs-rescore'}
-            onClick={() => setSortBy('needs-rescore')}
-            isMobile={isMobile}
-            tooltip={REPO_SORT_TOOLTIPS['needs-rescore']}
-          >
-            Most stale
-          </PillButton>
-          <PillButton
             active={sortBy === 'grade'}
             onClick={() => setSortBy('grade')}
             isMobile={isMobile}

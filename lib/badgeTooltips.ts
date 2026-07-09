@@ -23,7 +23,7 @@ export const REPO_FILTER_TOOLTIPS = {
 export const REPO_SORT_TOOLTIPS = {
   recent: 'Sorted by last GitHub push — newest activity first.',
   commits: 'Sorted by commit count in the selected window.',
-  'needs-rescore': 'Sorted by commits since the last score — most stale first.',
+  'needs-rescore': 'Sorted by commits since the last score — most outdated first.',
   grade: 'Sorted by overall rubric grades — highest first.',
 } as const
 
