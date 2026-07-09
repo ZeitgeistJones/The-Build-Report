@@ -1,6 +1,7 @@
 'use client'
 
 import type { OverheardEntry, OverheardQuote } from '@/lib/podcastMentions'
+import { filterValidQuotes } from '@/components/OverheardCard'
 
 export type MentionEditDraft = {
   writeup: string
@@ -9,12 +10,24 @@ export type MentionEditDraft = {
   quotes: OverheardQuote[]
 }
 
+export function sanitizeDraftForSave(draft: MentionEditDraft): MentionEditDraft {
+  const quotes = filterValidQuotes(
+    draft.quotes.map(q => ({
+      ...q,
+      speaker: q.speaker.trim(),
+      text: q.text.trim(),
+    })),
+  )
+  return { ...draft, quotes }
+}
+
 export function mentionToEditDraft(entry: OverheardEntry): MentionEditDraft {
+  const quotes = filterValidQuotes(entry.quotes.map(q => ({ ...q })))
   return {
     writeup: entry.writeup,
     repoSlug: entry.repoSlug,
     userContext: entry.userContext ?? '',
-    quotes: entry.quotes.map(q => ({ ...q })),
+    quotes: quotes.length ? quotes : entry.quotes.slice(0, 1).map(q => ({ ...q })),
   }
 }
 
@@ -123,14 +136,14 @@ export default function OverheardAdminEntryCard({
             {writeupPreview(entry.writeup)}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
-            {entry.quotes.slice(0, 2).map((q, i) => (
+            {filterValidQuotes(entry.quotes).slice(0, 2).map((q, i) => (
               <div key={`${entry.id}-preview-${i}`} style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5, padding: '6px 8px', background: 'var(--surface-2)', borderRadius: 'var(--radius)' }}>
                 <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{q.speaker}: </span>
                 &ldquo;{q.text.length > 120 ? `${q.text.slice(0, 120)}…` : q.text}&rdquo;
               </div>
             ))}
-            {entry.quotes.length > 2 && (
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>+{entry.quotes.length - 2} more quote(s)</span>
+            {filterValidQuotes(entry.quotes).length > 2 && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>+{filterValidQuotes(entry.quotes).length - 2} more quote(s)</span>
             )}
           </div>
         </>

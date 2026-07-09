@@ -6,7 +6,7 @@ import { BULK_REGEN_DEFAULT_BATCH } from '@/lib/bulkRegenConfig'
 import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
 import type { CommunityContextSubmission } from '@/lib/communityContextTypes'
 import type { OverheardEntry } from '@/lib/podcastMentions'
-import OverheardAdminEntryCard, { mentionToEditDraft, type MentionEditDraft } from '@/components/OverheardAdminEntryCard'
+import OverheardAdminEntryCard, { mentionToEditDraft, sanitizeDraftForSave, type MentionEditDraft } from '@/components/OverheardAdminEntryCard'
 
 type AdminContextSubmission = CommunityContextSubmission
 
@@ -251,6 +251,7 @@ export default function AdminPage() {
   async function saveMentionEdit(id: string) {
     const draft = mentionEditDrafts[id]
     if (!draft) return
+    const sanitized = sanitizeDraftForSave(draft)
     setMentionActionBusy(`save:${id}`)
     try {
       const res = await fetch('/api/admin/podcast-mentions-review', {
@@ -260,10 +261,10 @@ export default function AdminPage() {
           password,
           action: 'updateEntry',
           id,
-          writeup: draft.writeup,
-          repoSlug: draft.repoSlug,
-          userContext: draft.userContext,
-          quotes: draft.quotes,
+          writeup: sanitized.writeup,
+          repoSlug: sanitized.repoSlug,
+          userContext: sanitized.userContext,
+          quotes: sanitized.quotes,
         }),
       })
       const data = await res.json()
@@ -336,6 +337,7 @@ export default function AdminPage() {
     try {
       const draft = mentionEditDrafts[id]
       if (action === 'publish' && draft) {
+        const sanitized = sanitizeDraftForSave(draft)
         await fetch('/api/admin/podcast-mentions-review', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -343,14 +345,14 @@ export default function AdminPage() {
             password,
             action: 'updateEntry',
             id,
-            writeup: draft.writeup,
-            repoSlug: draft.repoSlug,
-            userContext: draft.userContext,
-            quotes: draft.quotes,
+            writeup: sanitized.writeup,
+            repoSlug: sanitized.repoSlug,
+            userContext: sanitized.userContext,
+            quotes: sanitized.quotes,
           }),
         })
       }
-      const writeup = action === 'publish' ? draft?.writeup : undefined
+      const writeup = action === 'publish' && draft ? sanitizeDraftForSave(draft).writeup : undefined
       await fetch('/api/admin/podcast-mentions-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
