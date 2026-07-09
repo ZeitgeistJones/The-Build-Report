@@ -33,8 +33,7 @@ import PromoRewardToast from '@/components/PromoRewardToast'
 import { playPromoRewardChime, primePromoRewardAudio } from '@/lib/promoRewardFx'
 
 /** Fixed action column so grade metrics line up across cards. */
-const ACTION_SLOT_WIDTH = 176
-const RESCORE_BUTTON_WIDTH = 154
+const ACTION_SLOT_WIDTH = 168
 const RESCORE_BUTTON_MIN_HEIGHT = 22
 
 interface Props {
@@ -54,9 +53,27 @@ type PromoQuote = {
   reason: string | null
 }
 
-function RescoreTooltipContent({ promoActive }: { promoActive: boolean }) {
+function RescoreTooltipContent({
+  promoActive,
+  promoEligible,
+  staleCommits,
+  rewardEth,
+  ethUsdRate,
+}: {
+  promoActive: boolean
+  promoEligible: boolean
+  staleCommits: number
+  rewardEth: number
+  ethUsdRate: number
+}) {
   return (
     <>
+      {promoEligible && (
+        <div style={{ marginBottom: '6px' }}>
+          Earn {formatApproxUsdFromEth(rewardEth, ethUsdRate)} for {staleCommits} stale commit
+          {staleCommits === 1 ? '' : 's'} on this repo.
+        </div>
+      )}
       {promoActive ? RESCORE_PROMO_TOOLTIP : RESCORE_BUTTON_TOOLTIP}{' '}
       <a href="/about#score-types" style={{ color: 'var(--accent)' }} onClick={e => e.stopPropagation()}>
         About score types ↗
@@ -294,12 +311,11 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     >
       <div
         style={{
-          position: 'relative',
-          width: '100%',
-          minHeight: isMobile ? MIN_TAP : RESCORE_BUTTON_MIN_HEIGHT,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          gap: '3px',
+          width: '100%',
         }}
       >
         <button
@@ -307,10 +323,10 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           onClick={handleClick}
           disabled={buttonDisabled}
           style={{
-            width: isMobile ? '100%' : RESCORE_BUTTON_WIDTH,
+            width: '100%',
             minHeight: isMobile ? MIN_TAP : RESCORE_BUTTON_MIN_HEIGHT,
             fontSize: '11px',
-            padding: isMobile ? '8px 12px' : '0 8px',
+            padding: isMobile ? '8px 10px' : '4px 10px',
             borderRadius: '99px',
             border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
             background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
@@ -329,16 +345,23 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
         >
           {actionLabel}
         </button>
-        <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
-          <InfoTooltip
-            content={<RescoreTooltipContent promoActive={Boolean(promoQuote?.promoActive)} />}
-            ariaLabel="About Score and Rescore"
-            icon="question"
-            placement="above"
-            width={260}
-            interactive
-          />
-        </div>
+        <InfoTooltip
+          content={
+            <RescoreTooltipContent
+              promoActive={Boolean(promoQuote?.promoActive)}
+              promoEligible={promoEligible}
+              staleCommits={promoQuote?.staleCommits ?? 0}
+              rewardEth={promoQuote?.rewardEth ?? 0}
+              ethUsdRate={ethUsdRate}
+            />
+          }
+          ariaLabel="About Score and Rescore"
+          icon="question"
+          placement="below"
+          width={260}
+          interactive
+          compact
+        />
       </div>
 
       {promoQuote?.promoBanner && promoEligible && (

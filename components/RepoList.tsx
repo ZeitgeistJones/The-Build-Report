@@ -86,7 +86,24 @@ type RepoSort = 'recent' | 'commits' | 'needs-rescore' | 'grade'
 export type RepoFilter = 'all' | 'needs-rescore' | 'burn-apps' | 'leverage' | 'clawd-cv-perks' | 'community-context' | Tag
 
 const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20, metricLabel: 9, pctLabel: 10 } as const
-const METRIC_COL_WIDTH = { holder: 52, builder: 44, commits: 32 } as const
+const METRIC_COL_WIDTH = { holder: 52, builder: 44, commits: 38 } as const
+
+function commitsColumnLabel(metricLabelPx: number, period: Period) {
+  return (
+    <div
+      style={{
+        fontSize: `${metricLabelPx}px`,
+        color: 'var(--text-muted)',
+        marginTop: '2px',
+        lineHeight: 1.25,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      commits
+      <span style={{ opacity: 0.5 }}> · {periodKeyLabel(period)}</span>
+    </div>
+  )
+}
 
 function metricColStyle(isMobile: boolean, width: number) {
   return isMobile
@@ -1049,9 +1066,7 @@ export default function RepoList({
                   <div style={gradeLetterStyle(d.gradeLetter, commitCountColor(periodCommits))}>
                     {periodCommitsLabel}
                   </div>
-                  <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                    commits
-                  </div>
+                  {commitsColumnLabel(d.metricLabel, repoPeriod)}
                 </RepoBadge>
                 </>
               ) : (
@@ -1101,9 +1116,7 @@ export default function RepoList({
                 <div style={gradeLetterStyle(d.gradeLetter, commitCountColor(periodCommits))}>
                   {periodCommitsLabel}
                 </div>
-                <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                  commits
-                </div>
+                {commitsColumnLabel(d.metricLabel, repoPeriod)}
               </RepoBadge>
 
               </>
