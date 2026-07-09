@@ -1424,7 +1424,7 @@ export default function RepoList({
             isMobile={isMobile}
             tooltip={REPO_SORT_TOOLTIPS['needs-rescore']}
           >
-            Needs rescore
+            Most stale
           </PillButton>
           <PillButton
             active={sortBy === 'grade'}
