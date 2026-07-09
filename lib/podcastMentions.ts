@@ -1,8 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { getRedis } from '@/lib/redis'
 import { fetchAllEpisodes, fetchIpfsText, type SlopEpisode } from '@/lib/web3/slopComputer'
 import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
+import { generateOverheardWriteup } from '@/lib/overheardWriteup'
 import { REPOS } from '@/lib/scores'
 
 /** Prefer the full clawdbotatg trackable set from the GitHub snapshot; fall back to scored REPOS. */
@@ -36,18 +37,117 @@ const MODE_KEY = 'build-report:overheard-mode'
 
 export type OverheardMode = 'automatic' | 'manual'
 
-export type PodcastMention = {
-  id: string
-  repoSlug: string
-  episodeName: string
-  episodeSlug: string
+export type OverheardQuote = {
   speaker: string
   text: string
   approxTimestampSec: number
-  confirmedAt: string
+  candidateId?: string
+}
+
+export type OverheardEntry = {
+  id: string
+  kind: 'single' | 'thread'
+  repoSlug: string
+  episodeName: string
+  episodeSlug: string
+  episodePublishedAt: string | null
+  quotes: OverheardQuote[]
+  writeup: string
   status: 'candidate' | 'pending' | 'published'
   userContext: string | null
+  scannedAt: string | null
+  confirmedAt: string | null
   publishedAt: string | null
+}
+
+/** @deprecated Use OverheardEntry */
+export type PodcastMention = OverheardEntry
+
+function episodePublishedAtIso(episode: SlopEpisode): string {
+  return new Date(Number(episode.datetime) * 1000).toISOString()
+}
+
+/** Normalize legacy flat mention records from Redis into OverheardEntry. */
+export function normalizeOverheardEntry(raw: unknown): OverheardEntry | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (typeof r.id !== 'string' || typeof r.repoSlug !== 'string') return null
+
+  if (Array.isArray(r.quotes) && r.quotes.length > 0) {
+    return {
+      id: r.id,
+      kind: r.kind === 'thread' ? 'thread' : 'single',
+      repoSlug: r.repoSlug,
+      episodeName: String(r.episodeName ?? ''),
+      episodeSlug: String(r.episodeSlug ?? ''),
+      episodePublishedAt: typeof r.episodePublishedAt === 'string' ? r.episodePublishedAt : null,
+      quotes: r.quotes as OverheardQuote[],
+      writeup: typeof r.writeup === 'string' ? r.writeup : '',
+      status: r.status === 'candidate' || r.status === 'pending' || r.status === 'published' ? r.status : 'candidate',
+      userContext: typeof r.userContext === 'string' ? r.userContext : null,
+      scannedAt: typeof r.scannedAt === 'string' ? r.scannedAt : null,
+      confirmedAt: typeof r.confirmedAt === 'string' ? r.confirmedAt : null,
+      publishedAt: typeof r.publishedAt === 'string' ? r.publishedAt : null,
+    }
+  }
+
+  if (typeof r.text === 'string' && typeof r.speaker === 'string') {
+    const legacyConfirmed = typeof r.confirmedAt === 'string' ? r.confirmedAt : null
+    return {
+      id: r.id,
+      kind: 'single',
+      repoSlug: r.repoSlug,
+      episodeName: String(r.episodeName ?? ''),
+      episodeSlug: String(r.episodeSlug ?? ''),
+      episodePublishedAt: typeof r.episodePublishedAt === 'string' ? r.episodePublishedAt : null,
+      quotes: [{
+        speaker: r.speaker,
+        text: r.text,
+        approxTimestampSec: typeof r.approxTimestampSec === 'number' ? r.approxTimestampSec : 0,
+        candidateId: r.id,
+      }],
+      writeup: typeof r.writeup === 'string' ? r.writeup : '',
+      status: r.status === 'candidate' || r.status === 'pending' || r.status === 'published' ? r.status : 'candidate',
+      userContext: typeof r.userContext === 'string' ? r.userContext : null,
+      scannedAt: legacyConfirmed,
+      confirmedAt: r.status === 'pending' || r.status === 'published' ? legacyConfirmed : null,
+      publishedAt: typeof r.publishedAt === 'string' ? r.publishedAt : null,
+    }
+  }
+
+  return null
+}
+
+function buildCandidateEntry(params: {
+  id: string
+  repoSlug: string
+  episode: SlopEpisode
+  speaker: string
+  text: string
+  approxTimestampSec: number
+  status: 'candidate' | 'pending'
+}): OverheardEntry {
+  const now = new Date().toISOString()
+  return {
+    id: params.id,
+    kind: 'single',
+    repoSlug: params.repoSlug,
+    episodeName: params.episode.name,
+    episodeSlug: params.episode.slug,
+    episodePublishedAt: episodePublishedAtIso(params.episode),
+    quotes: [{
+      speaker: params.speaker,
+      text: params.text,
+      approxTimestampSec: params.approxTimestampSec,
+      candidateId: params.id,
+    }],
+    writeup: '',
+    status: params.status,
+    userContext: null,
+    scannedAt: now,
+    confirmedAt: params.status === 'pending' ? now : null,
+    publishedAt: null,
+  }
 }
 
 type TranscriptLine = {
@@ -334,7 +434,7 @@ export async function setOverheardMode(mode: OverheardMode): Promise<void> {
 export async function scanEpisodeForMentions(
   episode: SlopEpisode,
   mode: OverheardMode,
-): Promise<PodcastMention[]> {
+): Promise<OverheardEntry[]> {
   if (!episode.manifest) return []
 
   const manifest = await fetchJsonFromIpfs<Record<string, unknown>>(episode.manifest)
@@ -347,7 +447,7 @@ export async function scanEpisodeForMentions(
   if (!lines.length) return []
 
   const startTs = lines[0]?.ts ?? Number(episode.datetime) * 1000
-  const results: PodcastMention[] = []
+  const results: OverheardEntry[] = []
   const repos = await getReposForMentionScan()
 
   for (const repo of repos) {
@@ -359,37 +459,30 @@ export async function scanEpisodeForMentions(
       const confirmed = await confirmMentionsWithHaiku(repo.githubSlug, repo.context, candidates)
       for (const c of confirmed) {
         const id = makeMentionId(repo.githubSlug, episode.slug, c.text)
-        results.push({
+        const entry = buildCandidateEntry({
           id,
           repoSlug: repo.githubSlug,
-          episodeName: episode.name,
-          episodeSlug: episode.slug,
+          episode,
           speaker: c.handle ?? 'unknown',
           text: c.text,
           approxTimestampSec: Math.max(0, Math.round((c.ts - startTs) / 1000)),
-          confirmedAt: new Date().toISOString(),
           status: 'pending',
-          userContext: null,
-          publishedAt: null,
         })
+        entry.writeup = await generateOverheardWriteup(entry)
+        results.push(entry)
       }
     } else {
-      // manual mode — skip Haiku, surface every raw keyword hit as a candidate for human review
       for (const c of candidates) {
         const id = makeMentionId(repo.githubSlug, episode.slug, c.text)
-        results.push({
+        results.push(buildCandidateEntry({
           id,
           repoSlug: repo.githubSlug,
-          episodeName: episode.name,
-          episodeSlug: episode.slug,
+          episode,
           speaker: c.handle ?? 'unknown',
           text: c.text,
           approxTimestampSec: Math.max(0, Math.round((c.ts - startTs) / 1000)),
-          confirmedAt: new Date().toISOString(),
           status: 'candidate',
-          userContext: null,
-          publishedAt: null,
-        })
+        }))
       }
     }
   }
@@ -404,7 +497,7 @@ export async function clearScannedEpisodes(): Promise<number> {
   return ids.length
 }
 
-async function persistMentions(mentions: PodcastMention[]): Promise<number> {
+async function persistMentions(mentions: OverheardEntry[]): Promise<number> {
   const redis = getRedis()
   let mentionsFound = 0
   for (const mention of mentions) {
@@ -491,35 +584,40 @@ export async function scanNewEpisodes(opts?: {
   }
 }
 
-async function getMentionsFromSet(setKey: string): Promise<PodcastMention[]> {
+async function getMentionsFromSet(setKey: string): Promise<OverheardEntry[]> {
   try {
     const redis = getRedis()
     const ids = (await redis.smembers<string[]>(setKey)) ?? []
     if (!ids.length) return []
     const keys = ids.map(mentionKey)
-    const values = await redis.mget<(PodcastMention | null)[]>(...keys)
+    const values = await redis.mget<unknown[]>(...keys)
     return values
-      .filter((v): v is PodcastMention => Boolean(v))
-      .sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt))
+      .map(normalizeOverheardEntry)
+      .filter((v): v is OverheardEntry => Boolean(v))
+      .sort((a, b) => {
+        const aTs = a.confirmedAt ?? a.scannedAt ?? ''
+        const bTs = b.confirmedAt ?? b.scannedAt ?? ''
+        return bTs.localeCompare(aTs)
+      })
   } catch {
     return []
   }
 }
 
-export async function getCandidateMentions(): Promise<PodcastMention[]> {
+export async function getCandidateMentions(): Promise<OverheardEntry[]> {
   return getMentionsFromSet(CANDIDATE_SET_KEY)
 }
 
-export async function getPendingMentions(): Promise<PodcastMention[]> {
+export async function getPendingMentions(): Promise<OverheardEntry[]> {
   return getMentionsFromSet(PENDING_SET_KEY)
 }
 
 export async function addContextToCandidate(id: string, context: string): Promise<boolean> {
   try {
     const redis = getRedis()
-    const mention = await redis.get<PodcastMention>(mentionKey(id))
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
     if (!mention || mention.status !== 'candidate') return false
-    const updated: PodcastMention = { ...mention, userContext: context }
+    const updated: OverheardEntry = { ...mention, userContext: context }
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     return true
   } catch {
@@ -530,9 +628,17 @@ export async function addContextToCandidate(id: string, context: string): Promis
 export async function confirmCandidate(id: string): Promise<boolean> {
   try {
     const redis = getRedis()
-    const mention = await redis.get<PodcastMention>(mentionKey(id))
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
     if (!mention || mention.status !== 'candidate') return false
-    const updated: PodcastMention = { ...mention, status: 'pending' }
+    const writeup = await generateOverheardWriteup(mention)
+    const now = new Date().toISOString()
+    const updated: OverheardEntry = {
+      ...mention,
+      kind: 'single',
+      status: 'pending',
+      writeup,
+      confirmedAt: now,
+    }
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     await redis.srem(CANDIDATE_SET_KEY, id)
     await redis.sadd(PENDING_SET_KEY, id)
@@ -542,12 +648,86 @@ export async function confirmCandidate(id: string): Promise<boolean> {
   }
 }
 
-export async function publishMention(id: string): Promise<boolean> {
+export async function groupCandidatesIntoThread(ids: string[]): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (ids.length < 2) return { ok: false, error: 'Select at least 2 candidates' }
+
   try {
     const redis = getRedis()
-    const mention = await redis.get<PodcastMention>(mentionKey(id))
-    if (!mention) return false
-    const updated: PodcastMention = { ...mention, status: 'published', publishedAt: new Date().toISOString() }
+    const entries = (
+      await Promise.all(ids.map(id => redis.get(mentionKey(id)).then(normalizeOverheardEntry)))
+    ).filter((e): e is OverheardEntry => Boolean(e))
+
+    if (entries.length !== ids.length) return { ok: false, error: 'One or more candidates not found' }
+    if (entries.some(e => e.status !== 'candidate')) return { ok: false, error: 'All selected items must be candidates' }
+
+    const repoSlug = entries[0]!.repoSlug
+    if (entries.some(e => e.repoSlug !== repoSlug)) return { ok: false, error: 'All candidates must share the same repo' }
+
+    const quotes: OverheardQuote[] = entries
+      .flatMap(e => e.quotes)
+      .sort((a, b) => a.approxTimestampSec - b.approxTimestampSec)
+
+    const userContext = entries.map(e => e.userContext?.trim()).filter(Boolean).join('\n\n') || null
+    const threadId = randomUUID()
+    const draft: OverheardEntry = {
+      id: threadId,
+      kind: 'thread',
+      repoSlug,
+      episodeName: entries[0]!.episodeName,
+      episodeSlug: entries[0]!.episodeSlug,
+      episodePublishedAt: entries[0]!.episodePublishedAt,
+      quotes,
+      writeup: '',
+      status: 'pending',
+      userContext,
+      scannedAt: entries.map(e => e.scannedAt).filter(Boolean).sort()[0] ?? new Date().toISOString(),
+      confirmedAt: new Date().toISOString(),
+      publishedAt: null,
+    }
+    draft.writeup = await generateOverheardWriteup(draft)
+
+    await redis.set(mentionKey(threadId), draft, { ex: 60 * 60 * 24 * 365 })
+    await redis.sadd(PENDING_SET_KEY, threadId)
+
+    for (const id of ids) {
+      await redis.srem(CANDIDATE_SET_KEY, id)
+      await redis.del(mentionKey(id))
+    }
+
+    return { ok: true, id: threadId }
+  } catch {
+    return { ok: false, error: 'Failed to group thread' }
+  }
+}
+
+export async function updatePendingWriteup(id: string, writeup: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
+    if (!mention || mention.status !== 'pending') return false
+    const updated: OverheardEntry = { ...mention, writeup: writeup.trim() }
+    await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function publishMention(id: string, writeup?: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
+    if (!mention || mention.status !== 'pending') return false
+    const nextWriteup =
+      typeof writeup === 'string' && writeup.trim()
+        ? writeup.trim()
+        : mention.writeup.trim() || (await generateOverheardWriteup(mention))
+    const updated: OverheardEntry = {
+      ...mention,
+      writeup: nextWriteup,
+      status: 'published',
+      publishedAt: new Date().toISOString(),
+    }
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     await redis.srem(PENDING_SET_KEY, id)
     await redis.sadd(PUBLISHED_SET_KEY, id)
@@ -569,6 +749,12 @@ export async function dismissMention(id: string): Promise<boolean> {
   }
 }
 
-export async function getPublishedMentions(): Promise<PodcastMention[]> {
-  return getMentionsFromSet(PUBLISHED_SET_KEY)
+export async function getPublishedMentions(): Promise<OverheardEntry[]> {
+  const entries = await getMentionsFromSet(PUBLISHED_SET_KEY)
+  return entries.sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
+}
+
+export async function getLatestPublishedMention(): Promise<OverheardEntry | null> {
+  const published = await getPublishedMentions()
+  return published[0] ?? null
 }

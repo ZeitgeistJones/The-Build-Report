@@ -5,6 +5,7 @@ import { REPOS } from '@/lib/scores'
 import { BULK_REGEN_DEFAULT_BATCH } from '@/lib/bulkRegenConfig'
 import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
 import type { CommunityContextSubmission } from '@/lib/communityContextTypes'
+import type { OverheardEntry } from '@/lib/podcastMentions'
 
 type AdminContextSubmission = CommunityContextSubmission
 
@@ -30,15 +31,13 @@ export default function AdminPage() {
   const [podcastScanResult, setPodcastScanResult] = useState<string | null>(null)
   const [overheardMode, setOverheardModeState] = useState<'automatic' | 'manual'>('automatic')
   const [modeSaving, setModeSaving] = useState(false)
-  const [candidateMentions, setCandidateMentions] = useState<Array<{
-    id: string; repoSlug: string; episodeName: string; speaker: string; text: string; userContext: string | null
-  }>>([])
-  const [pendingMentions, setPendingMentions] = useState<Array<{
-    id: string; repoSlug: string; episodeName: string; speaker: string; text: string
-  }>>([])
+  const [candidateMentions, setCandidateMentions] = useState<OverheardEntry[]>([])
+  const [pendingMentions, setPendingMentions] = useState<OverheardEntry[]>([])
   const [mentionsListLoading, setMentionsListLoading] = useState(false)
   const [mentionActionBusy, setMentionActionBusy] = useState<string | null>(null)
   const [candidateContextDrafts, setCandidateContextDrafts] = useState<Record<string, string>>({})
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([])
+  const [pendingWriteupDrafts, setPendingWriteupDrafts] = useState<Record<string, string>>({})
   const [spottedTweetUrl, setSpottedTweetUrl] = useState('')
   const [spottedTweetText, setSpottedTweetText] = useState('')
   const [spottedAccountContext, setSpottedAccountContext] = useState('')
@@ -146,6 +145,12 @@ export default function AdminPage() {
         setCandidateMentions(data.candidates ?? [])
         setPendingMentions(data.pending ?? [])
         setOverheardModeState(data.mode ?? 'automatic')
+        setSelectedCandidateIds([])
+        const drafts: Record<string, string> = {}
+        for (const p of (data.pending ?? []) as OverheardEntry[]) {
+          drafts[p.id] = p.writeup ?? ''
+        }
+        setPendingWriteupDrafts(drafts)
       }
     } catch {
       // ignore
@@ -199,13 +204,45 @@ export default function AdminPage() {
     setMentionActionBusy(null)
   }
 
+  async function groupSelectedCandidates() {
+    if (selectedCandidateIds.length < 2) return
+    setMentionActionBusy('group-thread')
+    try {
+      const res = await fetch('/api/admin/podcast-mentions-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'groupThread', ids: selectedCandidateIds }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setSelectedCandidateIds([])
+        void loadMentionsReview()
+      }
+    } catch {
+      // ignore
+    }
+    setMentionActionBusy(null)
+  }
+
+  function toggleCandidateSelection(id: string) {
+    setSelectedCandidateIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
+    )
+  }
+
   async function actOnPendingMention(id: string, action: 'publish' | 'dismiss') {
     setMentionActionBusy(id)
     try {
+      const writeup = action === 'publish' ? pendingWriteupDrafts[id] : undefined
       await fetch('/api/admin/podcast-mentions-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, action, id }),
+        body: JSON.stringify({
+          password,
+          action,
+          id,
+          ...(writeup !== undefined ? { writeup } : {}),
+        }),
       })
       setPendingMentions(prev => prev.filter(m => m.id !== id))
     } catch {
@@ -967,20 +1004,51 @@ export default function AdminPage() {
 
         {candidateMentions.length > 0 && (
           <>
-            <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
-              Candidates awaiting context ({candidateMentions.length})
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '13px', fontWeight: 500 }}>
+                Candidates awaiting context ({candidateMentions.length})
+              </div>
+              {selectedCandidateIds.length >= 2 && (
+                <button
+                  onClick={() => void groupSelectedCandidates()}
+                  disabled={mentionActionBusy === 'group-thread'}
+                  style={{
+                    fontSize: '11px',
+                    padding: '5px 12px',
+                    borderRadius: '99px',
+                    border: '1px solid var(--accent-border)',
+                    background: 'var(--accent-dim)',
+                    color: 'var(--accent)',
+                    fontWeight: 500,
+                  }}
+                >
+                  {mentionActionBusy === 'group-thread' ? 'Grouping…' : `Group into thread (${selectedCandidateIds.length})`}
+                </button>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-              {candidateMentions.map(m => (
-                <div key={m.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
+              {candidateMentions.map(m => {
+                const quote = m.quotes[0]
+                const selected = selectedCandidateIds.includes(m.id)
+                return (
+                <div key={m.id} style={{ background: 'var(--surface-1)', border: `1px solid ${selected ? 'var(--accent-border)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '4px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleCandidateSelection(m.id)}
+                      style={{ marginTop: '2px' }}
+                      aria-label={`Select ${m.repoSlug} candidate`}
+                    />
+                    <div style={{ flex: 1, fontSize: '12px', color: 'var(--text-muted)' }}>
+                      <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {quote?.speaker ?? 'unknown'}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
-                    "{m.text}"
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5, paddingLeft: '26px' }}>
+                    &ldquo;{quote?.text ?? ''}&rdquo;
                   </div>
                   <textarea
-                    value={candidateContextDrafts[m.id] ?? ''}
+                    value={candidateContextDrafts[m.id] ?? m.userContext ?? ''}
                     onChange={e => setCandidateContextDrafts(prev => ({ ...prev, [m.id]: e.target.value }))}
                     placeholder="Add context (optional)..."
                     rows={2}
@@ -1003,11 +1071,12 @@ export default function AdminPage() {
                       disabled={mentionActionBusy === m.id}
                       style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
                     >
-                      Confirm → pending
+                      {mentionActionBusy === m.id ? 'Generating…' : 'Confirm → pending'}
                     </button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </>
         )}
@@ -1024,11 +1093,27 @@ export default function AdminPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {pendingMentions.map(m => (
                 <div key={m.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong> · {m.episodeName} · {m.speaker}
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>{m.repoSlug}</strong>
+                    {m.kind === 'thread' ? ` · thread (${m.quotes.length} quotes)` : ''} · {m.episodeName}
                   </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: 1.5 }}>
-                    "{m.text}"
+                  <textarea
+                    value={pendingWriteupDrafts[m.id] ?? m.writeup}
+                    onChange={e => setPendingWriteupDrafts(prev => ({ ...prev, [m.id]: e.target.value }))}
+                    rows={4}
+                    style={{
+                      width: '100%', boxSizing: 'border-box', background: 'var(--surface-2)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px',
+                      fontFamily: 'var(--font-sans)', resize: 'vertical', marginBottom: '10px', lineHeight: 1.55,
+                    }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                    {m.quotes.map((q, i) => (
+                      <div key={`${m.id}-${i}`} style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5, padding: '6px 8px', background: 'var(--surface-2)', borderRadius: 'var(--radius)' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{q.speaker}: </span>
+                        &ldquo;{q.text}&rdquo;
+                      </div>
+                    ))}
                   </div>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button
@@ -1036,7 +1121,7 @@ export default function AdminPage() {
                       disabled={mentionActionBusy === m.id}
                       style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '99px', border: '1px solid var(--accent-border)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 500 }}
                     >
-                      Publish
+                      {mentionActionBusy === m.id ? 'Publishing…' : 'Publish'}
                     </button>
                     <button
                       onClick={() => void actOnPendingMention(m.id, 'dismiss')}

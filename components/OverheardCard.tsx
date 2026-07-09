@@ -1,15 +1,24 @@
-import type { OverheardData } from '@/lib/overheard'
+'use client'
+
+import { useState } from 'react'
+import type { OverheardEntry } from '@/lib/podcastMentions'
+import type { OverheardDigest } from '@/lib/overheard'
 
 interface Props {
-  overheard: OverheardData | null
+  entry: OverheardEntry | null
+  digest: OverheardDigest | null
 }
 
-export default function OverheardCard({ overheard }: Props) {
-  if (!overheard) return null
+export default function OverheardCard({ entry, digest }: Props) {
+  const [writeupExpanded, setWriteupExpanded] = useState(false)
+  const [quotesExpanded, setQuotesExpanded] = useState(false)
 
-  const lines = overheard.format === 'list'
-    ? overheard.text.split('\n').filter(Boolean)
-    : [overheard.text]
+  if (!entry) return null
+
+  const writeupLong = entry.writeup.length > 180 || entry.writeup.split(/\s+/).length > 40
+  const quotes = entry.quotes
+  const visibleQuotes = quotesExpanded ? quotes : quotes.slice(0, 2)
+  const hiddenQuoteCount = quotes.length - visibleQuotes.length
 
   return (
     <div
@@ -44,26 +53,48 @@ export default function OverheardCard({ overheard }: Props) {
           Overheard
         </span>
         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          {overheard.mentionCount} mention{overheard.mentionCount === 1 ? '' : 's'} on Slop.Computer
+          {entry.kind === 'thread'
+            ? `${quotes.length} quotes · ${entry.repoSlug}`
+            : `${entry.repoSlug} · Slop.Computer`}
         </span>
       </div>
 
-      {lines.map((line, i) => (
-        <p
-          key={i}
-          style={{
-            margin: i === 0 ? 0 : '6px 0 0',
-            fontSize: '14px',
-            color: 'var(--text-secondary)',
-            lineHeight: 1.65,
-          }}
+      <p className={`spotted-writeup${writeupExpanded || !writeupLong ? '' : ' spotted-writeup--clamped'}`}>
+        {entry.writeup}
+      </p>
+      {writeupLong && (
+        <button
+          type="button"
+          className="spotted-tweet-preview__link"
+          onClick={() => setWriteupExpanded(v => !v)}
+          style={{ marginBottom: '10px' }}
         >
-          {line}
-        </p>
-      ))}
+          {writeupExpanded ? 'Show less' : 'Read more'}
+        </button>
+      )}
+
+      <div className="overheard-quotes">
+        {visibleQuotes.map((q, i) => (
+          <div key={`${q.candidateId ?? i}-${q.approxTimestampSec}`} className="overheard-quote">
+            <div className="overheard-quote__speaker">{q.speaker}</div>
+            <p className="overheard-quote__text">&ldquo;{q.text}&rdquo;</p>
+          </div>
+        ))}
+      </div>
+
+      {quotes.length > 2 && (
+        <button
+          type="button"
+          className="spotted-tweet-preview__link"
+          onClick={() => setQuotesExpanded(v => !v)}
+          style={{ marginTop: '4px', marginBottom: '8px' }}
+        >
+          {quotesExpanded ? 'Show fewer quotes' : `Read more (${hiddenQuoteCount} more)`}
+        </button>
+      )}
 
       <p style={{ margin: '10px 0 0', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-        Reflects mentions published in the last 24 hours
+        {digest?.alsoDiscussed ?? `${entry.episodeName} · published in the last 24 hours`}
       </p>
     </div>
   )

@@ -7,6 +7,8 @@ import {
   dismissMention,
   addContextToCandidate,
   confirmCandidate,
+  groupCandidatesIntoThread,
+  updatePendingWriteup,
   getOverheardMode,
   setOverheardMode,
 } from '@/lib/podcastMentions'
@@ -53,10 +55,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: success })
   }
 
+  if (action === 'groupThread') {
+    const ids = Array.isArray(body?.ids) ? (body.ids as string[]).filter(Boolean) : []
+    const result = await groupCandidatesIntoThread(ids)
+    if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 400 })
+    return NextResponse.json({ ok: true, id: result.id })
+  }
+
+  if (action === 'updateWriteup') {
+    const id = body?.id as string
+    const writeup = (body?.writeup as string) ?? ''
+    if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
+    const success = await updatePendingWriteup(id, writeup)
+    return NextResponse.json({ ok: success })
+  }
+
   if (action === 'publish') {
     const id = body?.id as string
     if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
-    const success = await publishMention(id)
+    const writeup = typeof body?.writeup === 'string' ? body.writeup : undefined
+    const success = await publishMention(id, writeup)
     if (success) {
       const { generateAndCacheOverheard } = await import('@/lib/overheard')
       await generateAndCacheOverheard().catch(() => null)
