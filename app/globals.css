@@ -617,6 +617,48 @@ button {
   gap: 8px;
 }
 
+.overheard-card__subject {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.overheard-card__featured-kicker {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  line-height: 1.3;
+}
+
+[data-color-theme='light-90s'] .overheard-card__featured-kicker {
+  font-family: var(--font-kicker);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--text-secondary);
+}
+
+.overheard-card__repo {
+  margin: 0 0 6px;
+  font-family: var(--font-mono);
+  font-size: clamp(18px, 4.5vw, 22px);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.overheard-card__meta {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 .overheard-quote {
   padding: 8px 10px;
   background: var(--surface-2);

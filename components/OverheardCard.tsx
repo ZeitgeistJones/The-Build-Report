@@ -9,6 +9,32 @@ interface Props {
   digest: OverheardDigest | null
 }
 
+function displayGuest(speaker: string | undefined): string | null {
+  if (!speaker || speaker === 'unknown') return null
+  const cleaned = speaker.replace(/^@/, '')
+  return cleaned
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+function buildEpisodeMeta(entry: OverheardEntry): string {
+  const parts: string[] = []
+  if (entry.episodeSlug) parts.push(entry.episodeSlug)
+
+  const guest = displayGuest(entry.quotes[0]?.speaker)
+  if (guest) parts.push(`guest: ${guest}`)
+  else if (entry.episodeName) parts.push(entry.episodeName)
+
+  if (entry.kind === 'thread' && entry.quotes.length > 1) {
+    parts.push(`${entry.quotes.length} quotes`)
+  }
+
+  parts.push('Slop.Computer')
+  return parts.join(' · ')
+}
+
 export default function OverheardCard({ entry, digest }: Props) {
   const [writeupExpanded, setWriteupExpanded] = useState(false)
   const [quotesExpanded, setQuotesExpanded] = useState(false)
@@ -37,7 +63,7 @@ export default function OverheardCard({ entry, digest }: Props) {
           alignItems: 'baseline',
           justifyContent: 'space-between',
           gap: '12px',
-          marginBottom: '8px',
+          marginBottom: '10px',
           flexWrap: 'wrap',
         }}
       >
@@ -52,12 +78,13 @@ export default function OverheardCard({ entry, digest }: Props) {
         >
           Overheard
         </span>
-        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          {entry.kind === 'thread'
-            ? `${quotes.length} quotes · ${entry.repoSlug}`
-            : `${entry.repoSlug} · Slop.Computer`}
-        </span>
       </div>
+
+      <header className="overheard-card__subject">
+        <p className="overheard-card__featured-kicker">Featured repo</p>
+        <p className="overheard-card__repo">{entry.repoSlug}</p>
+        <p className="overheard-card__meta">{buildEpisodeMeta(entry)}</p>
+      </header>
 
       <p className={`spotted-writeup${writeupExpanded || !writeupLong ? '' : ' spotted-writeup--clamped'}`}>
         {entry.writeup}
