@@ -15,8 +15,8 @@ const LEGEND_ITEMS = [
     text: 'Repo Grade for holder economic impact. Burn and supply-lock repos are scored on direct CLAWD burn or lock, and feed the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage instead — how much they multiply the builder\u2019s ability to ship consumer apps that burn or lock CLAWD — and feed the separate Shipping leverage Ecosystem Grade.',
   },
   {
-    label: '“feeds leverage grade”',
-    text: 'This repo is scored on shipping leverage, not direct burn — so its Repo Grade rolls up into the Shipping leverage Ecosystem Grade at the top, not the Holder economics one. Two separate lenses on holder value.',
+    label: 'shipping leverage',
+    text: 'Indirect and infrastructure repos are scored on shipping leverage — how much they help consumer burn/lock apps ship. That Repo Grade rolls into the Shipping leverage Ecosystem Grade at the top, not Holder economics.',
   },
   {
     label: 'Builder standards',

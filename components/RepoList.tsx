@@ -1090,9 +1090,7 @@ export default function RepoList({
                 </div>
                 {showsEconomicNa(repo) && (
                   <div style={{ fontSize: `${Math.max(8, d.metricLabel - 1)}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2, fontStyle: 'italic', opacity: 0.9 }}>
-                    via {economicLensLabel(repo)}
-                    <br />
-                    feeds leverage grade
+                    shipping<br />leverage
                   </div>
                 )}
               </RepoBadge>
