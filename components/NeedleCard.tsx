@@ -1,11 +1,18 @@
+'use client'
+
 import type { NeedleData } from '@/lib/needle'
+import { useNormieMode } from '@/components/NormieModeProvider'
 
 interface Props {
   needle: NeedleData | null
 }
 
 export default function NeedleCard({ needle }: Props) {
+  const { normie } = useNormieMode()
+
   if (!needle) return null
+  const text = (normie && needle.textNormie) || needle.text
+  if (!text) return null
 
   return (
     <div
@@ -45,7 +52,7 @@ export default function NeedleCard({ needle }: Props) {
       </div>
 
       <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-        {needle.text}
+        {text}
       </p>
     </div>
   )

@@ -54,6 +54,8 @@ export const NORMIE_SURFACE_SHAPES = {
   gradeCard: '2-3 sentences, plain words, no stats or letter grades.',
   digestGeneral:
     '2-5 sentences as needed — use fewer when the day was quiet or the story is simple; use more when multiple repos shipped meaningful work. Same repo names and wins as the standard overview, just simpler words. Do not pad; do not compress away real detail.',
+  needle:
+    '2-3 sentences, one short paragraph. Same repo names and grade moves as the standard Needle, but no letter-grade jargon — say the score went up or down in plain words.',
 } as const
 
 /**

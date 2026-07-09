@@ -4,6 +4,7 @@ import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
 import { syncEthUsdRate } from '@/lib/ethUsdRate'
 import { generateAndCacheDailyDigest, loadReposForBrief } from '@/lib/buildBrief'
+import { generateAndCacheNeedle } from '@/lib/needle'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -31,6 +32,10 @@ export async function GET(req: NextRequest) {
     // Keep Yesterday's build fresh even when the dedicated daily-digest cron misses a run.
     const repos = await loadReposForBrief(stats)
     const digest = await generateAndCacheDailyDigest(stats, repos)
+    const needle = await generateAndCacheNeedle().catch(err => {
+      console.error('[warm-cache] needle generation failed', err)
+      return null
+    })
 
     return NextResponse.json({
       ok: true,
@@ -45,6 +50,8 @@ export async function GET(req: NextRequest) {
       briefRepoCount: digest.repoCount,
       briefCommitCount: digest.commitCount,
       briefGeneratedAt: digest.generatedAt,
+      needleDateKey: needle?.dateKey ?? null,
+      needleRepoCount: needle?.repoCount ?? 0,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Warm cache cron failed'

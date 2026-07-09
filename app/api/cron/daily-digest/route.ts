@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadGitHubStatsForCron } from '@/lib/githubStatsSnapshot'
 import { generateAndCacheDailyDigest, loadReposForBrief } from '@/lib/buildBrief'
+import { generateAndCacheNeedle } from '@/lib/needle'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -24,12 +25,18 @@ export async function GET(req: NextRequest) {
 
     const repos = await loadReposForBrief(stats)
     const digest = await generateAndCacheDailyDigest(stats, repos)
+    const needle = await generateAndCacheNeedle().catch(err => {
+      console.error('[daily-digest] needle generation failed', err)
+      return null
+    })
     return NextResponse.json({
       ok: true,
       dateKey: digest.dateKey,
       repoCount: digest.repoCount,
       commitCount: digest.commitCount,
       generatedAt: digest.generatedAt,
+      needleDateKey: needle?.dateKey ?? null,
+      needleRepoCount: needle?.repoCount ?? 0,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Daily digest cron failed'
