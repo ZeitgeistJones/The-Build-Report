@@ -11,21 +11,11 @@ import { RECEIVER_BUY_AND_BURN, SCORE_PAYMENT_WEI } from '@/lib/web3/constants'
 import { ScoringStatus } from '@/lib/scoringStatus'
 import { useClawdAccess } from './wallet/ClawdAccessContext'
 import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
-import {
-  commitsSinceScoreLabel,
-  shouldConfirmRescore,
-  type RepoActivitySnapshot,
-} from '@/lib/rescoreGuards'
-import { countCommitsSinceScore } from '@/lib/commitsSinceScore'
+import { shouldConfirmRescore, type RepoActivitySnapshot } from '@/lib/rescoreGuards'
 import InfoTooltip from '@/components/InfoTooltip'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
-import {
-  formatScoredDateLabel,
-  isLaunchBaseline,
-  RESCORE_BUTTON_TOOLTIP,
-  RESCORE_PROMO_TOOLTIP,
-} from '@/lib/scoringCopy'
+import { RESCORE_BUTTON_TOOLTIP, RESCORE_PROMO_TOOLTIP } from '@/lib/scoringCopy'
 import { SCORE_PAYMENT_ETH } from '@/lib/rescoreBurns'
 import { formatApproxUsdFromEth, formatRescorePriceLabel } from '@/lib/promoUsd'
 import { useEthUsdRate } from '@/components/EthUsdProvider'
@@ -51,14 +41,42 @@ type PromoQuote = {
 }
 
 function RescoreTooltipContent({
+  scoringStatus,
+  promoEligible,
   promoActive,
+  staleCommits,
+  rewardEth,
   promoBanner,
+  contextAcceptedPending,
+  ethUsdRate,
 }: {
+  scoringStatus: ScoringStatus
+  promoEligible: boolean
   promoActive: boolean
+  staleCommits: number
+  rewardEth: number
   promoBanner: string | null
+  contextAcceptedPending: boolean
+  ethUsdRate: number
 }) {
+  const priceLabel = formatRescorePriceLabel(SCORE_PAYMENT_ETH, ethUsdRate)
+
   return (
     <>
+      {promoEligible && (
+        <div style={{ marginBottom: '6px' }}>
+          Earn {formatApproxUsdFromEth(rewardEth, ethUsdRate)} for {staleCommits} stale commit
+          {staleCommits === 1 ? '' : 's'}.
+        </div>
+      )}
+      {contextAcceptedPending && !promoEligible && (
+        <div style={{ marginBottom: '6px' }}>
+          Accepted holder context will be applied on this rescore ({priceLabel}).
+        </div>
+      )}
+      {scoringStatus === 'unscored' && (
+        <div style={{ marginBottom: '6px' }}>First score for this repo ({priceLabel}).</div>
+      )}
       {promoActive ? (
         <>
           {RESCORE_PROMO_TOOLTIP}
@@ -110,33 +128,14 @@ export default function RepoScoreButton({
     (promoReady && !promoActive)
   const busy = phase !== 'idle' || isSending
   const buttonDisabled = busy
-  const defaultLabel = `${label} (${formatRescorePriceLabel(SCORE_PAYMENT_ETH, ethUsdRate)})`
   const actionLabel = busy
     ? phase === 'paying' || isSending
       ? 'Paying…'
       : phase === 'signing'
         ? 'Signing…'
         : 'Scoring…'
-    : promoEligible
-      ? (promoQuote?.buttonLabel ?? defaultLabel)
-      : defaultLabel
-  const showScoreMeta = scoringStatus === 'scored' && activity.scoredAt
-  const { hasNew: hasNewCommitsSinceScore } = countCommitsSinceScore(
-    activity.scoredAt,
-    activity.commitTimestamps,
-    { lastCommitAt: activity.lastCommitAt, pushedAt: activity.pushedAt },
-  )
-  const nudgeRescore =
-    Boolean(showScoreMeta) &&
-    hasNewCommitsSinceScore &&
-    !busy &&
-    (promoEligible || !promoActive)
-  const nudgeBaselineRefresh =
-    Boolean(showScoreMeta) &&
-    isLaunchBaseline(activity.adminNote) &&
-    !nudgeRescore &&
-    !busy &&
-    (promoEligible || !promoActive)
+    : label
+  const showOverlay = busy || confirmOpen || Boolean(promoReward) || Boolean(inlineMsg) || Boolean(error)
 
   useEffect(() => {
     let cancelled = false
@@ -307,66 +306,67 @@ export default function RepoScoreButton({
     await runRescore()
   }
 
-  if (!showAction && !busy && !confirmOpen && !promoReward && !inlineMsg && !error) {
-    return null
-  }
-
   const confirmMessage = promoEligible
-    ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — free rescore plus ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)} reward. Continue?`
+    ? `This repo has ${promoQuote?.staleCommits ?? 0} stale commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — earn ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)}. Continue?`
     : contextAcceptedPending
       ? `Accepted holder context will be applied on this rescore (${formatRescorePriceLabel(SCORE_PAYMENT_ETH, ethUsdRate)}). Continue?`
       : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'
 
   return (
     <div
-      style={{ position: 'relative', textAlign: 'center', minWidth: '88px', maxWidth: promoEligible ? '180px' : '140px' }}
+      style={{
+        position: 'relative',
+        width: isMobile ? '100%' : '104px',
+        flexShrink: 0,
+        alignSelf: 'flex-start',
+        paddingTop: '3px',
+        textAlign: 'center',
+      }}
       onClick={e => e.stopPropagation()}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: '4px' }}>
-        <button
-          type="button"
-          onClick={handleClick}
-          disabled={buttonDisabled}
-          style={{
-            fontSize: '11px',
-            padding: isMobile ? '8px 12px' : '3px 8px',
-            minHeight: isMobile ? MIN_TAP : undefined,
-            borderRadius: '99px',
-            border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
-            background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
-            color: busy ? 'var(--text-muted)' : promoEligible ? 'var(--accent)' : 'var(--text-secondary)',
-            cursor: buttonDisabled ? 'not-allowed' : 'pointer',
-            fontWeight: 500,
-          }}
-        >
-          {actionLabel}
-        </button>
-        <InfoTooltip
-          content={
-            <RescoreTooltipContent
-              promoActive={promoActive}
-              promoBanner={promoQuote?.promoBanner ?? null}
-            />
-          }
-          ariaLabel="About Score and Rescore"
-          icon="question"
-          placement="above"
-          width={260}
-          interactive
-        />
-      </div>
-
-      {showScoreMeta && showAction && (
-        <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '5px', lineHeight: 1.35 }}>
-          <div>Last scored {formatScoredDateLabel(activity.scoredAt)}</div>
-          <div style={nudgeRescore ? { color: 'var(--accent)', fontWeight: 500 } : undefined}>
-            {commitsSinceScoreLabel(activity)}
-          </div>
-          {nudgeRescore && (
-            <div style={{ color: 'var(--accent)', fontWeight: 500 }}>Rescore to update ↑</div>
+      {(showAction || showOverlay) && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+          {(showAction || busy) && (
+            <button
+              type="button"
+              onClick={handleClick}
+              disabled={buttonDisabled}
+              style={{
+                fontSize: '11px',
+                padding: isMobile ? '8px 12px' : '3px 10px',
+                minHeight: isMobile ? MIN_TAP : undefined,
+                minWidth: '72px',
+                borderRadius: '99px',
+                border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
+                background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
+                color: busy ? 'var(--text-muted)' : promoEligible ? 'var(--accent)' : 'var(--text-secondary)',
+                cursor: buttonDisabled ? 'not-allowed' : 'pointer',
+                fontWeight: 500,
+              }}
+            >
+              {actionLabel}
+            </button>
           )}
-          {nudgeBaselineRefresh && (
-            <div style={{ color: 'var(--accent)', fontWeight: 500 }}>Rescore to refresh ↑</div>
+          {(showAction || showOverlay) && (
+            <InfoTooltip
+              content={
+                <RescoreTooltipContent
+                  scoringStatus={scoringStatus}
+                  promoEligible={promoEligible}
+                  promoActive={promoActive}
+                  staleCommits={promoQuote?.staleCommits ?? 0}
+                  rewardEth={promoQuote?.rewardEth ?? 0}
+                  promoBanner={promoQuote?.promoBanner ?? null}
+                  contextAcceptedPending={contextAcceptedPending}
+                  ethUsdRate={ethUsdRate}
+                />
+              }
+              ariaLabel="About Score and Rescore"
+              icon="question"
+              placement="above"
+              width={260}
+              interactive
+            />
           )}
         </div>
       )}
