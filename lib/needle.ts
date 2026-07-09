@@ -41,15 +41,22 @@ function extractLetter(label: string | null | undefined): string | null {
   return label.trim().split(' ')[0]
 }
 
-function qualifyingChange(meta: RescoreSummaryRecord): boolean {
-  const biOld = extractLetter(meta.oldBuilderIntegrity)
-  const biNew = extractLetter(meta.newBuilderIntegrity)
-  if (biOld && biNew && biOld !== biNew) return true
+function extractPct(label: string | null | undefined): number | null {
+  if (!label || label === '—') return null
+  const match = label.match(/(\d+)%/)
+  return match ? Number(match[1]) : null
+}
 
-  const ecOld = extractLetter(meta.oldTokenMechanic)
-  const ecNew = extractLetter(meta.newTokenMechanic)
-  if (ecOld && ecNew && ecOld !== ecNew) return true
-  if (!ecOld && ecNew) return true
+function qualifyingChange(meta: RescoreSummaryRecord): boolean {
+  const biOldPct = extractPct(meta.oldBuilderIntegrity)
+  const biNewPct = extractPct(meta.newBuilderIntegrity)
+  if (biOldPct !== null && biNewPct !== null && biOldPct !== biNewPct) return true
+  if (biOldPct === null && biNewPct !== null) return true
+
+  const ecOldPct = extractPct(meta.oldTokenMechanic)
+  const ecNewPct = extractPct(meta.newTokenMechanic)
+  if (ecOldPct !== null && ecNewPct !== null && ecOldPct !== ecNewPct) return true
+  if (ecOldPct === null && ecNewPct !== null) return true
 
   return false
 }
