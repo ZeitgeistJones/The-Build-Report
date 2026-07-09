@@ -9,14 +9,13 @@ interface Props {
   brief: BuildBriefData | null
 }
 
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** Format YYYY-MM-DD as a calendar label — no Date/TZ (UTC browsers were showing the previous day). */
 function formatDigestDate(dateKey: string): string {
   const [y, m, d] = dateKey.split('-').map(Number)
-  if (!y || !m || !d) return dateKey
-  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'America/New_York',
-  })
+  if (!y || !m || !d || m < 1 || m > 12) return dateKey
+  return `${SHORT_MONTHS[m - 1]} ${d}`
 }
 
 /** Split a wall of text into 2–3 short paragraphs for scanning. */

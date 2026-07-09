@@ -3,6 +3,7 @@ import { getGitHubStats } from '@/lib/github'
 import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
 import { syncEthUsdRate } from '@/lib/ethUsdRate'
+import { generateAndCacheDailyDigest, loadReposForBrief } from '@/lib/buildBrief'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -27,6 +28,14 @@ export async function GET(req: NextRequest) {
       syncEthUsdRate(),
     ])
 
+    // daily-digest cron has been missing runs; warm-cache is reliable — keep the brief fresh here too.
+    const repos = await loadReposForBrief(stats)
+    const digest = await generateAndCacheDailyDigest(stats, repos)
+    // #region agent log
+    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'brief-debug',hypothesisId:'A',location:'app/api/cron/warm-cache/route.ts',message:'warm-cache wrote daily digest',data:{dateKey:digest.dateKey,repoCount:digest.repoCount,commitCount:digest.commitCount,generatedAt:digest.generatedAt},timestamp:Date.now()})}).catch(()=>{});
+    console.log('[brief-debug]', JSON.stringify({hypothesisId:'A',location:'warm-cache',event:'digest-ok',dateKey:digest.dateKey,repoCount:digest.repoCount,commitCount:digest.commitCount}))
+    // #endregion
+
     return NextResponse.json({
       ok: true,
       totalRepos: stats.totalRepos,
@@ -36,6 +45,10 @@ export async function GET(req: NextRequest) {
       githubSnapshotUpdatedAt,
       burnSnapshot,
       ethUsd,
+      briefDateKey: digest.dateKey,
+      briefRepoCount: digest.repoCount,
+      briefCommitCount: digest.commitCount,
+      briefGeneratedAt: digest.generatedAt,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Warm cache cron failed'
