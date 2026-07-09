@@ -88,7 +88,7 @@ export type RepoFilter = 'all' | 'needs-rescore' | 'burn-apps' | 'leverage' | 'c
 const CARD = { cardPadding: '14px 16px', name: 15, preview: 12, lastPushed: 11, gradeLetter: 20, metricLabel: 9, pctLabel: 10 } as const
 const METRIC_COL_WIDTH = { holder: 52, builder: 44, commits: 38 } as const
 
-function commitsColumnLabel(metricLabelPx: number, period: Period) {
+function commitsColumnLabel(metricLabelPx: number) {
   return (
     <div
       style={{
@@ -96,11 +96,9 @@ function commitsColumnLabel(metricLabelPx: number, period: Period) {
         color: 'var(--text-muted)',
         marginTop: '2px',
         lineHeight: 1.25,
-        whiteSpace: 'nowrap',
       }}
     >
       commits
-      <span style={{ opacity: 0.5 }}> · {periodKeyLabel(period)}</span>
     </div>
   )
 }
@@ -1066,13 +1064,17 @@ export default function RepoList({
                   <div style={gradeLetterStyle(d.gradeLetter, commitCountColor(periodCommits))}>
                     {periodCommitsLabel}
                   </div>
-                  {commitsColumnLabel(d.metricLabel, repoPeriod)}
+                  {commitsColumnLabel(d.metricLabel)}
                 </RepoBadge>
                 </>
               ) : (
               <>
               <RepoBadge
-                tooltip={HOLDER_ECONOMICS_COLUMN_TOOLTIP}
+                tooltip={
+                  showsEconomicNa(repo)
+                    ? REPO_FILTER_TOOLTIPS.leverage
+                    : HOLDER_ECONOMICS_COLUMN_TOOLTIP
+                }
                 style={{ ...metricColStyle(isMobile, METRIC_COL_WIDTH.holder), display: 'block' }}
               >
                 {economicScore ? (
@@ -1086,13 +1088,12 @@ export default function RepoList({
                   <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', paddingTop: '3px' }}>N/A</div>
                 )}
                 <div style={{ fontSize: `${d.metricLabel}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.25 }}>
-                  holder<br />economics
+                  {showsEconomicNa(repo) ? (
+                    <>shipping<br />leverage</>
+                  ) : (
+                    <>holder<br />economics</>
+                  )}
                 </div>
-                {showsEconomicNa(repo) && (
-                  <div style={{ fontSize: `${Math.max(8, d.metricLabel - 1)}px`, color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.2, fontStyle: 'italic', opacity: 0.9 }}>
-                    shipping<br />leverage
-                  </div>
-                )}
               </RepoBadge>
 
               <MetricDivider show={!isMobile} />
@@ -1114,7 +1115,7 @@ export default function RepoList({
                 <div style={gradeLetterStyle(d.gradeLetter, commitCountColor(periodCommits))}>
                   {periodCommitsLabel}
                 </div>
-                {commitsColumnLabel(d.metricLabel, repoPeriod)}
+                {commitsColumnLabel(d.metricLabel)}
               </RepoBadge>
 
               </>

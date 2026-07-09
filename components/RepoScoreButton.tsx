@@ -33,7 +33,7 @@ import PromoRewardToast from '@/components/PromoRewardToast'
 import { playPromoRewardChime, primePromoRewardAudio } from '@/lib/promoRewardFx'
 
 /** Fixed action column so grade metrics line up across cards. */
-const ACTION_SLOT_WIDTH = 168
+const ACTION_SLOT_WIDTH = 172
 const RESCORE_BUTTON_MIN_HEIGHT = 22
 
 interface Props {
@@ -312,10 +312,11 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       <div
         style={{
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
-          gap: '3px',
+          justifyContent: 'center',
+          gap: '4px',
           width: '100%',
+          minHeight: isMobile ? MIN_TAP : RESCORE_BUTTON_MIN_HEIGHT,
         }}
       >
         <button
@@ -323,10 +324,11 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           onClick={handleClick}
           disabled={buttonDisabled}
           style={{
-            width: '100%',
+            flex: 1,
+            minWidth: 0,
             minHeight: isMobile ? MIN_TAP : RESCORE_BUTTON_MIN_HEIGHT,
             fontSize: '11px',
-            padding: isMobile ? '8px 10px' : '4px 10px',
+            padding: isMobile ? '8px 8px' : '4px 8px',
             borderRadius: '99px',
             border: promoEligible ? '1px solid var(--accent-border)' : '1px solid var(--border)',
             background: promoEligible ? 'var(--accent-dim)' : 'var(--surface-2)',
@@ -340,6 +342,8 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
             lineHeight: 1.2,
             textAlign: 'center',
             whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
             boxSizing: 'border-box',
           }}
         >
@@ -357,7 +361,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           }
           ariaLabel="About Score and Rescore"
           icon="question"
-          placement="below"
+          placement="above"
           width={260}
           interactive
           compact
