@@ -363,8 +363,12 @@ export default async function Home() {
 
       <BuildBriefCard brief={buildBrief} />
       <NeedleCard needle={needle} />
-      <OverheardCard overheard={overheard} />
-      <SpottedCard spotted={spotted} />
+      {(spotted || overheard) && (
+        <div className="mentions-row">
+          {spotted && <SpottedCard spotted={spotted} />}
+          {overheard && <OverheardCard overheard={overheard} />}
+        </div>
+      )}
 
       <div style={{ marginBottom: '32px' }}>
       <GradesPanel

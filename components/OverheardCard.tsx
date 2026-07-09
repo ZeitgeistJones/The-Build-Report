@@ -14,12 +14,12 @@ export default function OverheardCard({ overheard }: Props) {
   return (
     <div
       style={{
-        marginBottom: '20px',
         padding: '14px 16px',
         background: 'var(--surface-1)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
         boxShadow: 'var(--card-elevated)',
+        height: '100%',
       }}
     >
       <div
