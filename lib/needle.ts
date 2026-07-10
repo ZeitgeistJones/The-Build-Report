@@ -5,11 +5,7 @@ import { getRescoreSummaries, type RescoreSummaryRecord } from '@/lib/rescoreSum
 import { REPOS } from '@/lib/scores'
 import { stripMarkdown } from '@/lib/textCleanup'
 import { normieVoiceGuidance } from '@/lib/normieVoice'
-import {
-  dateKeyEastern,
-  editionReadKeys,
-  yesterdayEasternDateKey,
-} from '@/lib/buildBrief'
+import { dateKeyEastern, editionReadKeys } from '@/lib/buildBrief'
 
 const NEEDLE_KEY_PREFIX = 'build-report:needle:'
 const NEEDLE_TTL_SEC = 72 * 3600
