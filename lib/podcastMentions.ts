@@ -54,6 +54,8 @@ export type OverheardEntry = {
   episodePublishedAt: string | null
   quotes: OverheardQuote[]
   writeup: string
+  /** Optional plain-English version for Normie mode; older entries omit this. */
+  writeupNormie?: string
   status: 'candidate' | 'pending' | 'published' | 'taken_down'
   userContext: string | null
   scannedAt: string | null
@@ -85,6 +87,9 @@ export function normalizeOverheardEntry(raw: unknown): OverheardEntry | null {
       episodePublishedAt: typeof r.episodePublishedAt === 'string' ? r.episodePublishedAt : null,
       quotes: r.quotes as OverheardQuote[],
       writeup: typeof r.writeup === 'string' ? r.writeup : '',
+      ...(typeof r.writeupNormie === 'string' && r.writeupNormie.trim()
+        ? { writeupNormie: r.writeupNormie }
+        : {}),
       status:
         r.status === 'candidate' || r.status === 'pending' || r.status === 'published' || r.status === 'taken_down'
           ? r.status
@@ -113,6 +118,9 @@ export function normalizeOverheardEntry(raw: unknown): OverheardEntry | null {
         candidateId: r.id,
       }],
       writeup: typeof r.writeup === 'string' ? r.writeup : '',
+      ...(typeof r.writeupNormie === 'string' && r.writeupNormie.trim()
+        ? { writeupNormie: r.writeupNormie }
+        : {}),
       status:
         r.status === 'candidate' || r.status === 'pending' || r.status === 'published' || r.status === 'taken_down'
           ? r.status
@@ -166,14 +174,16 @@ async function populatePendingWriteup(id: string): Promise<boolean> {
     const redis = getRedis()
     const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
     if (!mention || mention.status !== 'pending') return false
-    const writeup = await generateOverheardWriteup(mention)
+    const generated = await generateOverheardWriteup(mention)
     const updated: OverheardEntry = {
       ...mention,
-      writeup,
+      writeup: generated.writeup,
+      ...(generated.writeupNormie ? { writeupNormie: generated.writeupNormie } : { writeupNormie: undefined }),
       confirmedAt: mention.confirmedAt ?? new Date().toISOString(),
     }
+    if (!generated.writeupNormie) delete updated.writeupNormie
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
-    return Boolean(writeup)
+    return Boolean(generated.writeup)
   } catch {
     return false
   }
@@ -752,15 +762,17 @@ export async function regeneratePendingWriteup(id: string): Promise<string | nul
     const redis = getRedis()
     const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
     if (!mention || mention.status !== 'pending') return null
-    const writeup = await generateOverheardWriteup(mention)
-    if (!writeup) return null
+    const generated = await generateOverheardWriteup(mention)
+    if (!generated.writeup) return null
     const updated: OverheardEntry = {
       ...mention,
-      writeup,
+      writeup: generated.writeup,
+      ...(generated.writeupNormie ? { writeupNormie: generated.writeupNormie } : {}),
       confirmedAt: mention.confirmedAt ?? new Date().toISOString(),
     }
+    if (!generated.writeupNormie) delete updated.writeupNormie
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
-    return writeup
+    return generated.writeup
   } catch {
     return null
   }
@@ -768,6 +780,7 @@ export async function regeneratePendingWriteup(id: string): Promise<string | nul
 
 export type MentionEditPayload = {
   writeup?: string
+  writeupNormie?: string | null
   quotes?: OverheardQuote[]
   userContext?: string | null
   repoSlug?: string
@@ -780,6 +793,8 @@ export async function updateMentionEntry(id: string, payload: MentionEditPayload
     if (!mention || (mention.status !== 'pending' && mention.status !== 'published')) return false
 
     const quotes = payload.quotes ?? mention.quotes
+    const writeupChanged =
+      payload.writeup !== undefined && payload.writeup.trim() !== mention.writeup
     const updated: OverheardEntry = {
       ...mention,
       writeup: payload.writeup !== undefined ? payload.writeup.trim() : mention.writeup,
@@ -790,6 +805,13 @@ export async function updateMentionEntry(id: string, payload: MentionEditPayload
           : mention.userContext,
       repoSlug: payload.repoSlug?.trim() || mention.repoSlug,
       kind: quotes.length > 1 ? 'thread' : 'single',
+    }
+    if (payload.writeupNormie !== undefined) {
+      if (payload.writeupNormie?.trim()) updated.writeupNormie = payload.writeupNormie.trim()
+      else delete updated.writeupNormie
+    } else if (writeupChanged) {
+      // Manual edit of standard writeup invalidates the paired normie copy.
+      delete updated.writeupNormie
     }
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     if (mention.status === 'published') await invalidateOverheardPublicCache()
@@ -844,16 +866,26 @@ export async function publishMention(id: string, writeup?: string): Promise<bool
     const redis = getRedis()
     const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
     if (!mention || mention.status !== 'pending') return false
-    const nextWriteup =
-      typeof writeup === 'string' && writeup.trim()
-        ? writeup.trim()
-        : mention.writeup.trim() || (await generateOverheardWriteup(mention))
+
+    let nextWriteup = typeof writeup === 'string' && writeup.trim() ? writeup.trim() : mention.writeup.trim()
+    let nextNormie = mention.writeupNormie
+    if (!nextWriteup) {
+      const generated = await generateOverheardWriteup(mention)
+      nextWriteup = generated.writeup
+      nextNormie = generated.writeupNormie
+    } else if (nextWriteup !== mention.writeup) {
+      // Admin overrode the writeup at publish — drop stale normie copy.
+      nextNormie = undefined
+    }
+
     const updated: OverheardEntry = {
       ...mention,
       writeup: nextWriteup,
+      ...(nextNormie ? { writeupNormie: nextNormie } : {}),
       status: 'published',
       publishedAt: new Date().toISOString(),
     }
+    if (!nextNormie) delete updated.writeupNormie
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     await redis.srem(PENDING_SET_KEY, id)
     await redis.sadd(PUBLISHED_SET_KEY, id)

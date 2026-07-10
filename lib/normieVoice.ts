@@ -56,6 +56,10 @@ export const NORMIE_SURFACE_SHAPES = {
     '2-5 sentences as needed — use fewer when the day was quiet or the story is simple; use more when multiple repos shipped meaningful work. Same repo names and wins as the standard overview, just simpler words. Do not pad; do not compress away real detail.',
   needle:
     '2-3 sentences, one short paragraph. Same repo names and grade moves as the standard Needle, but no letter-grade jargon — say the score went up or down in plain words.',
+  spotted:
+    '2-3 sentences, one short paragraph. Same who/what/why as the standard Spotted writeup — who posted, what they said, why it matters — with zero jargon.',
+  overheard:
+    '1-4 sentences matching the standard Overheard length. Same facts and repo names; explain why the podcast mention matters to token holders in plain words, no insider terms.',
 } as const
 
 /**

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { OverheardEntry, OverheardQuote } from '@/lib/podcastMentions'
 import type { OverheardDigest } from '@/lib/overheard'
+import { useNormieMode } from '@/components/NormieModeProvider'
 
 interface Props {
   entry: OverheardEntry | null
@@ -46,12 +47,14 @@ function buildEpisodeMeta(entry: OverheardEntry, validQuoteCount: number): strin
 }
 
 export default function OverheardCard({ entry, digest }: Props) {
+  const { normie } = useNormieMode()
   const [writeupExpanded, setWriteupExpanded] = useState(false)
   const [quotesExpanded, setQuotesExpanded] = useState(false)
 
   if (!entry) return null
 
-  const writeupLong = entry.writeup.length > 180 || entry.writeup.split(/\s+/).length > 40
+  const writeup = (normie && entry.writeupNormie) || entry.writeup
+  const writeupLong = writeup.length > 180 || writeup.split(/\s+/).length > 40
   const validQuotes = filterValidQuotes(entry.quotes)
   const visibleQuotes = quotesExpanded ? validQuotes : validQuotes.slice(0, 2)
   const hiddenQuoteCount = validQuotes.length - visibleQuotes.length
@@ -108,7 +111,7 @@ export default function OverheardCard({ entry, digest }: Props) {
       </header>
 
       <p className={`spotted-writeup${writeupExpanded || !writeupLong ? '' : ' spotted-writeup--clamped'}`}>
-        {entry.writeup}
+        {writeup}
       </p>
       {writeupLong && (
         <button

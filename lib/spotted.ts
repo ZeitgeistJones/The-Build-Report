@@ -3,6 +3,8 @@ import { randomUUID } from 'crypto'
 import { getRedis } from '@/lib/redis'
 import { fetchTweetEmbed } from '@/lib/twitterEmbed'
 import { REPOS } from '@/lib/scores'
+import { stripMarkdown } from '@/lib/textCleanup'
+import { normieVoiceGuidance } from '@/lib/normieVoice'
 
 const KEY_PREFIX = 'build-report:spotted:'
 const PENDING_SET_KEY = 'build-report:spotted-pending'
@@ -18,6 +20,8 @@ export type SpottedEntry = {
   extraContext: string
   repoSlug: string | null
   writeup: string
+  /** Optional plain-English version for Normie mode; older entries omit this. */
+  writeupNormie?: string
   status: 'draft' | 'published'
   createdAt: string
   publishedAt: string | null
@@ -33,7 +37,7 @@ async function generateWriteup(params: {
   accountContext: string
   extraContext: string
   repoSlug: string | null
-}): Promise<string> {
+}): Promise<{ writeup: string; writeupNormie?: string }> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const repo = REPOS.find(r => r.githubSlug === params.repoSlug)
   const repoContext = repo
@@ -48,17 +52,38 @@ Tweet text: "${params.tweetText}"
 Repo/project being referenced: ${repoContext}
 ${params.extraContext ? `Additional context: ${params.extraContext}` : ''}
 
-Write 2-3 sentences: identify who the author is and why it's notable they said this, then summarize what they said. Casual, direct, no fluff, no headers. Just plain prose. Don't invent facts about the author beyond what's given.`
+Write a standard column and a plain-English version. For the standard writeup: 2-3 sentences — identify who the author is and why it's notable they said this, then summarize what they said. Casual, direct, no fluff, no headers. Just plain prose. Don't invent facts about the author beyond what's given.
+
+Return ONLY valid JSON (no markdown fences) with this shape:
+{
+  "writeup": "2-3 sentences following the instructions above.",
+  "writeupNormie": "Same facts as writeup, rewritten for someone who knows nothing about code or crypto."
+}
+
+NORMIE VOICE GUIDE (applies to writeupNormie only):
+${normieVoiceGuidance('spotted')}`
 
   try {
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
+      max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
     })
-    return response.content.map(b => (b.type === 'text' ? b.text : '')).join('').trim()
+    const raw = response.content.map(b => (b.type === 'text' ? b.text : '')).join('').trim()
+    if (!raw) return { writeup: '' }
+
+    const jsonMatch = raw.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return { writeup: stripMarkdown(raw).trim() }
+    }
+    const parsed = JSON.parse(jsonMatch[0]) as { writeup?: string; writeupNormie?: string }
+    const writeup = typeof parsed.writeup === 'string' ? stripMarkdown(parsed.writeup).trim() : ''
+    if (!writeup) return { writeup: '' }
+    const writeupNormie =
+      typeof parsed.writeupNormie === 'string' ? stripMarkdown(parsed.writeupNormie).trim() : ''
+    return writeupNormie ? { writeup, writeupNormie } : { writeup }
   } catch {
-    return ''
+    return { writeup: '' }
   }
 }
 
@@ -72,14 +97,14 @@ export async function generateSpottedDraft(params: {
   const embed = await fetchTweetEmbed(params.tweetUrl)
   if (!embed) return null
 
-  const writeup = await generateWriteup({
+  const generated = await generateWriteup({
     tweetText: params.tweetText,
     authorName: embed.authorName,
     accountContext: params.accountContext,
     extraContext: params.extraContext,
     repoSlug: params.repoSlug,
   })
-  if (!writeup) return null
+  if (!generated.writeup) return null
 
   const redis = getRedis()
   const id = randomUUID()
@@ -92,7 +117,8 @@ export async function generateSpottedDraft(params: {
     accountContext: params.accountContext,
     extraContext: params.extraContext,
     repoSlug: params.repoSlug,
-    writeup,
+    writeup: generated.writeup,
+    ...(generated.writeupNormie ? { writeupNormie: generated.writeupNormie } : {}),
     status: 'draft',
     createdAt: new Date().toISOString(),
     publishedAt: null,
@@ -123,12 +149,14 @@ export async function publishEntry(id: string, writeup?: string): Promise<boolea
     const entry = await redis.get<SpottedEntry>(entryKey(id))
     if (!entry) return false
     const nextWriteup = typeof writeup === 'string' && writeup.trim() ? writeup.trim() : entry.writeup
+    const writeupChanged = nextWriteup !== entry.writeup
     const updated: SpottedEntry = {
       ...entry,
       writeup: nextWriteup,
       status: 'published',
       publishedAt: new Date().toISOString(),
     }
+    if (writeupChanged) delete updated.writeupNormie
     await redis.set(entryKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     await redis.srem(PENDING_SET_KEY, id)
     await redis.sadd(PUBLISHED_SET_KEY, id)

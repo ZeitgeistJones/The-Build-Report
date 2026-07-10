@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { SpottedEntry } from '@/lib/spotted'
+import { useNormieMode } from '@/components/NormieModeProvider'
 
 interface Props {
   spotted: SpottedEntry | null
@@ -18,6 +19,7 @@ function handleFromTweetUrl(tweetUrl: string): string | null {
 }
 
 export default function SpottedCard({ spotted }: Props) {
+  const { normie } = useNormieMode()
   const [writeupExpanded, setWriteupExpanded] = useState(false)
   const [tweetExpanded, setTweetExpanded] = useState(false)
 
@@ -39,9 +41,10 @@ export default function SpottedCard({ spotted }: Props) {
 
   if (!spotted) return null
 
+  const writeup = (normie && spotted.writeupNormie) || spotted.writeup
   const handle = handleFromTweetUrl(spotted.tweetUrl)
   const initial = (spotted.authorName.trim()[0] || '?').toUpperCase()
-  const writeupLong = spotted.writeup.length > 180 || spotted.writeup.split(/\s+/).length > 40
+  const writeupLong = writeup.length > 180 || writeup.split(/\s+/).length > 40
 
   return (
     <div
@@ -81,7 +84,7 @@ export default function SpottedCard({ spotted }: Props) {
       </div>
 
       <p className={`spotted-writeup${writeupExpanded || !writeupLong ? '' : ' spotted-writeup--clamped'}`}>
-        {spotted.writeup}
+        {writeup}
       </p>
       {writeupLong && (
         <button
