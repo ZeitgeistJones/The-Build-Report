@@ -6,9 +6,10 @@ import { REPOS } from '@/lib/scores'
 import { stripMarkdown } from '@/lib/textCleanup'
 import { normieVoiceGuidance } from '@/lib/normieVoice'
 import { dateKeyEastern, editionReadKeys } from '@/lib/buildBrief'
+import { indexArchiveDate, NEEDLE_DATES_INDEX_KEY } from '@/lib/archiveIndex'
 
 const NEEDLE_KEY_PREFIX = 'build-report:needle:'
-const NEEDLE_TTL_SEC = 72 * 3600
+const NEEDLE_TTL_SEC = 90 * 24 * 3600
 
 export interface NeedleData {
   text: string
@@ -162,6 +163,7 @@ export async function generateAndCacheNeedle(
   }
 
   await redis.set(needleRedisKey(dateKey), data, { ex: NEEDLE_TTL_SEC })
+  await indexArchiveDate(NEEDLE_DATES_INDEX_KEY, dateKey)
   return data
 }
 
@@ -175,6 +177,15 @@ export function refreshNeedleAfterRescore(): void {
 async function readCachedNeedle(dateKey: string): Promise<NeedleData | null> {
   const redis = getRedis()
   return redis.get<NeedleData>(needleRedisKey(dateKey))
+}
+
+/** Public read for Archives — one Eastern calendar edition. */
+export async function getCachedNeedleForDate(dateKey: string): Promise<NeedleData | null> {
+  try {
+    return await readCachedNeedle(dateKey)
+  } catch {
+    return null
+  }
 }
 
 export async function getNeedle(): Promise<NeedleData | null> {

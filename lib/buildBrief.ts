@@ -10,6 +10,7 @@ import { REPOS, type Repo } from '@/lib/scores'
 import type { GitHubStats } from '@/lib/github'
 import { stripMarkdown } from '@/lib/textCleanup'
 import { normieVoiceGuidance } from '@/lib/normieVoice'
+import { BRIEF_DATES_INDEX_KEY, indexArchiveDate } from '@/lib/archiveIndex'
 import {
   calcBuilderGrade,
   calcIntegrityGrade,
@@ -29,7 +30,7 @@ import { isConsumerEconomicScored } from '@/lib/economicGrade'
 
 const DIGEST_KEY_PREFIX = 'build-report:daily-digest:'
 const BRIEF_KEY_PREFIX = 'build-report:build-brief:'
-const DIGEST_TTL_SEC = 72 * 3600
+const DIGEST_TTL_SEC = 90 * 24 * 3600
 const EASTERN_TZ = 'America/New_York'
 
 export interface RepoBuildActivity {
@@ -421,6 +422,7 @@ export async function cacheDailyDigest(dateKey: string, payload: DailyDigestCach
   try {
     const r = getRedis()
     await r.set(digestRedisKey(dateKey), JSON.stringify(payload), { ex: DIGEST_TTL_SEC })
+    await indexArchiveDate(BRIEF_DATES_INDEX_KEY, dateKey)
   } catch {
     // non-fatal
   }
@@ -475,6 +477,11 @@ async function readCachedDigest(dateKey: string): Promise<DailyDigestCache | nul
   } catch {
     return null
   }
+}
+
+/** Public read for Archives — one Eastern calendar edition. */
+export async function getCachedDigestForDate(dateKey: string): Promise<DailyDigestCache | null> {
+  return readCachedDigest(dateKey)
 }
 
 async function readLegacyBrief(

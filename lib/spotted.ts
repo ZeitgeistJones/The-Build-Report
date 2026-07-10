@@ -236,3 +236,20 @@ export async function getLatestPublished(): Promise<SpottedEntry | null> {
     return null
   }
 }
+
+/** Published Spotted entries with publishedAt >= sinceIso, newest first. */
+export async function listPublishedSpotted(sinceIso: string): Promise<SpottedEntry[]> {
+  try {
+    const redis = getRedis()
+    const ids = (await redis.smembers<string[]>(PUBLISHED_SET_KEY)) ?? []
+    if (!ids.length) return []
+    const values = await redis.mget<(SpottedEntry | null)[]>(...ids.map(entryKey))
+    const sinceMs = Date.parse(sinceIso)
+    return values
+      .filter((v): v is SpottedEntry => Boolean(v))
+      .filter(v => v.publishedAt && Date.parse(v.publishedAt) >= sinceMs)
+      .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
+  } catch {
+    return []
+  }
+}

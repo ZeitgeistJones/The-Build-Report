@@ -914,6 +914,13 @@ export async function getPublishedMentions(): Promise<OverheardEntry[]> {
   return entries.sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
 }
 
+/** Published Overheard entries with publishedAt >= sinceIso, newest first. */
+export async function listPublishedMentionsSince(sinceIso: string): Promise<OverheardEntry[]> {
+  const sinceMs = Date.parse(sinceIso)
+  const all = await getPublishedMentions()
+  return all.filter(m => m.publishedAt && Date.parse(m.publishedAt) >= sinceMs)
+}
+
 export async function getLatestPublishedMention(): Promise<OverheardEntry | null> {
   const published = await getPublishedMentions()
   return published[0] ?? null
