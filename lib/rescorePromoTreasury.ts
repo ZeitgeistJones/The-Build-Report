@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import {
   createPublicClient,
   createWalletClient,
@@ -8,6 +9,7 @@ import {
   parseEther,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { getRedis } from '@/lib/redis'
 import { BASE_CHAIN_ID, RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
 
 const base = defineChain({
@@ -25,6 +27,10 @@ const BASE_HTTP_RPCS = [
   'https://base-rpc.publicnode.com',
   'https://1rpc.io/base',
 ].filter((url): url is string => Boolean(url?.trim()))
+
+const TREASURY_SEND_LOCK_KEY = 'build-report:promo-treasury-send-lock'
+const TREASURY_LOCK_TTL_SEC = 90
+const TREASURY_LOCK_WAIT_MS = 85_000
 
 function baseTransport() {
   const urls = BASE_HTTP_RPCS
@@ -76,20 +82,93 @@ const SPLIT_PAYOUT_GAS_BUFFER_WEI = parseEther('0.0001')
 
 export type PromoTxResult = { hash: `0x${string}`; confirmed: boolean }
 
+function isNonceTooLow(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return msg.includes('Nonce too low') || msg.includes('NonceTooLow')
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function withTreasurySendLock<T>(fn: () => Promise<T>): Promise<T> {
+  const redis = getRedis()
+  const lockToken = randomBytes(8).toString('hex')
+  const deadline = Date.now() + TREASURY_LOCK_WAIT_MS
+  let acquired = false
+
+  while (Date.now() < deadline) {
+    const ok = await redis.set(TREASURY_SEND_LOCK_KEY, lockToken, { nx: true, ex: TREASURY_LOCK_TTL_SEC })
+    if (ok) {
+      acquired = true
+      break
+    }
+    await sleep(400)
+  }
+
+  if (!acquired) {
+    throw new Error('Promo treasury is busy — retry the rescore in a moment')
+  }
+
+  try {
+    return await fn()
+  } finally {
+    try {
+      const current = await redis.get<string>(TREASURY_SEND_LOCK_KEY)
+      if (current === lockToken) await redis.del(TREASURY_SEND_LOCK_KEY)
+    } catch {
+      // lock expires via TTL
+    }
+  }
+}
+
+async function getTreasuryPendingNonce(): Promise<number> {
+  const account = getTreasuryAccount()
+  if (!account) throw new Error('Promo treasury is not configured')
+  const publicClient = createBasePublicClient()
+  return publicClient.getTransactionCount({ address: account.address, blockTag: 'pending' })
+}
+
 async function sendTreasuryEth(
   to: `0x${string}`,
   valueWei: bigint,
+  nonce: number,
 ): Promise<PromoTxResult> {
   const wallet = createTreasuryWalletClient()
-  if (!wallet) {
+  const account = getTreasuryAccount()
+  if (!wallet || !account) {
     throw new Error('Promo treasury is not configured')
   }
 
-  const hash = await wallet.sendTransaction({
+  // #region agent log
+  console.log('[promo-treasury-nonce]', JSON.stringify({
+    event: 'send-start',
     to,
-    value: valueWei,
-    chain: base,
-  })
+    valueWei: valueWei.toString(),
+    nonce,
+    from: account.address,
+  }))
+  // #endregion
+
+  let hash: `0x${string}`
+  try {
+    hash = await wallet.sendTransaction({
+      to,
+      value: valueWei,
+      chain: base,
+      nonce,
+    })
+  } catch (err) {
+    // #region agent log
+    console.log('[promo-treasury-nonce]', JSON.stringify({
+      event: 'send-failed',
+      to,
+      nonce,
+      error: err instanceof Error ? err.message : String(err),
+    }))
+    // #endregion
+    throw err
+  }
 
   const publicClient = createBasePublicClient()
   try {
@@ -97,10 +176,40 @@ async function sendTreasuryEth(
     if (receipt.status !== 'success') {
       throw new Error('Promo treasury transaction failed on-chain')
     }
+    // #region agent log
+    console.log('[promo-treasury-nonce]', JSON.stringify({
+      event: 'send-confirmed',
+      to,
+      nonce,
+      hash,
+    }))
+    // #endregion
     return { hash, confirmed: true }
   } catch (err) {
     console.warn('[promo-treasury] tx broadcast; receipt unconfirmed:', hash, err)
     return { hash, confirmed: false }
+  }
+}
+
+async function sendTreasuryEthWithRetry(
+  to: `0x${string}`,
+  valueWei: bigint,
+  nonce: number,
+): Promise<PromoTxResult> {
+  try {
+    return await sendTreasuryEth(to, valueWei, nonce)
+  } catch (err) {
+    if (!isNonceTooLow(err)) throw err
+    const refreshed = await getTreasuryPendingNonce()
+    // #region agent log
+    console.log('[promo-treasury-nonce]', JSON.stringify({
+      event: 'nonce-retry',
+      to,
+      failedNonce: nonce,
+      refreshedNonce: refreshed,
+    }))
+    // #endregion
+    return sendTreasuryEth(to, valueWei, refreshed)
   }
 }
 
@@ -141,7 +250,10 @@ export async function sendPromoReward(
     throw new Error('Promo treasury balance is too low for this reward')
   }
 
-  return sendTreasuryEth(getAddress(toAddress), rewardWei)
+  return withTreasurySendLock(async () => {
+    const nonce = await getTreasuryPendingNonce()
+    return sendTreasuryEthWithRetry(getAddress(toAddress), rewardWei, nonce)
+  })
 }
 
 export async function sendPromoSplitReward(
@@ -161,7 +273,20 @@ export async function sendPromoSplitReward(
     throw new Error('Promo treasury balance is too low for this reward')
   }
 
-  const burnFundTx = await sendTreasuryEth(RECEIVER_BUY_AND_BURN, burnFundWei)
-  const walletTx = await sendTreasuryEth(getAddress(walletAddress), walletRewardWei)
-  return { burnFundTx, walletTx }
+  return withTreasurySendLock(async () => {
+    let nonce = await getTreasuryPendingNonce()
+    // #region agent log
+    console.log('[promo-treasury-nonce]', JSON.stringify({
+      event: 'split-start',
+      walletAddress,
+      totalWei: totalWei.toString(),
+      startNonce: nonce,
+    }))
+    // #endregion
+
+    const burnFundTx = await sendTreasuryEthWithRetry(RECEIVER_BUY_AND_BURN, burnFundWei, nonce)
+    nonce += 1
+    const walletTx = await sendTreasuryEthWithRetry(getAddress(walletAddress), walletRewardWei, nonce)
+    return { burnFundTx, walletTx }
+  })
 }
