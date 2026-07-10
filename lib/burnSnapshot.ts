@@ -24,12 +24,6 @@ const ETH_PENDING_KEY = 'build-report:burns:hub:ethPending'
 const APPLIED_TX_PREFIX = 'build-report:burns:applied-tx:'
 const LEGACY_ONCHAIN_CACHE_KEY = 'build-report:burns:onchain-cache'
 
-function pickNewerBurnAt(a: string | null, b: string | null): string | null {
-  if (!a) return b
-  if (!b) return a
-  return a >= b ? a : b
-}
-
 function mergeClawdBurned(existing: number, scanned: number, scanOk: boolean): number {
   if (!scanOk) return existing
   return scanned >= existing ? scanned : existing
@@ -53,7 +47,8 @@ export async function syncBurnSnapshot(): Promise<BurnSnapshot> {
   const scanOk = totals.ok
   const snapshot: BurnSnapshot = {
     clawdBurned: mergeClawdBurned(existing.clawdBurned, totals.clawdBurned, scanOk),
-    lastBurnAt: scanOk ? pickNewerBurnAt(existing.lastBurnAt, totals.lastBurnAt) : existing.lastBurnAt,
+    // Successful scan is authoritative for lastBurnAt (monotonic merge could stick a bad/future date).
+    lastBurnAt: scanOk ? totals.lastBurnAt : existing.lastBurnAt,
     updatedAt: scanOk ? updatedAt : (existing.updatedAt ?? updatedAt),
     ethPendingInReceiver: ethPending,
   }

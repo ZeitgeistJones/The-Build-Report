@@ -238,7 +238,9 @@ export function formatLastBurnLabel(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
-  return d.toLocaleString(undefined, {
+  // Always Eastern so the label matches Base/chain time, not the visitor's browser TZ.
+  return d.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',

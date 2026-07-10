@@ -92,13 +92,15 @@ export function dateKeyEastern(d = new Date()): string {
 /** Eastern calendar date for the day before `now` (the day we summarize for morning visitors). */
 export function yesterdayEasternDateKey(now = new Date()): string {
   const todayKey = dateKeyEastern(now)
-  let probe = new Date(now.getTime() - 25 * 3600000)
-  let key = dateKeyEastern(probe)
-  if (key >= todayKey) {
-    probe = new Date(probe.getTime() - 24 * 3600000)
-    key = dateKeyEastern(probe)
+  const [y, m, d] = todayKey.split('-').map(Number)
+  if (!y || !m || !d) {
+    return dateKeyEastern(new Date(now.getTime() - 24 * 3600000))
   }
-  return key
+  // Subtract one calendar day from the Eastern YYYY-MM-DD — do not use a fixed
+  // hour offset (e.g. -25h), which skips yesterday in the first hours after midnight.
+  const prior = new Date(Date.UTC(y, m - 1, d))
+  prior.setUTCDate(prior.getUTCDate() - 1)
+  return prior.toISOString().slice(0, 10)
 }
 
 /** Keys for reading cached build-brief editions (matches daily-digest cron). */
