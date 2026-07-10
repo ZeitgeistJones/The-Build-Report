@@ -88,3 +88,42 @@ ${normieVoiceGuidance('overheard')}`
     return { writeup: '' }
   }
 }
+
+/** Rewrite an existing Overheard writeup into plain-English (same facts). */
+export async function rewriteOverheardWriteupNormie(
+  entry: Pick<OverheardEntry, 'writeup' | 'repoSlug' | 'episodeName' | 'quotes'>,
+): Promise<string | null> {
+  if (!entry.writeup.trim() || !process.env.ANTHROPIC_API_KEY) return null
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const quoteBlock = formatQuotesForPrompt(entry.quotes, entry.episodeName)
+  const prompt = `Rewrite this Overheard column writeup into plain English for someone who knows nothing about code or crypto. Keep the same facts and repo names. Do not add new claims.
+
+Repo: ${entry.repoSlug}
+Episode: ${entry.episodeName}
+Quotes:
+${quoteBlock || '(none)'}
+
+Writeup:
+"""
+${entry.writeup}
+"""
+
+Return ONLY the rewritten paragraph (no JSON, no labels, no markdown).
+
+NORMIE VOICE GUIDE:
+${normieVoiceGuidance('overheard')}`
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    const text = stripMarkdown(
+      response.content.map(b => (b.type === 'text' ? b.text : '')).join(''),
+    ).trim()
+    return text || null
+  } catch {
+    return null
+  }
+}

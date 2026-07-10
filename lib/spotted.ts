@@ -177,6 +177,51 @@ export async function dismissEntry(id: string): Promise<boolean> {
   }
 }
 
+/** Rewrite an existing Spotted writeup into plain-English (same facts). */
+async function rewriteSpottedWriteupNormie(writeup: string): Promise<string | null> {
+  if (!writeup.trim() || !process.env.ANTHROPIC_API_KEY) return null
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const prompt = `Rewrite this Spotted column writeup into plain English for someone who knows nothing about code or crypto. Keep the same facts and names. Do not add new claims.
+
+Writeup:
+"""
+${writeup}
+"""
+
+Return ONLY the rewritten paragraph (no JSON, no labels, no markdown).
+
+NORMIE VOICE GUIDE:
+${normieVoiceGuidance('spotted')}`
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    const text = stripMarkdown(
+      response.content.map(b => (b.type === 'text' ? b.text : '')).join(''),
+    ).trim()
+    return text || null
+  } catch {
+    return null
+  }
+}
+
+/** Lazy-backfill writeupNormie for published entries that predate Plain English mode. */
+async function ensureSpottedWriteupNormie(entry: SpottedEntry): Promise<SpottedEntry> {
+  if (entry.writeupNormie?.trim() || !entry.writeup.trim()) return entry
+  const writeupNormie = await rewriteSpottedWriteupNormie(entry.writeup)
+  if (!writeupNormie) return entry
+  const updated: SpottedEntry = { ...entry, writeupNormie }
+  try {
+    await getRedis().set(entryKey(entry.id), updated, { ex: 60 * 60 * 24 * 365 })
+  } catch {
+    // still return in-memory so this request can show Plain English
+  }
+  return updated
+}
+
 export async function getLatestPublished(): Promise<SpottedEntry | null> {
   try {
     const redis = getRedis()
@@ -185,7 +230,8 @@ export async function getLatestPublished(): Promise<SpottedEntry | null> {
     const values = await redis.mget<(SpottedEntry | null)[]>(...ids.map(entryKey))
     const valid = values.filter((v): v is SpottedEntry => Boolean(v))
     if (!valid.length) return null
-    return valid.sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))[0]
+    const latest = valid.sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))[0]
+    return ensureSpottedWriteupNormie(latest)
   } catch {
     return null
   }

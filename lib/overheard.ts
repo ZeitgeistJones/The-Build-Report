@@ -1,5 +1,10 @@
 import { getRedis } from '@/lib/redis'
-import { getPublishedMentions, type OverheardEntry } from '@/lib/podcastMentions'
+import {
+  getPublishedMentions,
+  updateMentionEntry,
+  type OverheardEntry,
+} from '@/lib/podcastMentions'
+import { rewriteOverheardWriteupNormie } from '@/lib/overheardWriteup'
 import { REPOS } from '@/lib/scores'
 
 const OVERHEARD_DIGEST_KEY_PREFIX = 'build-report:overheard-digest:'
@@ -48,7 +53,15 @@ function buildDigestFromPublished(published: OverheardEntry[]): OverheardDigest 
 
 export async function getFeaturedOverheardEntry(): Promise<OverheardEntry | null> {
   const published = await getMentionsPublishedLast24h()
-  return published[0] ?? null
+  const featured = published[0] ?? null
+  if (!featured) return null
+  if (featured.writeupNormie?.trim() || !featured.writeup.trim()) return featured
+
+  const writeupNormie = await rewriteOverheardWriteupNormie(featured)
+  if (!writeupNormie) return featured
+
+  await updateMentionEntry(featured.id, { writeupNormie }).catch(() => false)
+  return { ...featured, writeupNormie }
 }
 
 export async function getOverheardDigest(): Promise<OverheardDigest | null> {
