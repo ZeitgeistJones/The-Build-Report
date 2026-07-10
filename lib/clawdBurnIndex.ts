@@ -161,7 +161,10 @@ async function fetchOnChainBurnTotalsInner(
         )
         if (!logsPage?.items?.length) continue
 
-        total += clawdToDeadInLogs(logsPage.items)
+        const burned = clawdToDeadInLogs(logsPage.items)
+        total += burned
+        // Only attribute lastBurnAt to executes that actually destroyed CLAWD.
+        if (burned <= BigInt(0)) continue
         const ts = tx.timestamp
         if (ts && (!lastBurnAt || ts > lastBurnAt)) lastBurnAt = ts
       }

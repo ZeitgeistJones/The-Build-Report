@@ -117,13 +117,23 @@ export async function refreshBurnAfterExecute(txHash: `0x${string}`): Promise<Bu
 
   const existing = await getBurnSnapshotForDisplay()
   const clawdBurned = existing.clawdBurned + Number(clawdFromTx) / 1e18
-  let lastBurnAt = existing.lastBurnAt
+
+  let lastBurnAt: string | null = null
   try {
     const block = await client.getBlock({ blockHash: receipt.blockHash })
     lastBurnAt = new Date(Number(block.timestamp) * 1000).toISOString()
   } catch {
-    // keep prior lastBurnAt
+    try {
+      const block = await client.getBlock({ blockNumber: receipt.blockNumber })
+      lastBurnAt = new Date(Number(block.timestamp) * 1000).toISOString()
+    } catch {
+      // Don't bump the amount while leaving a stale lastBurnAt — full resync instead.
+      const synced = await syncBurnSnapshot()
+      await r.set(appliedKey, 1, { ex: 60 * 60 * 24 * 30 })
+      return { ...synced, ethPendingInReceiver, appliedFromTx: true }
+    }
   }
+
   const updatedAt = new Date().toISOString()
 
   await Promise.all([

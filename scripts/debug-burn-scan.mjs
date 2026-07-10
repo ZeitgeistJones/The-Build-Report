@@ -61,7 +61,10 @@ while (pages < MAX_TX_PAGES) {
     executeCount++
     const logsPage = await getJson(`${BLOCKSCOUT_V2}/transactions/${tx.hash}/logs`)
     if (logsPage.__err || !logsPage?.items?.length) continue
-    total += clawdToDeadInLogs(logsPage.items)
+    const burned = clawdToDeadInLogs(logsPage.items)
+    total += burned
+    // Only attribute lastBurnAt to executes that actually destroyed CLAWD.
+    if (burned <= 0n) continue
     const ts = tx.timestamp
     if (ts && (!lastBurnAt || ts > lastBurnAt)) lastBurnAt = ts
   }
