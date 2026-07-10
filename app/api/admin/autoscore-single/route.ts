@@ -27,6 +27,7 @@ import { sendPromoSplitReward, treasuryCanCover } from '@/lib/rescorePromoTreasu
 import { refreshNeedleAfterRescore } from '@/lib/needle'
 import { appendScoreHistory } from '@/lib/scoreHistory'
 import { getShippingLeverage, getTokenMechanicForDisplay, showsEconomicNa } from '@/lib/economicGrade'
+import { reportFirstScanIfNeeded } from '@/lib/achievementReport'
 
 export const maxDuration = 60
 
@@ -209,6 +210,8 @@ export async function POST(req: NextRequest) {
       if (paidKey) await redis.del(paidKey)
       throw err
     }
+
+    reportFirstScanIfNeeded(walletAddress)
 
     if (isPromoPath) {
       let payoutResult: Awaited<ReturnType<typeof sendPromoSplitReward>>

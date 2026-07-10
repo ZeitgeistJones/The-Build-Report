@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import './globals.css'
 import './mobile.css'
 import Web3Provider from '@/components/wallet/Web3Provider'
+import ClawdAchievementsBridge from '@/components/wallet/ClawdAchievementsBridge'
 import { ColorThemeProvider } from '@/components/ColorThemeProvider'
 import { NormieModeProvider, NORMIE_MODE_STORAGE_KEY } from '@/components/NormieModeProvider'
 import NavBar from '@/components/NavBar'
@@ -13,6 +15,8 @@ import { COLOR_THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY } from '@/lib/colorTh
 const SITE_URL = 'https://the-build-report.vercel.app'
 const SITE_TITLE = 'The Build Report'
 const SITE_DESCRIPTION = 'A plain English look at the repos, scored and sourced.'
+const ACHIEVEMENT_HUB_EMBED =
+  'https://community-achievement-hub.vercel.app/embed/clawd-achievements.js'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -92,6 +96,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <NormieModeProvider>
           <EthUsdProvider rate={ethUsdRate}>
           <Web3Provider>
+            <Script src={ACHIEVEMENT_HUB_EMBED} strategy="afterInteractive" />
+            <ClawdAchievementsBridge />
             <NavBar />
             <RescorePromoBannerShell />
             <main className="site-main" style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', padding: '32px var(--content-padding-x) 80px' }}>
