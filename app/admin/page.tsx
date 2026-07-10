@@ -52,6 +52,13 @@ export default function AdminPage() {
   const [spottedDraftsList, setSpottedDraftsList] = useState<Array<{
     id: string; writeup: string; embedHtml: string; authorName: string; tweetUrl: string
   }>>([])
+  const [spottedPublishedList, setSpottedPublishedList] = useState<Array<{
+    id: string
+    writeup: string
+    authorName: string
+    tweetUrl: string
+    publishedAt: string | null
+  }>>([])
   const [spottedActionBusy, setSpottedActionBusy] = useState<string | null>(null)
   const [refreshRunning, setRefreshRunning] = useState(false)
   const [refreshResult, setRefreshResult] = useState<string | null>(null)
@@ -402,10 +409,31 @@ export default function AdminPage() {
         body: JSON.stringify({ password, action: 'list' }),
       })
       const data = await res.json()
-      if (data.ok) setSpottedDraftsList(data.drafts ?? [])
+      if (data.ok) {
+        setSpottedDraftsList(data.drafts ?? [])
+        setSpottedPublishedList(data.published ?? [])
+      }
     } catch {
       // ignore
     }
+  }
+
+  async function takeDownSpotted(id: string) {
+    setSpottedActionBusy(id)
+    try {
+      const res = await fetch('/api/admin/spotted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'takeDown', id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setSpottedPublishedList(prev => prev.filter(d => d.id !== id))
+      }
+    } catch {
+      // ignore
+    }
+    setSpottedActionBusy(null)
   }
 
   async function actOnSpottedDraft(id: string, action: 'publish' | 'dismiss') {
@@ -417,13 +445,17 @@ export default function AdminPage() {
             ? spottedDraft.writeup
             : spottedDraftsList.find(d => d.id === id)?.writeup
           : undefined
-      await fetch('/api/admin/spotted', {
+      const res = await fetch('/api/admin/spotted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password, action, id, ...(writeup !== undefined ? { writeup } : {}) }),
       })
+      const data = await res.json()
       setSpottedDraftsList(prev => prev.filter(d => d.id !== id))
       if (spottedDraft?.id === id) setSpottedDraft(null)
+      if (action === 'publish' && data.ok) {
+        void loadSpottedDrafts()
+      }
     } catch {
       // ignore
     }
@@ -1375,11 +1407,64 @@ export default function AdminPage() {
           onClick={() => void loadSpottedDrafts()}
           style={{ fontSize: '12px', padding: '6px 14px', borderRadius: 'var(--radius)', background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
         >
-          Load saved drafts
+          Load drafts &amp; published
         </button>
+
+        {spottedPublishedList.length > 0 && (
+          <div style={{ marginTop: '16px' }}>
+            <h3 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-secondary)' }}>
+              Published live ({spottedPublishedList.length})
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {spottedPublishedList.map(d => (
+                <div
+                  key={d.id}
+                  style={{
+                    background: 'var(--surface-1)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '12px 16px',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>{d.authorName}</strong>
+                    {d.publishedAt && (
+                      <> · published {new Date(d.publishedAt).toLocaleString()}</>
+                    )}
+                    {' · '}
+                    <a href={d.tweetUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+                      tweet
+                    </a>
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0 0 10px' }}>
+                    {d.writeup}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void takeDownSpotted(d.id)}
+                    disabled={spottedActionBusy === d.id}
+                    style={{
+                      fontSize: '11px',
+                      padding: '5px 12px',
+                      borderRadius: 'var(--radius)',
+                      background: 'var(--surface-3)',
+                      color: 'var(--red, #c44)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    {spottedActionBusy === d.id ? 'Taking down…' : 'Take down'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {spottedDraftsList.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+            <h3 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '0', color: 'var(--text-secondary)' }}>
+              Drafts ({spottedDraftsList.length})
+            </h3>
             {spottedDraftsList.map(d => (
               <div key={d.id} style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
                 <textarea

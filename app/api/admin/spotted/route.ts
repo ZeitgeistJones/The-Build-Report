@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin } from '@/lib/admin'
-import { generateSpottedDraft, getDraftEntries, publishEntry, dismissEntry } from '@/lib/spotted'
+import {
+  generateSpottedDraft,
+  getDraftEntries,
+  getPublishedEntries,
+  publishEntry,
+  dismissEntry,
+  takeDownEntry,
+} from '@/lib/spotted'
 
 export const maxDuration = 60
 
@@ -30,8 +37,8 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'list') {
-    const drafts = await getDraftEntries()
-    return NextResponse.json({ ok: true, drafts })
+    const [drafts, published] = await Promise.all([getDraftEntries(), getPublishedEntries()])
+    return NextResponse.json({ ok: true, drafts, published })
   }
 
   if (action === 'publish') {
@@ -46,6 +53,13 @@ export async function POST(req: NextRequest) {
     const id = body?.id as string
     if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
     const success = await dismissEntry(id)
+    return NextResponse.json({ ok: success })
+  }
+
+  if (action === 'takeDown') {
+    const id = body?.id as string
+    if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
+    const success = await takeDownEntry(id)
     return NextResponse.json({ ok: success })
   }
 

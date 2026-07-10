@@ -22,7 +22,7 @@ export type SpottedEntry = {
   writeup: string
   /** Optional plain-English version for Normie mode; older entries omit this. */
   writeupNormie?: string
-  status: 'draft' | 'published'
+  status: 'draft' | 'published' | 'taken_down'
   createdAt: string
   publishedAt: string | null
 }
@@ -174,6 +174,35 @@ export async function dismissEntry(id: string): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+/** Remove a live Spotted column from the homepage published set. */
+export async function takeDownEntry(id: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const entry = await redis.get<SpottedEntry>(entryKey(id))
+    if (!entry || entry.status !== 'published') return false
+    const updated: SpottedEntry = { ...entry, status: 'taken_down' }
+    await redis.set(entryKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    await redis.srem(PUBLISHED_SET_KEY, id)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function getPublishedEntries(): Promise<SpottedEntry[]> {
+  try {
+    const redis = getRedis()
+    const ids = (await redis.smembers<string[]>(PUBLISHED_SET_KEY)) ?? []
+    if (!ids.length) return []
+    const values = await redis.mget<(SpottedEntry | null)[]>(...ids.map(entryKey))
+    return values
+      .filter((v): v is SpottedEntry => Boolean(v))
+      .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
+  } catch {
+    return []
   }
 }
 
