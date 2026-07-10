@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadGitHubStatsForCron } from '@/lib/githubStatsSnapshot'
-import { generateAndCacheDailyDigest, loadReposForBrief } from '@/lib/buildBrief'
+import { generateAndCacheDailyDigest, loadReposForBrief, yesterdayEasternDateKey } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
 
 export const dynamic = 'force-dynamic'
@@ -24,8 +24,9 @@ export async function GET(req: NextRequest) {
     }
 
     const repos = await loadReposForBrief(stats)
-    const digest = await generateAndCacheDailyDigest(stats, repos)
-    const needle = await generateAndCacheNeedle().catch(err => {
+    const editionKey = yesterdayEasternDateKey()
+    const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
+    const needle = await generateAndCacheNeedle({ dateKey: editionKey }).catch(err => {
       console.error('[daily-digest] needle generation failed', err)
       return null
     })

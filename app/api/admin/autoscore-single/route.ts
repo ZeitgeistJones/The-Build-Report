@@ -24,6 +24,7 @@ import {
 } from '@/lib/rescorePromo'
 import { incrementEthPendingOptimistic, scheduleBurnSnapshotSync } from '@/lib/burnSnapshot'
 import { sendPromoSplitReward, treasuryCanCover } from '@/lib/rescorePromoTreasury'
+import { refreshNeedleAfterRescore } from '@/lib/needle'
 import { appendScoreHistory } from '@/lib/scoreHistory'
 import { getShippingLeverage, getTokenMechanicForDisplay, showsEconomicNa } from '@/lib/economicGrade'
 
@@ -203,6 +204,7 @@ export async function POST(req: NextRequest) {
     let pipeline
     try {
       pipeline = await runRescorePipeline(repoSlug)
+      refreshNeedleAfterRescore()
     } catch (err) {
       if (paidKey) await redis.del(paidKey)
       throw err

@@ -3,7 +3,7 @@ import { getGitHubStats } from '@/lib/github'
 import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
 import { syncEthUsdRate } from '@/lib/ethUsdRate'
-import { generateAndCacheDailyDigest, loadReposForBrief } from '@/lib/buildBrief'
+import { generateAndCacheDailyDigest, loadReposForBrief, yesterdayEasternDateKey } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
 
 export const dynamic = 'force-dynamic'
@@ -31,8 +31,9 @@ export async function GET(req: NextRequest) {
 
     // Keep Yesterday's build fresh even when the dedicated daily-digest cron misses a run.
     const repos = await loadReposForBrief(stats)
-    const digest = await generateAndCacheDailyDigest(stats, repos)
-    const needle = await generateAndCacheNeedle().catch(err => {
+    const editionKey = yesterdayEasternDateKey()
+    const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
+    const needle = await generateAndCacheNeedle({ dateKey: editionKey }).catch(err => {
       console.error('[warm-cache] needle generation failed', err)
       return null
     })

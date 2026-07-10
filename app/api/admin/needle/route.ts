@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin } from '@/lib/admin'
+import { yesterdayEasternDateKey } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
 
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (denied) return denied
 
   try {
-    const needle = await generateAndCacheNeedle()
+    const needle = await generateAndCacheNeedle({ dateKey: yesterdayEasternDateKey() })
     return NextResponse.json({
       ok: true,
       generated: Boolean(needle),

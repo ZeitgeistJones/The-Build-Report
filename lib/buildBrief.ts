@@ -101,6 +101,21 @@ export function yesterdayEasternDateKey(now = new Date()): string {
   return key
 }
 
+/** Keys for reading cached build-brief editions (matches daily-digest cron). */
+export function buildBriefEditionKeys(now = new Date()): string[] {
+  const keys = [
+    yesterdayEasternDateKey(now),
+    yesterdayEasternDateKey(new Date(now.getTime() - 86400000)),
+  ]
+  return [...new Set(keys)]
+}
+
+/** Keys for reading cached homepage articles — brief edition plus today's live needle. */
+export function editionReadKeys(now = new Date()): string[] {
+  const keys = [dateKeyEastern(now), ...buildBriefEditionKeys(now)]
+  return [...new Set(keys)]
+}
+
 function digestRedisKey(dateKey: string): string {
   return `${DIGEST_KEY_PREFIX}${dateKey}`
 }
@@ -489,14 +504,12 @@ function toBuildBriefData(digest: DailyDigestCache): BuildBriefData {
 }
 
 export async function getBuildBrief(): Promise<BuildBriefData | null> {
-  const targetKey = yesterdayEasternDateKey()
-  const digest = await readCachedDigest(targetKey)
-  if (digest) return toBuildBriefData(digest)
+  for (const targetKey of buildBriefEditionKeys()) {
+    const digest = await readCachedDigest(targetKey)
+    if (digest) return toBuildBriefData(digest)
+  }
 
-  const priorKey = yesterdayEasternDateKey(new Date(Date.now() - 86400000))
-  const priorDigest = await readCachedDigest(priorKey)
-  if (priorDigest) return toBuildBriefData(priorDigest)
-
+  const targetKey = buildBriefEditionKeys()[0]
   const legacy = await readLegacyBrief(targetKey)
   if (legacy) {
     return {

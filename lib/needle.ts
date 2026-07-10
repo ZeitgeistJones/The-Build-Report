@@ -5,10 +5,14 @@ import { getRescoreSummaries, type RescoreSummaryRecord } from '@/lib/rescoreSum
 import { REPOS } from '@/lib/scores'
 import { stripMarkdown } from '@/lib/textCleanup'
 import { normieVoiceGuidance } from '@/lib/normieVoice'
+import {
+  dateKeyEastern,
+  editionReadKeys,
+  yesterdayEasternDateKey,
+} from '@/lib/buildBrief'
 
 const NEEDLE_KEY_PREFIX = 'build-report:needle:'
 const NEEDLE_TTL_SEC = 72 * 3600
-const EASTERN_TZ = 'America/New_York'
 
 export interface NeedleData {
   text: string
@@ -29,23 +33,8 @@ type QualifyingMove = {
   summary: string | null
 }
 
-function dateKeyEastern(d = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: EASTERN_TZ }).format(d)
-}
-
 function needleRedisKey(dateKey: string): string {
   return `${NEEDLE_KEY_PREFIX}${dateKey}`
-}
-
-function extractLetter(label: string | null | undefined): string | null {
-  if (!label || label === '—') return null
-  return label.trim().split(' ')[0]
-}
-
-function extractPct(label: string | null | undefined): number | null {
-  if (!label || label === '—') return null
-  const match = label.match(/(\d+)%/)
-  return match ? Number(match[1]) : null
 }
 
 function qualifyingChange(_meta: RescoreSummaryRecord): boolean {
@@ -132,7 +121,14 @@ ${normieVoiceGuidance('needle')}
   }
 }
 
-export async function generateAndCacheNeedle(): Promise<NeedleData | null> {
+export type GenerateNeedleOptions = {
+  /** Defaults to today Eastern — use yesterdayEasternDateKey() from daily-digest cron for brief sync. */
+  dateKey?: string
+}
+
+export async function generateAndCacheNeedle(
+  options: GenerateNeedleOptions = {},
+): Promise<NeedleData | null> {
   const redis = getRedis()
   const since = Date.now() - 24 * 3600 * 1000
   const slugs = await getSlugsRescoredSince(since)
@@ -160,7 +156,7 @@ export async function generateAndCacheNeedle(): Promise<NeedleData | null> {
   const text = ai?.text ?? fallback.text
   const textNormie = ai?.textNormie ?? fallback.textNormie
 
-  const dateKey = dateKeyEastern()
+  const dateKey = options.dateKey ?? dateKeyEastern()
   const data: NeedleData = {
     text,
     textNormie,
@@ -173,13 +169,46 @@ export async function generateAndCacheNeedle(): Promise<NeedleData | null> {
   return data
 }
 
+/** Fire-and-forget refresh after a rescore so The Needle stays current intraday. */
+export function refreshNeedleAfterRescore(): void {
+  void generateAndCacheNeedle().catch(err => {
+    console.error('[needle] post-rescore refresh failed', err)
+  })
+}
+
+async function readCachedNeedle(dateKey: string): Promise<NeedleData | null> {
+  const redis = getRedis()
+  return redis.get<NeedleData>(needleRedisKey(dateKey))
+}
+
 export async function getNeedle(): Promise<NeedleData | null> {
   try {
-    const redis = getRedis()
-    const dateKey = dateKeyEastern()
-    const cached = await redis.get<NeedleData>(needleRedisKey(dateKey))
-    return cached ?? null
-  } catch {
+    const keys = editionReadKeys()
+    for (const key of keys) {
+      const cached = await readCachedNeedle(key)
+      if (cached) {
+        // #region agent log
+        fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',location:'lib/needle.ts:getNeedle',message:'needle cache hit',data:{cacheKey:key,dateKey:cached.dateKey,repoCount:cached.repoCount,readKeys:keys},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+        console.log('[needle-cache]', JSON.stringify({
+          event: 'hit',
+          cacheKey: key,
+          dateKey: cached.dateKey,
+          repoCount: cached.repoCount,
+        }))
+        // #endregion
+        return cached
+      }
+    }
+
+    // #region agent log
+    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',location:'lib/needle.ts:getNeedle',message:'needle missing',data:{readKeys:keys},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+    console.log('[needle-cache]', JSON.stringify({ event: 'miss', readKeys: keys }))
+    // #endregion
+    return null
+  } catch (err) {
+    // #region agent log
+    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',location:'lib/needle.ts:getNeedle',message:'needle read error',data:{error:err instanceof Error?err.message:String(err)},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     return null
   }
 }

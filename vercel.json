@@ -9,10 +9,6 @@
       "schedule": "0 5 * * *"
     },
     {
-      "path": "/api/cron/needle",
-      "schedule": "10 5 * * *"
-    },
-    {
       "path": "/api/cron/podcast-mentions",
       "schedule": "20 5 * * *"
     },
