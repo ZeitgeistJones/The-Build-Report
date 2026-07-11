@@ -576,9 +576,12 @@ export async function getGitHubStats(options?: { fresh?: boolean }): Promise<Git
   }
 }
 
-export async function fetchRepoBySlug(slug: string): Promise<GitHubRepo | null> {
+export async function fetchRepoBySlug(
+  slug: string,
+  options?: { fresh?: boolean },
+): Promise<GitHubRepo | null> {
   try {
-    const data = await ghFetch(`/repos/${GITHUB_ORG}/${slug}`)
+    const data = await ghFetch(`/repos/${GITHUB_ORG}/${slug}`, { fresh: options?.fresh })
     return {
       name: data.name,
       description: data.description ?? null,
@@ -623,19 +626,26 @@ function deriveFlags(rootFiles: string[], hasCi: boolean): RepoEvidenceFlags {
   }
 }
 
-export async function fetchRepoEvidence(slug: string): Promise<RepoEvidence | null> {
+export async function fetchRepoEvidence(
+  slug: string,
+  options?: { fresh?: boolean },
+): Promise<RepoEvidence | null> {
   try {
     const authHeaders: Record<string, string> = {}
     if (GITHUB_TOKEN) authHeaders['Authorization'] = `Bearer ${GITHUB_TOKEN}`
 
+    const cacheOpts = options?.fresh
+      ? { cache: 'no-store' as const }
+      : { next: { revalidate: 3600, tags: ['github-stats'] as string[] } }
+
     const [readmeRes, contentsRes] = await Promise.all([
       fetch(`https://api.github.com/repos/${GITHUB_ORG}/${slug}/readme`, {
         headers: { ...authHeaders, Accept: 'application/vnd.github.raw+json' },
-        next: { revalidate: 3600, tags: ['github-stats'] },
+        ...cacheOpts,
       }),
       fetch(`https://api.github.com/repos/${GITHUB_ORG}/${slug}/contents/`, {
         headers: { ...authHeaders, Accept: 'application/vnd.github.v3+json' },
-        next: { revalidate: 3600, tags: ['github-stats'] },
+        ...cacheOpts,
       }),
     ])
 
@@ -657,7 +667,7 @@ export async function fetchRepoEvidence(slug: string): Promise<RepoEvidence | nu
       `https://api.github.com/repos/${GITHUB_ORG}/${slug}/contents/.github/workflows`,
       {
         headers: { ...authHeaders, Accept: 'application/vnd.github.v3+json' },
-        next: { revalidate: 3600, tags: ['github-stats'] },
+        ...cacheOpts,
       },
     )
     const hasCi = ciRes.ok && ciRes.status !== 404

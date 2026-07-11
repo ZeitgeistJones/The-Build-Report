@@ -164,7 +164,7 @@ export function toRawRepo(gh: {
 
 async function inferScore(
   repo: RawRepo,
-  options?: { chronicleContext?: string; communityContext?: string },
+  options?: { chronicleContext?: string; communityContext?: string; freshEvidence?: boolean },
 ): Promise<Repo | null> {
   console.log(`[autoscore] inferring: ${repo.name}`)
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -172,7 +172,7 @@ async function inferScore(
   const derivedStatus = deriveStatus(repo)
   const [ecosystemCtx, evidence] = await Promise.all([
     getEcosystemContext().catch(() => null).then(v => v ?? DEFAULT_ECOSYSTEM_CONTEXT),
-    fetchRepoEvidence(repo.name),
+    fetchRepoEvidence(repo.name, { fresh: options?.freshEvidence }),
   ])
 
   const chronicleBlock = options?.chronicleContext?.trim()
@@ -396,7 +396,13 @@ export async function inferAndCacheRepo(
   const chronicleContext =
     options?.chronicleContext ?? (await getChronicleContext().catch(() => null)) ?? undefined
 
-  const scored = await inferScore(raw, { chronicleContext, communityContext: options?.communityContext })
+  const scored = await inferScore(raw, {
+    chronicleContext,
+    communityContext: options?.communityContext,
+    // Paid/promo rescore and forced regen must not score hour-old README/root listings
+    // while change summaries already use live commit messages.
+    freshEvidence: Boolean(options?.skipCache),
+  })
   if (!scored) return null
 
   await cacheScoredRepo(scored, {
@@ -577,7 +583,7 @@ export async function resolveRepoBeforeRescore(repoSlug: string): Promise<Repo |
 export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null> {
   if (shouldSkipRepo(repoSlug)) return null
 
-  const gh = await fetchRepoBySlug(repoSlug)
+  const gh = await fetchRepoBySlug(repoSlug, { fresh: true })
   if (!gh) return null
 
   const raw: RawRepo = {
