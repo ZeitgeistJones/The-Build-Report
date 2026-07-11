@@ -40,6 +40,15 @@ export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
       getContractEthBalance(RECEIVER_BUY_AND_BURN),
     ])
 
+    // #region agent log
+    console.log('[rescore-count-debug]', JSON.stringify({
+      hypothesisId: 'E',
+      countRaw,
+      countRawType: typeof countRaw,
+      parsedAsNumberOnly: typeof countRaw === 'number' ? countRaw : 0,
+    }))
+    // #endregion
+
     return {
       count: typeof countRaw === 'number' ? countRaw : 0,
       ethContributed: typeof ethRaw === 'number' ? ethRaw : 0,

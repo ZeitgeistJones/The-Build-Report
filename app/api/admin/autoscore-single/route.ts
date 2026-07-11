@@ -214,6 +214,20 @@ export async function POST(req: NextRequest) {
     console.log('achievement report wallet:', walletAddress)
     reportFirstScanIfNeeded(walletAddress)
 
+    // #region agent log
+    {
+      const countBefore = await redis.get<number | string>('build-report:burns:rescore-count').catch(() => null)
+      console.log('[rescore-count-debug]', JSON.stringify({
+        hypothesisId: 'A',
+        isPromoPath,
+        countBefore,
+        countBeforeType: typeof countBefore,
+        willCallRecordRescoreBurn: !isPromoPath,
+      }))
+      fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',hypothesisId:'A',location:'autoscore-single/route.ts:post-pipeline',message:'rescore path before count update',data:{isPromoPath,countBefore,countBeforeType:typeof countBefore,willCallRecordRescoreBurn:!isPromoPath},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
+
     if (isPromoPath) {
       let payoutResult: Awaited<ReturnType<typeof sendPromoSplitReward>>
       try {
@@ -225,8 +239,23 @@ export async function POST(req: NextRequest) {
         )
         await incrementEthPendingOptimistic(promoBurnFundEth)
         scheduleBurnSnapshotSync()
+        // #region agent log
+        {
+          const countAfterPromo = await redis.get<number | string>('build-report:burns:rescore-count').catch(() => null)
+          console.log('[rescore-count-debug]', JSON.stringify({
+            hypothesisId: 'A-promo-exit',
+            countAfterPromo,
+            note: 'promo path does not call recordRescoreBurn',
+          }))
+          fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',hypothesisId:'A',location:'autoscore-single/route.ts:promo-success',message:'promo path completed without recordRescoreBurn',data:{countAfterPromo,promoBurnFundEth},timestamp:Date.now()})}).catch(()=>{});
+        }
+        // #endregion
       } catch (payoutErr) {
         console.error('[autoscore-single] promo payout failed after rescore:', payoutErr)
+        // #region agent log
+        console.log('[rescore-count-debug]', JSON.stringify({ hypothesisId: 'D', note: 'promo payout failed; count not incremented' }))
+        fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',hypothesisId:'D',location:'autoscore-single/route.ts:promo-payout-fail',message:'promo payout failed',data:{err:payoutErr instanceof Error ? payoutErr.message : String(payoutErr)},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         return NextResponse.json({
           ok: true,
           repo: pipeline.repo,
@@ -270,7 +299,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (paidKey) await redis.set(paidKey, `complete:${repoSlug}`)
+    // #region agent log
+    console.log('[rescore-count-debug]', JSON.stringify({ hypothesisId: 'B', note: 'calling recordRescoreBurn on paid path' }))
+    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',hypothesisId:'B',location:'autoscore-single/route.ts:paid-path',message:'about to recordRescoreBurn',data:{},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     await recordRescoreBurn(redis)
+    // #region agent log
+    {
+      const countAfterPaid = await redis.get<number | string>('build-report:burns:rescore-count').catch(() => null)
+      console.log('[rescore-count-debug]', JSON.stringify({ hypothesisId: 'B-after', countAfterPaid, countAfterType: typeof countAfterPaid }))
+      fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',hypothesisId:'B',location:'autoscore-single/route.ts:after-record',message:'after recordRescoreBurn',data:{countAfterPaid,countAfterType:typeof countAfterPaid},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
 
     return NextResponse.json({
       ok: true,
