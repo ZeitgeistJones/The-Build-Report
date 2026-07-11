@@ -39,24 +39,18 @@ export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
   try {
     const r = getRedis()
     const [countRaw, ethRaw, snapshot, ethPending] = await Promise.all([
-      r.get<number>(RESCORE_COUNT_KEY),
-      r.get<number>(ETH_TOTAL_KEY),
+      r.get<number | string>(RESCORE_COUNT_KEY),
+      r.get<number | string>(ETH_TOTAL_KEY),
       getBurnSnapshotForDisplay(),
       getContractEthBalance(RECEIVER_BUY_AND_BURN),
     ])
 
-    // #region agent log
-    console.log('[rescore-count-debug]', JSON.stringify({
-      hypothesisId: 'E',
-      countRaw,
-      countRawType: typeof countRaw,
-      parsedAsNumberOnly: typeof countRaw === 'number' ? countRaw : 0,
-    }))
-    // #endregion
+    const count = typeof countRaw === 'number' ? countRaw : Number(countRaw)
+    const ethContributed = typeof ethRaw === 'number' ? ethRaw : Number(ethRaw)
 
     return {
-      count: typeof countRaw === 'number' ? countRaw : 0,
-      ethContributed: typeof ethRaw === 'number' ? ethRaw : 0,
+      count: Number.isFinite(count) ? count : 0,
+      ethContributed: Number.isFinite(ethContributed) ? ethContributed : 0,
       ethPendingInReceiver: ethPending,
       clawdBurnedOnChain: snapshot.clawdBurned,
       lastBurnAt: snapshot.lastBurnAt,

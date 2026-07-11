@@ -170,25 +170,16 @@ async function sendTreasuryEth(
     throw err
   }
 
-  const publicClient = createBasePublicClient()
-  try {
-    const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 25_000 })
-    if (receipt.status !== 'success') {
-      throw new Error('Promo treasury transaction failed on-chain')
-    }
-    // #region agent log
-    console.log('[promo-treasury-nonce]', JSON.stringify({
-      event: 'send-confirmed',
-      to,
-      nonce,
-      hash,
-    }))
-    // #endregion
-    return { hash, confirmed: true }
-  } catch (err) {
-    console.warn('[promo-treasury] tx broadcast; receipt unconfirmed:', hash, err)
-    return { hash, confirmed: false }
-  }
+  // Broadcast only — waiting for receipts here regularly blew past route maxDuration
+  // (AI score + 2× confirmation) and skipped recordRescoreFundedCount. Client already
+  // treats payoutPending when confirmed is false.
+  console.log('[promo-treasury-nonce]', JSON.stringify({
+    event: 'send-broadcast',
+    to,
+    nonce,
+    hash,
+  }))
+  return { hash, confirmed: false }
 }
 
 async function sendTreasuryEthWithRetry(
@@ -286,7 +277,14 @@ export async function sendPromoSplitReward(
 
     const burnFundTx = await sendTreasuryEthWithRetry(RECEIVER_BUY_AND_BURN, burnFundWei, nonce)
     nonce += 1
-    const walletTx = await sendTreasuryEthWithRetry(getAddress(walletAddress), walletRewardWei, nonce)
-    return { burnFundTx, walletTx }
+    try {
+      const walletTx = await sendTreasuryEthWithRetry(getAddress(walletAddress), walletRewardWei, nonce)
+      return { burnFundTx, walletTx }
+    } catch (err) {
+      // Burn receiver already funded — surface that so callers can still bump the rescore counter.
+      const wrapped = err instanceof Error ? err : new Error(String(err))
+      ;(wrapped as Error & { burnFundTx?: PromoTxResult }).burnFundTx = burnFundTx
+      throw wrapped
+    }
   })
 }
