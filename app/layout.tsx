@@ -11,6 +11,7 @@ import RescorePromoBannerShell from '@/components/RescorePromoBannerShell'
 import { EthUsdProvider } from '@/components/EthUsdProvider'
 import { getEthUsdRateCached } from '@/lib/ethUsdRate'
 import { COLOR_THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY } from '@/lib/colorThemes'
+import { Analytics } from '@vercel/analytics/next'
 
 const SITE_URL = 'https://the-build-report.vercel.app'
 const SITE_TITLE = 'The Build Report'
@@ -116,6 +117,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </EthUsdProvider>
           </NormieModeProvider>
         </ColorThemeProvider>
+        <Analytics />
       </body>
     </html>
   )
