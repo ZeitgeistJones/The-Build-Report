@@ -1,82 +1,68 @@
-// Standalone replica of lib/clawdBurnIndex.ts fetchOnChainBurnTotals, run
-// against the public Base Blockscout API. Gives the *live* on-chain CLAWD-burned
-// total independently of the app's Redis cache, so we can tell whether the
-// homepage's "0" is a clobbered cache or a real on-chain change.
-const BLOCKSCOUT_V2 = 'https://base.blockscout.com/api/v2'
+// Live CLAWD-burned total via receiver Burned(uint256) RPC getLogs (same primary
+// path as lib/clawdBurnIndex.ts). Compares against Redis only when env is set.
+import { createPublicClient, defineChain, http, parseAbiItem } from 'viem'
+
 const RECEIVER = '0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad'
-const CLAWD = '0x9f86dB9fc6f7c9408e8Fda3Ff8ce4e78ac7a6b07'.toLowerCase()
-const DEAD_TOPIC = '0x000000000000000000000000000000000000000000000000000000000000dead'
-const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
-const EXECUTE_METHOD_ID = '61461954'
-const MAX_TX_PAGES = 10
+const FROM_BLOCK = BigInt(47_000_000)
+const CHUNK = BigInt(9_000)
+const BURNED = parseAbiItem('event Burned(uint256 amount)')
 
-async function getJson(url) {
-  try {
-    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) })
-    if (!res.ok) return { __err: `HTTP ${res.status}` }
-    return await res.json()
-  } catch (e) {
-    return { __err: String(e) }
-  }
-}
+const base = defineChain({
+  id: 8453,
+  name: 'Base',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: { default: { http: ['https://mainnet.base.org'] } },
+})
 
-function isExecuteTx(tx) {
-  if (tx.result && tx.result !== 'success' && tx.status && tx.status !== 'ok') return false
-  if (tx.method === 'execute') return true
-  const input = (tx.raw_input || '').toLowerCase().replace(/^0x/, '')
-  return input.startsWith(EXECUTE_METHOD_ID)
-}
+const rpc = process.env.BASE_RPC_URL || process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org'
+const client = createPublicClient({ chain: base, transport: http(rpc, { timeout: 20_000 }) })
 
-function clawdToDeadInLogs(logs) {
-  let total = 0n
-  for (const log of logs) {
-    if (log.address?.hash?.toLowerCase() !== CLAWD) continue
-    if (log.topics?.[0]?.toLowerCase() !== TRANSFER_TOPIC) continue
-    if (log.topics?.[2]?.toLowerCase() !== DEAD_TOPIC) continue
-    const fromDecoded = log.decoded?.parameters?.find(p => p.name === 'value')?.value
-    const raw = fromDecoded ?? log.total?.value ?? log.data
-    if (!raw) continue
-    try { total += BigInt(raw) } catch {}
-  }
-  return total
-}
-
+const latest = await client.getBlockNumber()
 let total = 0n
-let lastBurnAt = null
-let cursor
-let pages = 0
-let executeCount = 0
-let firstPageErr = null
+let lastBlock = null
+let chunks = 0
+const t0 = Date.now()
 
-while (pages < MAX_TX_PAGES) {
-  const url = new URL(`${BLOCKSCOUT_V2}/addresses/${RECEIVER}/transactions`)
-  if (cursor) for (const [k, v] of Object.entries(cursor)) if (v != null) url.searchParams.set(k, String(v))
-  const page = await getJson(url.toString())
-  if (page.__err) { if (pages === 0) firstPageErr = page.__err; break }
-  if (!page?.items?.length) break
-
-  console.log(`[burn-scan] page ${pages}: ${page.items.length} txs`)
-  for (const tx of page.items) {
-    if (!isExecuteTx(tx)) continue
-    executeCount++
-    const logsPage = await getJson(`${BLOCKSCOUT_V2}/transactions/${tx.hash}/logs`)
-    if (logsPage.__err || !logsPage?.items?.length) continue
-    const burned = clawdToDeadInLogs(logsPage.items)
-    total += burned
-    // Only attribute lastBurnAt to executes that actually destroyed CLAWD.
-    if (burned <= 0n) continue
-    const ts = tx.timestamp
-    if (ts && (!lastBurnAt || ts > lastBurnAt)) lastBurnAt = ts
+for (let start = FROM_BLOCK; start <= latest; start += CHUNK) {
+  const end = start + CHUNK - 1n > latest ? latest : start + CHUNK - 1n
+  const logs = await client.getLogs({
+    address: RECEIVER,
+    event: BURNED,
+    fromBlock: start,
+    toBlock: end,
+  })
+  for (const log of logs) {
+    const amount = log.args?.amount
+    if (typeof amount !== 'bigint' || amount <= 0n) continue
+    total += amount
+    if (log.blockNumber != null && (lastBlock === null || log.blockNumber > lastBlock)) {
+      lastBlock = log.blockNumber
+    }
   }
-  pages += 1
-  cursor = page.next_page_params ?? null
-  if (!cursor) break
+  chunks += 1
+  if (chunks % 20 === 0) {
+    console.error(`… ${chunks} chunks, through ${end}, ${Number(total) / 1e18} CLAWD`)
+  }
+  await new Promise(r => setTimeout(r, 100))
 }
 
-console.log('[burn-scan] RESULT', JSON.stringify({
-  firstPageErr,
-  pagesScanned: pages,
-  executeTxCount: executeCount,
-  clawdBurned: Number(total) / 1e18,
-  lastBurnAt,
-}))
+let lastBurnAt = null
+if (lastBlock != null) {
+  const block = await client.getBlock({ blockNumber: lastBlock })
+  lastBurnAt = new Date(Number(block.timestamp) * 1000).toISOString()
+}
+
+console.log(
+  JSON.stringify(
+    {
+      clawdBurned: Number(total) / 1e18,
+      lastBurnAt,
+      eventsIndexedThrough: String(latest),
+      chunks,
+      ms: Date.now() - t0,
+      rpc,
+    },
+    null,
+    2,
+  ),
+)

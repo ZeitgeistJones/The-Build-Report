@@ -33,6 +33,16 @@ manual rescore for accuracy unless a repo's own score predates the last flush.
   that fix, rescores could score hour-old README/root listings while summaries already saw live
   commits — which looked like the scorer “ignored” new work.
 
+## Burn tracker (CLAWD burned / last burn)
+
+- Source of truth: receiver `Burned(uint256)` via RPC `eth_getLogs`, checkpointed in Redis
+  (`build-report:burns:hub:rpc-index`). Base public RPC caps log ranges at 10k blocks — we
+  chunk at 9k, retry on rate limits, and resume across cron/sync runs. Blockscout is fallback only.
+- Homepage uses `getBurnSnapshotLiveMerged()` (`mode: 'display'`) — incremental catch-up only,
+  write-back when chain is ahead of the display snapshot. Cold backfill is cron/`syncBurnSnapshot`.
+- After `execute()`, `/api/burns/refresh` floors totals at pre+receipt amount so a mid-backfill
+  index cannot leave the new burn off the UI; `appliedFromTx` only when receipt/index actually applied.
+
 ## Grades model (quick orientation)
 
 Four **Ecosystem Grades** at the top of the homepage: Builder activity, Builder standards, and the

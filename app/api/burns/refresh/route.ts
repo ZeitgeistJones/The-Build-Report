@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { refreshBurnAfterExecute, syncBurnSnapshot } from '@/lib/burnSnapshot'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 
 const TX_HASH_RE = /^0x[a-fA-F0-9]{64}$/
 
@@ -26,15 +26,15 @@ export async function POST(req: NextRequest) {
           },
         })
       }
-      // RPC parse missed the burn (timing / wallet quirks) — fall back to full Blockscout sync.
     }
 
     const snapshot = await syncBurnSnapshot()
     return NextResponse.json({
       ok: true,
-      // Tell the execute button to reload whenever sync wrote a usable snapshot.
-      appliedFromTx: Boolean(snapshot.updatedAt),
+      // Only tell the UI to hard-reload when the chain index actually succeeded.
+      appliedFromTx: snapshot.scanOk,
       via: 'sync',
+      scanOk: snapshot.scanOk,
       snapshot,
     })
   } catch (err) {

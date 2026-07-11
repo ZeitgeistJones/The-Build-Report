@@ -21,6 +21,9 @@ export const SCORE_PAYMENT_WEI = BigInt('8000000000000') // 0.000008 ETH
 /** Burn required to submit community context. Same amount as a rescore for now. */
 export const CONTEXT_SUBMIT_WEI = SCORE_PAYMENT_WEI
 
+/** Earliest Base block to scan for receiver Burned events (chunked getLogs). */
+export const RECEIVER_BUY_AND_BURN_FROM_BLOCK = BigInt(47_000_000)
+
 export const RECEIVER_BUY_AND_BURN_ABI = [
   {
     name: 'execute',
@@ -28,6 +31,12 @@ export const RECEIVER_BUY_AND_BURN_ABI = [
     inputs: [],
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    // Emitted by execute() — amount is CLAWD sent to dead (param name varies by explorer).
+    name: 'Burned',
+    type: 'event',
+    inputs: [{ name: 'amount', type: 'uint256', indexed: false }],
   },
 ] as const
 

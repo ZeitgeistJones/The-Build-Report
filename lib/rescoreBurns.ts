@@ -3,7 +3,7 @@ import { getRedis } from '@/lib/redis'
 import { SCORE_PAYMENT_WEI, RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
 import { getContractEthBalance } from '@/lib/clawdBurnIndex'
 import {
-  getBurnSnapshotForDisplay,
+  getBurnSnapshotLiveMerged,
   incrementEthPendingOptimistic,
   scheduleBurnSnapshotSync,
 } from '@/lib/burnSnapshot'
@@ -41,7 +41,7 @@ export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
     const [countRaw, ethRaw, snapshot, ethPending] = await Promise.all([
       r.get<number | string>(RESCORE_COUNT_KEY),
       r.get<number | string>(ETH_TOTAL_KEY),
-      getBurnSnapshotForDisplay(),
+      getBurnSnapshotLiveMerged(),
       getContractEthBalance(RECEIVER_BUY_AND_BURN),
     ])
 
@@ -51,6 +51,7 @@ export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
     return {
       count: Number.isFinite(count) ? count : 0,
       ethContributed: Number.isFinite(ethContributed) ? ethContributed : 0,
+      // Live ETH balance is authoritative; snapshot merge may be slightly stale on write-back.
       ethPendingInReceiver: ethPending,
       clawdBurnedOnChain: snapshot.clawdBurned,
       lastBurnAt: snapshot.lastBurnAt,

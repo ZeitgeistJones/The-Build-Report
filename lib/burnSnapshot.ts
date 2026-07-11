@@ -1,7 +1,12 @@
 import { createPublicClient, defineChain, http } from 'viem'
 import { getRedis } from '@/lib/redis'
 import { BASE_CHAIN_ID, RECEIVER_BUY_AND_BURN } from '@/lib/web3/constants'
-import { fetchOnChainBurnTotals, getContractEthBalance, clawdToDeadFromRpcLogs } from '@/lib/clawdBurnIndex'
+import {
+  fetchOnChainBurnTotals,
+  getContractEthBalance,
+  clawdBurnedFromExecuteReceipt,
+  type OnChainBurnTotals,
+} from '@/lib/clawdBurnIndex'
 
 const base = defineChain({
   id: BASE_CHAIN_ID,
@@ -23,10 +28,31 @@ const UPDATED_AT_KEY = 'build-report:burns:hub:updatedAt'
 const ETH_PENDING_KEY = 'build-report:burns:hub:ethPending'
 const APPLIED_TX_PREFIX = 'build-report:burns:applied-tx:'
 const LEGACY_ONCHAIN_CACHE_KEY = 'build-report:burns:onchain-cache'
+const SYNC_LOCK_KEY = 'build-report:burns:hub:sync-lock'
 
 function mergeClawdBurned(existing: number, scanned: number, scanOk: boolean): number {
   if (!scanOk) return existing
   return scanned >= existing ? scanned : existing
+}
+
+function mergeLastBurnAt(
+  existing: string | null,
+  scanned: string | null,
+  scanOk: boolean,
+): string | null {
+  if (!scanOk) return existing
+  if (!scanned) return existing
+  if (!existing) return scanned
+  return scanned >= existing ? scanned : existing
+}
+
+function parseRedisNumber(raw: unknown): number | null {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
 }
 
 export type BurnSnapshot = {
@@ -36,8 +62,12 @@ export type BurnSnapshot = {
   ethPendingInReceiver: number
 }
 
-/** Slow path — Blockscout scan. Call from cron/admin only. */
-export async function syncBurnSnapshot(): Promise<BurnSnapshot> {
+export type BurnSyncResult = BurnSnapshot & {
+  scanOk: boolean
+}
+
+/** Authoritative on-chain resync (RPC Burned events, Blockscout fallback). */
+export async function syncBurnSnapshot(): Promise<BurnSyncResult> {
   const [totals, ethPending, existing] = await Promise.all([
     fetchOnChainBurnTotals([RECEIVER_BUY_AND_BURN]),
     getContractEthBalance(RECEIVER_BUY_AND_BURN),
@@ -47,8 +77,7 @@ export async function syncBurnSnapshot(): Promise<BurnSnapshot> {
   const scanOk = totals.ok
   const snapshot: BurnSnapshot = {
     clawdBurned: mergeClawdBurned(existing.clawdBurned, totals.clawdBurned, scanOk),
-    // Successful scan is authoritative for lastBurnAt (monotonic merge could stick a bad/future date).
-    lastBurnAt: scanOk ? totals.lastBurnAt : existing.lastBurnAt,
+    lastBurnAt: mergeLastBurnAt(existing.lastBurnAt, totals.lastBurnAt, scanOk),
     updatedAt: scanOk ? updatedAt : (existing.updatedAt ?? updatedAt),
     ethPendingInReceiver: ethPending,
   }
@@ -67,34 +96,35 @@ export async function syncBurnSnapshot(): Promise<BurnSnapshot> {
 
   await Promise.all(writes)
 
-  return snapshot
+  return { ...snapshot, scanOk }
 }
 
 export type BurnRefreshResult = BurnSnapshot & {
   appliedFromTx: boolean
+  scanOk?: boolean
 }
 
-/** Fast path after execute() — parse receipt via RPC and bump cached totals. */
+/** Fast path after execute() — receipt amount + chain index; never leave totals stale. */
 export async function refreshBurnAfterExecute(txHash: `0x${string}`): Promise<BurnRefreshResult> {
   const r = getRedis()
   const appliedKey = `${APPLIED_TX_PREFIX}${txHash.toLowerCase()}`
   const ethPendingInReceiver = await getContractEthBalance(RECEIVER_BUY_AND_BURN)
   await r.set(ETH_PENDING_KEY, ethPendingInReceiver)
 
+  // Already applied — still re-sync from chain so amount/time cannot stay stale.
   if (await r.get(appliedKey)) {
-    const snapshot = await getBurnSnapshotForDisplay()
-    return { ...snapshot, ethPendingInReceiver, appliedFromTx: true }
+    const synced = await syncBurnSnapshot()
+    return { ...synced, ethPendingInReceiver: synced.ethPendingInReceiver, appliedFromTx: synced.scanOk }
   }
 
   const client = createBaseClient()
   let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>> | null = null
 
   try {
-    // Prefer receipt only — EIP-7702 / smart-wallet txs can make getTransaction().to flaky.
     receipt = await client.getTransactionReceipt({ hash: txHash })
   } catch {
-    const snapshot = await getBurnSnapshotForDisplay()
-    return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }
+    const synced = await syncBurnSnapshot()
+    return { ...synced, appliedFromTx: false }
   }
 
   if (
@@ -102,35 +132,41 @@ export async function refreshBurnAfterExecute(txHash: `0x${string}`): Promise<Bu
     receipt.status !== 'success' ||
     receipt.to?.toLowerCase() !== RECEIVER_BUY_AND_BURN.toLowerCase()
   ) {
-    const snapshot = await getBurnSnapshotForDisplay()
-    return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }
+    const synced = await syncBurnSnapshot()
+    return { ...synced, appliedFromTx: false }
   }
 
-  const clawdFromTx = clawdToDeadFromRpcLogs(receipt.logs)
-  if (clawdFromTx <= BigInt(0)) {
-    const snapshot = await getBurnSnapshotForDisplay()
-    return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }
-  }
+  const clawdFromTx = clawdBurnedFromExecuteReceipt(receipt.logs)
+  const pre = await getBurnSnapshotForDisplay()
+  const synced = await syncBurnSnapshot()
 
-  const existing = await getBurnSnapshotForDisplay()
-  const clawdBurned = existing.clawdBurned + Number(clawdFromTx) / 1e18
-
-  let lastBurnAt: string | null = null
+  let lastBurnAtFromTx: string | null = null
   try {
     const block = await client.getBlock({ blockHash: receipt.blockHash })
-    lastBurnAt = new Date(Number(block.timestamp) * 1000).toISOString()
+    lastBurnAtFromTx = new Date(Number(block.timestamp) * 1000).toISOString()
   } catch {
     try {
       const block = await client.getBlock({ blockNumber: receipt.blockNumber })
-      lastBurnAt = new Date(Number(block.timestamp) * 1000).toISOString()
+      lastBurnAtFromTx = new Date(Number(block.timestamp) * 1000).toISOString()
     } catch {
-      // Don't bump the amount while leaving a stale lastBurnAt — full resync instead.
-      const synced = await syncBurnSnapshot()
-      await r.set(appliedKey, 1, { ex: 60 * 60 * 24 * 30 })
-      return { ...synced, ethPendingInReceiver, appliedFromTx: true }
+      lastBurnAtFromTx = null
     }
   }
 
+  if (clawdFromTx <= BigInt(0) && !synced.scanOk) {
+    return { ...synced, ethPendingInReceiver, appliedFromTx: false }
+  }
+
+  // Absolute index when caught up; otherwise floor at pre+tx so a mid-backfill sync
+  // cannot claim success while leaving this execute off the displayed total.
+  const fromReceipt =
+    clawdFromTx > BigInt(0) ? pre.clawdBurned + Number(clawdFromTx) / 1e18 : pre.clawdBurned
+  const clawdBurned = Math.max(synced.clawdBurned, fromReceipt)
+  const lastBurnAt = mergeLastBurnAt(
+    mergeLastBurnAt(pre.lastBurnAt, synced.lastBurnAt, synced.scanOk),
+    lastBurnAtFromTx,
+    Boolean(lastBurnAtFromTx),
+  )
   const updatedAt = new Date().toISOString()
 
   await Promise.all([
@@ -147,26 +183,28 @@ export async function refreshBurnAfterExecute(txHash: `0x${string}`): Promise<Bu
     updatedAt,
     ethPendingInReceiver,
     appliedFromTx: true,
+    scanOk: synced.scanOk,
   }
 }
 
-/** Fast path — KV read only. Never hits Blockscout. */
+/** Fast path — KV read only. */
 export async function getBurnSnapshotForDisplay(): Promise<BurnSnapshot> {
   try {
     const r = getRedis()
     const [clawdBurnedRaw, lastBurnAt, updatedAt, ethPendingRaw] = await Promise.all([
-      r.get<number>(CLAWD_BURNED_KEY),
+      r.get<number | string>(CLAWD_BURNED_KEY),
       r.get<string | null>(LAST_BURN_AT_KEY),
       r.get<string | null>(UPDATED_AT_KEY),
-      r.get<number>(ETH_PENDING_KEY),
+      r.get<number | string>(ETH_PENDING_KEY),
     ])
 
-    if (typeof clawdBurnedRaw === 'number') {
+    const clawdBurned = parseRedisNumber(clawdBurnedRaw)
+    if (clawdBurned != null) {
       return {
-        clawdBurned: clawdBurnedRaw,
+        clawdBurned,
         lastBurnAt: lastBurnAt ?? null,
         updatedAt: updatedAt ?? null,
-        ethPendingInReceiver: typeof ethPendingRaw === 'number' ? ethPendingRaw : 0,
+        ethPendingInReceiver: parseRedisNumber(ethPendingRaw) ?? 0,
       }
     }
 
@@ -176,7 +214,7 @@ export async function getBurnSnapshotForDisplay(): Promise<BurnSnapshot> {
         clawdBurned: legacy.clawdBurned,
         lastBurnAt: legacy.lastBurnAt ?? null,
         updatedAt: new Date().toISOString(),
-        ethPendingInReceiver: typeof ethPendingRaw === 'number' ? ethPendingRaw : 0,
+        ethPendingInReceiver: parseRedisNumber(ethPendingRaw) ?? 0,
       }
       await Promise.all([
         r.set(CLAWD_BURNED_KEY, migrated.clawdBurned),
@@ -192,9 +230,71 @@ export async function getBurnSnapshotForDisplay(): Promise<BurnSnapshot> {
   }
 }
 
-/** Fire-and-forget refresh after rescore — does not block the caller. */
+/**
+ * Display totals: live RPC index when available, Redis otherwise.
+ * Write-back keeps Redis from drifting after executes the client refresh missed.
+ */
+export async function getBurnSnapshotLiveMerged(): Promise<BurnSnapshot> {
+  const [cached, ethPending, live] = await Promise.all([
+    getBurnSnapshotForDisplay(),
+    getContractEthBalance(RECEIVER_BUY_AND_BURN),
+    fetchOnChainBurnTotals([RECEIVER_BUY_AND_BURN], { mode: 'display' }).catch(
+      (): OnChainBurnTotals => ({
+        clawdBurned: 0,
+        lastBurnAt: null,
+        ok: false,
+        caughtUp: false,
+      }),
+    ),
+  ])
+
+  if (!live.ok || live.caughtUp === false) {
+    scheduleBurnSnapshotSync()
+  }
+
+  if (!live.ok) {
+    return { ...cached, ethPendingInReceiver: ethPending }
+  }
+
+  const clawdBurned = Math.max(cached.clawdBurned, live.clawdBurned)
+  const lastBurnAt = mergeLastBurnAt(cached.lastBurnAt, live.lastBurnAt, true)
+  const updatedAt = new Date().toISOString()
+  const merged: BurnSnapshot = {
+    clawdBurned,
+    lastBurnAt,
+    updatedAt,
+    ethPendingInReceiver: ethPending,
+  }
+
+  const drifted =
+    clawdBurned > cached.clawdBurned + 1e-9 ||
+    (lastBurnAt != null && lastBurnAt !== cached.lastBurnAt)
+
+  if (drifted) {
+    const r = getRedis()
+    void Promise.all([
+      r.set(CLAWD_BURNED_KEY, clawdBurned),
+      r.set(LAST_BURN_AT_KEY, lastBurnAt),
+      r.set(UPDATED_AT_KEY, updatedAt),
+      r.set(ETH_PENDING_KEY, ethPending),
+    ]).catch(() => {})
+  }
+
+  return merged
+}
+
+/** Fire-and-forget refresh — locked so homepage traffic cannot stampede RPC backfill. */
 export function scheduleBurnSnapshotSync(): void {
-  void syncBurnSnapshot().catch(() => {})
+  void (async () => {
+    try {
+      const r = getRedis()
+      const got = await r.set(SYNC_LOCK_KEY, 1, { nx: true, ex: 90 })
+      if (!got) return
+      await syncBurnSnapshot()
+    } catch {
+      // non-blocking
+    }
+  })()
 }
 
 /** Optimistic bump until the next on-chain sync overwrites ETH_PENDING_KEY. */
