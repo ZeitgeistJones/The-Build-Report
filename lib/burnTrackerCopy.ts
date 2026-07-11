@@ -11,7 +11,7 @@ export const CLAWD_BURNED_TOOLTIP =
   'Cumulative CLAWD sent to dead from execute() on the receiver contract — counted on-chain via Blockscout.'
 
 export const RESCORE_COUNT_TOOLTIP =
-  'Paid rescores that funded ETH into the receiver. CLAWD burned only increases after someone calls execute().'
+  'Score/Rescore runs that funded ETH into the receiver (paid fees or promo burn subsidy). CLAWD burned only increases after someone calls execute().'
 
 /** Combined tooltip for the burn tracker stat card headline. */
 export const BURN_TRACKER_TOOLTIP = [
