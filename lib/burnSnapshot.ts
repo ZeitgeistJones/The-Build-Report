@@ -88,13 +88,10 @@ export async function refreshBurnAfterExecute(txHash: `0x${string}`): Promise<Bu
 
   const client = createBaseClient()
   let receipt: Awaited<ReturnType<typeof client.getTransactionReceipt>> | null = null
-  let tx: Awaited<ReturnType<typeof client.getTransaction>> | null = null
 
   try {
-    ;[receipt, tx] = await Promise.all([
-      client.getTransactionReceipt({ hash: txHash }),
-      client.getTransaction({ hash: txHash }),
-    ])
+    // Prefer receipt only — EIP-7702 / smart-wallet txs can make getTransaction().to flaky.
+    receipt = await client.getTransactionReceipt({ hash: txHash })
   } catch {
     const snapshot = await getBurnSnapshotForDisplay()
     return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }
@@ -103,7 +100,7 @@ export async function refreshBurnAfterExecute(txHash: `0x${string}`): Promise<Bu
   if (
     !receipt ||
     receipt.status !== 'success' ||
-    tx?.to?.toLowerCase() !== RECEIVER_BUY_AND_BURN.toLowerCase()
+    receipt.to?.toLowerCase() !== RECEIVER_BUY_AND_BURN.toLowerCase()
   ) {
     const snapshot = await getBurnSnapshotForDisplay()
     return { ...snapshot, ethPendingInReceiver, appliedFromTx: false }

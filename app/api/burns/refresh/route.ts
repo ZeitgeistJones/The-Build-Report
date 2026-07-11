@@ -14,21 +14,27 @@ export async function POST(req: NextRequest) {
 
     if (txHash && TX_HASH_RE.test(txHash)) {
       const snapshot = await refreshBurnAfterExecute(txHash as `0x${string}`)
-      return NextResponse.json({
-        ok: true,
-        appliedFromTx: snapshot.appliedFromTx,
-        snapshot: {
-          clawdBurned: snapshot.clawdBurned,
-          lastBurnAt: snapshot.lastBurnAt,
-          ethPendingInReceiver: snapshot.ethPendingInReceiver,
-        },
-      })
+      if (snapshot.appliedFromTx) {
+        return NextResponse.json({
+          ok: true,
+          appliedFromTx: true,
+          via: 'tx',
+          snapshot: {
+            clawdBurned: snapshot.clawdBurned,
+            lastBurnAt: snapshot.lastBurnAt,
+            ethPendingInReceiver: snapshot.ethPendingInReceiver,
+          },
+        })
+      }
+      // RPC parse missed the burn (timing / wallet quirks) — fall back to full Blockscout sync.
     }
 
     const snapshot = await syncBurnSnapshot()
     return NextResponse.json({
       ok: true,
-      appliedFromTx: false,
+      // Tell the execute button to reload whenever sync wrote a usable snapshot.
+      appliedFromTx: Boolean(snapshot.updatedAt),
+      via: 'sync',
       snapshot,
     })
   } catch (err) {

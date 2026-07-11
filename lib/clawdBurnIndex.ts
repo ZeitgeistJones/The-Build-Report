@@ -17,7 +17,8 @@ const TRANSFER_TOPIC =
 const EXECUTE_METHOD_ID = '61461954'
 const MAX_TX_PAGES = 10
 const FETCH_TIMEOUT_MS = 8_000
-const BURN_INDEX_BUDGET_MS = 12_000
+/** Cron/refresh routes allow up to 60s; keep headroom under that. */
+const BURN_INDEX_BUDGET_MS = 45_000
 
 export type OnChainBurnTotals = {
   clawdBurned: number
@@ -153,19 +154,19 @@ async function fetchOnChainBurnTotalsInner(
       )
       if (!page?.items?.length) break
 
-      for (const tx of page.items) {
-        if (!isExecuteTx(tx)) continue
-
-        const logsPage = await fetchBlockscout<TxLogsPage>(
-          `${BLOCKSCOUT_V2}/transactions/${tx.hash}/logs`,
-        )
-        if (!logsPage?.items?.length) continue
-
-        const burned = clawdToDeadInLogs(logsPage.items)
+      const executeTxs = page.items.filter(isExecuteTx)
+      const burnedPerTx = await Promise.all(
+        executeTxs.map(async tx => {
+          const logsPage = await fetchBlockscout<TxLogsPage>(
+            `${BLOCKSCOUT_V2}/transactions/${tx.hash}/logs`,
+          )
+          if (!logsPage?.items?.length) return { burned: BigInt(0), ts: null as string | null }
+          const burned = clawdToDeadInLogs(logsPage.items)
+          return { burned, ts: burned > BigInt(0) ? (tx.timestamp ?? null) : null }
+        }),
+      )
+      for (const { burned, ts } of burnedPerTx) {
         total += burned
-        // Only attribute lastBurnAt to executes that actually destroyed CLAWD.
-        if (burned <= BigInt(0)) continue
-        const ts = tx.timestamp
         if (ts && (!lastBurnAt || ts > lastBurnAt)) lastBurnAt = ts
       }
 
