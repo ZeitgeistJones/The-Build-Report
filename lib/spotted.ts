@@ -214,7 +214,7 @@ export async function getPublishedEntries(): Promise<SpottedEntry[]> {
     if (!ids.length) return []
     const values = await redis.mget<(SpottedEntry | null)[]>(...ids.map(entryKey))
     return values
-      .filter((v): v is SpottedEntry => Boolean(v) && (v.status === 'published' || v.status === 'archived'))
+      .filter((v): v is SpottedEntry => v != null && (v.status === 'published' || v.status === 'archived'))
       .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
   } catch {
     return []
@@ -272,7 +272,7 @@ export async function getLatestPublished(): Promise<SpottedEntry | null> {
     const ids = (await redis.smembers<string[]>(PUBLISHED_SET_KEY)) ?? []
     if (!ids.length) return null
     const values = await redis.mget<(SpottedEntry | null)[]>(...ids.map(entryKey))
-    const valid = values.filter((v): v is SpottedEntry => Boolean(v) && v.status === 'published')
+    const valid = values.filter((v): v is SpottedEntry => v != null && v.status === 'published')
     if (!valid.length) return null
     const latest = valid.sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))[0]
     return ensureSpottedWriteupNormie(latest)
@@ -290,7 +290,7 @@ export async function listPublishedSpotted(sinceIso: string): Promise<SpottedEnt
     const values = await redis.mget<(SpottedEntry | null)[]>(...ids.map(entryKey))
     const sinceMs = Date.parse(sinceIso)
     return values
-      .filter((v): v is SpottedEntry => Boolean(v) && (v.status === 'published' || v.status === 'archived'))
+      .filter((v): v is SpottedEntry => v != null && (v.status === 'published' || v.status === 'archived'))
       .filter(v => v.publishedAt && Date.parse(v.publishedAt) >= sinceMs)
       .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
   } catch {
