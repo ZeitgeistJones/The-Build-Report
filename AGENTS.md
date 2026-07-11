@@ -21,6 +21,18 @@ re-scored everything after that — so the infra/indirect/theoretical ("leverage
 genuine `shippingLeverage` scores, not token-mechanic approximations. Don't assume repos need a
 manual rescore for accuracy unless a repo's own score predates the last flush.
 
+## Rescore evidence vs “what changed”
+
+- The **score** model sees repo metadata + **root file names / README excerpt / CI-test flags** —
+  not commit messages. Flat grades with ambitious commit titles usually mean thin tree evidence,
+  not a skipped rescore.
+- Commit messages feed only the **change-summary** blurb. That blurb must not invent
+  “scored an older snapshot / before these commits” stories after a live rescore.
+- **Jul 11, 2026:** paid/promo rescores pass `fresh: true` into `fetchRepoEvidence` /
+  `fetchRepoBySlug` (`cache: 'no-store'`). Cron/bulk may still use the 1h cached path. Before
+  that fix, rescores could score hour-old README/root listings while summaries already saw live
+  commits — which looked like the scorer “ignored” new work.
+
 ## Grades model (quick orientation)
 
 Four **Ecosystem Grades** at the top of the homepage: Builder activity, Builder standards, and the
