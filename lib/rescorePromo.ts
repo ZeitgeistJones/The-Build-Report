@@ -119,7 +119,7 @@ export function isUnscoredPromoActivity(activity: RepoActivitySnapshot): boolean
   return !activity.scoredAt?.trim()
 }
 
-/** Commits after GitHub repo creation — drops inherited fork history for first-Score earn. */
+/** Commits on/after GitHub repo creation — drops inherited fork history for first-Score earn. */
 export function countCommitsAfterRepoCreated(activity: RepoActivitySnapshot): number {
   const createdMs = activity.createdAt ? new Date(activity.createdAt).getTime() : NaN
   const hasCreated = Number.isFinite(createdMs)
@@ -128,18 +128,19 @@ export function countCommitsAfterRepoCreated(activity: RepoActivitySnapshot): nu
     const count = activity.commitTimestamps.filter(ts => {
       const ms = new Date(ts).getTime()
       if (!Number.isFinite(ms)) return false
-      // Strictly after fork/create so parent history at/before create doesn't pay.
-      return !hasCreated || ms > createdMs
+      // On/after create: brand-new repos' first commit often shares created_at.
+      // Fork parent history is still older than the fork's created_at, so it stays excluded.
+      return !hasCreated || ms >= createdMs
     }).length
     return Math.min(count, COMMIT_CAP)
   }
 
-  // No timestamp scan — only credit activity that landed after the repo existed.
+  // No timestamp scan — credit activity that landed on/after the repo existed.
   for (const raw of [activity.lastCommitAt, activity.pushedAt]) {
     if (!raw) continue
     const ms = new Date(raw).getTime()
     if (!Number.isFinite(ms)) continue
-    if (!hasCreated || ms > createdMs) return 1
+    if (!hasCreated || ms >= createdMs) return 1
   }
   return 0
 }
