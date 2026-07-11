@@ -54,6 +54,25 @@ function summaryContradictsDeltas(text: string, deltas: RescoreAggregateDelta): 
   return false
 }
 
+/** Invented "we scored an older snapshot / before these commits" excuses — false for a live rescore. */
+function summaryClaimsStaleSnapshot(text: string): boolean {
+  const lower = text.toLowerCase()
+  return (
+    /\b(scoring snapshot|scored (state|before)|before (these|the) (substantive )?commits were added|before these substantive commits|prior to (these|the) commits|outdated (score|snapshot))\b/.test(
+      lower,
+    ) ||
+    /\b(re-?evaluat(e|ed|ion) in the next|should be re-?(scored|evaluated) (in|on) the next)\b/.test(lower)
+  )
+}
+
+function fallbackFlatSummary(deltas: RescoreAggregateDelta): string {
+  const bothFlat = deltas.economic.label === 'flat' && deltas.builderIntegrity.label === 'flat'
+  if (bothFlat) {
+    return 'Scores stayed flat. Commit messages may describe more ambition than the current repo evidence supports for the rubric.'
+  }
+  return 'Scores shifted as shown above. Recent commits may not yet move every rubric level.'
+}
+
 export async function generateRescoreChangeSummary(params: {
   oldRepo: Repo | null
   newRepo: Repo
@@ -72,7 +91,7 @@ export async function generateRescoreChangeSummary(params: {
     ? commitMessages.map(m => `- ${m}`).join('\n')
     : '- No recent commit messages available'
 
-  const prompt = `These are the old and new scores for this repo. Recent commits are provided.
+  const prompt = `These are the old and new scores from a live rescore that just ran on the current repo. Recent commits are context only.
 
 COMPUTED DELTAS (authoritative — your narrative MUST match these directions):
 ${deltaHeader}
@@ -83,17 +102,19 @@ ${rowChanges}
 OLD SCORES:
 ${oldRepo ? formatRepoScores(oldRepo) : 'No prior score on record.'}
 
-NEW SCORES:
+NEW SCORES (this rescore — current repo evidence):
 ${formatRepoScores(newRepo)}
 
 RECENT COMMITS:
 ${commitsBlock}
 
-Write 1-2 sentences explaining what changed and why, grounded in the commits. Rules:
-- If a score is flat, say it stayed flat — do not claim it rose or fell.
+Write 1-2 sentences explaining what changed and why. Rules:
+- NEW SCORES already reflect this rescore of the current repo. Never say scores ignored newer commits, used an older snapshot, scored before these commits landed, or should wait for a "next cycle" to count them.
+- If a score is flat, say it stayed flat because the current evidence still supports that level — e.g. commit messages sound ahead of what the tree/README actually show. Do not invent timing excuses.
 - If a score fell, do not say it should rise or improved.
 - If a score rose, do not say it declined.
 - Mention specific rubric rows only when they changed in RUBRIC ROW CHANGES above.
+- Do not promise a future rescore will fix the grade.
 Plain English, no markdown.`
 
   try {
@@ -106,8 +127,8 @@ Plain English, no markdown.`
     let text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
     text = text ? stripMarkdown(text) : ''
 
-    if (text && summaryContradictsDeltas(text, deltas)) {
-      text = `Scores ${deltas.economic.label === 'flat' && deltas.builderIntegrity.label === 'flat' ? 'unchanged overall' : 'shifted as shown above'}. Recent commits may not yet move rubric levels.`
+    if (text && (summaryContradictsDeltas(text, deltas) || summaryClaimsStaleSnapshot(text))) {
+      text = fallbackFlatSummary(deltas)
     }
 
     return { summary: text || null, deltaHeader }
