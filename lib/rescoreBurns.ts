@@ -30,6 +30,11 @@ export async function recordRescoreBurn(redisClient: Redis): Promise<void> {
   scheduleBurnSnapshotSync()
 }
 
+/** Promo path already tracks ETH pending separately — only bump the funded-rescore counter. */
+export async function recordRescoreFundedCount(redisClient: Redis): Promise<void> {
+  await redisClient.incr(RESCORE_COUNT_KEY)
+}
+
 export async function getRescoreBurnStats(): Promise<RescoreBurnStats | null> {
   try {
     const r = getRedis()

@@ -5,7 +5,7 @@ import { shouldSkipRepo } from '@/lib/repoFilters'
 import { isRepoExcluded } from '@/lib/repoExclude'
 import { fetchRecentCommitMessages, fetchCommits30dCount } from '@/lib/github'
 import { bustOverallSummaryCache } from '@/lib/overallSummary'
-import { recordRescoreBurn } from '@/lib/rescoreBurns'
+import { recordRescoreBurn, recordRescoreFundedCount } from '@/lib/rescoreBurns'
 import { generateRescoreChangeSummary } from '@/lib/rescoreChangeSummary'
 import { buildRescoreSummaryRecord, saveRescoreSummary } from '@/lib/rescoreSummaries'
 import { isCommunityContextEnabled, markAcceptedConsumed } from '@/lib/communityContext'
@@ -239,15 +239,17 @@ export async function POST(req: NextRequest) {
         )
         await incrementEthPendingOptimistic(promoBurnFundEth)
         scheduleBurnSnapshotSync()
+        await recordRescoreFundedCount(redis)
         // #region agent log
         {
           const countAfterPromo = await redis.get<number | string>('build-report:burns:rescore-count').catch(() => null)
           console.log('[rescore-count-debug]', JSON.stringify({
             hypothesisId: 'A-promo-exit',
+            runId: 'post-fix',
             countAfterPromo,
-            note: 'promo path does not call recordRescoreBurn',
+            note: 'promo path now calls recordRescoreFundedCount',
           }))
-          fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',hypothesisId:'A',location:'autoscore-single/route.ts:promo-success',message:'promo path completed without recordRescoreBurn',data:{countAfterPromo,promoBurnFundEth},timestamp:Date.now()})}).catch(()=>{});
+          fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'post-fix',hypothesisId:'A',location:'autoscore-single/route.ts:promo-success',message:'promo path after recordRescoreFundedCount',data:{countAfterPromo,promoBurnFundEth},timestamp:Date.now()})}).catch(()=>{});
         }
         // #endregion
       } catch (payoutErr) {
