@@ -211,6 +211,7 @@ export async function POST(req: NextRequest) {
       throw err
     }
 
+    console.log('achievement report wallet:', walletAddress)
     reportFirstScanIfNeeded(walletAddress)
 
     if (isPromoPath) {
