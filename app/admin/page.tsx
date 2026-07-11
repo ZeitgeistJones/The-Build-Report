@@ -58,6 +58,7 @@ export default function AdminPage() {
     authorName: string
     tweetUrl: string
     publishedAt: string | null
+    status?: string
   }>>([])
   const [spottedActionBusy, setSpottedActionBusy] = useState<string | null>(null)
   const [refreshRunning, setRefreshRunning] = useState(false)
@@ -292,6 +293,26 @@ export default function AdminPage() {
       })
       const data = await res.json()
       if (data.ok) {
+        setPublishedMentions(prev =>
+          prev.map(m => (m.id === id ? { ...m, status: 'archived' as const } : m)),
+        )
+      }
+    } catch {
+      // ignore
+    }
+    setMentionActionBusy(null)
+  }
+
+  async function removePublishedFromArchives(id: string) {
+    setMentionActionBusy(id)
+    try {
+      const res = await fetch('/api/admin/podcast-mentions-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'removeFromArchives', id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
         setPublishedMentions(prev => prev.filter(m => m.id !== id))
         setEditingMentionIds(prev => prev.filter(x => x !== id))
       }
@@ -425,6 +446,26 @@ export default function AdminPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password, action: 'takeDown', id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setSpottedPublishedList(prev =>
+          prev.map(d => (d.id === id ? { ...d, status: 'archived' } : d)),
+        )
+      }
+    } catch {
+      // ignore
+    }
+    setSpottedActionBusy(null)
+  }
+
+  async function removeSpottedFromArchives(id: string) {
+    setSpottedActionBusy(id)
+    try {
+      const res = await fetch('/api/admin/spotted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'removeFromArchives', id }),
       })
       const data = await res.json()
       if (data.ok) {
@@ -1153,13 +1194,13 @@ export default function AdminPage() {
           {mentionsListLoading ? 'Loading…' : 'Load candidates, pending & published'}
         </button>
 
-        {publishedMentions.length > 0 && (
+        {publishedMentions.filter(m => m.status === 'published').length > 0 && (
           <>
             <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
-              Published live ({publishedMentions.length})
+              Published live ({publishedMentions.filter(m => m.status === 'published').length})
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-              {publishedMentions.map(m => (
+              {publishedMentions.filter(m => m.status === 'published').map(m => (
                 <OverheardAdminEntryCard
                   key={m.id}
                   entry={m}
@@ -1170,6 +1211,31 @@ export default function AdminPage() {
                   onToggleEdit={() => toggleMentionEdit(m.id, m)}
                   onSave={() => void saveMentionEdit(m.id)}
                   onTakeDown={() => void takeDownPublished(m.id)}
+                  onRemoveFromArchives={() => void removePublishedFromArchives(m.id)}
+                  onMoveToPending={() => void movePublishedToPending(m.id)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {publishedMentions.filter(m => m.status === 'archived').length > 0 && (
+          <>
+            <div style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px' }}>
+              In archives only ({publishedMentions.filter(m => m.status === 'archived').length})
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              {publishedMentions.filter(m => m.status === 'archived').map(m => (
+                <OverheardAdminEntryCard
+                  key={m.id}
+                  entry={m}
+                  editing={editingMentionIds.includes(m.id)}
+                  draft={mentionEditDrafts[m.id] ?? mentionToEditDraft(m)}
+                  busyKey={mentionActionBusy}
+                  onDraftChange={draft => setMentionEditDrafts(prev => ({ ...prev, [m.id]: draft }))}
+                  onToggleEdit={() => toggleMentionEdit(m.id, m)}
+                  onSave={() => void saveMentionEdit(m.id)}
+                  onRemoveFromArchives={() => void removePublishedFromArchives(m.id)}
                   onMoveToPending={() => void movePublishedToPending(m.id)}
                 />
               ))}
@@ -1410,13 +1476,80 @@ export default function AdminPage() {
           Load drafts &amp; published
         </button>
 
-        {spottedPublishedList.length > 0 && (
+        {spottedPublishedList.filter(d => d.status !== 'archived').length > 0 && (
           <div style={{ marginTop: '16px' }}>
             <h3 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-secondary)' }}>
-              Published live ({spottedPublishedList.length})
+              Published live ({spottedPublishedList.filter(d => d.status !== 'archived').length})
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {spottedPublishedList.map(d => (
+              {spottedPublishedList.filter(d => d.status !== 'archived').map(d => (
+                <div
+                  key={d.id}
+                  style={{
+                    background: 'var(--surface-1)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '12px 16px',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    <strong style={{ color: 'var(--text-primary)' }}>{d.authorName}</strong>
+                    {d.publishedAt && (
+                      <> · published {new Date(d.publishedAt).toLocaleString()}</>
+                    )}
+                    {' · '}
+                    <a href={d.tweetUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+                      tweet
+                    </a>
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.55, margin: '0 0 10px' }}>
+                    {d.writeup}
+                  </p>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => void takeDownSpotted(d.id)}
+                      disabled={spottedActionBusy === d.id}
+                      style={{
+                        fontSize: '11px',
+                        padding: '5px 12px',
+                        borderRadius: 'var(--radius)',
+                        background: 'var(--surface-3)',
+                        color: 'var(--red, #c44)',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      {spottedActionBusy === d.id ? 'Working…' : 'Take down'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void removeSpottedFromArchives(d.id)}
+                      disabled={spottedActionBusy === d.id}
+                      style={{
+                        fontSize: '11px',
+                        padding: '5px 12px',
+                        borderRadius: 'var(--radius)',
+                        background: 'var(--surface-3)',
+                        color: 'var(--red, #c44)',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      Take down from archives
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {spottedPublishedList.filter(d => d.status === 'archived').length > 0 && (
+          <div style={{ marginTop: '16px' }}>
+            <h3 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-secondary)' }}>
+              In archives only ({spottedPublishedList.filter(d => d.status === 'archived').length})
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {spottedPublishedList.filter(d => d.status === 'archived').map(d => (
                 <div
                   key={d.id}
                   style={{
@@ -1441,7 +1574,7 @@ export default function AdminPage() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => void takeDownSpotted(d.id)}
+                    onClick={() => void removeSpottedFromArchives(d.id)}
                     disabled={spottedActionBusy === d.id}
                     style={{
                       fontSize: '11px',
@@ -1452,7 +1585,7 @@ export default function AdminPage() {
                       border: '1px solid var(--border)',
                     }}
                   >
-                    {spottedActionBusy === d.id ? 'Taking down…' : 'Take down'}
+                    {spottedActionBusy === d.id ? 'Working…' : 'Take down from archives'}
                   </button>
                 </div>
               ))}

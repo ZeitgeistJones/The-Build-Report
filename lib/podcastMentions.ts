@@ -56,7 +56,7 @@ export type OverheardEntry = {
   writeup: string
   /** Optional plain-English version for Normie mode; older entries omit this. */
   writeupNormie?: string
-  status: 'candidate' | 'pending' | 'published' | 'taken_down'
+  status: 'candidate' | 'pending' | 'published' | 'archived' | 'taken_down'
   userContext: string | null
   scannedAt: string | null
   confirmedAt: string | null
@@ -91,7 +91,11 @@ export function normalizeOverheardEntry(raw: unknown): OverheardEntry | null {
         ? { writeupNormie: r.writeupNormie }
         : {}),
       status:
-        r.status === 'candidate' || r.status === 'pending' || r.status === 'published' || r.status === 'taken_down'
+        r.status === 'candidate' ||
+        r.status === 'pending' ||
+        r.status === 'published' ||
+        r.status === 'archived' ||
+        r.status === 'taken_down'
           ? r.status
           : 'candidate',
       userContext: typeof r.userContext === 'string' ? r.userContext : null,
@@ -122,7 +126,11 @@ export function normalizeOverheardEntry(raw: unknown): OverheardEntry | null {
         ? { writeupNormie: r.writeupNormie }
         : {}),
       status:
-        r.status === 'candidate' || r.status === 'pending' || r.status === 'published' || r.status === 'taken_down'
+        r.status === 'candidate' ||
+        r.status === 'pending' ||
+        r.status === 'published' ||
+        r.status === 'archived' ||
+        r.status === 'taken_down'
           ? r.status
           : 'candidate',
       userContext: typeof r.userContext === 'string' ? r.userContext : null,
@@ -830,11 +838,27 @@ async function invalidateOverheardPublicCache(): Promise<void> {
   await generateAndCacheOverheard().catch(() => null)
 }
 
+/** Remove from homepage only — keep in archives. */
 export async function takeDownMention(id: string): Promise<boolean> {
   try {
     const redis = getRedis()
     const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
     if (!mention || mention.status !== 'published') return false
+    const updated: OverheardEntry = { ...mention, status: 'archived' }
+    await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    await invalidateOverheardPublicCache()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Remove from homepage and archives. */
+export async function removeMentionFromArchives(id: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
+    if (!mention || (mention.status !== 'published' && mention.status !== 'archived')) return false
     const updated: OverheardEntry = { ...mention, status: 'taken_down' }
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     await redis.srem(PUBLISHED_SET_KEY, id)
@@ -849,7 +873,7 @@ export async function movePublishedToPending(id: string): Promise<boolean> {
   try {
     const redis = getRedis()
     const mention = normalizeOverheardEntry(await redis.get(mentionKey(id)))
-    if (!mention || mention.status !== 'published') return false
+    if (!mention || (mention.status !== 'published' && mention.status !== 'archived')) return false
     const updated: OverheardEntry = { ...mention, status: 'pending' }
     await redis.set(mentionKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     await redis.srem(PUBLISHED_SET_KEY, id)
@@ -911,13 +935,23 @@ export async function dismissMention(id: string): Promise<boolean> {
 
 export async function getPublishedMentions(): Promise<OverheardEntry[]> {
   const entries = await getMentionsFromSet(PUBLISHED_SET_KEY)
-  return entries.sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
+  return entries
+    .filter(e => e.status === 'published')
+    .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
 }
 
-/** Published Overheard entries with publishedAt >= sinceIso, newest first. */
+/** Live + archived (home take-down) entries for admin lists. */
+export async function getArchiveVisibleMentions(): Promise<OverheardEntry[]> {
+  const entries = await getMentionsFromSet(PUBLISHED_SET_KEY)
+  return entries
+    .filter(e => e.status === 'published' || e.status === 'archived')
+    .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
+}
+
+/** Archive feed: published + archived Overheard with publishedAt >= sinceIso. */
 export async function listPublishedMentionsSince(sinceIso: string): Promise<OverheardEntry[]> {
   const sinceMs = Date.parse(sinceIso)
-  const all = await getPublishedMentions()
+  const all = await getArchiveVisibleMentions()
   return all.filter(m => m.publishedAt && Date.parse(m.publishedAt) >= sinceMs)
 }
 

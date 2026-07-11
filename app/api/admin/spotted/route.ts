@@ -7,6 +7,7 @@ import {
   publishEntry,
   dismissEntry,
   takeDownEntry,
+  removeFromArchives,
 } from '@/lib/spotted'
 
 export const maxDuration = 60
@@ -60,6 +61,13 @@ export async function POST(req: NextRequest) {
     const id = body?.id as string
     if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
     const success = await takeDownEntry(id)
+    return NextResponse.json({ ok: success })
+  }
+
+  if (action === 'removeFromArchives') {
+    const id = body?.id as string
+    if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
+    const success = await removeFromArchives(id)
     return NextResponse.json({ ok: success })
   }
 

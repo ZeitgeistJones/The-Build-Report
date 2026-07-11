@@ -3,7 +3,6 @@ import { guardAdmin } from '@/lib/admin'
 import {
   getPendingMentions,
   getCandidateMentions,
-  getPublishedMentions,
   publishMention,
   dismissMention,
   addContextToCandidate,
@@ -12,9 +11,11 @@ import {
   updateMentionEntry,
   regeneratePendingWriteup,
   takeDownMention,
+  removeMentionFromArchives,
   movePublishedToPending,
   getOverheardMode,
   setOverheardMode,
+  getArchiveVisibleMentions,
 } from '@/lib/podcastMentions'
 
 async function refreshPublicOverheardCache(): Promise<void> {
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   if (action === 'list') {
     const pending = await getPendingMentions()
     const candidates = await getCandidateMentions()
-    const published = await getPublishedMentions()
+    const published = await getArchiveVisibleMentions()
     const mode = await getOverheardMode()
     return NextResponse.json({ ok: true, pending, candidates, published, mode })
   }
@@ -104,6 +105,13 @@ export async function POST(req: NextRequest) {
     const id = body?.id as string
     if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
     const success = await takeDownMention(id)
+    return NextResponse.json({ ok: success })
+  }
+
+  if (action === 'removeFromArchives') {
+    const id = body?.id as string
+    if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
+    const success = await removeMentionFromArchives(id)
     return NextResponse.json({ ok: success })
   }
 

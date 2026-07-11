@@ -64,6 +64,7 @@ type Props = {
   onToggleEdit: () => void
   onSave: () => void
   onTakeDown?: () => void
+  onRemoveFromArchives?: () => void
   onMoveToPending?: () => void
   onPublish?: () => void
   onDismiss?: () => void
@@ -82,6 +83,7 @@ export default function OverheardAdminEntryCard({
   onToggleEdit,
   onSave,
   onTakeDown,
+  onRemoveFromArchives,
   onMoveToPending,
   onPublish,
   onDismiss,
@@ -238,6 +240,16 @@ export default function OverheardAdminEntryCard({
             style={{ fontSize: '11px', padding: '5px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-3)', color: 'var(--red, #c44)', border: '1px solid var(--border)' }}
           >
             Take down
+          </button>
+        )}
+        {onRemoveFromArchives && (
+          <button
+            type="button"
+            onClick={onRemoveFromArchives}
+            disabled={isBusy}
+            style={{ fontSize: '11px', padding: '5px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-3)', color: 'var(--red, #c44)', border: '1px solid var(--border)' }}
+          >
+            Take down from archives
           </button>
         )}
         {onMoveToPending && (

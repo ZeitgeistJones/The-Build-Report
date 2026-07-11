@@ -22,7 +22,7 @@ export type SpottedEntry = {
   writeup: string
   /** Optional plain-English version for Normie mode; older entries omit this. */
   writeupNormie?: string
-  status: 'draft' | 'published' | 'taken_down'
+  status: 'draft' | 'published' | 'archived' | 'taken_down'
   createdAt: string
   publishedAt: string | null
 }
@@ -177,12 +177,27 @@ export async function dismissEntry(id: string): Promise<boolean> {
   }
 }
 
-/** Remove a live Spotted column from the homepage published set. */
+/** Remove from homepage only — keep in archives. */
 export async function takeDownEntry(id: string): Promise<boolean> {
   try {
     const redis = getRedis()
     const entry = await redis.get<SpottedEntry>(entryKey(id))
     if (!entry || entry.status !== 'published') return false
+    const updated: SpottedEntry = { ...entry, status: 'archived' }
+    await redis.set(entryKey(id), updated, { ex: 60 * 60 * 24 * 365 })
+    // Stay in PUBLISHED_SET so archives still list it.
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Remove from homepage and archives. */
+export async function removeFromArchives(id: string): Promise<boolean> {
+  try {
+    const redis = getRedis()
+    const entry = await redis.get<SpottedEntry>(entryKey(id))
+    if (!entry || (entry.status !== 'published' && entry.status !== 'archived')) return false
     const updated: SpottedEntry = { ...entry, status: 'taken_down' }
     await redis.set(entryKey(id), updated, { ex: 60 * 60 * 24 * 365 })
     await redis.srem(PUBLISHED_SET_KEY, id)
@@ -199,7 +214,7 @@ export async function getPublishedEntries(): Promise<SpottedEntry[]> {
     if (!ids.length) return []
     const values = await redis.mget<(SpottedEntry | null)[]>(...ids.map(entryKey))
     return values
-      .filter((v): v is SpottedEntry => Boolean(v))
+      .filter((v): v is SpottedEntry => Boolean(v) && (v.status === 'published' || v.status === 'archived'))
       .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
   } catch {
     return []
@@ -257,7 +272,7 @@ export async function getLatestPublished(): Promise<SpottedEntry | null> {
     const ids = (await redis.smembers<string[]>(PUBLISHED_SET_KEY)) ?? []
     if (!ids.length) return null
     const values = await redis.mget<(SpottedEntry | null)[]>(...ids.map(entryKey))
-    const valid = values.filter((v): v is SpottedEntry => Boolean(v))
+    const valid = values.filter((v): v is SpottedEntry => Boolean(v) && v.status === 'published')
     if (!valid.length) return null
     const latest = valid.sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))[0]
     return ensureSpottedWriteupNormie(latest)
@@ -266,7 +281,7 @@ export async function getLatestPublished(): Promise<SpottedEntry | null> {
   }
 }
 
-/** Published Spotted entries with publishedAt >= sinceIso, newest first. */
+/** Archive-visible Spotted entries (live + taken down from home) with publishedAt >= sinceIso. */
 export async function listPublishedSpotted(sinceIso: string): Promise<SpottedEntry[]> {
   try {
     const redis = getRedis()
@@ -275,7 +290,7 @@ export async function listPublishedSpotted(sinceIso: string): Promise<SpottedEnt
     const values = await redis.mget<(SpottedEntry | null)[]>(...ids.map(entryKey))
     const sinceMs = Date.parse(sinceIso)
     return values
-      .filter((v): v is SpottedEntry => Boolean(v))
+      .filter((v): v is SpottedEntry => Boolean(v) && (v.status === 'published' || v.status === 'archived'))
       .filter(v => v.publishedAt && Date.parse(v.publishedAt) >= sinceMs)
       .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
   } catch {
