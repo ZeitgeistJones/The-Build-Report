@@ -8,7 +8,7 @@ export default function BriefFreshnessNudge() {
   return (
     <aside className="brief-freshness-nudge" aria-label="How rescoring keeps the brief current">
       <p className="brief-freshness-nudge__lead">
-        Want a sharper <strong>Yesterday&apos;s build</strong> and <strong>The Needle</strong>?
+        Want a sharper <strong>Yesterday&apos;s Build</strong> and <strong>The Needle</strong>?
       </p>
       <p className="brief-freshness-nudge__body">
         Those columns pull from recently scored repos. The more people rescore, the more current
