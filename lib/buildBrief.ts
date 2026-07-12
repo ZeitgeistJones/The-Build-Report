@@ -8,7 +8,6 @@ import { applyExcludedToRepos, filterPublicRepos, getExcludedSlugs } from '@/lib
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { REPOS, type Repo } from '@/lib/scores'
 import type { GitHubStats } from '@/lib/github'
-import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 import { stripMarkdown } from '@/lib/textCleanup'
 import { normieVoiceGuidance } from '@/lib/normieVoice'
 import { BRIEF_DATES_INDEX_KEY, indexArchiveDate } from '@/lib/archiveIndex'
@@ -417,42 +416,6 @@ export async function loadReposForBrief(stats: GitHubStats): Promise<Repo[]> {
   const autoScoredRaw = cacheSlugs.length > 0 ? await getCachedAutoScoresForSlugs(cacheSlugs) : []
   const autoScored = autoScoredRaw.filter(r => !shouldSkipRepo(r.githubSlug))
   return filterPublicRepos(applyExcludedToRepos(mergeRepoSources(REPOS, autoScored), excludedMap))
-}
-
-/** Upstream evidence for admin Under 280 — same inputs as the digest, not column prose. */
-export type BriefShareEvidence = {
-  dateKey: string
-  repoCount: number
-  commitCount: number
-  evidenceText: string
-}
-
-export async function getBriefShareEvidence(dateKey?: string): Promise<BriefShareEvidence | null> {
-  const key = dateKey?.trim() || yesterdayEasternDateKey()
-  const stats = await getGitHubStatsForDisplay()
-  if (!stats) return null
-  const repos = await loadReposForBrief(stats)
-  const activity = collectBuildActivityForEasternDay(stats, repos, key)
-  const commitCount = activity.reduce((n, a) => n + a.commits.length, 0)
-  const activityBlock = formatActivityForPrompt(activity, key)
-  const gradeContext = formatGradeContext(stats, repos)
-  const evidenceText = [
-    `EASTERN DAY: ${key}`,
-    `ACTIVE REPOS: ${activity.length}`,
-    `COMMITS: ${commitCount}`,
-    '',
-    'COMMIT ACTIVITY (primary evidence):',
-    activityBlock,
-    '',
-    'GRADE CONTEXT (secondary — use lightly):',
-    gradeContext,
-  ].join('\n')
-  return {
-    dateKey: key,
-    repoCount: activity.length,
-    commitCount,
-    evidenceText,
-  }
 }
 
 export async function cacheDailyDigest(dateKey: string, payload: DailyDigestCache): Promise<void> {

@@ -1,9 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin } from '@/lib/admin'
-import { getBriefShareEvidence } from '@/lib/buildBrief'
 import { middleVoiceGuidanceForTweet } from '@/lib/middleVoice'
-import { getNeedleShareEvidence } from '@/lib/needle'
 import {
   TBR_SITE_URL,
   X_CHAR_LIMIT,
@@ -22,11 +20,10 @@ const X_TWEET_AIM_MIN = 265
 const EXPAND_MAX_ATTEMPTS = 3
 const EXPAND_MIN_GROWTH = 10
 
-type Kind = 'brief' | 'needle'
+type Kind = 'brief'
 
 /**
- * Write 3 under-280 tweet variants from the same upstream evidence as the homepage
- * Yesterday's Build / Needle columns — not from column prose.
+ * Summarize a full Yesterday's Build draft into 3 under-280 tweet variants for the admin share tool.
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
@@ -34,53 +31,28 @@ export async function POST(req: NextRequest) {
   if (denied) return denied
 
   const kind = (body as { kind?: string }).kind
+  const text = typeof (body as { text?: unknown }).text === 'string' ? (body as { text: string }).text.trim() : ''
   // Default false — site URL burns ~23 weighted chars; opt in from admin checkbox.
   const includeLink = (body as { includeLink?: boolean }).includeLink === true
   const voiceRaw = (body as { voice?: unknown }).voice
   const voice: ShareVoice = voiceRaw === 'normie' ? 'normie' : 'standard'
-  const dateKey =
-    typeof (body as { dateKey?: unknown }).dateKey === 'string'
-      ? (body as { dateKey: string }).dateKey.trim()
-      : ''
 
-  if (kind !== 'brief' && kind !== 'needle') {
-    return NextResponse.json({ ok: false, error: 'kind must be brief or needle' }, { status: 400 })
+  if (kind !== 'brief') {
+    return NextResponse.json({ ok: false, error: 'kind must be brief' }, { status: 400 })
+  }
+  if (!text) {
+    return NextResponse.json({ ok: false, error: 'Missing text to summarize' }, { status: 400 })
   }
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ ok: false, error: 'ANTHROPIC_API_KEY is not configured' }, { status: 500 })
   }
 
   try {
-    const evidence =
-      kind === 'brief'
-        ? await getBriefShareEvidence(dateKey || undefined)
-        : await getNeedleShareEvidence(dateKey ? { dateKey } : {})
-
-    if (!evidence?.evidenceText.trim()) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            kind === 'brief'
-              ? 'No brief share evidence (GitHub stats / commits unavailable)'
-              : 'No Needle share evidence (no rescored repos in the last 24h)',
-        },
-        { status: 404 },
-      )
-    }
-
-    const variants = await summarizeToTweetVariants(kind, evidence.evidenceText, includeLink, voice)
+    const variants = await summarizeToTweetVariants(kind, text, includeLink, voice)
     return NextResponse.json({
       ok: true,
       variants,
       lengths: variants.map(v => xWeightedLength(v)),
-      evidenceMeta: {
-        dateKey: evidence.dateKey,
-        repoCount: evidence.repoCount,
-        ...(kind === 'brief' && 'commitCount' in evidence
-          ? { commitCount: evidence.commitCount }
-          : {}),
-      },
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Summarize failed'
@@ -90,22 +62,19 @@ export async function POST(req: NextRequest) {
 
 async function summarizeToTweetVariants(
   kind: Kind,
-  evidenceText: string,
+  sourceText: string,
   includeLink: boolean,
   voice: ShareVoice,
 ): Promise<[string, string, string]> {
-  const label = kind === 'brief' ? "Yesterday's Build" : 'The Needle'
-  const briefOpener = kind === 'brief' ? 'Yesterday:' : ''
+  const label = "Yesterday's Build"
+  const briefOpener = 'Yesterday:'
   const urlRule = includeLink
     ? `Each variant MUST end with a blank line then exactly: ${TBR_SITE_URL}`
     : 'Do NOT include any URL.'
 
-  const openerRule =
-    kind === 'brief'
-      ? `Each variant MUST start with exactly: Yesterday: (not a dated "Jul 11 Build:" or "Yesterday's Build — …" opener).`
-      : 'Keep The Needle framing if useful; do not use a Yesterday opener.'
+  const openerRule = `Each variant MUST start with exactly: Yesterday: (not a dated "Jul 11 Build:" or "Yesterday's Build — …" opener).`
 
-  const lengthRule = `HARD MINIMUM ${X_TWEET_MIN_CHARS} characters per variant (URLs count as 23). Prefer ${X_TWEET_AIM_MIN}–${X_CHAR_LIMIT}. Pack concrete detail from the evidence — not filler. Hard max ${X_CHAR_LIMIT}. Variants under ${X_TWEET_MIN_CHARS} are invalid.`
+  const lengthRule = `HARD MINIMUM ${X_TWEET_MIN_CHARS} characters per variant (URLs count as 23). Prefer ${X_TWEET_AIM_MIN}–${X_CHAR_LIMIT}. Pack concrete detail from the source — not filler. Hard max ${X_CHAR_LIMIT}. Variants under ${X_TWEET_MIN_CHARS} are invalid.`
 
   const voiceBlock =
     voice === 'normie'
@@ -115,18 +84,18 @@ async function summarizeToTweetVariants(
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const prompt = `You write X/Twitter posts for The Build Report (independent community project scoring clawdbotatg repos).
 
-Task: write THREE tweet-sized ${label} variants from the RAW EVIDENCE below. This is a fresh short take from the same upstream data the homepage column uses — NOT a rewrite of an existing column. Same facts across variants; different wording and emphasis. All three must land in the ${X_TWEET_MIN_CHARS}–${X_CHAR_LIMIT} character band. Name at most 1–2 repos if space allows. Do not invent facts not supported by the evidence.
+Task: turn this full ${label} draft into THREE tweet-sized variants. Same facts; different wording and emphasis — all three must land in the ${X_TWEET_MIN_CHARS}–${X_CHAR_LIMIT} character band (do not make a short variant). Name at most 1–2 repos if space allows.
 ${voiceBlock}
-RAW EVIDENCE:
+SOURCE DRAFT:
 """
-${evidenceText.slice(0, 12000)}
+${sourceText.slice(0, 6000)}
 """
 
 Hard rules:
 - ${lengthRule}
 - ${openerRule}
 - ${urlRule}
-- No hashtags unless already in the evidence.
+- No hashtags unless already in the source.
 - Return ONLY valid JSON (no markdown fences):
 { "variants": ["...", "...", "..."] }
 `
@@ -154,11 +123,11 @@ Hard rules:
   const cleaned = await Promise.all(
     parsed.variants.slice(0, 3).map(async v => {
       let s = typeof v === 'string' ? v.trim() : ''
-      if (!s) s = evidenceText.slice(0, 200)
+      if (!s) s = sourceText.slice(0, 200)
       s = finalizeVariant(s, { kind, briefOpener, includeLink })
       s = await expandUntilFloor(client, {
         kind,
-        evidenceText,
+        sourceText,
         text: s,
         includeLink,
         briefOpener,
@@ -190,7 +159,7 @@ async function expandUntilFloor(
   client: Anthropic,
   opts: {
     kind: Kind
-    evidenceText: string
+    sourceText: string
     text: string
     includeLink: boolean
     briefOpener: string
@@ -205,7 +174,7 @@ async function expandUntilFloor(
     const needed = X_TWEET_MIN_CHARS - len
     const expanded = await expandVariant(client, {
       kind: opts.kind,
-      evidenceText: opts.evidenceText,
+      sourceText: opts.sourceText,
       shortText: s,
       includeLink: opts.includeLink,
       briefOpener: opts.briefOpener,
@@ -220,6 +189,7 @@ async function expandUntilFloor(
     })
     const nextLen = xWeightedLength(next)
     if (nextLen < len + EXPAND_MIN_GROWTH) {
+      // Expand didn't meaningfully grow — stop rather than spinning.
       return nextLen > len ? next : s
     }
     s = next
@@ -243,7 +213,7 @@ async function expandVariant(
   client: Anthropic,
   opts: {
     kind: Kind
-    evidenceText: string
+    sourceText: string
     shortText: string
     includeLink: boolean
     briefOpener: string
@@ -262,19 +232,19 @@ async function expandVariant(
   const voiceBit =
     opts.voice === 'normie'
       ? `Stay in Middle voice (plain explanatory, not baby-talk):\n${MIDDLE_EXPAND_HINT}`
-      : 'Stay friendly and clear; add concrete detail from the evidence.'
+      : 'Stay friendly and clear; add concrete detail from the source.'
 
   const prompt = `Lengthen this X post. It is currently ${opts.currentLength} characters — TOO SHORT.
-You must add at least ${opts.charsNeeded}+ characters of real concrete detail from the RAW EVIDENCE (same facts only).
+You must add at least ${opts.charsNeeded}+ characters of real concrete detail from the source draft (same facts only).
 Target ${X_TWEET_AIM_MIN}–${X_CHAR_LIMIT} characters (URLs count as 23). Hard max ${X_CHAR_LIMIT}. Hard minimum ${X_TWEET_MIN_CHARS}.
 No invented facts. No hashtags. No filler fluff.
 ${voiceBit}
 ${openerRule}
 ${urlRule}
 
-RAW EVIDENCE:
+SOURCE DRAFT:
 """
-${opts.evidenceText.slice(0, 8000)}
+${opts.sourceText.slice(0, 4000)}
 """
 
 SHORT POST (${opts.currentLength} chars):

@@ -123,22 +123,18 @@ export type GenerateNeedleOptions = {
   dateKey?: string
 }
 
-/** Upstream evidence for admin Under 280 — same inputs as Needle generation, not column prose. */
-export type NeedleShareEvidence = {
-  dateKey: string
-  repoCount: number
-  evidenceText: string
-}
-
-async function collectNeedleQualifyingMoves(): Promise<QualifyingMove[]> {
+export async function generateAndCacheNeedle(
+  options: GenerateNeedleOptions = {},
+): Promise<NeedleData | null> {
+  const redis = getRedis()
   const since = Date.now() - 24 * 3600 * 1000
   const slugs = await getSlugsRescoredSince(since)
-  if (!slugs.length) return []
+  if (!slugs.length) return null
 
   const summaries = await getRescoreSummaries(slugs)
   const nameBySlug = new Map(REPOS.map(r => [r.githubSlug, r.name]))
 
-  return Object.entries(summaries)
+  const qualifying: QualifyingMove[] = Object.entries(summaries)
     .filter(([, meta]) => qualifyingChange(meta))
     .map(([slug, meta]) => ({
       name: nameBySlug.get(slug) ?? slug,
@@ -149,32 +145,7 @@ async function collectNeedleQualifyingMoves(): Promise<QualifyingMove[]> {
       deltaHeader: meta.deltaHeader ?? null,
       summary: meta.summary ?? null,
     }))
-}
 
-export async function getNeedleShareEvidence(
-  options: GenerateNeedleOptions = {},
-): Promise<NeedleShareEvidence | null> {
-  const qualifying = await collectNeedleQualifyingMoves()
-  if (!qualifying.length) return null
-  const dateKey = options.dateKey ?? dateKeyEastern()
-  return {
-    dateKey,
-    repoCount: qualifying.length,
-    evidenceText: [
-      `NEEDLE WINDOW: last 24h rescored repos`,
-      `MOVES: ${qualifying.length}`,
-      '',
-      'RESCORE EVIDENCE (primary):',
-      formatMoveLines(qualifying),
-    ].join('\n'),
-  }
-}
-
-export async function generateAndCacheNeedle(
-  options: GenerateNeedleOptions = {},
-): Promise<NeedleData | null> {
-  const redis = getRedis()
-  const qualifying = await collectNeedleQualifyingMoves()
   if (!qualifying.length) return null
 
   const ai = await generateNeedleCopy(qualifying)
