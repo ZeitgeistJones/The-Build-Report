@@ -29,6 +29,8 @@ type Props = {
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error'
 
+type VariantBundle = [string, string, string]
+
 export default function AdminXShareTool({ password }: Props) {
   const [includeLink, setIncludeLink] = useState(true)
   const [briefVoice, setBriefVoice] = useState<ShareVoice>('standard')
@@ -39,6 +41,12 @@ export default function AdminXShareTool({ password }: Props) {
   const [needleSource, setNeedleSource] = useState<ShareNeedleSource | null>(null)
   const [briefText, setBriefText] = useState('')
   const [needleText, setNeedleText] = useState('')
+  const [briefFull, setBriefFull] = useState<string | null>(null)
+  const [needleFull, setNeedleFull] = useState<string | null>(null)
+  const [briefVariants, setBriefVariants] = useState<VariantBundle | null>(null)
+  const [needleVariants, setNeedleVariants] = useState<VariantBundle | null>(null)
+  const [briefVariantIdx, setBriefVariantIdx] = useState(0)
+  const [needleVariantIdx, setNeedleVariantIdx] = useState(0)
   const [copied, setCopied] = useState<string | null>(null)
   const [threadPreview, setThreadPreview] = useState<{ kind: 'brief' | 'needle'; parts: string[] } | null>(
     null,
@@ -46,12 +54,27 @@ export default function AdminXShareTool({ password }: Props) {
   const [briefPreviewUrl, setBriefPreviewUrl] = useState<string | null>(null)
   const [needlePreviewUrl, setNeedlePreviewUrl] = useState<string | null>(null)
   const [imageBusy, setImageBusy] = useState<string | null>(null)
+  const [summarizeBusy, setSummarizeBusy] = useState<ShareImageKind | null>(null)
+
+  function clearBriefShort() {
+    setBriefFull(null)
+    setBriefVariants(null)
+    setBriefVariantIdx(0)
+  }
+
+  function clearNeedleShort() {
+    setNeedleFull(null)
+    setNeedleVariants(null)
+    setNeedleVariantIdx(0)
+  }
 
   function applyBrief(source: ShareBriefSource | null, voice: ShareVoice, link: boolean) {
+    clearBriefShort()
     setBriefText(source ? composeBriefPost(source, voice, { includeLink: link }) : '')
   }
 
   function applyNeedle(source: ShareNeedleSource | null, voice: ShareVoice, link: boolean) {
+    clearNeedleShort()
     setNeedleText(source ? composeNeedlePost(source, voice, { includeLink: link }) : '')
   }
 
@@ -67,6 +90,8 @@ export default function AdminXShareTool({ password }: Props) {
     revokePreview(needlePreviewUrl)
     setBriefPreviewUrl(null)
     setNeedlePreviewUrl(null)
+    clearBriefShort()
+    clearNeedleShort()
     try {
       const res = await fetch('/api/admin/share-posts', {
         method: 'POST',
@@ -123,6 +148,81 @@ export default function AdminXShareTool({ password }: Props) {
 
   function openOnX(text: string) {
     window.open(xIntentUrl(text), '_blank', 'noopener,noreferrer')
+  }
+
+  async function summarizeUnder280(kind: ShareImageKind) {
+    const text = kind === 'brief' ? briefText : needleText
+    if (!text.trim()) return
+    setSummarizeBusy(kind)
+    setError(null)
+    try {
+      // Stash full draft only the first time we leave full mode
+      if (kind === 'brief' && briefFull == null) setBriefFull(text)
+      if (kind === 'needle' && needleFull == null) setNeedleFull(text)
+
+      const sourceForApi = (kind === 'brief' ? briefFull : needleFull) ?? text
+      const res = await fetch('/api/admin/share-summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password,
+          kind,
+          text: sourceForApi,
+          includeLink,
+        }),
+      })
+      const data = await res.json()
+      if (!data.ok || !Array.isArray(data.variants) || data.variants.length < 3) {
+        setError(data.error ?? 'Under 280 summarize failed')
+        return
+      }
+      const variants = data.variants.slice(0, 3) as VariantBundle
+      if (kind === 'brief') {
+        setBriefVariants(variants)
+        setBriefVariantIdx(0)
+        setBriefText(variants[0]!)
+      } else {
+        setNeedleVariants(variants)
+        setNeedleVariantIdx(0)
+        setNeedleText(variants[0]!)
+      }
+    } catch {
+      setError('Under 280 request failed')
+    } finally {
+      setSummarizeBusy(null)
+    }
+  }
+
+  function setVariant(kind: ShareImageKind, nextIdx: number) {
+    const variants = kind === 'brief' ? briefVariants : needleVariants
+    if (!variants) return
+    const idx = ((nextIdx % 3) + 3) % 3
+    if (kind === 'brief') {
+      setBriefVariantIdx(idx)
+      setBriefText(variants[idx]!)
+    } else {
+      setNeedleVariantIdx(idx)
+      setNeedleText(variants[idx]!)
+    }
+  }
+
+  function resetVariant(kind: ShareImageKind) {
+    const variants = kind === 'brief' ? briefVariants : needleVariants
+    const idx = kind === 'brief' ? briefVariantIdx : needleVariantIdx
+    if (!variants) return
+    if (kind === 'brief') setBriefText(variants[idx]!)
+    else setNeedleText(variants[idx]!)
+  }
+
+  function showFull(kind: ShareImageKind) {
+    if (kind === 'brief' && briefFull != null) {
+      setBriefText(briefFull)
+      clearBriefShort()
+    }
+    if (kind === 'needle' && needleFull != null) {
+      setNeedleText(needleFull)
+      clearNeedleShort()
+    }
   }
 
   async function buildImageBlob(
@@ -203,9 +303,15 @@ export default function AdminXShareTool({ password }: Props) {
     }
   }
 
-  function postCaptionOnX(kind: ShareImageKind) {
+  /** Under limit → post the draft; over limit → short caption for image attach. */
+  function postOnX(kind: ShareImageKind) {
     const source = kind === 'brief' ? briefSource : needleSource
+    const text = kind === 'brief' ? briefText : needleText
     if (!source) return
+    if (xWeightedLength(text) <= X_CHAR_LIMIT) {
+      openOnX(text)
+      return
+    }
     openOnX(composeShortCaption(kind, source))
   }
 
@@ -251,11 +357,12 @@ export default function AdminXShareTool({ password }: Props) {
       >
         <div>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Share on X</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '560px' }}>
-            Compose from cached Yesterday&apos;s Build and The Needle. For long copy:{' '}
-            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Save as image</strong>,
-            then <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Post on X</strong>{' '}
-            opens a short caption — attach the PNG in the composer.
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '580px' }}>
+            Compose from cached Yesterday&apos;s Build and The Needle.{' '}
+            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Under 280</strong> makes
+            three tweet-sized variants (text or image). Full drafts can still{' '}
+            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Save as image</strong> with
+            a short caption on Post on X.
           </p>
         </div>
         <button onClick={loadPosts} disabled={loadState === 'loading'} style={btnStyle}>
@@ -285,7 +392,7 @@ export default function AdminXShareTool({ password }: Props) {
                 checked={includeLink}
                 onChange={e => setLink(e.target.checked)}
               />
-              Include site link in full text
+              Include site link
             </label>
             {copied && (
               <span style={{ color: 'var(--accent)', fontSize: '12px' }}>Copied {copied}</span>
@@ -309,8 +416,16 @@ export default function AdminXShareTool({ password }: Props) {
             onCopyText={() => copyText('brief', briefText)}
             onSaveImage={() => saveAsImage('brief')}
             onCopyImage={() => copyAsImage('brief')}
-            onPostCaption={() => postCaptionOnX('brief')}
+            onPost={() => postOnX('brief')}
             onThread={() => setThreadPreview({ kind: 'brief', parts: splitIntoThread(briefText) })}
+            onUnder280={() => summarizeUnder280('brief')}
+            onShowFull={() => showFull('brief')}
+            onPrevVariant={() => setVariant('brief', briefVariantIdx - 1)}
+            onNextVariant={() => setVariant('brief', briefVariantIdx + 1)}
+            onResetVariant={() => resetVariant('brief')}
+            hasFull={briefFull != null}
+            variantIndex={briefVariants ? briefVariantIdx : null}
+            summarizeBusy={summarizeBusy === 'brief'}
             imageBusy={imageBusy}
             previewUrl={briefPreviewUrl}
             panelStyle={panelStyle}
@@ -336,8 +451,16 @@ export default function AdminXShareTool({ password }: Props) {
             onCopyText={() => copyText('needle', needleText)}
             onSaveImage={() => saveAsImage('needle')}
             onCopyImage={() => copyAsImage('needle')}
-            onPostCaption={() => postCaptionOnX('needle')}
+            onPost={() => postOnX('needle')}
             onThread={() => setThreadPreview({ kind: 'needle', parts: splitIntoThread(needleText) })}
+            onUnder280={() => summarizeUnder280('needle')}
+            onShowFull={() => showFull('needle')}
+            onPrevVariant={() => setVariant('needle', needleVariantIdx - 1)}
+            onNextVariant={() => setVariant('needle', needleVariantIdx + 1)}
+            onResetVariant={() => resetVariant('needle')}
+            hasFull={needleFull != null}
+            variantIndex={needleVariants ? needleVariantIdx : null}
+            summarizeBusy={summarizeBusy === 'needle'}
             imageBusy={imageBusy}
             previewUrl={needlePreviewUrl}
             panelStyle={panelStyle}
@@ -454,8 +577,16 @@ function ShareDraft({
   onCopyText,
   onSaveImage,
   onCopyImage,
-  onPostCaption,
+  onPost,
   onThread,
+  onUnder280,
+  onShowFull,
+  onPrevVariant,
+  onNextVariant,
+  onResetVariant,
+  hasFull,
+  variantIndex,
+  summarizeBusy,
   imageBusy,
   previewUrl,
   panelStyle,
@@ -475,8 +606,16 @@ function ShareDraft({
   onCopyText: () => void
   onSaveImage: () => void
   onCopyImage: () => void
-  onPostCaption: () => void
+  onPost: () => void
   onThread: () => void
+  onUnder280: () => void
+  onShowFull: () => void
+  onPrevVariant: () => void
+  onNextVariant: () => void
+  onResetVariant: () => void
+  hasFull: boolean
+  variantIndex: number | null
+  summarizeBusy: boolean
   imageBusy: string | null
   previewUrl: string | null
   panelStyle: CSSProperties
@@ -512,6 +651,30 @@ function ShareDraft({
         hasPlainEnglish={hasPlainEnglish}
         btnStyle={btnStyle}
       />
+      {variantIndex != null && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            alignItems: 'center',
+            marginBottom: '8px',
+          }}
+        >
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            Variant {variantIndex + 1} of 3
+          </span>
+          <button type="button" style={btnStyle} onClick={onPrevVariant}>
+            ← Prev
+          </button>
+          <button type="button" style={btnStyle} onClick={onNextVariant}>
+            Next →
+          </button>
+          <button type="button" style={btnStyle} onClick={onResetVariant}>
+            Reset variant
+          </button>
+        </div>
+      )}
       <textarea
         value={text}
         onChange={e => onChange(e.target.value)}
@@ -547,8 +710,16 @@ function ShareDraft({
           }}
         >
           {len}/{X_CHAR_LIMIT}
-          {over ? ' — over limit → save as image' : ''}
+          {over ? ' — over limit → Under 280 or image' : ''}
         </span>
+        <button type="button" style={btnStyle} onClick={onUnder280} disabled={summarizeBusy}>
+          {summarizeBusy ? 'Summarizing…' : 'Under 280'}
+        </button>
+        {hasFull && (
+          <button type="button" style={btnStyle} onClick={onShowFull}>
+            Show full
+          </button>
+        )}
         <button type="button" style={btnStyle} onClick={onCopyText}>
           Copy text
         </button>
@@ -561,12 +732,14 @@ function ShareDraft({
         <button type="button" style={btnStyle} onClick={onThread}>
           Make thread
         </button>
-        <button type="button" style={accentBtn} onClick={onPostCaption}>
+        <button type="button" style={accentBtn} onClick={onPost}>
           Post on X
         </button>
       </div>
       <p style={{ margin: '8px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-        Post on X opens a short caption only — attach the PNG in the composer after Save/Copy image.
+        {over
+          ? 'Post on X opens a short caption — attach a full PNG after Save/Copy image. Or run Under 280 for a tweet-sized draft (works for text and image).'
+          : 'Post on X uses this text. Save as image uses the same draft (short text = less text on the PNG).'}
       </p>
       {previewUrl && (
         <div style={{ marginTop: '12px' }}>

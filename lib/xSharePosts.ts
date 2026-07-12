@@ -37,6 +37,45 @@ export function xIntentUrl(text: string): string {
   return `https://x.com/intent/post?text=${encodeURIComponent(text)}`
 }
 
+/**
+ * Force text under the weighted X limit: drop trailing sentences, then hard-trim words.
+ * Prefers keeping a trailing site URL when present.
+ */
+export function enforceWeightedLimit(text: string, limit = X_CHAR_LIMIT): string {
+  let t = text.trim()
+  if (!t) return t
+  if (xWeightedLength(t) <= limit) return t
+
+  let trailer = ''
+  if (t.endsWith(TBR_SITE_URL)) {
+    t = t.slice(0, -TBR_SITE_URL.length).trimEnd()
+    trailer = TBR_SITE_URL
+  }
+
+  const budget = trailer ? limit - X_URL_WEIGHT - 1 : limit
+
+  const sentences =
+    t.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) ?? [t]
+  let kept = ''
+  for (const sentence of sentences) {
+    const next = kept ? `${kept} ${sentence}` : sentence
+    if (xWeightedLength(next) > budget) break
+    kept = next
+  }
+  if (!kept) {
+    const words = t.split(/\s+/)
+    kept = ''
+    for (const w of words) {
+      const next = kept ? `${kept} ${w}` : w
+      if (xWeightedLength(next) > budget) break
+      kept = next
+    }
+  }
+  if (!kept) kept = t.slice(0, Math.max(1, budget - 1))
+
+  return trailer ? `${kept.trim()}\n${trailer}` : kept.trim()
+}
+
 function briefBody(source: ShareBriefSource, voice: ShareVoice): string {
   if (voice === 'normie' && source.generalNormie?.trim()) return source.generalNormie.trim()
   return source.general.trim()
