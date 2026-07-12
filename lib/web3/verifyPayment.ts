@@ -5,6 +5,7 @@ import {
   CLAWD_GATE_ADDRESS,
   CLAWD_GATE_TIER,
   RECEIVER_BUY_AND_BURN,
+  REPORT_TOKEN_GATE_ENABLED,
   SCORE_PAYMENT_WEI,
 } from './constants'
 
@@ -115,14 +116,16 @@ export async function verifyPaymentTx(
     throw new Error('Incorrect payment amount')
   }
 
-  const hasAccess = await client.readContract({
-    address: CLAWD_GATE_ADDRESS,
-    abi: CLAWD_GATE_ABI,
-    functionName: 'hasAccess',
-    args: [getAddress(walletAddress), CLAWD_GATE_TIER],
-  })
-  if (!hasAccess) {
-    throw new Error('Wallet does not meet CLAWDGate access requirements')
+  if (REPORT_TOKEN_GATE_ENABLED) {
+    const hasAccess = await client.readContract({
+      address: CLAWD_GATE_ADDRESS,
+      abi: CLAWD_GATE_ABI,
+      functionName: 'hasAccess',
+      args: [getAddress(walletAddress), CLAWD_GATE_TIER],
+    })
+    if (!hasAccess) {
+      throw new Error('Wallet does not meet CLAWDGate access requirements')
+    }
   }
 }
 

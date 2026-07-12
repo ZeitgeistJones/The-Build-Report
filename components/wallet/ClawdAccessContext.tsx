@@ -13,6 +13,7 @@ import {
   CLAWD_GATE_ABI,
   CLAWD_GATE_ADDRESS,
   CLAWD_GATE_TIER,
+  REPORT_TOKEN_GATE_ENABLED,
 } from '@/lib/web3/constants'
 
 interface ClawdAccessContextValue {
@@ -48,7 +49,11 @@ export function ClawdAccessProvider({ children }: { children: ReactNode }) {
   })
 
   const hasAccess = !!hasAccessRaw
-  const unlocked = isConnected && !isWrongChain && hasAccess
+  // Content unlock: when the report gate is off, everyone sees the full list/stats.
+  // hasAccess stays the real on-chain check for community context votes.
+  const unlocked = REPORT_TOKEN_GATE_ENABLED
+    ? isConnected && !isWrongChain && hasAccess
+    : true
 
   const connectWallet = useCallback(() => {
     const connector = connectors[0]

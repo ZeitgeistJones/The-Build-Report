@@ -43,7 +43,7 @@ Cost: 0.000008 ETH per score. When you pay, ETH goes to the receiver-buy-and-bur
 
 Launch promo (limited time): on rescored repos with stale commits, rescore can be free — ~$0.01 per stale commit to your wallet and the same queued for CLAWD burns (50/50 treasury subsidy). Approx USD refreshes weekly from ETH price; on-chain amounts are still ETH. This is temporary — not a permanent subsidy.
 
-Who can use it: any wallet that passes CLAWDGate tier 1 on Base (10M+ $CLAWD). The full report blur gate uses the same check.
+Who can use it: connect a wallet on Base. The full report is open to read without a CLAWD hold. Community context votes still require CLAWDGate tier 1 (10M+ $CLAWD) when that feature is enabled.
 
 Result is shared: once a repo is scored, the result is cached in Redis and everyone sees it for free — including visitors who have not connected a wallet.
 

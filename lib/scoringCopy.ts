@@ -42,7 +42,7 @@ export const RESCORE_BUTTON_TOOLTIP =
   `Score this repo using Claude AI. Cost: ~$0.01 (0.000008 ETH). Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Result is cached for everyone. ${APPROX_USD_NOTE}`
 
 export const RESCORE_PROMO_TOOLTIP =
-  `Limited launch promo: earn ~$0.01 per commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy) — first Score on commits after the repo was created (forks: after the fork), or Rescore on stale scored repos. Hold 10M $CLAWD to qualify. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
+  `Limited launch promo: earn ~$0.01 per commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy) — first Score on commits after the repo was created (forks: after the fork), or Rescore on stale scored repos. Connect a Base wallet to qualify. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
 
 export const ECOSYSTEM_ADD_CONTEXT_LABEL =
   'Disagree with a grade? Holders can add context →'
@@ -55,7 +55,7 @@ export const RESCORE_PROMO_SITE_BANNER = {
   summary:
     'Earn ~$0.01 per commit to your wallet and the same to the burn queue (50/50 treasury subsidy) — first Score on commits after the repo was created (forks: after the fork), or Rescore on stale scored repos. Approx USD refreshes weekly from ETH price.',
   bullets: [
-    'Hold 10M $CLAWD and connect on Base to use Score / Rescore.',
+    'Connect on Base to use Score / Rescore.',
     'Earn on first Score for commits after the repo was created (forks: after the fork), and on Rescore when a scored repo has commits since last score.',
     '{{perCommit}} to your wallet; the other half fuels CLAWD burns when someone runs Execute burn.',
     'Promo ends when funds run low or we turn it off.',

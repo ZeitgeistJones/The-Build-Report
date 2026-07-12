@@ -3,6 +3,13 @@ export const BASE_CHAIN_ID = 8453
 export const CLAWD_GATE_ADDRESS = '0xc22B7b983EC81523c969753c2385106835E8CfCE' as const
 export const CLAWD_GATE_TIER = 1
 
+/**
+ * When false: report is fully visible and Score/Rescore/promo skip CLAWDGate.
+ * Community context votes still use walletHasGateAccess (on-chain check).
+ * Flip to true to restore the blur + Score hold requirement.
+ */
+export const REPORT_TOKEN_GATE_ENABLED = false
+
 export const CLAWD_GATE_ABI = [
   {
     name: 'hasAccess',
