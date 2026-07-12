@@ -20,8 +20,9 @@ type Props = {
 type LoadState = 'idle' | 'loading' | 'ready' | 'error'
 
 export default function AdminXShareTool({ password }: Props) {
-  const [voice, setVoice] = useState<ShareVoice>('standard')
   const [includeLink, setIncludeLink] = useState(true)
+  const [briefVoice, setBriefVoice] = useState<ShareVoice>('standard')
+  const [needleVoice, setNeedleVoice] = useState<ShareVoice>('standard')
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [briefSource, setBriefSource] = useState<ShareBriefSource | null>(null)
@@ -32,6 +33,14 @@ export default function AdminXShareTool({ password }: Props) {
   const [threadPreview, setThreadPreview] = useState<{ kind: 'brief' | 'needle'; parts: string[] } | null>(
     null,
   )
+
+  function applyBrief(source: ShareBriefSource | null, voice: ShareVoice, link: boolean) {
+    setBriefText(source ? composeBriefPost(source, voice, { includeLink: link }) : '')
+  }
+
+  function applyNeedle(source: ShareNeedleSource | null, voice: ShareVoice, link: boolean) {
+    setNeedleText(source ? composeNeedlePost(source, voice, { includeLink: link }) : '')
+  }
 
   async function loadPosts() {
     setLoadState('loading')
@@ -53,8 +62,8 @@ export default function AdminXShareTool({ password }: Props) {
       const needle = data.needle as ShareNeedleSource | null
       setBriefSource(brief)
       setNeedleSource(needle)
-      setBriefText(brief ? composeBriefPost(brief, voice, { includeLink }) : '')
-      setNeedleText(needle ? composeNeedlePost(needle, voice, { includeLink }) : '')
+      applyBrief(brief, briefVoice, includeLink)
+      applyNeedle(needle, needleVoice, includeLink)
       setLoadState('ready')
     } catch {
       setLoadState('error')
@@ -62,12 +71,23 @@ export default function AdminXShareTool({ password }: Props) {
     }
   }
 
-  function recompose(nextVoice: ShareVoice, nextLink: boolean) {
-    setVoice(nextVoice)
-    setIncludeLink(nextLink)
+  function setLink(next: boolean) {
+    setIncludeLink(next)
     setThreadPreview(null)
-    if (briefSource) setBriefText(composeBriefPost(briefSource, nextVoice, { includeLink: nextLink }))
-    if (needleSource) setNeedleText(composeNeedlePost(needleSource, nextVoice, { includeLink: nextLink }))
+    applyBrief(briefSource, briefVoice, next)
+    applyNeedle(needleSource, needleVoice, next)
+  }
+
+  function changeBriefVoice(next: ShareVoice) {
+    setBriefVoice(next)
+    setThreadPreview(null)
+    applyBrief(briefSource, next, includeLink)
+  }
+
+  function changeNeedleVoice(next: ShareVoice) {
+    setNeedleVoice(next)
+    setThreadPreview(null)
+    applyNeedle(needleSource, next, includeLink)
   }
 
   async function copyText(label: string, text: string) {
@@ -109,6 +129,9 @@ export default function AdminXShareTool({ password }: Props) {
     border: '1px solid var(--accent)',
   }
 
+  const briefHasPlain = Boolean(briefSource?.generalNormie?.trim())
+  const needleHasPlain = Boolean(needleSource?.textNormie?.trim())
+
   return (
     <div style={{ marginBottom: '32px' }}>
       <div
@@ -124,8 +147,10 @@ export default function AdminXShareTool({ password }: Props) {
         <div>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Share on X</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-            Compose posts from the cached Yesterday&apos;s build and The Needle. Edit before posting —
-            briefs often need a trim or a thread.
+            Compose posts from the cached Yesterday&apos;s build and The Needle. Pick{' '}
+            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Regular</strong> or{' '}
+            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Plain English</strong>{' '}
+            per post, then copy or open on X.
           </p>
         </div>
         <button onClick={loadPosts} disabled={loadState === 'loading'} style={btnStyle}>
@@ -150,28 +175,10 @@ export default function AdminXShareTool({ password }: Props) {
             }}
           >
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              Voice
-              <select
-                value={voice}
-                onChange={e => recompose(e.target.value as ShareVoice, includeLink)}
-                style={{
-                  fontSize: '12px',
-                  padding: '4px 8px',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
-                  background: 'var(--surface-1)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <option value="standard">Standard</option>
-                <option value="normie">Normie</option>
-              </select>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <input
                 type="checkbox"
                 checked={includeLink}
-                onChange={e => recompose(voice, e.target.checked)}
+                onChange={e => setLink(e.target.checked)}
               />
               Include site link
             </label>
@@ -188,6 +195,9 @@ export default function AdminXShareTool({ password }: Props) {
                 : null
             }
             emptyLabel="No build brief cached yet — regenerate it above first."
+            voice={briefVoice}
+            onVoiceChange={changeBriefVoice}
+            hasPlainEnglish={briefHasPlain}
             text={briefText}
             onChange={setBriefText}
             onCopy={() => copyText('brief', briefText)}
@@ -207,6 +217,9 @@ export default function AdminXShareTool({ password }: Props) {
                 : null
             }
             emptyLabel="No Needle cached yet — regenerate it above first."
+            voice={needleVoice}
+            onVoiceChange={changeNeedleVoice}
+            hasPlainEnglish={needleHasPlain}
             text={needleText}
             onChange={setNeedleText}
             onCopy={() => copyText('needle', needleText)}
@@ -259,10 +272,67 @@ export default function AdminXShareTool({ password }: Props) {
   )
 }
 
+function VoiceToggle({
+  value,
+  onChange,
+  hasPlainEnglish,
+  btnStyle,
+}: {
+  value: ShareVoice
+  onChange: (v: ShareVoice) => void
+  hasPlainEnglish: boolean
+  btnStyle: CSSProperties
+}) {
+  const active = (on: boolean): CSSProperties => ({
+    ...btnStyle,
+    background: on ? 'var(--accent)' : 'var(--surface-3)',
+    color: on ? 'var(--accent-contrast, #fff)' : 'var(--text-primary)',
+    border: on ? '1px solid var(--accent)' : '1px solid var(--border-strong)',
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginRight: '4px' }}>Version</span>
+        <button
+          type="button"
+          style={active(value === 'standard')}
+          onClick={() => onChange('standard')}
+        >
+          Regular
+        </button>
+        <button
+          type="button"
+          style={{
+            ...active(value === 'normie'),
+            opacity: hasPlainEnglish ? 1 : 0.55,
+          }}
+          onClick={() => onChange('normie')}
+          title={
+            hasPlainEnglish
+              ? 'Use the plain-English copy'
+              : 'No plain-English copy cached — regenerate the brief/needle to create one'
+          }
+        >
+          Plain English
+        </button>
+      </div>
+      {value === 'normie' && !hasPlainEnglish && (
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+          No plain-English version cached — showing regular copy. Regenerate above to create one.
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ShareDraft({
   title,
   meta,
   emptyLabel,
+  voice,
+  onVoiceChange,
+  hasPlainEnglish,
   text,
   onChange,
   onCopy,
@@ -276,6 +346,9 @@ function ShareDraft({
   title: string
   meta: string | null
   emptyLabel: string
+  voice: ShareVoice
+  onVoiceChange: (v: ShareVoice) => void
+  hasPlainEnglish: boolean
   text: string
   onChange: (v: string) => void
   onCopy: () => void
@@ -306,6 +379,12 @@ function ShareDraft({
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{meta}</div>
         )}
       </div>
+      <VoiceToggle
+        value={voice}
+        onChange={onVoiceChange}
+        hasPlainEnglish={hasPlainEnglish}
+        btnStyle={btnStyle}
+      />
       <textarea
         value={text}
         onChange={e => onChange(e.target.value)}
