@@ -13,7 +13,8 @@ export default function BriefFreshnessNudge() {
       <p className="brief-freshness-nudge__body">
         Those columns pull from recently scored repos. The more people rescore, the more current
         material overnight digests can use. Score or Rescore is one click on a repo card — and during
-        the launch promo, eligible runs can pay ETH to your wallet.
+        this launch promo you aren&apos;t paying: the site operator subsidizes it. Eligible runs send
+        ETH to your wallet <em>and</em> an equal amount into the buy-and-burn queue for CLAWD.
       </p>
       <button type="button" className="brief-freshness-nudge__zap" onClick={zapToRepos}>
         Repos that need a rescore →
