@@ -68,18 +68,115 @@ export default function AdminXShareTool({ password }: Props) {
     setNeedleVariantIdx(0)
   }
 
-  function applyBrief(source: ShareBriefSource | null, voice: ShareVoice, link: boolean) {
+  /** Regular = full standard column draft in the box. */
+  function applyRegularBrief(source: ShareBriefSource | null, link: boolean) {
     clearBriefShort()
-    setBriefText(source ? composeBriefPost(source, voice, { includeLink: link }) : '')
+    setBriefText(source ? composeBriefPost(source, 'standard', { includeLink: link }) : '')
   }
 
-  function applyNeedle(source: ShareNeedleSource | null, voice: ShareVoice, link: boolean) {
+  function applyRegularNeedle(source: ShareNeedleSource | null, link: boolean) {
     clearNeedleShort()
-    setNeedleText(source ? composeNeedlePost(source, voice, { includeLink: link }) : '')
+    setNeedleText(source ? composeNeedlePost(source, 'standard', { includeLink: link }) : '')
   }
 
   function revokePreview(url: string | null) {
     if (url) URL.revokeObjectURL(url)
+  }
+
+  async function fetchUnder280Variants(opts: {
+    kind: ShareImageKind
+    voice: ShareVoice
+    link: boolean
+    dateKey?: string
+  }): Promise<VariantBundle | null> {
+    const res = await fetch('/api/admin/share-summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password,
+        kind: opts.kind,
+        includeLink: opts.link,
+        voice: opts.voice,
+        dateKey: opts.dateKey,
+      }),
+    })
+    const data = await res.json()
+    if (!data.ok || !Array.isArray(data.variants) || data.variants.length < 3) {
+      setError(data.error ?? 'Under 280 summarize failed')
+      return null
+    }
+    return data.variants.slice(0, 3) as VariantBundle
+  }
+
+  /**
+   * Plain English: stash standard column for Show full, fill box with evidence→Middle tweets.
+   * Does not put homepage Normie brief into the editor.
+   */
+  async function applyPlainEnglishFromEvidence(
+    kind: ShareImageKind,
+    source: ShareBriefSource | ShareNeedleSource | null,
+    link: boolean,
+    manageBusy = true,
+  ) {
+    if (!source) {
+      if (kind === 'brief') {
+        clearBriefShort()
+        setBriefText('')
+      } else {
+        clearNeedleShort()
+        setNeedleText('')
+      }
+      return
+    }
+
+    const column =
+      kind === 'brief'
+        ? composeBriefPost(source as ShareBriefSource, 'standard', { includeLink: link })
+        : composeNeedlePost(source as ShareNeedleSource, 'standard', { includeLink: link })
+
+    if (manageBusy) setSummarizeBusy(kind)
+    setError(null)
+    try {
+      const variants = await fetchUnder280Variants({
+        kind,
+        voice: 'normie',
+        link,
+        dateKey: source.dateKey,
+      })
+      if (!variants) {
+        // Fall back to standard column so the box isn't empty on failure
+        if (kind === 'brief') {
+          clearBriefShort()
+          setBriefText(column)
+        } else {
+          clearNeedleShort()
+          setNeedleText(column)
+        }
+        return
+      }
+      if (kind === 'brief') {
+        setBriefFull(column)
+        setBriefVariants(variants)
+        setBriefVariantIdx(0)
+        setBriefText(variants[0]!)
+      } else {
+        setNeedleFull(column)
+        setNeedleVariants(variants)
+        setNeedleVariantIdx(0)
+        setNeedleText(variants[0]!)
+      }
+    } catch {
+      setError('Under 280 request failed')
+      if (kind === 'brief') {
+        clearBriefShort()
+        setBriefText(column)
+      } else {
+        clearNeedleShort()
+        setNeedleText(column)
+      }
+    } finally {
+      if (manageBusy) setSummarizeBusy(null)
+    }
   }
 
   async function loadPosts() {
@@ -108,8 +205,16 @@ export default function AdminXShareTool({ password }: Props) {
       const needle = data.needle as ShareNeedleSource | null
       setBriefSource(brief)
       setNeedleSource(needle)
-      applyBrief(brief, briefVoice, includeLink)
-      applyNeedle(needle, needleVoice, includeLink)
+
+      // Plain English → evidence Mid tweets; Regular → full standard column
+      await Promise.all([
+        briefVoice === 'normie'
+          ? applyPlainEnglishFromEvidence('brief', brief, includeLink, false)
+          : Promise.resolve(applyRegularBrief(brief, includeLink)),
+        needleVoice === 'normie'
+          ? applyPlainEnglishFromEvidence('needle', needle, includeLink, false)
+          : Promise.resolve(applyRegularNeedle(needle, includeLink)),
+      ])
       setLoadState('ready')
     } catch {
       setLoadState('error')
@@ -117,23 +222,42 @@ export default function AdminXShareTool({ password }: Props) {
     }
   }
 
-  function setLink(next: boolean) {
+  async function setLink(next: boolean) {
     setIncludeLink(next)
     setThreadPreview(null)
-    applyBrief(briefSource, briefVoice, next)
-    applyNeedle(needleSource, needleVoice, next)
+    setSummarizeBusy('brief')
+    try {
+      await Promise.all([
+        briefVoice === 'normie'
+          ? applyPlainEnglishFromEvidence('brief', briefSource, next, false)
+          : Promise.resolve(applyRegularBrief(briefSource, next)),
+        needleVoice === 'normie'
+          ? applyPlainEnglishFromEvidence('needle', needleSource, next, false)
+          : Promise.resolve(applyRegularNeedle(needleSource, next)),
+      ])
+    } finally {
+      setSummarizeBusy(null)
+    }
   }
 
-  function changeBriefVoice(next: ShareVoice) {
+  async function changeBriefVoice(next: ShareVoice) {
     setBriefVoice(next)
     setThreadPreview(null)
-    applyBrief(briefSource, next, includeLink)
+    if (next === 'normie') {
+      await applyPlainEnglishFromEvidence('brief', briefSource, includeLink)
+    } else {
+      applyRegularBrief(briefSource, includeLink)
+    }
   }
 
-  function changeNeedleVoice(next: ShareVoice) {
+  async function changeNeedleVoice(next: ShareVoice) {
     setNeedleVoice(next)
     setThreadPreview(null)
-    applyNeedle(needleSource, next, includeLink)
+    if (next === 'normie') {
+      await applyPlainEnglishFromEvidence('needle', needleSource, includeLink)
+    } else {
+      applyRegularNeedle(needleSource, includeLink)
+    }
   }
 
   async function copyText(label: string, text: string) {
@@ -151,37 +275,31 @@ export default function AdminXShareTool({ password }: Props) {
   }
 
   async function summarizeUnder280(kind: ShareImageKind) {
-    const text = kind === 'brief' ? briefText : needleText
-    if (!text.trim() && !(kind === 'brief' ? briefSource : needleSource)) return
+    const source = kind === 'brief' ? briefSource : needleSource
+    if (!source) return
+    const voice = kind === 'brief' ? briefVoice : needleVoice
+    const column =
+      kind === 'brief'
+        ? composeBriefPost(source, 'standard', { includeLink })
+        : composeNeedlePost(source, 'standard', { includeLink })
+
     setSummarizeBusy(kind)
     setError(null)
     try {
-      // Stash current full draft so Show full can restore the column compose
-      if (kind === 'brief' && briefFull == null && text.trim()) setBriefFull(text)
-      if (kind === 'needle' && needleFull == null && text.trim()) setNeedleFull(text)
-
-      const res = await fetch('/api/admin/share-summarize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          password,
-          kind,
-          includeLink,
-          voice: kind === 'brief' ? briefVoice : needleVoice,
-          dateKey: kind === 'brief' ? briefSource?.dateKey : needleSource?.dateKey,
-        }),
+      const variants = await fetchUnder280Variants({
+        kind,
+        voice,
+        link: includeLink,
+        dateKey: source.dateKey,
       })
-      const data = await res.json()
-      if (!data.ok || !Array.isArray(data.variants) || data.variants.length < 3) {
-        setError(data.error ?? 'Under 280 summarize failed')
-        return
-      }
-      const variants = data.variants.slice(0, 3) as VariantBundle
+      if (!variants) return
       if (kind === 'brief') {
+        setBriefFull(column)
         setBriefVariants(variants)
         setBriefVariantIdx(0)
         setBriefText(variants[0]!)
       } else {
+        setNeedleFull(column)
         setNeedleVariants(variants)
         setNeedleVariantIdx(0)
         setNeedleText(variants[0]!)
@@ -340,8 +458,8 @@ export default function AdminXShareTool({ password }: Props) {
     border: '1px solid var(--accent)',
   }
 
-  const briefHasPlain = Boolean(briefSource?.generalNormie?.trim())
-  const needleHasPlain = Boolean(needleSource?.textNormie?.trim())
+  const briefHasPlain = true
+  const needleHasPlain = true
 
   return (
     <div style={{ marginBottom: '32px' }}>
@@ -358,19 +476,24 @@ export default function AdminXShareTool({ password }: Props) {
         <div>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Share on X</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '580px' }}>
-            Compose from cached Yesterday&apos;s Build and The Needle. Defaults to{' '}
             <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Plain English</strong>{' '}
-            with no site link.{' '}
-            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Under 280</strong> writes
-            three tweet-sized variants (255–280 chars; brief opens with Yesterday:) from the same
-            upstream commit/rescore evidence as the homepage columns — not from the column text. Plain
-            English uses Middle voice. Full drafts can still{' '}
-            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Save as image</strong> with
-            a short caption on Post on X when over the limit.
+            (default) fills the box with short Mid-voice tweets written from the same commit/rescore
+            evidence as the homepage — not from the long brief/Needle column.{' '}
+            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Regular</strong> loads the
+            full standard column draft for threads/images. No site link by default. Under 280 re-runs the
+            evidence pass; Show full restores the stashed column draft.
           </p>
         </div>
-        <button onClick={loadPosts} disabled={loadState === 'loading'} style={btnStyle}>
-          {loadState === 'loading' ? 'Loading…' : loadState === 'ready' ? 'Reload posts' : 'Load posts'}
+        <button
+          onClick={loadPosts}
+          disabled={loadState === 'loading' || summarizeBusy != null}
+          style={btnStyle}
+        >
+          {loadState === 'loading' || summarizeBusy != null
+            ? 'Loading…'
+            : loadState === 'ready'
+              ? 'Reload posts'
+              : 'Load posts'}
         </button>
       </div>
 
@@ -552,16 +675,16 @@ function VoiceToggle({
           onClick={() => onChange('normie')}
           title={
             hasPlainEnglish
-              ? 'Use the plain-English copy'
-              : 'No plain-English copy cached — regenerate the brief/needle to create one'
+              ? 'Short Mid-voice tweets from commit/rescore evidence'
+              : 'Plain English unavailable'
           }
         >
           Plain English
         </button>
       </div>
-      {value === 'normie' && !hasPlainEnglish && (
+      {value === 'normie' && (
         <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-          No plain-English version cached — showing regular copy. Regenerate above to create one.
+          Short tweets from live evidence (not the long homepage brief). Use Regular for the full column.
         </div>
       )}
     </div>
