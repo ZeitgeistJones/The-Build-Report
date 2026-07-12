@@ -4,11 +4,16 @@ export const CLAWD_GATE_ADDRESS = '0xc22B7b983EC81523c969753c2385106835E8CfCE' a
 export const CLAWD_GATE_TIER = 1
 
 /**
- * When false: report is fully visible and Score/Rescore/promo skip CLAWDGate.
- * Community context votes still use walletHasGateAccess (on-chain check).
- * Flip to true to restore the blur + Score hold requirement.
+ * When false: report is fully visible (no blur). Flip to true to restore the
+ * CLAWDGate unlock overlay on the main report.
  */
 export const REPORT_TOKEN_GATE_ENABLED = false
+
+/**
+ * When true: Score / Rescore / promo require CLAWDGate tier 1 (10M+ $CLAWD).
+ * Independent of the content blur flag above.
+ */
+export const RESCORE_TOKEN_GATE_ENABLED = true
 
 export const CLAWD_GATE_ABI = [
   {

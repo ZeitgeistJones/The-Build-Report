@@ -7,7 +7,7 @@ import { waitForTransactionReceipt } from '@wagmi/core'
 import { base } from 'wagmi/chains'
 import { Repo } from '@/lib/scores'
 import { wagmiConfig } from '@/lib/wagmi/config'
-import { RECEIVER_BUY_AND_BURN, REPORT_TOKEN_GATE_ENABLED, SCORE_PAYMENT_WEI } from '@/lib/web3/constants'
+import { RECEIVER_BUY_AND_BURN, RESCORE_TOKEN_GATE_ENABLED, SCORE_PAYMENT_WEI } from '@/lib/web3/constants'
 import { ScoringStatus } from '@/lib/scoringStatus'
 import { useClawdAccess } from './wallet/ClawdAccessContext'
 import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
@@ -288,7 +288,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       switchToBase()
       return
     }
-    if (REPORT_TOKEN_GATE_ENABLED && !hasAccess) {
+    if (RESCORE_TOKEN_GATE_ENABLED && !hasAccess) {
       setInlineMsg('Hold 10M $CLAWD to use this feature')
       return
     }

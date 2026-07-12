@@ -10,7 +10,7 @@ import { generateRescoreChangeSummary } from '@/lib/rescoreChangeSummary'
 import { buildRescoreSummaryRecord, saveRescoreSummary } from '@/lib/rescoreSummaries'
 import { isCommunityContextEnabled, markAcceptedConsumed } from '@/lib/communityContext'
 import { getRedis } from '@/lib/redis'
-import { PAID_TX_KEY_PREFIX, REPORT_TOKEN_GATE_ENABLED } from '@/lib/web3/constants'
+import { PAID_TX_KEY_PREFIX, RESCORE_TOKEN_GATE_ENABLED } from '@/lib/web3/constants'
 import { verifyPaymentTx, verifyWalletSignature, walletHasGateAccess } from '@/lib/web3/verifyPayment'
 import {
   consumePromoNonce,
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Repo is excluded from scoring' }, { status: 400 })
     }
 
-    if (REPORT_TOKEN_GATE_ENABLED) {
+    if (RESCORE_TOKEN_GATE_ENABLED) {
       const hasAccess = await walletHasGateAccess(walletAddress)
       if (!hasAccess) {
         return NextResponse.json({ ok: false, error: 'Wallet does not meet CLAWDGate access requirements' }, { status: 403 })

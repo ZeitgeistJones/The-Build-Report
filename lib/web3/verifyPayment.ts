@@ -5,7 +5,7 @@ import {
   CLAWD_GATE_ADDRESS,
   CLAWD_GATE_TIER,
   RECEIVER_BUY_AND_BURN,
-  REPORT_TOKEN_GATE_ENABLED,
+  RESCORE_TOKEN_GATE_ENABLED,
   SCORE_PAYMENT_WEI,
 } from './constants'
 
@@ -116,7 +116,7 @@ export async function verifyPaymentTx(
     throw new Error('Incorrect payment amount')
   }
 
-  if (REPORT_TOKEN_GATE_ENABLED) {
+  if (RESCORE_TOKEN_GATE_ENABLED) {
     const hasAccess = await client.readContract({
       address: CLAWD_GATE_ADDRESS,
       abi: CLAWD_GATE_ABI,

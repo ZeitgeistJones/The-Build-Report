@@ -9,7 +9,7 @@ import {
 } from '@/lib/rescorePromo'
 import { getTreasuryBalanceEth } from '@/lib/rescorePromoTreasury'
 import { walletHasGateAccess } from '@/lib/web3/verifyPayment'
-import { REPORT_TOKEN_GATE_ENABLED } from '@/lib/web3/constants'
+import { RESCORE_TOKEN_GATE_ENABLED } from '@/lib/web3/constants'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Missing required fields' }, { status: 400 })
     }
 
-    if (REPORT_TOKEN_GATE_ENABLED) {
+    if (RESCORE_TOKEN_GATE_ENABLED) {
       const hasAccess = await walletHasGateAccess(walletAddress)
       if (!hasAccess) {
         return NextResponse.json({ ok: false, error: 'Wallet does not meet CLAWDGate access requirements' }, { status: 403 })
