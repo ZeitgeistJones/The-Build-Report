@@ -23,6 +23,7 @@ import {
   isLaunchBaseline,
   RESCORE_BUTTON_TOOLTIP,
   RESCORE_PROMO_TOOLTIP,
+  RESCORE_TOKEN_GATE_TOOLTIP,
 } from '@/lib/scoringCopy'
 import { SCORE_PAYMENT_ETH } from '@/lib/rescoreBurns'
 import { formatApproxUsdFromEth, formatRescorePriceLabel } from '@/lib/promoUsd'
@@ -59,6 +60,7 @@ function RescoreTooltipContent({
   rewardEth,
   pausedReason,
   ethUsdRate,
+  needsHold,
 }: {
   promoActive: boolean
   promoEligible: boolean
@@ -67,9 +69,15 @@ function RescoreTooltipContent({
   rewardEth: number
   pausedReason: string | null
   ethUsdRate: number
+  needsHold: boolean
 }) {
   return (
     <>
+      {needsHold && (
+        <div style={{ marginBottom: '6px', fontWeight: 600, color: 'var(--text-primary)' }}>
+          {RESCORE_TOKEN_GATE_TOOLTIP}
+        </div>
+      )}
       {promoEligible && (
         <div style={{ marginBottom: '6px' }}>
           Earn {formatApproxUsdFromEth(rewardEth, ethUsdRate)} for {staleCommits} commit
@@ -93,11 +101,20 @@ function RescoreTooltipContent({
 export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onScored }: Props) {
   const router = useRouter()
   const isMobile = useIsMobile()
-  const { isConnected, hasAccess, connectWallet, address, isWrongChain, switchToBase } = useClawdAccess()
+  const {
+    isConnected,
+    hasAccess,
+    isLoading: isAccessLoading,
+    connectWallet,
+    address,
+    isWrongChain,
+    switchToBase,
+  } = useClawdAccess()
   const [inlineMsg, setInlineMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [phase, setPhase] = useState<'idle' | 'paying' | 'signing' | 'scoring'>('idle')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [gateTipOpen, setGateTipOpen] = useState(false)
   const [promoQuote, setPromoQuote] = useState<PromoQuote | null>(null)
   const [promoReward, setPromoReward] = useState<{
     amountLabel: string
@@ -115,6 +132,12 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     scoringStatus === 'scored' && Boolean(promoQuote?.promoActive) && !promoEligible
   const busy = phase !== 'idle' || isSending
   const buttonDisabled = busy || paidRescorePaused
+  const needsHold =
+    RESCORE_TOKEN_GATE_ENABLED &&
+    isConnected &&
+    !isWrongChain &&
+    !isAccessLoading &&
+    !hasAccess
   const defaultLabel = `${label} (${formatRescorePriceLabel(SCORE_PAYMENT_ETH, ethUsdRate)})`
   const actionLabel = busy
     ? phase === 'paying' || isSending
@@ -279,6 +302,7 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
     setError(null)
     setInlineMsg(null)
     setPromoReward(null)
+    setGateTipOpen(false)
 
     if (!isConnected) {
       connectWallet()
@@ -289,7 +313,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
       return
     }
     if (RESCORE_TOKEN_GATE_ENABLED && !hasAccess) {
-      setInlineMsg('Hold 10M $CLAWD to use this feature')
+      if (isAccessLoading) return
+      setGateTipOpen(true)
+      setInlineMsg(RESCORE_TOKEN_GATE_TOOLTIP)
       return
     }
     if (!address) return
@@ -314,14 +340,17 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
           rewardEth={promoQuote?.rewardEth ?? 0}
           pausedReason={promoQuote?.reason ?? null}
           ethUsdRate={ethUsdRate}
+          needsHold={needsHold}
         />
       }
-      ariaLabel="About Score and Rescore"
+      ariaLabel={needsHold ? RESCORE_TOKEN_GATE_TOOLTIP : 'About Score and Rescore'}
       icon="question"
       placement="above"
       width={260}
       interactive
       compact
+      forceOpen={gateTipOpen}
+      onOpenChange={setGateTipOpen}
     />
   )
 
@@ -367,6 +396,8 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
             type="button"
             onClick={handleClick}
             disabled={buttonDisabled}
+            title={needsHold ? RESCORE_TOKEN_GATE_TOOLTIP : undefined}
+            aria-label={needsHold ? RESCORE_TOKEN_GATE_TOOLTIP : undefined}
             style={{
               flex: 1,
               minWidth: 0,

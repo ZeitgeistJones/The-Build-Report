@@ -44,6 +44,10 @@ export const RESCORE_BUTTON_TOOLTIP =
 export const RESCORE_PROMO_TOOLTIP =
   `Limited launch promo: earn ~$0.01 per commit to your wallet plus the same amount queued for CLAWD burns (50/50 treasury subsidy) — first Score on commits after the repo was created (forks: after the fork), or Rescore on stale scored repos. Connect a Base wallet to qualify. Promo ends when disabled or the treasury runs low. ${APPROX_USD_NOTE}`
 
+/** Shown when a connected wallet fails CLAWDGate tier 1 (Score / Rescore). */
+export const RESCORE_TOKEN_GATE_TOOLTIP =
+  'Hold at least 10M $CLAWD to Score or Rescore.'
+
 export const ECOSYSTEM_ADD_CONTEXT_LABEL =
   'Disagree with a grade? Holders can add context →'
 

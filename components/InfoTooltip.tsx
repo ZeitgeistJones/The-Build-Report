@@ -21,6 +21,9 @@ interface Props {
   compact?: boolean
   /** Accent link-style label instead of the ⓘ / ? icon. */
   textTrigger?: string
+  /** Force the panel open (e.g. after a gated click). */
+  forceOpen?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export default function InfoTooltip({
@@ -32,12 +35,22 @@ export default function InfoTooltip({
   interactive = false,
   compact = false,
   textTrigger,
+  forceOpen,
+  onOpenChange,
 }: Props) {
   const isMobile = useIsMobile()
-  const [show, setShow] = useState(false)
+  const [internalShow, setInternalShow] = useState(false)
+  const controlled = typeof forceOpen === 'boolean'
+  const show = controlled ? forceOpen : internalShow
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const anchorRef = useRef<HTMLButtonElement>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function setShow(next: boolean | ((prev: boolean) => boolean)) {
+    const resolved = typeof next === 'function' ? next(show) : next
+    if (!controlled) setInternalShow(resolved)
+    onOpenChange?.(resolved)
+  }
 
   function clearHoverTimer() {
     if (hoverTimerRef.current) {
@@ -69,7 +82,7 @@ export default function InfoTooltip({
   }
 
   useEffect(() => {
-    if (!show || (!interactive && !textTrigger)) return
+    if (!show || (!interactive && !textTrigger && !controlled)) return
     function onDocClick() {
       setShow(false)
     }
@@ -80,7 +93,7 @@ export default function InfoTooltip({
       clearTimeout(timer)
       document.removeEventListener('click', onDocClick)
     }
-  }, [show, interactive, textTrigger])
+  }, [show, interactive, textTrigger, controlled])
 
   useLayoutEffect(() => {
     if (!show || !anchorRef.current) {
@@ -103,7 +116,7 @@ export default function InfoTooltip({
 
   const hitSize = isMobile ? MIN_TAP : compact ? 24 : 14
   const iconSize = compact ? 9 : icon === 'question' ? 9 : 11
-  const panelInteractive = interactive || Boolean(textTrigger)
+  const panelInteractive = interactive || Boolean(textTrigger) || controlled
 
   const panelStyle = {
     background: 'var(--surface-3)',
