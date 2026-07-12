@@ -101,7 +101,7 @@ export function composeBriefPost(
 ): string {
   const includeLink = opts.includeLink !== false
   const body = briefBody(source, voice)
-  const header = `Yesterday's Build — ${formatShareDate(source.dateKey)}`
+  const header = `${formatShareDate(source.dateKey)} Build`
   const meta = `${source.repoCount} repos · ${source.commitCount} commits`
   const parts = [header, '', body, '', meta]
   if (includeLink) parts.push(TBR_SITE_URL)
@@ -132,7 +132,7 @@ export function composeShortCaption(
   source: { dateKey: string; repoCount?: number; commitCount?: number },
 ): string {
   if (kind === 'brief') {
-    return `Yesterday's Build — ${formatShareDate(source.dateKey)}\n${TBR_SITE_URL}`
+    return `${formatShareDate(source.dateKey)} Build\n${TBR_SITE_URL}`
   }
   const moved =
     source.repoCount == null

@@ -169,6 +169,8 @@ export default function AdminXShareTool({ password }: Props) {
           kind,
           text: sourceForApi,
           includeLink,
+          dateKey: kind === 'brief' ? briefSource?.dateKey : needleSource?.dateKey,
+          voice: kind === 'brief' ? briefVoice : needleVoice,
         }),
       })
       const data = await res.json()
@@ -362,7 +364,8 @@ export default function AdminXShareTool({ password }: Props) {
             <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Plain English</strong>{' '}
             with no site link.{' '}
             <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Under 280</strong> makes
-            three tweet-sized variants (text or image). Full drafts can still{' '}
+            three tweet-sized variants (255–280 chars; brief opens with e.g. Jul 11 Build:). Plain English
+            tweets use Middle voice — clearer than site Normie, not Full Normie. Full drafts can still{' '}
             <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Save as image</strong> with
             a short caption on Post on X when over the limit.
           </p>
