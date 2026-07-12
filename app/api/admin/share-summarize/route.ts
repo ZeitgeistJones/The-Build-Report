@@ -6,7 +6,6 @@ import {
   TBR_SITE_URL,
   X_CHAR_LIMIT,
   enforceWeightedLimit,
-  formatShareDate,
   xWeightedLength,
   type ShareVoice,
 } from '@/lib/xSharePosts'
@@ -31,10 +30,6 @@ export async function POST(req: NextRequest) {
   const text = typeof (body as { text?: unknown }).text === 'string' ? (body as { text: string }).text.trim() : ''
   // Default false — site URL burns ~23 weighted chars; opt in from admin checkbox.
   const includeLink = (body as { includeLink?: boolean }).includeLink === true
-  const dateKey =
-    typeof (body as { dateKey?: unknown }).dateKey === 'string'
-      ? (body as { dateKey: string }).dateKey.trim()
-      : ''
   const voiceRaw = (body as { voice?: unknown }).voice
   const voice: ShareVoice = voiceRaw === 'normie' ? 'normie' : 'standard'
 
@@ -49,7 +44,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const variants = await summarizeToTweetVariants(kind, text, includeLink, dateKey, voice)
+    const variants = await summarizeToTweetVariants(kind, text, includeLink, voice)
     return NextResponse.json({
       ok: true,
       variants,
@@ -65,22 +60,18 @@ async function summarizeToTweetVariants(
   kind: Kind,
   sourceText: string,
   includeLink: boolean,
-  dateKey: string,
   voice: ShareVoice,
 ): Promise<[string, string, string]> {
   const label = kind === 'brief' ? "Yesterday's Build" : 'The Needle'
-  const dateLabel = dateKey ? formatShareDate(dateKey) : ''
-  const briefOpener = dateLabel ? `${dateLabel} Build:` : ''
+  const briefOpener = kind === 'brief' ? 'Yesterday:' : ''
   const urlRule = includeLink
     ? `Each variant MUST end with a blank line then exactly: ${TBR_SITE_URL}`
     : 'Do NOT include any URL.'
 
   const openerRule =
-    kind === 'brief' && briefOpener
-      ? `Each variant MUST start with exactly: ${briefOpener} (not "Yesterday's Build — …").`
-      : kind === 'needle'
-        ? 'Keep The Needle framing if useful; do not use a Yesterday\'s Build opener.'
-        : ''
+    kind === 'brief'
+      ? `Each variant MUST start with exactly: Yesterday: (not a dated "Jul 11 Build:" or "Yesterday's Build — …" opener).`
+      : 'Keep The Needle framing if useful; do not use a Yesterday opener.'
 
   const lengthRule = `Each variant should be ${X_TWEET_MIN_CHARS}–${X_CHAR_LIMIT} characters (URLs count as 23). Pack concrete detail from the source — not filler. Hard max ${X_CHAR_LIMIT}.`
 
@@ -171,6 +162,7 @@ function ensureBriefOpener(text: string, opener: string): string {
     .replace(/^Yesterday'?s\s+Build\s*[—–\-:]\s*[A-Za-z]{3}\s+\d{1,2}\s*:?\s*/i, '')
     .replace(/^Yesterday'?s\s+Build\s*:?\s*/i, '')
     .replace(/^[A-Za-z]{3}\s+\d{1,2}\s+Build\s*:?\s*/i, '')
+    .replace(/^Yesterday\s*:?\s*/i, '')
     .trim()
   if (body.toLowerCase().startsWith(opener.toLowerCase())) return body
   return `${opener} ${body}`

@@ -75,6 +75,7 @@ export function extractShareImageBody(draftText: string): string {
     }
     if (
       /^Yesterday'?s\s+Build\b/i.test(first) ||
+      /^Yesterday:?$/i.test(first) ||
       /^[A-Za-z]{3}\s+\d{1,2}\s+Build\b/i.test(first) ||
       /^The\s+Needle\b/i.test(first)
     ) {
