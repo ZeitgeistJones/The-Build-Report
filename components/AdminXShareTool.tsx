@@ -5,6 +5,8 @@ import {
   X_CHAR_LIMIT,
   composeBriefPost,
   composeNeedlePost,
+  composeShortCaption,
+  formatShareDate,
   splitIntoThread,
   xIntentUrl,
   xWeightedLength,
@@ -12,6 +14,14 @@ import {
   type ShareNeedleSource,
   type ShareVoice,
 } from '@/lib/xSharePosts'
+import {
+  canvasToPngBlob,
+  copyPngBlob,
+  downloadPngBlob,
+  renderSharePostCanvas,
+  shareImageFilename,
+  type ShareImageKind,
+} from '@/lib/sharePostImage'
 
 type Props = {
   password: string
@@ -33,6 +43,9 @@ export default function AdminXShareTool({ password }: Props) {
   const [threadPreview, setThreadPreview] = useState<{ kind: 'brief' | 'needle'; parts: string[] } | null>(
     null,
   )
+  const [briefPreviewUrl, setBriefPreviewUrl] = useState<string | null>(null)
+  const [needlePreviewUrl, setNeedlePreviewUrl] = useState<string | null>(null)
+  const [imageBusy, setImageBusy] = useState<string | null>(null)
 
   function applyBrief(source: ShareBriefSource | null, voice: ShareVoice, link: boolean) {
     setBriefText(source ? composeBriefPost(source, voice, { includeLink: link }) : '')
@@ -42,10 +55,18 @@ export default function AdminXShareTool({ password }: Props) {
     setNeedleText(source ? composeNeedlePost(source, voice, { includeLink: link }) : '')
   }
 
+  function revokePreview(url: string | null) {
+    if (url) URL.revokeObjectURL(url)
+  }
+
   async function loadPosts() {
     setLoadState('loading')
     setError(null)
     setThreadPreview(null)
+    revokePreview(briefPreviewUrl)
+    revokePreview(needlePreviewUrl)
+    setBriefPreviewUrl(null)
+    setNeedlePreviewUrl(null)
     try {
       const res = await fetch('/api/admin/share-posts', {
         method: 'POST',
@@ -104,6 +125,90 @@ export default function AdminXShareTool({ password }: Props) {
     window.open(xIntentUrl(text), '_blank', 'noopener,noreferrer')
   }
 
+  async function buildImageBlob(
+    kind: ShareImageKind,
+    draftText: string,
+    dateKey: string,
+    metaLine: string,
+  ): Promise<{ blob: Blob; filename: string }> {
+    const canvas = renderSharePostCanvas({
+      kind,
+      title: kind === 'brief' ? "Yesterday's Build" : 'The Needle',
+      meta: metaLine,
+      draftText,
+    })
+    const blob = await canvasToPngBlob(canvas)
+    return { blob, filename: shareImageFilename(kind, dateKey) }
+  }
+
+  async function saveAsImage(kind: ShareImageKind) {
+    const source = kind === 'brief' ? briefSource : needleSource
+    const text = kind === 'brief' ? briefText : needleText
+    if (!source || !text.trim()) return
+    setImageBusy(`${kind}-save`)
+    try {
+      const metaLine =
+        kind === 'brief'
+          ? `${formatShareDate(source.dateKey)} · ${source.repoCount} repos · ${(source as ShareBriefSource).commitCount} commits`
+          : `${formatShareDate(source.dateKey)} · ${source.repoCount} repos moved`
+      const { blob, filename } = await buildImageBlob(kind, text, source.dateKey, metaLine)
+      downloadPngBlob(blob, filename)
+      const url = URL.createObjectURL(blob)
+      if (kind === 'brief') {
+        revokePreview(briefPreviewUrl)
+        setBriefPreviewUrl(url)
+      } else {
+        revokePreview(needlePreviewUrl)
+        setNeedlePreviewUrl(url)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to build image')
+    } finally {
+      setImageBusy(null)
+    }
+  }
+
+  async function copyAsImage(kind: ShareImageKind) {
+    const source = kind === 'brief' ? briefSource : needleSource
+    const text = kind === 'brief' ? briefText : needleText
+    if (!source || !text.trim()) return
+    setImageBusy(`${kind}-copy`)
+    try {
+      const metaLine =
+        kind === 'brief'
+          ? `${formatShareDate(source.dateKey)} · ${source.repoCount} repos · ${(source as ShareBriefSource).commitCount} commits`
+          : `${formatShareDate(source.dateKey)} · ${source.repoCount} repos moved`
+      const { blob, filename } = await buildImageBlob(kind, text, source.dateKey, metaLine)
+      const ok = await copyPngBlob(blob)
+      if (ok) {
+        setCopied(`${kind} image`)
+        window.setTimeout(() => setCopied(null), 2000)
+      } else {
+        downloadPngBlob(blob, filename)
+        setCopied(`${kind} image downloaded`)
+        window.setTimeout(() => setCopied(null), 2500)
+      }
+      const url = URL.createObjectURL(blob)
+      if (kind === 'brief') {
+        revokePreview(briefPreviewUrl)
+        setBriefPreviewUrl(url)
+      } else {
+        revokePreview(needlePreviewUrl)
+        setNeedlePreviewUrl(url)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to copy image')
+    } finally {
+      setImageBusy(null)
+    }
+  }
+
+  function postCaptionOnX(kind: ShareImageKind) {
+    const source = kind === 'brief' ? briefSource : needleSource
+    if (!source) return
+    openOnX(composeShortCaption(kind, source))
+  }
+
   const panelStyle = {
     marginBottom: '12px',
     padding: '12px 14px',
@@ -146,11 +251,11 @@ export default function AdminXShareTool({ password }: Props) {
       >
         <div>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Share on X</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-            Compose posts from the cached Yesterday&apos;s build and The Needle. Pick{' '}
-            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Regular</strong> or{' '}
-            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Plain English</strong>{' '}
-            per post, then copy or open on X.
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '560px' }}>
+            Compose from cached Yesterday&apos;s Build and The Needle. For long copy:{' '}
+            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Save as image</strong>,
+            then <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Post on X</strong>{' '}
+            opens a short caption — attach the PNG in the composer.
           </p>
         </div>
         <button onClick={loadPosts} disabled={loadState === 'loading'} style={btnStyle}>
@@ -180,7 +285,7 @@ export default function AdminXShareTool({ password }: Props) {
                 checked={includeLink}
                 onChange={e => setLink(e.target.checked)}
               />
-              Include site link
+              Include site link in full text
             </label>
             {copied && (
               <span style={{ color: 'var(--accent)', fontSize: '12px' }}>Copied {copied}</span>
@@ -188,7 +293,8 @@ export default function AdminXShareTool({ password }: Props) {
           </div>
 
           <ShareDraft
-            title="Yesterday's build"
+            title="Yesterday's Build"
+            kind="brief"
             meta={
               briefSource
                 ? `${briefSource.dateKey} · ${briefSource.repoCount} repos · ${briefSource.commitCount} commits`
@@ -200,9 +306,13 @@ export default function AdminXShareTool({ password }: Props) {
             hasPlainEnglish={briefHasPlain}
             text={briefText}
             onChange={setBriefText}
-            onCopy={() => copyText('brief', briefText)}
-            onPost={() => openOnX(briefText)}
+            onCopyText={() => copyText('brief', briefText)}
+            onSaveImage={() => saveAsImage('brief')}
+            onCopyImage={() => copyAsImage('brief')}
+            onPostCaption={() => postCaptionOnX('brief')}
             onThread={() => setThreadPreview({ kind: 'brief', parts: splitIntoThread(briefText) })}
+            imageBusy={imageBusy}
+            previewUrl={briefPreviewUrl}
             panelStyle={panelStyle}
             btnStyle={btnStyle}
             accentBtn={accentBtn}
@@ -211,6 +321,7 @@ export default function AdminXShareTool({ password }: Props) {
 
           <ShareDraft
             title="The Needle"
+            kind="needle"
             meta={
               needleSource
                 ? `${needleSource.dateKey} · ${needleSource.repoCount} repos moved`
@@ -222,9 +333,13 @@ export default function AdminXShareTool({ password }: Props) {
             hasPlainEnglish={needleHasPlain}
             text={needleText}
             onChange={setNeedleText}
-            onCopy={() => copyText('needle', needleText)}
-            onPost={() => openOnX(needleText)}
+            onCopyText={() => copyText('needle', needleText)}
+            onSaveImage={() => saveAsImage('needle')}
+            onCopyImage={() => copyAsImage('needle')}
+            onPostCaption={() => postCaptionOnX('needle')}
             onThread={() => setThreadPreview({ kind: 'needle', parts: splitIntoThread(needleText) })}
+            imageBusy={imageBusy}
+            previewUrl={needlePreviewUrl}
             panelStyle={panelStyle}
             btnStyle={btnStyle}
             accentBtn={accentBtn}
@@ -244,7 +359,7 @@ export default function AdminXShareTool({ password }: Props) {
                 }}
               >
                 <strong style={{ fontSize: '13px' }}>
-                  Thread preview — {threadPreview.kind === 'brief' ? "Yesterday's build" : 'The Needle'}{' '}
+                  Thread preview — {threadPreview.kind === 'brief' ? "Yesterday's Build" : 'The Needle'}{' '}
                   ({threadPreview.parts.length} posts)
                 </strong>
                 <button type="button" style={btnStyle} onClick={() => setThreadPreview(null)}>
@@ -328,6 +443,7 @@ function VoiceToggle({
 
 function ShareDraft({
   title,
+  kind,
   meta,
   emptyLabel,
   voice,
@@ -335,15 +451,20 @@ function ShareDraft({
   hasPlainEnglish,
   text,
   onChange,
-  onCopy,
-  onPost,
+  onCopyText,
+  onSaveImage,
+  onCopyImage,
+  onPostCaption,
   onThread,
+  imageBusy,
+  previewUrl,
   panelStyle,
   btnStyle,
   accentBtn,
   hasSource,
 }: {
   title: string
+  kind: ShareImageKind
   meta: string | null
   emptyLabel: string
   voice: ShareVoice
@@ -351,9 +472,13 @@ function ShareDraft({
   hasPlainEnglish: boolean
   text: string
   onChange: (v: string) => void
-  onCopy: () => void
-  onPost: () => void
+  onCopyText: () => void
+  onSaveImage: () => void
+  onCopyImage: () => void
+  onPostCaption: () => void
   onThread: () => void
+  imageBusy: string | null
+  previewUrl: string | null
   panelStyle: CSSProperties
   btnStyle: CSSProperties
   accentBtn: CSSProperties
@@ -361,6 +486,8 @@ function ShareDraft({
 }) {
   const len = useMemo(() => xWeightedLength(text), [text])
   const over = len > X_CHAR_LIMIT
+  const busySave = imageBusy === `${kind}-save`
+  const busyCopy = imageBusy === `${kind}-copy`
 
   if (!hasSource) {
     return (
@@ -420,18 +547,47 @@ function ShareDraft({
           }}
         >
           {len}/{X_CHAR_LIMIT}
-          {over ? ' — over limit (trim or make a thread)' : ''}
+          {over ? ' — over limit → save as image' : ''}
         </span>
-        <button type="button" style={btnStyle} onClick={onCopy}>
-          Copy
+        <button type="button" style={btnStyle} onClick={onCopyText}>
+          Copy text
+        </button>
+        <button type="button" style={btnStyle} onClick={onSaveImage} disabled={busySave || busyCopy}>
+          {busySave ? 'Saving…' : 'Save as image'}
+        </button>
+        <button type="button" style={btnStyle} onClick={onCopyImage} disabled={busySave || busyCopy}>
+          {busyCopy ? 'Copying…' : 'Copy image'}
         </button>
         <button type="button" style={btnStyle} onClick={onThread}>
           Make thread
         </button>
-        <button type="button" style={accentBtn} onClick={onPost}>
+        <button type="button" style={accentBtn} onClick={onPostCaption}>
           Post on X
         </button>
       </div>
+      <p style={{ margin: '8px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+        Post on X opens a short caption only — attach the PNG in the composer after Save/Copy image.
+      </p>
+      {previewUrl && (
+        <div style={{ marginTop: '12px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+            Image preview
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewUrl}
+            alt={`${title} share preview`}
+            style={{
+              display: 'block',
+              width: '100%',
+              maxWidth: '420px',
+              height: 'auto',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

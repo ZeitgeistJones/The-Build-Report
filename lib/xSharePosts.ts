@@ -47,14 +47,14 @@ function needleBody(source: ShareNeedleSource, voice: ShareVoice): string {
   return source.text.trim()
 }
 
-function formatBriefDate(dateKey: string): string {
+export function formatShareDate(dateKey: string): string {
   const [y, m, d] = dateKey.split('-').map(Number)
   if (!y || !m || !d) return dateKey
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   return `${months[m - 1]} ${d}`
 }
 
-/** Default shareable post for Yesterday's build. */
+/** Default shareable post for Yesterday's Build (full text — use for copy/thread). */
 export function composeBriefPost(
   source: ShareBriefSource,
   voice: ShareVoice,
@@ -62,14 +62,14 @@ export function composeBriefPost(
 ): string {
   const includeLink = opts.includeLink !== false
   const body = briefBody(source, voice)
-  const header = `Yesterday's build — ${formatBriefDate(source.dateKey)}`
+  const header = `Yesterday's Build — ${formatShareDate(source.dateKey)}`
   const meta = `${source.repoCount} repos · ${source.commitCount} commits`
   const parts = [header, '', body, '', meta]
   if (includeLink) parts.push(TBR_SITE_URL)
   return parts.join('\n').trim()
 }
 
-/** Default shareable post for The Needle. */
+/** Default shareable post for The Needle (full text — use for copy/thread). */
 export function composeNeedlePost(
   source: ShareNeedleSource,
   voice: ShareVoice,
@@ -85,6 +85,25 @@ export function composeNeedlePost(
   const parts = [header, '', body, '', meta]
   if (includeLink) parts.push(TBR_SITE_URL)
   return parts.join('\n').trim()
+}
+
+/** Short caption for X intent when the full writeup ships as an image. */
+export function composeShortCaption(
+  kind: 'brief' | 'needle',
+  source: { dateKey: string; repoCount?: number; commitCount?: number },
+): string {
+  if (kind === 'brief') {
+    return `Yesterday's Build — ${formatShareDate(source.dateKey)}\n${TBR_SITE_URL}`
+  }
+  const moved =
+    source.repoCount == null
+      ? null
+      : source.repoCount === 1
+        ? '1 repo moved'
+        : `${source.repoCount} repos moved`
+  return moved
+    ? `The Needle — ${formatShareDate(source.dateKey)}\n${moved}\n${TBR_SITE_URL}`
+    : `The Needle — ${formatShareDate(source.dateKey)}\n${TBR_SITE_URL}`
 }
 
 /**
