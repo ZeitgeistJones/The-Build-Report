@@ -360,6 +360,62 @@ button {
   color: var(--text-muted);
 }
 
+/* Homepage: why rescoring keeps Yesterday's build / The Needle current */
+.brief-freshness-nudge {
+  margin: 4px 0 28px;
+  max-width: 42rem;
+}
+
+.brief-freshness-nudge__lead {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.brief-freshness-nudge__lead strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.brief-freshness-nudge__body {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.brief-freshness-nudge__zap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.brief-freshness-nudge__zap:hover {
+  color: var(--accent-hover, var(--accent));
+  text-decoration-color: var(--accent);
+}
+
+.brief-freshness-nudge__zap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
 /* Pressroom masthead — heavy slab nameplate */
 [data-color-theme='light-90s'] .site-masthead {
   font-family: var(--font-slab) !important;

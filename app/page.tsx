@@ -34,6 +34,7 @@ import HomeRepoSection from '@/components/HomeRepoSection'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 import HomeHeader from '@/components/HomeHeader'
+import BriefFreshnessNudge from '@/components/BriefFreshnessNudge'
 import BuildBriefCard from '@/components/BuildBriefCard'
 import NeedleCard from '@/components/NeedleCard'
 import { getNeedle } from '@/lib/needle'
@@ -361,6 +362,8 @@ export default async function Home() {
           )}
         </div>
       )}
+
+      <BriefFreshnessNudge />
 
       <BuildBriefCard brief={buildBrief} />
       <NeedleCard needle={needle} />

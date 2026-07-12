@@ -198,4 +198,23 @@
     min-height: 44px;
     padding: 8px 14px;
   }
+
+  .brief-freshness-nudge {
+    margin: 0 0 24px;
+  }
+
+  .brief-freshness-nudge__lead {
+    font-size: 15px;
+  }
+
+  .brief-freshness-nudge__body {
+    font-size: 14px;
+  }
+
+  .brief-freshness-nudge__zap {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    padding: 4px 0;
+  }
 }
