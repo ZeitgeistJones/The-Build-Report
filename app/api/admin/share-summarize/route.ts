@@ -13,8 +13,12 @@ import {
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-/** Soft floor for Under 280 variants — expand if below this. */
+/** Hard floor for Under 280 variants — expand in a loop if below this. */
 const X_TWEET_MIN_CHARS = 255
+/** Prefer landing in this band when expanding. */
+const X_TWEET_AIM_MIN = 265
+const EXPAND_MAX_ATTEMPTS = 3
+const EXPAND_MIN_GROWTH = 10
 
 type Kind = 'brief' | 'needle'
 
@@ -73,17 +77,17 @@ async function summarizeToTweetVariants(
       ? `Each variant MUST start with exactly: Yesterday: (not a dated "Jul 11 Build:" or "Yesterday's Build — …" opener).`
       : 'Keep The Needle framing if useful; do not use a Yesterday opener.'
 
-  const lengthRule = `Each variant should be ${X_TWEET_MIN_CHARS}–${X_CHAR_LIMIT} characters (URLs count as 23). Pack concrete detail from the source — not filler. Hard max ${X_CHAR_LIMIT}.`
+  const lengthRule = `HARD MINIMUM ${X_TWEET_MIN_CHARS} characters per variant (URLs count as 23). Prefer ${X_TWEET_AIM_MIN}–${X_CHAR_LIMIT}. Pack concrete detail from the source — not filler. Hard max ${X_CHAR_LIMIT}. Variants under ${X_TWEET_MIN_CHARS} are invalid.`
 
   const voiceBlock =
     voice === 'normie'
-      ? `\nVoice (Plain English → Middle, not site Normie and not Full Normie ELI5):\n${middleVoiceGuidanceForTweet()}\n`
+      ? `\nVoice (Plain English → Middle, not site Normie and not Full Normie ELI5):\n${middleVoiceGuidanceForTweet()}\nNote: Middle few-shots are register examples only — each tweet variant must still hit ${X_TWEET_MIN_CHARS}–${X_CHAR_LIMIT} characters even if some examples are shorter.\n`
       : `\nVoice: friendly, clear, light personality — no hype, no invented facts. You may keep normal product/tech wording.\n`
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const prompt = `You write X/Twitter posts for The Build Report (independent community project scoring clawdbotatg repos).
 
-Task: turn this full ${label} draft into THREE different tweet-sized variants. Same facts; different wording, emphasis, and length. Name at most 1–2 repos if space allows.
+Task: turn this full ${label} draft into THREE tweet-sized variants. Same facts; different wording and emphasis — all three must land in the ${X_TWEET_MIN_CHARS}–${X_CHAR_LIMIT} character band (do not make a short variant). Name at most 1–2 repos if space allows.
 ${voiceBlock}
 SOURCE DRAFT:
 """
@@ -123,37 +127,77 @@ Hard rules:
     parsed.variants.slice(0, 3).map(async v => {
       let s = typeof v === 'string' ? v.trim() : ''
       if (!s) s = sourceText.slice(0, 200)
-      if (kind === 'brief' && briefOpener) s = ensureBriefOpener(s, briefOpener)
-      if (includeLink && !s.includes(TBR_SITE_URL)) {
-        s = `${s.trim()}\n\n${TBR_SITE_URL}`
-      }
-      if (!includeLink) {
-        s = s.replace(new RegExp(`\\s*${TBR_SITE_URL.replace(/\./g, '\\.')}\\s*`, 'g'), '').trim()
-      }
-      s = enforceWeightedLimit(s, X_CHAR_LIMIT)
-      if (xWeightedLength(s) < X_TWEET_MIN_CHARS) {
-        s = await expandVariant(client, {
-          kind,
-          sourceText,
-          shortText: s,
-          includeLink,
-          briefOpener,
-          voice,
-        })
-        if (kind === 'brief' && briefOpener) s = ensureBriefOpener(s, briefOpener)
-        if (includeLink && !s.includes(TBR_SITE_URL)) {
-          s = `${s.trim()}\n\n${TBR_SITE_URL}`
-        }
-        if (!includeLink) {
-          s = s.replace(new RegExp(`\\s*${TBR_SITE_URL.replace(/\./g, '\\.')}\\s*`, 'g'), '').trim()
-        }
-        s = enforceWeightedLimit(s, X_CHAR_LIMIT)
-      }
+      s = finalizeVariant(s, { kind, briefOpener, includeLink })
+      s = await expandUntilFloor(client, {
+        kind,
+        sourceText,
+        text: s,
+        includeLink,
+        briefOpener,
+        voice,
+      })
       return s
     }),
   )
 
   return cleaned as [string, string, string]
+}
+
+function finalizeVariant(
+  text: string,
+  opts: { kind: Kind; briefOpener: string; includeLink: boolean },
+): string {
+  let s = text.trim()
+  if (opts.kind === 'brief' && opts.briefOpener) s = ensureBriefOpener(s, opts.briefOpener)
+  if (opts.includeLink && !s.includes(TBR_SITE_URL)) {
+    s = `${s.trim()}\n\n${TBR_SITE_URL}`
+  }
+  if (!opts.includeLink) {
+    s = s.replace(new RegExp(`\\s*${TBR_SITE_URL.replace(/\./g, '\\.')}\\s*`, 'g'), '').trim()
+  }
+  return enforceWeightedLimit(s, X_CHAR_LIMIT)
+}
+
+async function expandUntilFloor(
+  client: Anthropic,
+  opts: {
+    kind: Kind
+    sourceText: string
+    text: string
+    includeLink: boolean
+    briefOpener: string
+    voice: ShareVoice
+  },
+): Promise<string> {
+  let s = opts.text
+  for (let attempt = 0; attempt < EXPAND_MAX_ATTEMPTS; attempt++) {
+    const len = xWeightedLength(s)
+    if (len >= X_TWEET_MIN_CHARS) return s
+
+    const needed = X_TWEET_MIN_CHARS - len
+    const expanded = await expandVariant(client, {
+      kind: opts.kind,
+      sourceText: opts.sourceText,
+      shortText: s,
+      includeLink: opts.includeLink,
+      briefOpener: opts.briefOpener,
+      voice: opts.voice,
+      currentLength: len,
+      charsNeeded: needed,
+    })
+    const next = finalizeVariant(expanded, {
+      kind: opts.kind,
+      briefOpener: opts.briefOpener,
+      includeLink: opts.includeLink,
+    })
+    const nextLen = xWeightedLength(next)
+    if (nextLen < len + EXPAND_MIN_GROWTH) {
+      // Expand didn't meaningfully grow — stop rather than spinning.
+      return nextLen > len ? next : s
+    }
+    s = next
+  }
+  return s
 }
 
 function ensureBriefOpener(text: string, opener: string): string {
@@ -177,6 +221,8 @@ async function expandVariant(
     includeLink: boolean
     briefOpener: string
     voice: ShareVoice
+    currentLength: number
+    charsNeeded: number
   },
 ): Promise<string> {
   const urlRule = opts.includeLink
@@ -191,7 +237,10 @@ async function expandVariant(
       ? `Stay in Middle voice (plain explanatory, not baby-talk):\n${MIDDLE_EXPAND_HINT}`
       : 'Stay friendly and clear; add concrete detail from the source.'
 
-  const prompt = `Lengthen this X post so it is ${X_TWEET_MIN_CHARS}–${X_CHAR_LIMIT} characters (URLs=23). Same facts only — add concrete detail from the source draft. No invented facts. No hashtags.
+  const prompt = `Lengthen this X post. It is currently ${opts.currentLength} characters — TOO SHORT.
+You must add at least ${opts.charsNeeded}+ characters of real concrete detail from the source draft (same facts only).
+Target ${X_TWEET_AIM_MIN}–${X_CHAR_LIMIT} characters (URLs count as 23). Hard max ${X_CHAR_LIMIT}. Hard minimum ${X_TWEET_MIN_CHARS}.
+No invented facts. No hashtags. No filler fluff.
 ${voiceBit}
 ${openerRule}
 ${urlRule}
@@ -201,7 +250,7 @@ SOURCE DRAFT:
 ${opts.sourceText.slice(0, 4000)}
 """
 
-SHORT POST:
+SHORT POST (${opts.currentLength} chars):
 """
 ${opts.shortText}
 """
