@@ -30,11 +30,20 @@ export const metadata: Metadata = {
     siteName: SITE_TITLE,
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: '/og.png',
+        width: 1024,
+        height: 438,
+        alt: 'The Build Report — a plain English look at the repos, scored and sourced',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
+    images: ['/og.png'],
   },
   appleWebApp: {
     capable: true,
