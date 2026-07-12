@@ -152,24 +152,23 @@ export default function AdminXShareTool({ password }: Props) {
 
   async function summarizeUnder280(kind: ShareImageKind) {
     const text = kind === 'brief' ? briefText : needleText
-    if (!text.trim()) return
+    if (!text.trim() && !(kind === 'brief' ? briefSource : needleSource)) return
     setSummarizeBusy(kind)
     setError(null)
     try {
-      // Stash full draft only the first time we leave full mode
-      if (kind === 'brief' && briefFull == null) setBriefFull(text)
-      if (kind === 'needle' && needleFull == null) setNeedleFull(text)
+      // Stash current full draft so Show full can restore the column compose
+      if (kind === 'brief' && briefFull == null && text.trim()) setBriefFull(text)
+      if (kind === 'needle' && needleFull == null && text.trim()) setNeedleFull(text)
 
-      const sourceForApi = (kind === 'brief' ? briefFull : needleFull) ?? text
       const res = await fetch('/api/admin/share-summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           password,
           kind,
-          text: sourceForApi,
           includeLink,
           voice: kind === 'brief' ? briefVoice : needleVoice,
+          dateKey: kind === 'brief' ? briefSource?.dateKey : needleSource?.dateKey,
         }),
       })
       const data = await res.json()
@@ -362,9 +361,10 @@ export default function AdminXShareTool({ password }: Props) {
             Compose from cached Yesterday&apos;s Build and The Needle. Defaults to{' '}
             <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Plain English</strong>{' '}
             with no site link.{' '}
-            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Under 280</strong> makes
-            three tweet-sized variants (255–280 chars; brief opens with Yesterday:). Plain English
-            tweets use Middle voice — clearer than site Normie, not Full Normie. Full drafts can still{' '}
+            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Under 280</strong> writes
+            three tweet-sized variants (255–280 chars; brief opens with Yesterday:) from the same
+            upstream commit/rescore evidence as the homepage columns — not from the column text. Plain
+            English uses Middle voice. Full drafts can still{' '}
             <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Save as image</strong> with
             a short caption on Post on X when over the limit.
           </p>

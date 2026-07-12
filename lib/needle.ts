@@ -123,18 +123,22 @@ export type GenerateNeedleOptions = {
   dateKey?: string
 }
 
-export async function generateAndCacheNeedle(
-  options: GenerateNeedleOptions = {},
-): Promise<NeedleData | null> {
-  const redis = getRedis()
+/** Upstream evidence for admin Under 280 — same inputs as Needle generation, not column prose. */
+export type NeedleShareEvidence = {
+  dateKey: string
+  repoCount: number
+  evidenceText: string
+}
+
+async function collectNeedleQualifyingMoves(): Promise<QualifyingMove[]> {
   const since = Date.now() - 24 * 3600 * 1000
   const slugs = await getSlugsRescoredSince(since)
-  if (!slugs.length) return null
+  if (!slugs.length) return []
 
   const summaries = await getRescoreSummaries(slugs)
   const nameBySlug = new Map(REPOS.map(r => [r.githubSlug, r.name]))
 
-  const qualifying: QualifyingMove[] = Object.entries(summaries)
+  return Object.entries(summaries)
     .filter(([, meta]) => qualifyingChange(meta))
     .map(([slug, meta]) => ({
       name: nameBySlug.get(slug) ?? slug,
@@ -145,7 +149,32 @@ export async function generateAndCacheNeedle(
       deltaHeader: meta.deltaHeader ?? null,
       summary: meta.summary ?? null,
     }))
+}
 
+export async function getNeedleShareEvidence(
+  options: GenerateNeedleOptions = {},
+): Promise<NeedleShareEvidence | null> {
+  const qualifying = await collectNeedleQualifyingMoves()
+  if (!qualifying.length) return null
+  const dateKey = options.dateKey ?? dateKeyEastern()
+  return {
+    dateKey,
+    repoCount: qualifying.length,
+    evidenceText: [
+      `NEEDLE WINDOW: last 24h rescored repos`,
+      `MOVES: ${qualifying.length}`,
+      '',
+      'RESCORE EVIDENCE (primary):',
+      formatMoveLines(qualifying),
+    ].join('\n'),
+  }
+}
+
+export async function generateAndCacheNeedle(
+  options: GenerateNeedleOptions = {},
+): Promise<NeedleData | null> {
+  const redis = getRedis()
+  const qualifying = await collectNeedleQualifyingMoves()
   if (!qualifying.length) return null
 
   const ai = await generateNeedleCopy(qualifying)
