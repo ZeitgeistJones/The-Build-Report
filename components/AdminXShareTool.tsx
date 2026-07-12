@@ -280,8 +280,8 @@ export default function AdminXShareTool({ password }: Props) {
     const voice = kind === 'brief' ? briefVoice : needleVoice
     const column =
       kind === 'brief'
-        ? composeBriefPost(source, 'standard', { includeLink })
-        : composeNeedlePost(source, 'standard', { includeLink })
+        ? composeBriefPost(source as ShareBriefSource, 'standard', { includeLink })
+        : composeNeedlePost(source as ShareNeedleSource, 'standard', { includeLink })
 
     setSummarizeBusy(kind)
     setError(null)
