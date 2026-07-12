@@ -32,9 +32,9 @@ type LoadState = 'idle' | 'loading' | 'ready' | 'error'
 type VariantBundle = [string, string, string]
 
 export default function AdminXShareTool({ password }: Props) {
-  const [includeLink, setIncludeLink] = useState(true)
-  const [briefVoice, setBriefVoice] = useState<ShareVoice>('standard')
-  const [needleVoice, setNeedleVoice] = useState<ShareVoice>('standard')
+  const [includeLink, setIncludeLink] = useState(false)
+  const [briefVoice, setBriefVoice] = useState<ShareVoice>('normie')
+  const [needleVoice, setNeedleVoice] = useState<ShareVoice>('normie')
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [error, setError] = useState<string | null>(null)
   const [briefSource, setBriefSource] = useState<ShareBriefSource | null>(null)
@@ -358,11 +358,13 @@ export default function AdminXShareTool({ password }: Props) {
         <div>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Share on X</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '580px' }}>
-            Compose from cached Yesterday&apos;s Build and The Needle.{' '}
+            Compose from cached Yesterday&apos;s Build and The Needle. Defaults to{' '}
+            <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Plain English</strong>{' '}
+            with no site link.{' '}
             <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Under 280</strong> makes
             three tweet-sized variants (text or image). Full drafts can still{' '}
             <strong style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Save as image</strong> with
-            a short caption on Post on X.
+            a short caption on Post on X when over the limit.
           </p>
         </div>
         <button onClick={loadPosts} disabled={loadState === 'loading'} style={btnStyle}>
@@ -392,7 +394,7 @@ export default function AdminXShareTool({ password }: Props) {
                 checked={includeLink}
                 onChange={e => setLink(e.target.checked)}
               />
-              Include site link
+              Include site link (off by default — saves ~23 chars)
             </label>
             {copied && (
               <span style={{ color: 'var(--accent)', fontSize: '12px' }}>Copied {copied}</span>

@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
 
   const kind = (body as { kind?: string }).kind
   const text = typeof (body as { text?: unknown }).text === 'string' ? (body as { text: string }).text.trim() : ''
-  const includeLink = (body as { includeLink?: boolean }).includeLink !== false
+  // Default false — site URL burns ~23 weighted chars; opt in from admin checkbox.
+  const includeLink = (body as { includeLink?: boolean }).includeLink === true
 
   if (kind !== 'brief' && kind !== 'needle') {
     return NextResponse.json({ ok: false, error: 'kind must be brief or needle' }, { status: 400 })
