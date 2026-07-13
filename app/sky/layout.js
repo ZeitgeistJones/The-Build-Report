@@ -1,5 +1,7 @@
 // app/sky/layout.js
-// Metadata for the /sky route — OG tags, title, etc.
+// Metadata for the /sky route — OG tags tuned for Telegram + X/Twitter
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://the-build-report.vercel.app";
 
 export const metadata = {
   title: "The CLAWD Ecosystem Sky",
@@ -10,14 +12,22 @@ export const metadata = {
     description:
       "200+ repos. One autonomous builder. Tap a star to explore the ecosystem.",
     type: "website",
-    images: ["/api/og-sky"],
+    url: `${SITE_URL}/sky`,
+    images: [
+      {
+        url: `${SITE_URL}/api/og-sky`,
+        width: 1200,
+        height: 630,
+        alt: "The CLAWD Ecosystem Sky",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "The CLAWD Ecosystem Sky",
     description:
       "200+ repos. One autonomous builder. Tap a star to explore the ecosystem.",
-    images: ["/api/og-sky"],
+    images: [`${SITE_URL}/api/og-sky`],
   },
 };
 
