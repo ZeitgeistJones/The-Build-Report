@@ -7,7 +7,6 @@ import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
 import type { CommunityContextSubmission } from '@/lib/communityContextTypes'
 import type { OverheardEntry } from '@/lib/podcastMentions'
 import OverheardAdminEntryCard, { mentionToEditDraft, sanitizeDraftForSave, type MentionEditDraft } from '@/components/OverheardAdminEntryCard'
-import AdminXShareTool from '@/components/AdminXShareTool'
 import AdminStarterKitShare from '@/components/AdminStarterKitShare'
 
 type AdminContextSubmission = CommunityContextSubmission
@@ -1065,8 +1064,6 @@ export default function AdminPage() {
           </div>
         )}
       </div>
-
-      <AdminXShareTool password={password} />
 
       <AdminStarterKitShare />
 
