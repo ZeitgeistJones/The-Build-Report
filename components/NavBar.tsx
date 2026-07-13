@@ -72,14 +72,6 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         <a href="/about" className="mobile-nav-link" onClick={onClose}>
           About
         </a>
-        <div className="mobile-nav-theme-row" onClick={e => e.stopPropagation()}>
-          <span>Plain English</span>
-          <NormieToggle compact />
-        </div>
-        <div className="mobile-nav-theme-row" onClick={e => e.stopPropagation()}>
-          <span>Theme</span>
-          <ColorThemePicker compact />
-        </div>
       </div>
     </>
   )
@@ -127,6 +119,7 @@ export default function NavBar() {
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <NormieToggle header />
+            <ColorThemePicker header />
             <ConnectWalletButton />
             <button
               type="button"

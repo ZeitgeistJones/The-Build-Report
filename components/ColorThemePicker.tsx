@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import {
   COLOR_THEME_GROUPS,
   getColorThemeMeta,
+  type ColorThemeId,
   type ColorThemeMeta,
   type CustomThemeVars,
 } from '@/lib/colorThemes'
@@ -11,27 +13,50 @@ import { useColorTheme } from '@/components/ColorThemeProvider'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
 
-export default function ColorThemePicker({ compact }: { compact?: boolean }) {
+function closeThemePicker(
+  setOpen: (v: boolean) => void,
+  setShowCustomPanel: (v: boolean) => void,
+) {
+  setOpen(false)
+  setShowCustomPanel(false)
+}
+
+export default function ColorThemePicker({ compact, header }: { compact?: boolean; header?: boolean }) {
   const { theme, setTheme, customVars, setCustomTheme, clearCustomTheme, isCustomActive } = useColorTheme()
   const [open, setOpen] = useState(false)
   const [showCustomPanel, setShowCustomPanel] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const isMobile = useIsMobile()
   const current = getColorThemeMeta(theme)
+  const swatchOnly = compact || header
 
   useEffect(() => {
-    if (!open) return
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!open || !isMobile) return
+    const scrollY = window.scrollY
+    document.body.classList.add('scroll-lock')
+    document.body.style.top = `-${scrollY}px`
+    return () => {
+      document.body.classList.remove('scroll-lock')
+      document.body.style.top = ''
+      window.scrollTo(0, scrollY)
+    }
+  }, [open, isMobile])
+
+  useEffect(() => {
+    if (!open || isMobile) return
     function onDocClick(e: MouseEvent) {
       const outside = ref.current ? !ref.current.contains(e.target as Node) : true
-      if (outside) {
-        setOpen(false)
-        setShowCustomPanel(false)
-      }
+      if (outside) closeThemePicker(setOpen, setShowCustomPanel)
     }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
-  }, [open])
+  }, [open, isMobile])
 
   useEffect(() => {
     if (!showCustomPanel) return
@@ -44,8 +69,111 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
   const triggerSwatchBg = isCustomActive ? (customVars?.bg ?? '#FAFAFA') : (current?.swatchBg ?? '#FAFAFA')
   const triggerSwatchAccent = isCustomActive ? (customVars?.accent ?? '#3D9A88') : (current?.swatchAccent ?? '#3D9A88')
 
+  function handleSelectTheme(id: Parameters<typeof setTheme>[0]) {
+    setTheme(id)
+    closeThemePicker(setOpen, setShowCustomPanel)
+  }
+
+  const panel = (
+    <ThemePickerPanel
+      theme={theme}
+      isCustomActive={isCustomActive}
+      customVars={customVars}
+      showCustomPanel={showCustomPanel}
+      isMobile={isMobile}
+      onSelectTheme={handleSelectTheme}
+      onToggleCustomPanel={() => setShowCustomPanel(p => !p)}
+      onCustomChange={setCustomTheme}
+      onCustomReset={() => {
+        clearCustomTheme()
+        setShowCustomPanel(false)
+      }}
+    />
+  )
+
+  const mobileSheet =
+    open && isMobile && mounted
+      ? createPortal(
+          <>
+            <div
+              role="presentation"
+              onClick={() => closeThemePicker(setOpen, setShowCustomPanel)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.45)',
+                zIndex: 100,
+              }}
+            />
+            <div
+              role="dialog"
+              aria-label="Color theme"
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'fixed',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                maxHeight: 'min(85vh, 640px)',
+                background: 'var(--surface-2)',
+                borderTop: '1px solid var(--border-strong)',
+                borderRadius: '16px 16px 0 0',
+                zIndex: 101,
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.35)',
+                paddingBottom: 'max(12px, env(safe-area-inset-bottom, 0px))',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px 8px',
+                  borderBottom: '1px solid var(--border)',
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>Theme</span>
+                <button
+                  type="button"
+                  onClick={() => closeThemePicker(setOpen, setShowCustomPanel)}
+                  aria-label="Close theme picker"
+                  style={{
+                    width: MIN_TAP,
+                    height: MIN_TAP,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--text-secondary)',
+                    fontSize: '18px',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              <div
+                ref={scrollRef}
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  overscrollBehavior: 'contain',
+                  WebkitOverflowScrolling: 'touch',
+                  padding: '6px 10px 8px',
+                }}
+              >
+                {panel}
+              </div>
+            </div>
+          </>,
+          document.body,
+        )
+      : null
+
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -53,24 +181,27 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
         aria-expanded={open}
         title="Color theme"
         style={{
-          fontSize: '11px',
+          fontSize: header ? '10px' : '11px',
           color: 'var(--text-muted)',
-          padding: isMobile ? '8px 10px' : '4px 8px',
-          minHeight: isMobile ? MIN_TAP : undefined,
+          padding: header ? '6px 8px' : isMobile ? '8px 10px' : '4px 8px',
+          minHeight: isMobile || header ? MIN_TAP : undefined,
+          minWidth: header ? MIN_TAP : undefined,
           borderRadius: 'var(--radius-pill)',
           border: '1px solid var(--border)',
           background: 'var(--surface-1)',
           display: 'inline-flex',
           alignItems: 'center',
-          gap: '6px',
+          justifyContent: 'center',
+          gap: header ? '4px' : '6px',
           cursor: 'pointer',
+          flexShrink: 0,
         }}
       >
-        <RawSwatch bg={triggerSwatchBg} accent={triggerSwatchAccent} size={compact ? 14 : 12} />
-        {!compact && triggerLabel}
+        <RawSwatch bg={triggerSwatchBg} accent={triggerSwatchAccent} size={header ? 14 : compact ? 14 : 12} />
+        {!swatchOnly && triggerLabel}
       </button>
 
-      {open && (
+      {open && !isMobile && (
         <div
           ref={scrollRef}
           style={{
@@ -88,96 +219,120 @@ export default function ColorThemePicker({ compact }: { compact?: boolean }) {
             boxShadow: 'var(--card-elevated)',
           }}
         >
-          {COLOR_THEME_GROUPS.map((group, groupIndex) => (
-            <div key={group.label} style={{ marginTop: groupIndex > 0 ? '8px' : 0 }}>
-              <div
-                style={{
-                  fontSize: '10px',
-                  fontWeight: 600,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-muted)',
-                  padding: '4px 8px 6px',
-                }}
-              >
-                {group.label}
-              </div>
-              {group.themes.map(t => (
-                <ThemeOption
-                  key={t.id}
-                  meta={t}
-                  active={!isCustomActive && theme === t.id}
-                  onSelect={() => {
-                    setTheme(t.id)
-                    setShowCustomPanel(false)
-                    setOpen(false)
-                  }}
-                />
-              ))}
-            </div>
-          ))}
-
-          {/* Custom section */}
-          <div style={{ marginTop: '8px', borderTop: '1px solid var(--border)', paddingTop: '6px' }}>
-            <div
-              style={{
-                fontSize: '10px',
-                fontWeight: 600,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                color: 'var(--text-muted)',
-                padding: '4px 8px 6px',
-              }}
-            >
-              Custom
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowCustomPanel(p => !p)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                width: '100%',
-                textAlign: 'left',
-                padding: '7px 8px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                color: isCustomActive ? 'var(--accent)' : 'var(--text-secondary)',
-                background: isCustomActive ? 'var(--accent-dim)' : 'transparent',
-                cursor: 'pointer',
-              }}
-            >
-              <RawSwatch
-                bg={customVars?.bg ?? '#FAFAFA'}
-                accent={customVars?.accent ?? '#3D9A88'}
-                size={16}
-                checkerboard={!isCustomActive}
-              />
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: 'block', fontWeight: 500 }}>
-                  {isCustomActive ? 'Custom (active)' : 'Customize...'}
-                </span>
-                <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)' }}>
-                  {isCustomActive ? `${customVars?.bg} · ${customVars?.accent}` : 'Set your own colors'}
-                </span>
-              </span>
-            </button>
-
-            {showCustomPanel && (
-              <CustomPanel
-                initial={customVars ?? { bg: '#FAFAFA', accent: '#3D9A88', base: 'light' }}
-                onChange={setCustomTheme}
-                onReset={() => {
-                  clearCustomTheme()
-                  setShowCustomPanel(false)
-                }}
-              />
-            )}
-          </div>
+          {panel}
         </div>
       )}
+
+      {mobileSheet}
     </div>
+  )
+}
+
+function ThemePickerPanel({
+  theme,
+  isCustomActive,
+  customVars,
+  showCustomPanel,
+  isMobile,
+  onSelectTheme,
+  onToggleCustomPanel,
+  onCustomChange,
+  onCustomReset,
+}: {
+  theme: string
+  isCustomActive: boolean
+  customVars: CustomThemeVars | null
+  showCustomPanel: boolean
+  isMobile: boolean
+  onSelectTheme: (id: ColorThemeId) => void
+  onToggleCustomPanel: () => void
+  onCustomChange: (v: CustomThemeVars) => void
+  onCustomReset: () => void
+}) {
+  return (
+    <>
+      {COLOR_THEME_GROUPS.map((group, groupIndex) => (
+        <div key={group.label} style={{ marginTop: groupIndex > 0 ? '8px' : 0 }}>
+          <div
+            style={{
+              fontSize: '10px',
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted)',
+              padding: '4px 8px 6px',
+            }}
+          >
+            {group.label}
+          </div>
+          {group.themes.map(t => (
+            <ThemeOption
+              key={t.id}
+              meta={t}
+              active={!isCustomActive && theme === t.id}
+              isMobile={isMobile}
+              onSelect={() => onSelectTheme(t.id)}
+            />
+          ))}
+        </div>
+      ))}
+
+      <div style={{ marginTop: '8px', borderTop: '1px solid var(--border)', paddingTop: '6px' }}>
+        <div
+          style={{
+            fontSize: '10px',
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: 'var(--text-muted)',
+            padding: '4px 8px 6px',
+          }}
+        >
+          Custom
+        </div>
+        <button
+          type="button"
+          onClick={onToggleCustomPanel}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            width: '100%',
+            textAlign: 'left',
+            padding: isMobile ? '10px 8px' : '7px 8px',
+            minHeight: isMobile ? MIN_TAP : undefined,
+            borderRadius: '6px',
+            fontSize: '12px',
+            color: isCustomActive ? 'var(--accent)' : 'var(--text-secondary)',
+            background: isCustomActive ? 'var(--accent-dim)' : 'transparent',
+            cursor: 'pointer',
+          }}
+        >
+          <RawSwatch
+            bg={customVars?.bg ?? '#FAFAFA'}
+            accent={customVars?.accent ?? '#3D9A88'}
+            size={16}
+            checkerboard={!isCustomActive}
+          />
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', fontWeight: 500 }}>
+              {isCustomActive ? 'Custom (active)' : 'Customize...'}
+            </span>
+            <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)' }}>
+              {isCustomActive ? `${customVars?.bg} · ${customVars?.accent}` : 'Set your own colors'}
+            </span>
+          </span>
+        </button>
+
+        {showCustomPanel && (
+          <CustomPanel
+            initial={customVars ?? { bg: '#FAFAFA', accent: '#3D9A88', base: 'light' }}
+            onChange={onCustomChange}
+            onReset={onCustomReset}
+          />
+        )}
+      </div>
+    </>
   )
 }
 
@@ -290,10 +445,12 @@ function CustomPanel({
 function ThemeOption({
   meta,
   active,
+  isMobile,
   onSelect,
 }: {
   meta: ColorThemeMeta
   active: boolean
+  isMobile: boolean
   onSelect: () => void
 }) {
   return (
@@ -306,7 +463,8 @@ function ThemeOption({
         gap: '10px',
         width: '100%',
         textAlign: 'left',
-        padding: '7px 8px',
+        padding: isMobile ? '10px 8px' : '7px 8px',
+        minHeight: isMobile ? MIN_TAP : undefined,
         borderRadius: '6px',
         fontSize: '12px',
         color: active ? 'var(--accent)' : 'var(--text-secondary)',
