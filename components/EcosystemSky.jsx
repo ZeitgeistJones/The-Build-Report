@@ -159,6 +159,26 @@ function timeAgo(isoString) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+// Generate a procedural star-surface texture — blotchy radial gradients,
+// unique per repo (seeded by name), colored from its category palette.
+function generateSphereTexture(name, coreColor, glowColor) {
+  const seed = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const blobs = [];
+  const blobCount = 14;
+  for (let i = 0; i < blobCount; i++) {
+    const x = rand(seed + i * 3.1) * 100;
+    const y = rand(seed + i * 5.7) * 100;
+    const size = 8 + rand(seed + i * 1.9) * 22;
+    const brightness = rand(seed + i * 2.3);
+    // Alternate between lighter (hot) and darker (cool) blotches
+    const color = brightness > 0.5
+      ? `${coreColor}${Math.floor(30 + brightness * 40).toString(16).padStart(2, "0")}`
+      : `#000000${Math.floor(20 + (1 - brightness) * 30).toString(16).padStart(2, "0")}`;
+    blobs.push(`radial-gradient(circle at ${x}% ${y}%, ${color} 0%, transparent ${size}%)`);
+  }
+  return blobs.join(", ");
+}
+
 // --- Component ---
 
 export default function EcosystemSky() {
@@ -178,6 +198,7 @@ export default function EcosystemSky() {
   const [tourIndex, setTourIndex] = useState(0);
   const [legendOpen, setLegendOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [inspecting, setInspecting] = useState(null);
   const searchInputRef = useRef(null);
   const cursorGlowRef = useRef(null);
   const containerRef = useRef(null);
@@ -359,6 +380,7 @@ export default function EcosystemSky() {
   );
 
   const selectedRepo = selected ? positioned.find((r) => r.n === selected) : null;
+  const inspectingRepo = inspecting ? positioned.find((r) => r.n === inspecting) : null;
   const searchActive = q.length > 0;
 
   const activeConns = selected
@@ -366,20 +388,8 @@ export default function EcosystemSky() {
     : [];
   const connectedNames = new Set(activeConns.flatMap((c) => [c.a, c.b]));
 
-  // Track selection status in ref for the animation loop
-  const isSelectedRef = useRef(false);
-  useEffect(() => {
-    isSelectedRef.current = !!selected;
-  }, [selected]);
-
-  // Update camera target when selection changes
-  useEffect(() => {
-    if (selectedRepo) {
-      targetRef.current = { x: selectedRepo.x, y: selectedRepo.y, zoom: 1.6 };
-    }
-  }, [selected, positioned.length]);
-
-  // Spring-physics camera + ambient idle drift
+  // Spring-physics camera — pure ambient idle drift now (selecting a star no
+  // longer moves the camera; that's reserved for the Inspect view instead)
   useEffect(() => {
     const velRef = { x: 0, y: 0, zoom: 0 };
     let localT = 0;
@@ -387,14 +397,11 @@ export default function EcosystemSky() {
     const step = () => {
       localT += 0.006;
 
-      // When nothing is selected, target drifts slowly (sky feels alive)
-      if (!isSelectedRef.current) {
-        targetRef.current = {
-          x: 0.5 + Math.sin(localT * 0.12) * 0.025,
-          y: 0.5 + Math.cos(localT * 0.09) * 0.02,
-          zoom: 1 + Math.sin(localT * 0.05) * 0.02,
-        };
-      }
+      targetRef.current = {
+        x: 0.5 + Math.sin(localT * 0.12) * 0.025,
+        y: 0.5 + Math.cos(localT * 0.09) * 0.02,
+        zoom: 1 + Math.sin(localT * 0.05) * 0.02,
+      };
 
       const cur = cameraRef.current;
       const tgt = targetRef.current;
@@ -431,6 +438,7 @@ export default function EcosystemSky() {
       if (e.key === "Escape") {
         e.preventDefault();
         if (inField) e.target.blur();
+        setInspecting(null);
         setSelected(null);
         setTouring(false);
         setQuery("");
@@ -836,6 +844,7 @@ export default function EcosystemSky() {
           <div
             key={r.n}
             onClick={(e) => { e.stopPropagation(); setSelected(selected === r.n ? null : r.n); }}
+            onDoubleClick={(e) => { e.stopPropagation(); setInspecting(r.n); }}
             onMouseEnter={() => { setHoveredCat(r.c); setHoveredStar(r.n); }}
             onMouseLeave={() => { setHoveredCat(null); setHoveredStar(null); }}
             style={{
@@ -973,6 +982,23 @@ export default function EcosystemSky() {
             <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>★ {selectedRepo.s}</span>
             <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>⑂ {selectedRepo.f}</span>
             <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+              <button
+                onClick={() => setInspecting(selectedRepo.n)}
+                title="Zoom in for a close-up"
+                style={{
+                  fontSize: 11,
+                  color: "#030810",
+                  background: CAT_META[selectedRepo.c].core,
+                  border: "none",
+                  padding: "3px 12px",
+                  borderRadius: 20,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  boxShadow: `0 0 10px ${CAT_META[selectedRepo.c].glow}`,
+                }}
+              >
+                ◎ inspect
+              </button>
               <button
                 onClick={() => {
                   const url = `${window.location.origin}${window.location.pathname}#${selectedRepo.n}`;
@@ -1181,7 +1207,7 @@ export default function EcosystemSky() {
           fontSize: 10, color: "rgba(255,255,255,0.18)", letterSpacing: 0.5,
           pointerEvents: "none", whiteSpace: "nowrap",
         }}>
-          tap a star · press / to search · esc to reset
+          tap a star · double-tap to inspect · press / to search
         </div>
       )}
       {touring && (
@@ -1191,6 +1217,262 @@ export default function EcosystemSky() {
           fontStyle: "italic", fontFamily: "Georgia, 'Times New Roman', serif",
         }}>
           tap anywhere to stop
+        </div>
+      )}
+
+      {/* ═══ INSPECT VIEW — the awe-inspiring close-up ═══ */}
+      {inspectingRepo && (
+        <div
+          onClick={() => setInspecting(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 200,
+            background: "radial-gradient(ellipse at 50% 45%, #050a12 0%, #01030a 70%)",
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: isMobile ? 24 : 64,
+            padding: isMobile ? "24px 20px" : "40px",
+            animation: "inspectFadeIn 0.5s ease",
+            overflowY: "auto",
+          }}
+        >
+          <style>{`
+            @keyframes inspectFadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes sphereRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            @keyframes sphereRiseIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+            @keyframes textRiseIn { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+          `}</style>
+
+          {/* Close button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setInspecting(null); }}
+            style={{
+              position: "absolute",
+              top: 24,
+              right: 24,
+              zIndex: 210,
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "rgba(255,255,255,0.6)",
+              fontSize: 16,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ×
+          </button>
+
+          {/* Far background starfield for depth */}
+          <svg width="100%" height="100%" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            {Array.from({ length: 60 }, (_, i) => (
+              <circle
+                key={i}
+                cx={`${rand(i * 9.1) * 100}%`}
+                cy={`${rand(i * 7.3) * 100}%`}
+                r={rand(i * 4.1) * 1.2 + 0.2}
+                fill="white"
+                opacity={(rand(i * 3.7) * 0.35 + 0.08) * (0.6 + 0.4 * Math.sin(time * 1.5 + i))}
+              />
+            ))}
+          </svg>
+
+          {/* The sphere */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "relative",
+              width: isMobile ? 220 : 340,
+              height: isMobile ? 220 : 340,
+              flexShrink: 0,
+              animation: "sphereRiseIn 0.7s cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
+          >
+            {/* Atmospheric glow */}
+            <div style={{
+              position: "absolute",
+              inset: -60,
+              borderRadius: "50%",
+              background: `radial-gradient(circle, ${CAT_META[inspectingRepo.c].glow} 0%, transparent 65%)`,
+              filter: "blur(20px)",
+              opacity: 0.9,
+            }} />
+            {/* Diffraction spikes, huge */}
+            {[0, 45, 90, 135].map((angle) => (
+              <div
+                key={angle}
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  width: isMobile ? 340 : 560,
+                  height: 1.5,
+                  background: `linear-gradient(to right, transparent 0%, ${CAT_META[inspectingRepo.c].core}00 10%, ${CAT_META[inspectingRepo.c].core}99 50%, ${CAT_META[inspectingRepo.c].core}00 90%, transparent 100%)`,
+                  transform: `translate(-50%, -50%) rotate(${angle}deg)`,
+                  opacity: 0.5,
+                }}
+              />
+            ))}
+            {/* Sphere body — masked circle containing rotating texture */}
+            <div style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: "50%",
+              overflow: "hidden",
+              boxShadow: `0 0 60px 10px ${CAT_META[inspectingRepo.c].glow}, inset -30px -30px 60px rgba(0,0,0,0.7)`,
+            }}>
+              {/* Rotating textured layer */}
+              <div style={{
+                position: "absolute",
+                top: "-25%",
+                left: "-25%",
+                width: "150%",
+                height: "150%",
+                background: `${generateSphereTexture(inspectingRepo.n, CAT_META[inspectingRepo.c].core, CAT_META[inspectingRepo.c].glow)}, radial-gradient(circle, ${CAT_META[inspectingRepo.c].core}55 0%, #05080f 75%)`,
+                animation: "sphereRotate 90s linear infinite",
+              }} />
+              {/* Lighting overlay: highlight top-left, shadow bottom-right */}
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                background: `radial-gradient(circle at 32% 28%, rgba(255,255,255,0.5) 0%, transparent 35%), radial-gradient(circle at 70% 75%, rgba(0,0,0,0.6) 0%, transparent 55%)`,
+              }} />
+            </div>
+            {/* Sonar rings */}
+            {[0, 1, 2].map((ringI) => {
+              const ringCycle = 3.2;
+              const ringPhase = ((time + ringI * 1.05) % ringCycle) / ringCycle;
+              const ringScale = 1 + ringPhase * 0.5;
+              const ringOpacity = (1 - ringPhase) * 0.5 * Math.sin(ringPhase * Math.PI);
+              return (
+                <div key={ringI} style={{
+                  position: "absolute", inset: 0, borderRadius: "50%",
+                  border: `1px solid ${CAT_META[inspectingRepo.c].core}`,
+                  transform: `scale(${ringScale})`,
+                  opacity: ringOpacity,
+                  pointerEvents: "none",
+                }} />
+              );
+            })}
+          </div>
+
+          {/* Info panel */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: isMobile ? "100%" : 440,
+              textAlign: isMobile ? "center" : "left",
+              animation: "textRiseIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both",
+            }}
+          >
+            <div style={{
+              fontSize: 11, letterSpacing: 4, textTransform: "uppercase",
+              color: CAT_META[inspectingRepo.c].core, opacity: 0.8, marginBottom: 10,
+              fontWeight: 500,
+            }}>
+              {CAT_META[inspectingRepo.c].label} · {inspectingRepo.catRank} of {inspectingRepo.catTotal}
+            </div>
+            <div style={{
+              fontSize: isMobile ? 32 : 46, fontWeight: 800, color: "white",
+              letterSpacing: -0.5, lineHeight: 1.05, marginBottom: 14,
+              wordBreak: "break-word",
+            }}>
+              {inspectingRepo.n}
+            </div>
+            <div style={{
+              fontSize: 15, color: "rgba(255,255,255,0.55)", lineHeight: 1.6,
+              marginBottom: 22, fontStyle: inspectingRepo.d ? "normal" : "italic",
+            }}>
+              {inspectingRepo.d || "No description yet — clawdbotatg hasn't written one."}
+            </div>
+
+            <div style={{
+              display: "flex", gap: 24, marginBottom: 22,
+              justifyContent: isMobile ? "center" : "flex-start",
+            }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "white" }}>{inspectingRepo.s}</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", letterSpacing: 1, textTransform: "uppercase" }}>stars</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "white" }}>{inspectingRepo.f}</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", letterSpacing: 1, textTransform: "uppercase" }}>forks</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "white" }}>{inspectingRepo.l || "—"}</div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", letterSpacing: 1, textTransform: "uppercase" }}>language</div>
+              </div>
+            </div>
+
+            {/* Connections */}
+            {(() => {
+              const conns = connections.filter((c) => c.a === inspectingRepo.n || c.b === inspectingRepo.n);
+              if (conns.length === 0) return null;
+              return (
+                <div style={{ marginBottom: 22 }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>
+                    Connected to
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: isMobile ? "center" : "flex-start" }}>
+                    {conns.map((conn, i) => {
+                      const other = conn.a === inspectingRepo.n ? conn.b : conn.a;
+                      return (
+                        <div
+                          key={i}
+                          onClick={() => setInspecting(other)}
+                          style={{
+                            fontSize: 10.5, padding: "4px 11px", borderRadius: 16,
+                            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                            color: "rgba(255,255,255,0.6)", cursor: "pointer",
+                          }}
+                        >
+                          {other}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div style={{ display: "flex", gap: 10, justifyContent: isMobile ? "center" : "flex-start" }}>
+              <a
+                href={inspectingRepo.u}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: 12.5, color: "#030810", background: CAT_META[inspectingRepo.c].core,
+                  textDecoration: "none", padding: "8px 18px", borderRadius: 20, fontWeight: 600,
+                  boxShadow: `0 0 16px ${CAT_META[inspectingRepo.c].glow}`,
+                }}
+              >
+                View on GitHub →
+              </a>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}${window.location.pathname}#${inspectingRepo.n}`;
+                  navigator.clipboard?.writeText(url).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  });
+                }}
+                style={{
+                  fontSize: 12.5, color: "rgba(255,255,255,0.6)", background: "transparent",
+                  border: "1px solid rgba(255,255,255,0.2)", padding: "8px 18px",
+                  borderRadius: 20, cursor: "pointer",
+                }}
+              >
+                {copied ? "✓ copied" : "copy link"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
