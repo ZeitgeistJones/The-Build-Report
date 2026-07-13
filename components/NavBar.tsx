@@ -13,6 +13,9 @@ function DesktopNavLinks() {
       <a href="/" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Repos
       </a>
+      <a href="/sky" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        The Sky
+      </a>
       <a href="/start" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Start Here
       </a>
@@ -59,6 +62,9 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
       <div id="mobile-nav-menu" className="mobile-nav-panel">
         <a href="/" className="mobile-nav-link" onClick={onClose}>
           Repos
+        </a>
+        <a href="/sky" className="mobile-nav-link" onClick={onClose}>
+          The Sky
         </a>
         <a href="/start" className="mobile-nav-link" onClick={onClose}>
           Start Here
