@@ -553,6 +553,20 @@ function commitsSinceScoredColor(count: number): string {
   return META_MUTED
 }
 
+function normalizeRepoSearch(query: string): string {
+  return query.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+/** Match repo name, GitHub slug, or description. */
+function repoMatchesSearch(repo: RepoWithLive, query: string): boolean {
+  const q = normalizeRepoSearch(query)
+  if (!q) return true
+  const haystack = [repo.name, repo.githubSlug, repo.description ?? '']
+    .join(' ')
+    .toLowerCase()
+  return q.split(' ').every(token => token.length === 0 || haystack.includes(token))
+}
+
 interface RepoWithLive extends Repo {
   description: string | null
   createdAt: string | null
@@ -593,6 +607,7 @@ export default function RepoList({
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
   const [sortBy, setSortBy] = useState<RepoSort>('needs-rescore')
   const [repoPeriod, setRepoPeriod] = useState<Period>('24h')
+  const [searchQuery, setSearchQuery] = useState('')
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
   const [rescoreSummaries, setRescoreSummaries] = useState(initialRescoreSummaries)
@@ -602,6 +617,7 @@ export default function RepoList({
   const isMobile = useIsMobile()
   const d = cardLayout(isMobile)
   const collectionSets = buildCollectionSets(repoCollections)
+  const isSearching = normalizeRepoSearch(searchQuery).length > 0
 
   useEffect(() => {
     if (!filterControl) return
@@ -692,27 +708,35 @@ export default function RepoList({
     })
   }
 
-  const tagFiltered = repoItems.filter(r =>
-    repoMatchesFilter(
-      r,
-      activeFilter,
-      collectionSets,
-      contextSummary,
-      pinnedNeedsRescoreSlugs,
-      repoPeriod,
-      rescoreSummaries,
-    ),
-  )
+  // Search looks across the full list so a specific repo isn't hidden by pills/scope.
+  const tagFiltered = isSearching
+    ? repoItems.filter(r => repoMatchesSearch(r, searchQuery))
+    : repoItems.filter(r =>
+        repoMatchesFilter(
+          r,
+          activeFilter,
+          collectionSets,
+          contextSummary,
+          pinnedNeedsRescoreSlugs,
+          repoPeriod,
+          rescoreSummaries,
+        ),
+      )
   const activeInPeriod = tagFiltered.filter(r => {
     const c = repoCommitsForPeriodKey(r, repoPeriod)
     return c != null && c > 0
   })
   const skipActiveScope =
+    isSearching ||
     activeFilter === 'needs-rescore' ||
     activeFilter === 'new-arrivals' ||
     activeFilter === 'recently-rescored'
   const filtered = (activityScope === 'active' && !skipActiveScope ? activeInPeriod : tagFiltered)
     .sort((a, b) => {
+      if (isSearching) {
+        return a.name.localeCompare(b.name)
+      }
+
       if (activeFilter === 'needs-rescore' && pinnedNeedsRescoreSlugs.length) {
         const aPinned = pinnedNeedsRescoreSlugs.indexOf(a.githubSlug)
         const bPinned = pinnedNeedsRescoreSlugs.indexOf(b.githubSlug)
@@ -774,7 +798,9 @@ export default function RepoList({
       return a.name.localeCompare(b.name)
     })
 
-  const repoCountLabel = activeFilter === 'needs-rescore'
+  const repoCountLabel = isSearching
+    ? ` · ${filtered.length} match${filtered.length === 1 ? '' : 'es'}`
+    : activeFilter === 'needs-rescore'
     ? ` · ${filtered.length} need rescore`
     : activeFilter === 'recently-rescored'
       ? ` · ${filtered.length} rescored (${periodKeyLabel(repoPeriod)})`
@@ -1375,6 +1401,75 @@ export default function RepoList({
 
   return (
     <div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '10px',
+          width: '100%',
+        }}
+      >
+        <label
+          htmlFor="repo-search"
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: 'hidden',
+            clip: 'rect(0, 0, 0, 0)',
+            whiteSpace: 'nowrap',
+            border: 0,
+          }}
+        >
+          Search repos
+        </label>
+        <input
+          id="repo-search"
+          type="search"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search repos by name…"
+          autoComplete="off"
+          spellCheck={false}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: '13px',
+            padding: isMobile ? '10px 12px' : '7px 12px',
+            minHeight: isMobile ? MIN_TAP : undefined,
+            borderRadius: 'var(--radius-pill)',
+            border: '1px solid var(--border)',
+            background: 'var(--surface-1)',
+            color: 'var(--text-primary)',
+            outline: 'none',
+            fontFamily: 'var(--font-sans)',
+          }}
+        />
+        {isSearching && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            aria-label="Clear search"
+            style={{
+              fontSize: '12px',
+              padding: isMobile ? '8px 12px' : '5px 10px',
+              minHeight: isMobile ? MIN_TAP : undefined,
+              borderRadius: 'var(--radius-pill)',
+              border: '1px solid var(--border)',
+              background: 'var(--surface-1)',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
@@ -1452,6 +1547,21 @@ export default function RepoList({
 
       <RepoCardLegend />
 
+      {isSearching && filtered.length === 0 ? (
+        <div
+          style={{
+            padding: '28px 16px',
+            textAlign: 'center',
+            fontSize: '13px',
+            color: 'var(--text-muted)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            background: 'var(--surface-1)',
+          }}
+        >
+          No repos match “{searchQuery.trim()}”.
+        </div>
+      ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {visibleRepos.map(repo => renderRepoCard(repo))}
         {gatedRepos.length > 0 && (
@@ -1465,6 +1575,7 @@ export default function RepoList({
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }
