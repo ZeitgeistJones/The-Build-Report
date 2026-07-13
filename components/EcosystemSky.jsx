@@ -19,6 +19,21 @@ const CAT_META = {
 };
 const CAT_ORDER = Object.keys(CAT_META);
 
+// One-line descriptions shown on legend hover
+const CAT_DESCRIPTIONS = {
+  "token-econ":  "CLAWD's monetary layer — vesting, staking, burns, auctions",
+  "onchain":     "Solidity, ERC-8004, and dapps that live on-chain",
+  "agent-infra": "Larvae, harnesses, and the tools that let agents run agents",
+  "devtools":    "Local-first utilities and daily-driver tools",
+  "media":       "Video, audio, streams, and the slop.computer podcast",
+  "governance":  "Scoring, auditing, and holding the ecosystem to account",
+  "research":    "ZK proofs, LLM proxies, papers, and exploration",
+  "mobile":      "iOS and on-device experiments",
+  "games":       "Playable moments in CLAWD",
+  "community":   "Delegates, badges, and the social layer",
+  "misc":        "Unfinished ideas and one-off experiments",
+};
+
 const TOUR_STOPS = [
   { repo: "bot-wallet-guide",   caption: "Where it begins. A manifesto: why crypto, why bots." },
   { repo: "clawd-vesting",       caption: "The first mechanic. Lock up CLAWD, let it drip back." },
@@ -133,12 +148,6 @@ function buildConnections(repos) {
   return [...edges.values()];
 }
 
-const STAR_SHAPES = ["disc", "spike", "diamond", "ring", "halo"];
-
-function getStarShape(seed) {
-  return STAR_SHAPES[Math.floor(rand(seed * 3.7) * STAR_SHAPES.length)];
-}
-
 function timeAgo(isoString) {
   if (!isoString) return "";
   const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
@@ -168,6 +177,9 @@ export default function EcosystemSky() {
   const [touring, setTouring] = useState(false);
   const [tourIndex, setTourIndex] = useState(0);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const searchInputRef = useRef(null);
+  const cursorGlowRef = useRef(null);
   const containerRef = useRef(null);
 
   const isMobile = dimensions.w < 640;
@@ -324,12 +336,23 @@ export default function EcosystemSky() {
     [q]
   );
 
+  // --- Camera refs for smooth zoom-on-select ---
+  const cameraRef = useRef({ x: 0.5, y: 0.5, zoom: 1 });
+  const targetRef = useRef({ x: 0.5, y: 0.5, zoom: 1 });
+
   const getPos = useCallback(
     (p) => {
       const drift = 2.2;
+      const cam = cameraRef.current;
+      // World-space position with drift
+      const wx = p.x + Math.sin(time * 0.6 + p.seed) * (drift / dimensions.w);
+      const wy = p.y + Math.cos(time * 0.45 + p.seed * 1.3) * (drift / dimensions.h);
+      // Apply camera transform: center on cam.x/cam.y with zoom
+      const sx = (wx - cam.x) * cam.zoom + 0.5;
+      const sy = (wy - cam.y) * cam.zoom + 0.5;
       return {
-        x: p.x * dimensions.w + Math.sin(time * 0.6 + p.seed) * drift,
-        y: p.y * dimensions.h + Math.cos(time * 0.45 + p.seed * 1.3) * drift,
+        x: sx * dimensions.w,
+        y: sy * dimensions.h,
       };
     },
     [time, dimensions]
@@ -338,26 +361,87 @@ export default function EcosystemSky() {
   const selectedRepo = selected ? positioned.find((r) => r.n === selected) : null;
   const searchActive = q.length > 0;
 
-  // --- Click-to-zoom: scale + translate the world layer toward the selected star ---
-  const ZOOM_SCALE = isMobile ? 1.6 : 1.9;
-  const zoomScale = selectedRepo ? ZOOM_SCALE : 1;
-  const zoomTx = selectedRepo
-    ? dimensions.w / 2 - selectedRepo.x * dimensions.w * zoomScale
-    : 0;
-  const zoomTy = selectedRepo
-    ? dimensions.h / 2 - selectedRepo.y * dimensions.h * zoomScale
-    : 0;
-  const worldTransform = {
-    transform: `translate(${zoomTx}px, ${zoomTy}px) scale(${zoomScale})`,
-    transformOrigin: "0 0",
-    transition: "transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)",
-    willChange: "transform",
-  };
-
   const activeConns = selected
     ? connections.filter((c) => c.a === selected || c.b === selected)
     : [];
   const connectedNames = new Set(activeConns.flatMap((c) => [c.a, c.b]));
+
+  // Track selection status in ref for the animation loop
+  const isSelectedRef = useRef(false);
+  useEffect(() => {
+    isSelectedRef.current = !!selected;
+  }, [selected]);
+
+  // Update camera target when selection changes
+  useEffect(() => {
+    if (selectedRepo) {
+      targetRef.current = { x: selectedRepo.x, y: selectedRepo.y, zoom: 1.6 };
+    }
+  }, [selected, positioned.length]);
+
+  // Spring-physics camera + ambient idle drift
+  useEffect(() => {
+    const velRef = { x: 0, y: 0, zoom: 0 };
+    let localT = 0;
+    let frame;
+    const step = () => {
+      localT += 0.006;
+
+      // When nothing is selected, target drifts slowly (sky feels alive)
+      if (!isSelectedRef.current) {
+        targetRef.current = {
+          x: 0.5 + Math.sin(localT * 0.12) * 0.025,
+          y: 0.5 + Math.cos(localT * 0.09) * 0.02,
+          zoom: 1 + Math.sin(localT * 0.05) * 0.02,
+        };
+      }
+
+      const cur = cameraRef.current;
+      const tgt = targetRef.current;
+      const stiffness = 0.012;
+      const damping = 0.86;
+
+      velRef.x = velRef.x * damping + (tgt.x - cur.x) * stiffness;
+      velRef.y = velRef.y * damping + (tgt.y - cur.y) * stiffness;
+      velRef.zoom = velRef.zoom * damping + (tgt.zoom - cur.zoom) * stiffness;
+
+      cameraRef.current = {
+        x: cur.x + velRef.x,
+        y: cur.y + velRef.y,
+        zoom: cur.zoom + velRef.zoom,
+      };
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  // Lock body scroll while sky is mounted (fullscreen immersive mode)
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target.tagName;
+      const inField = tag === "INPUT" || tag === "TEXTAREA";
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (inField) e.target.blur();
+        setSelected(null);
+        setTouring(false);
+        setQuery("");
+      } else if (e.key === "/" && !inField) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // --- Loading screen ---
   if (loading) {
@@ -422,17 +506,47 @@ export default function EcosystemSky() {
         setSelected(null);
         setTouring(false);
       }}
+      onMouseMove={(e) => {
+        if (cursorGlowRef.current) {
+          cursorGlowRef.current.style.left = `${e.clientX}px`;
+          cursorGlowRef.current.style.top = `${e.clientY}px`;
+          cursorGlowRef.current.style.opacity = "1";
+        }
+      }}
+      onMouseLeave={() => {
+        if (cursorGlowRef.current) {
+          cursorGlowRef.current.style.opacity = "0";
+        }
+      }}
       style={{
-        position: "relative",
-        width: "100%",
-        height: "100vh",
-        minHeight: 500,
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
         background: "radial-gradient(ellipse at 50% 30%, #0c1929 0%, #060d17 55%, #030810 100%)",
         overflow: "hidden",
         fontFamily: "'Inter','SF Pro Display',-apple-system,sans-serif",
         userSelect: "none",
       }}
     >
+      {/* Cursor glow — soft light following the mouse */}
+      <div
+        ref={cursorGlowRef}
+        style={{
+          position: "fixed",
+          width: 400,
+          height: 400,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(94,234,212,0.06) 0%, rgba(94,234,212,0.02) 30%, transparent 60%)",
+          transform: "translate(-50%, -50%)",
+          pointerEvents: "none",
+          zIndex: 4,
+          opacity: 0,
+          transition: "opacity 0.4s ease",
+          left: -1000,
+          top: -1000,
+          mixBlendMode: "screen",
+        }}
+      />
       {/* Back link */}
       <a
         href="/"
@@ -511,6 +625,7 @@ export default function EcosystemSky() {
             </>
           ) : (
             <input
+              ref={searchInputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="search the sky..."
@@ -560,25 +675,48 @@ export default function EcosystemSky() {
         </button>
       )}
 
-      {/* World layer — everything in the starfield zooms together toward the selected star */}
-      <div style={{ position: "absolute", top: 0, left: 0, width: dimensions.w, height: dimensions.h, ...worldTransform }}>
-
       {/* Nebula glow */}
       <div style={{ position: "absolute", top: "15%", left: "15%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(94,234,212,0.035) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: "10%", right: "12%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(167,139,250,0.035) 0%, transparent 70%)", filter: "blur(50px)", pointerEvents: "none" }} />
 
       {/* Background stars */}
+      {/* Background stars — 3 parallax layers for depth */}
       <svg width="100%" height="100%" style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}>
-        {Array.from({ length: 90 }, (_, i) => (
-          <circle
-            key={i}
-            cx={`${rand(i * 3.1) * 100}%`}
-            cy={`${rand(i * 5.7) * 100}%`}
-            r={rand(i * 1.9) * 1.3 + 0.3}
-            fill="white"
-            opacity={(rand(i * 2.3) * 0.4 + 0.1) * (0.6 + 0.4 * Math.sin(time * 2 + i))}
-          />
-        ))}
+        {(() => {
+          const cam = cameraRef.current;
+          const layers = [
+            { count: 150, parallax: 0.15, rMin: 0.3, rMax: 0.7, opMin: 0.1, opMax: 0.35, seed: 100 },
+            { count: 80,  parallax: 0.4,  rMin: 0.6, rMax: 1.2, opMin: 0.2, opMax: 0.5,  seed: 300 },
+            { count: 35,  parallax: 0.75, rMin: 1.1, rMax: 1.9, opMin: 0.3, opMax: 0.6,  seed: 700 },
+          ];
+          const out = [];
+          layers.forEach((layer, li) => {
+            const effCX = 0.5 + (cam.x - 0.5) * layer.parallax;
+            const effCY = 0.5 + (cam.y - 0.5) * layer.parallax;
+            const effZ = 1 + (cam.zoom - 1) * layer.parallax;
+            for (let i = 0; i < layer.count; i++) {
+              const wx = rand(layer.seed + i * 3.1);
+              const wy = rand(layer.seed + i * 5.7);
+              const sx = (wx - effCX) * effZ + 0.5;
+              const sy = (wy - effCY) * effZ + 0.5;
+              if (sx < -0.05 || sx > 1.05 || sy < -0.05 || sy > 1.05) continue;
+              const r = layer.rMin + rand(layer.seed + i * 1.9) * (layer.rMax - layer.rMin);
+              const baseOp = layer.opMin + rand(layer.seed + i * 2.3) * (layer.opMax - layer.opMin);
+              const twinkle = 0.55 + 0.45 * Math.sin(time * (1.5 + li * 0.4) + i);
+              out.push(
+                <circle
+                  key={`${li}-${i}`}
+                  cx={`${sx * 100}%`}
+                  cy={`${sy * 100}%`}
+                  r={r * (0.9 + effZ * 0.1)}
+                  fill="white"
+                  opacity={baseOp * twinkle}
+                />
+              );
+            }
+          });
+          return out;
+        })()}
       </svg>
 
       {/* Shooting stars */}
@@ -629,8 +767,32 @@ export default function EcosystemSky() {
               <g key={i}>
                 <line x1={posA.x} y1={posA.y} x2={posB.x} y2={posB.y}
                   stroke={meta.core} strokeWidth={1.2} opacity={0.45} filter="url(#conn-glow)" />
+                {/* Flowing particles — data traveling along the connection */}
+                {[0, 0.33, 0.66].map((offset) => {
+                  const speed = 0.35;
+                  const t = ((time * speed + offset + i * 0.17) % 1);
+                  // Particles travel from A to B (or B to A if selected is B)
+                  const goingFromSel = conn.a === selected;
+                  const from = goingFromSel ? posA : posB;
+                  const to = goingFromSel ? posB : posA;
+                  const px = from.x + (to.x - from.x) * t;
+                  const py = from.y + (to.y - from.y) * t;
+                  // Fade in/out at endpoints, brightest at midpoint
+                  const op = Math.sin(t * Math.PI) * 0.85;
+                  return (
+                    <circle
+                      key={`p-${offset}`}
+                      cx={px}
+                      cy={py}
+                      r={1.6}
+                      fill={meta.core}
+                      opacity={op}
+                      filter="url(#conn-glow)"
+                    />
+                  );
+                })}
                 {!isMobile && (
-                  <text x={midX} y={midY - 5} fill={meta.core} fontSize={8.5}
+                  <text x={midX} y={midY - 8} fill={meta.core} fontSize={8.5}
                     textAnchor="middle" opacity={0.6} fontFamily="inherit">
                     {conn.label}
                   </text>
@@ -656,9 +818,19 @@ export default function EcosystemSky() {
           (selected && !isSel && !isConnected);
 
         const weight = Math.log2(r.s + r.f + 2);
+        const zoom = cameraRef.current.zoom;
         const baseSize = 5 + weight * 3.2;
-        const size = baseSize * (isSel ? 1.6 : 1);
-        const pulse = 1 + Math.sin(time * 2.2 + r.seed * 6) * 0.12;
+        // Search matches get subtly larger to stand out more
+        const searchBoost = searchActive && searchMatch ? 1.25 : 1;
+        const size = baseSize * (isSel ? 1.6 : 1) * (0.85 + zoom * 0.15) * searchBoost;
+        // Search matches pulse more strongly to feel alive
+        const pulseAmp = searchActive && searchMatch ? 0.25 : 0.12;
+        const pulse = 1 + Math.sin(time * 2.2 + r.seed * 6) * pulseAmp;
+
+        // Diffraction spikes for bright stars (real astronomy: bright stars have visible spikes)
+        const spikeMode = weight >= 4 ? 8 : weight >= 3 ? 4 : 0;
+        const spikeAngles = spikeMode === 8 ? [0, 45, 90, 135] : spikeMode === 4 ? [0, 90] : [];
+        const spikeLength = size * (spikeMode === 8 ? 5 : 4) * pulse;
 
         return (
           <div
@@ -678,6 +850,48 @@ export default function EcosystemSky() {
               transition: "opacity 0.3s ease",
             }}
           >
+            {/* Sonar pulse rings for selected star (expanding outward, fading) */}
+            {isSel && [0, 1, 2].map((ringI) => {
+              const ringCycle = 2.8;
+              const ringPhase = ((time + ringI * 0.93) % ringCycle) / ringCycle;
+              const ringScale = 1.5 + ringPhase * 8;
+              const ringOpacity = (1 - ringPhase) * 0.7 * Math.sin(ringPhase * Math.PI);
+              return (
+                <div
+                  key={`ring-${ringI}`}
+                  style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    width: size * ringScale,
+                    height: size * ringScale,
+                    borderRadius: "50%",
+                    border: `1px solid ${meta.core}`,
+                    transform: "translate(-50%, -50%)",
+                    opacity: ringOpacity,
+                    pointerEvents: "none",
+                    boxShadow: `0 0 8px ${meta.glow}`,
+                  }}
+                />
+              );
+            })}
+            {/* Diffraction spikes (bright stars only) */}
+            {spikeAngles.map((angle) => (
+              <div
+                key={angle}
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  width: spikeLength,
+                  height: 0.8,
+                  background: `linear-gradient(to right, transparent 0%, ${meta.core}00 15%, ${meta.core}CC 50%, ${meta.core}00 85%, transparent 100%)`,
+                  transform: `translate(-50%, -50%) rotate(${angle}deg)`,
+                  opacity: isSel ? 0.9 : 0.55,
+                  pointerEvents: "none",
+                }}
+              />
+            ))}
             {/* Outer glow */}
             <div style={{
               position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
@@ -686,72 +900,13 @@ export default function EcosystemSky() {
               background: `radial-gradient(circle, ${meta.glow} 0%, transparent 70%)`,
               opacity: isSel ? 0.9 : 0.45,
             }} />
-            {/* Core — shape varies by repo seed so the field isn't a uniform dot-grid */}
-            {(() => {
-              const shape = getStarShape(r.seed);
-              const coreSize = size * 0.55;
-              const glowShadow = `0 0 ${size * 0.6}px ${meta.glow}`;
-              if (shape === "diamond") {
-                return (
-                  <div style={{
-                    position: "absolute", top: "50%", left: "50%",
-                    transform: "translate(-50%,-50%) rotate(45deg)",
-                    width: coreSize * 0.82, height: coreSize * 0.82,
-                    background: meta.core,
-                    boxShadow: glowShadow,
-                  }} />
-                );
-              }
-              if (shape === "spike") {
-                return (
-                  <div style={{
-                    position: "absolute", top: "50%", left: "50%",
-                    transform: "translate(-50%,-50%)",
-                    width: coreSize * 1.7, height: coreSize * 1.7,
-                    background: meta.core,
-                    clipPath: "polygon(50% 0%, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0% 50%, 38% 38%)",
-                    boxShadow: glowShadow,
-                  }} />
-                );
-              }
-              if (shape === "ring") {
-                return (
-                  <div style={{
-                    position: "absolute", top: "50%", left: "50%",
-                    transform: "translate(-50%,-50%)",
-                    width: coreSize * 1.35, height: coreSize * 1.35,
-                    borderRadius: "50%",
-                    border: `${Math.max(1.3, coreSize * 0.24)}px solid ${meta.core}`,
-                    boxShadow: glowShadow,
-                  }} />
-                );
-              }
-              if (shape === "halo") {
-                return (
-                  <>
-                    <div style={{
-                      position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                      width: coreSize * 2.1, height: coreSize * 2.1, borderRadius: "50%",
-                      background: `radial-gradient(circle, ${meta.core}66 0%, transparent 72%)`,
-                    }} />
-                    <div style={{
-                      position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                      width: coreSize * 0.5, height: coreSize * 0.5, borderRadius: "50%",
-                      background: meta.core, boxShadow: glowShadow,
-                    }} />
-                  </>
-                );
-              }
-              // disc (default)
-              return (
-                <div style={{
-                  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                  width: coreSize, height: coreSize, borderRadius: "50%",
-                  background: meta.core,
-                  boxShadow: glowShadow,
-                }} />
-              );
-            })()}
+            {/* Core */}
+            <div style={{
+              position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+              width: size * 0.55, height: size * 0.55, borderRadius: "50%",
+              background: meta.core,
+              boxShadow: `0 0 ${size * 0.6}px ${meta.glow}`,
+            }} />
             {/* Hover label */}
             {(isHovered || isSel) && (
               <div style={{
@@ -772,9 +927,6 @@ export default function EcosystemSky() {
           </div>
         );
       })}
-
-      </div>
-      {/* end world layer */}
 
       {/* Detail panel */}
       {selectedRepo && (
@@ -820,18 +972,60 @@ export default function EcosystemSky() {
             <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>{selectedRepo.l || "no language"}</span>
             <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>★ {selectedRepo.s}</span>
             <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>⑂ {selectedRepo.f}</span>
-            <a
-              href={selectedRepo.u}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                marginLeft: "auto", fontSize: 11, color: CAT_META[selectedRepo.c].core,
-                textDecoration: "none", border: `1px solid ${CAT_META[selectedRepo.c].core}44`,
-                padding: "3px 10px", borderRadius: 20,
-              }}
-            >
-              view on GitHub →
-            </a>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}${window.location.pathname}#${selectedRepo.n}`;
+                  navigator.clipboard?.writeText(url).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  });
+                }}
+                title="Copy link to this star"
+                style={{
+                  fontSize: 11,
+                  color: copied ? CAT_META[selectedRepo.c].core : "rgba(255,255,255,0.5)",
+                  background: "transparent",
+                  border: `1px solid ${copied ? CAT_META[selectedRepo.c].core + "88" : "rgba(255,255,255,0.15)"}`,
+                  padding: "3px 10px",
+                  borderRadius: 20,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                {copied ? "✓ copied" : "copy link"}
+              </button>
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`look at ${selectedRepo.n} in the CLAWD ecosystem sky`)}&url=${encodeURIComponent(typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}#${selectedRepo.n}` : "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Share on X"
+                style={{
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.5)",
+                  background: "transparent",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  padding: "3px 10px",
+                  borderRadius: 20,
+                  textDecoration: "none",
+                  cursor: "pointer",
+                }}
+              >
+                share
+              </a>
+              <a
+                href={selectedRepo.u}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: 11, color: CAT_META[selectedRepo.c].core,
+                  textDecoration: "none", border: `1px solid ${CAT_META[selectedRepo.c].core}44`,
+                  padding: "3px 10px", borderRadius: 20,
+                }}
+              >
+                GitHub →
+              </a>
+            </div>
           </div>
           {activeConns.length > 0 && (
             <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 5 }}>
@@ -922,6 +1116,33 @@ export default function EcosystemSky() {
         </div>
       )}
 
+      {/* Category description tooltip (floats left of legend on hover) */}
+      {hoveredCat && !isMobile && !selected && CAT_DESCRIPTIONS[hoveredCat] && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 20,
+            right: 200,
+            maxWidth: 260,
+            padding: "10px 14px",
+            borderRadius: 8,
+            background: "rgba(6,13,23,0.92)",
+            border: `1px solid ${CAT_META[hoveredCat].core}33`,
+            backdropFilter: "blur(12px)",
+            zIndex: 22,
+            pointerEvents: "none",
+            fontSize: 11,
+            color: "rgba(255,255,255,0.75)",
+            fontFamily: "Georgia, 'Times New Roman', serif",
+            fontStyle: "italic",
+            lineHeight: 1.45,
+            textAlign: "right",
+          }}
+        >
+          {CAT_DESCRIPTIONS[hoveredCat]}
+        </div>
+      )}
+
       {/* Stats bar */}
       {!selected && !touring && (
         <div
@@ -960,7 +1181,7 @@ export default function EcosystemSky() {
           fontSize: 10, color: "rgba(255,255,255,0.18)", letterSpacing: 0.5,
           pointerEvents: "none", whiteSpace: "nowrap",
         }}>
-          tap a star · hover a legend row · search by name
+          tap a star · press / to search · esc to reset
         </div>
       )}
       {touring && (
