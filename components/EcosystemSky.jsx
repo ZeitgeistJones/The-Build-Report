@@ -19,6 +19,10 @@ const CAT_META = {
 };
 const CAT_ORDER = Object.keys(CAT_META);
 
+// Ambient bed — Space Ambient Music | No Copyright V1 (Lazor Brown)
+const SKY_MUSIC_VIDEO_ID = "7GKrV3JY0Rc";
+const SKY_MUSIC_VOLUME = 40;
+
 // One-line descriptions shown on legend hover
 const CAT_DESCRIPTIONS = {
   "token-econ":  "CLAWD's monetary layer — vesting, staking, burns, auctions",
@@ -199,11 +203,58 @@ export default function EcosystemSky() {
   const [legendOpen, setLegendOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inspecting, setInspecting] = useState(null);
+  const [musicOn, setMusicOn] = useState(true);
   const searchInputRef = useRef(null);
   const cursorGlowRef = useRef(null);
   const containerRef = useRef(null);
+  const ytIframeRef = useRef(null);
+  const musicOnRef = useRef(true);
 
   const isMobile = dimensions.w < 640;
+
+  const sendYtCommand = useCallback((func, args = []) => {
+    const win = ytIframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage(
+      JSON.stringify({ event: "command", func, args }),
+      "https://www.youtube.com"
+    );
+  }, []);
+
+  useEffect(() => {
+    musicOnRef.current = musicOn;
+  }, [musicOn]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (musicOn) {
+        sendYtCommand("unMute");
+        sendYtCommand("setVolume", [SKY_MUSIC_VOLUME]);
+        sendYtCommand("playVideo");
+      } else {
+        sendYtCommand("mute");
+        sendYtCommand("pauseVideo");
+      }
+    }, musicOn ? 500 : 0);
+    return () => clearTimeout(t);
+  }, [musicOn, sendYtCommand]);
+
+  // Browsers often block unmuted autoplay — resume on first interaction if still on
+  useEffect(() => {
+    const kick = () => {
+      if (!musicOnRef.current) return;
+      sendYtCommand("unMute");
+      sendYtCommand("setVolume", [SKY_MUSIC_VOLUME]);
+      sendYtCommand("playVideo");
+    };
+    window.addEventListener("pointerdown", kick, { once: true, capture: true });
+    return () => window.removeEventListener("pointerdown", kick, { capture: true });
+  }, [sendYtCommand]);
+
+  const toggleMusic = (e) => {
+    e.stopPropagation();
+    setMusicOn((on) => !on);
+  };
 
   // --- Fetch repos ---
   useEffect(() => {
@@ -654,6 +705,51 @@ export default function EcosystemSky() {
         </div>
       </div>
 
+      {/* Ambient music — on by default, loops; toggle to mute */}
+      <iframe
+        ref={ytIframeRef}
+        title="Night Sky ambient music"
+        src={`https://www.youtube.com/embed/${SKY_MUSIC_VIDEO_ID}?enablejsapi=1&autoplay=1&loop=1&playlist=${SKY_MUSIC_VIDEO_ID}&controls=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3`}
+        allow="autoplay; encrypted-media"
+        tabIndex={-1}
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          opacity: 0,
+          pointerEvents: "none",
+          left: -9999,
+          top: 0,
+          border: 0,
+        }}
+      />
+
+      {/* Sound toggle */}
+      <button
+        type="button"
+        onClick={toggleMusic}
+        aria-pressed={musicOn}
+        title={musicOn ? "Mute ambient music" : "Play ambient music"}
+        style={{
+          position: "absolute",
+          top: 24,
+          right: !touring && !selected ? (isMobile ? 118 : 148) : 24,
+          zIndex: 25,
+          fontSize: isMobile ? 10 : 11,
+          letterSpacing: 1.5,
+          color: musicOn ? "rgba(94,234,212,0.9)" : "rgba(255,255,255,0.45)",
+          background: musicOn ? "rgba(94,234,212,0.08)" : "rgba(255,255,255,0.04)",
+          border: musicOn ? "1px solid rgba(94,234,212,0.35)" : "1px solid rgba(255,255,255,0.15)",
+          padding: isMobile ? "6px 12px" : "7px 14px",
+          borderRadius: 20,
+          cursor: "pointer",
+          textTransform: "uppercase",
+          transition: "all 0.2s ease",
+        }}
+      >
+        {musicOn ? "Sound on" : "Sound off"}
+      </button>
+
       {/* Chronicle button */}
       {!touring && !selected && (
         <button
@@ -827,13 +923,20 @@ export default function EcosystemSky() {
 
         const weight = Math.log2(r.s + r.f + 2);
         const zoom = cameraRef.current.zoom;
-        const baseSize = 5 + weight * 3.2;
+        // Steeper power curve — makes the gap between quiet repos and heavy
+        // hitters dramatic and instantly readable, instead of a subtle gradient.
+        const baseSize = 4 + Math.pow(weight, 1.6) * 2.3;
         // Search matches get subtly larger to stand out more
         const searchBoost = searchActive && searchMatch ? 1.25 : 1;
         const size = baseSize * (isSel ? 1.6 : 1) * (0.85 + zoom * 0.15) * searchBoost;
         // Search matches pulse more strongly to feel alive
         const pulseAmp = searchActive && searchMatch ? 0.25 : 0.12;
         const pulse = 1 + Math.sin(time * 2.2 + r.seed * 6) * pulseAmp;
+
+        // Brightness scales with activity too — heavy hitters aren't just
+        // bigger, they're visibly brighter and glow further into the dark.
+        const glowIntensity = Math.min(1, 0.35 + weight * 0.13);
+        const isMajor = weight >= 3.0; // top tier — gets a persistent name label
 
         // Diffraction spikes for bright stars (real astronomy: bright stars have visible spikes)
         const spikeMode = weight >= 4 ? 8 : weight >= 3 ? 4 : 0;
@@ -901,21 +1004,41 @@ export default function EcosystemSky() {
                 }}
               />
             ))}
-            {/* Outer glow */}
+            {/* Outer glow — brighter for high-activity repos */}
             <div style={{
               position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
               width: size * (isSel ? 3 : 2.2) * pulse, height: size * (isSel ? 3 : 2.2) * pulse,
               borderRadius: "50%",
               background: `radial-gradient(circle, ${meta.glow} 0%, transparent 70%)`,
-              opacity: isSel ? 0.9 : 0.45,
+              opacity: isSel ? 0.9 : glowIntensity,
             }} />
-            {/* Core */}
+            {/* Core — bright box-shadow scales with activity, not just size */}
             <div style={{
               position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
               width: size * 0.55, height: size * 0.55, borderRadius: "50%",
               background: meta.core,
-              boxShadow: `0 0 ${size * 0.6}px ${meta.glow}`,
+              boxShadow: `0 0 ${size * 0.6 * (0.6 + glowIntensity * 0.6)}px ${meta.glow}`,
             }} />
+            {/* Persistent label for major repos — visible without hovering, so the
+                heavy hitters read as a named constellation at a glance */}
+            {isMajor && !isHovered && !isSel && !dimmed && (
+              <div style={{
+                position: "absolute",
+                top: size + 3,
+                left: "50%",
+                transform: "translateX(-50%)",
+                whiteSpace: "nowrap",
+                fontSize: 9,
+                fontWeight: 500,
+                color: meta.core,
+                opacity: 0.55,
+                textShadow: "0 1px 4px rgba(0,0,0,0.9)",
+                pointerEvents: "none",
+                letterSpacing: 0.2,
+              }}>
+                {r.n}
+              </div>
+            )}
             {/* Hover label */}
             {(isHovered || isSel) && (
               <div style={{
@@ -937,11 +1060,11 @@ export default function EcosystemSky() {
         );
       })}
 
-      {/* Detail panel */}
+      {/* Detail panel — right-side sidebar on desktop so it never covers the star field, bottom sheet on mobile */}
       {selectedRepo && (
         <div
           onClick={(e) => e.stopPropagation()}
-          style={{
+          style={isMobile ? {
             position: "absolute",
             bottom: 22,
             left: "50%",
@@ -949,16 +1072,61 @@ export default function EcosystemSky() {
             background: "rgba(6,13,23,0.94)",
             border: `1px solid ${CAT_META[selectedRepo.c].core}33`,
             borderRadius: 12,
-            padding: isMobile ? "14px 16px" : "16px 22px",
+            padding: "14px 16px",
             maxWidth: 440,
             width: "calc(100% - 48px)",
             zIndex: 40,
             backdropFilter: "blur(20px)",
-            maxHeight: isMobile ? "40vh" : "auto",
+            maxHeight: "40vh",
             overflowY: "auto",
+          } : {
+            position: "absolute",
+            top: 100,
+            bottom: 100,
+            right: 20,
+            width: 320,
+            background: "rgba(6,13,23,0.94)",
+            border: `1px solid ${CAT_META[selectedRepo.c].core}33`,
+            borderRadius: 12,
+            padding: "18px 20px",
+            zIndex: 40,
+            backdropFilter: "blur(20px)",
+            overflowY: "auto",
+            animation: "panelSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          {!isMobile && (
+            <style>{`
+              @keyframes panelSlideIn {
+                from { transform: translateX(20px); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+              }
+            `}</style>
+          )}
+          {/* Close button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setSelected(null); }}
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              width: 22,
+              height: 22,
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "rgba(255,255,255,0.5)",
+              fontSize: 13,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, paddingRight: isMobile ? 0 : 26, flexWrap: isMobile ? "nowrap" : "wrap" }}>
             <div style={{
               width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
               background: CAT_META[selectedRepo.c].core,
@@ -969,7 +1137,7 @@ export default function EcosystemSky() {
             </div>
             <div style={{
               fontSize: 9, color: CAT_META[selectedRepo.c].core, textTransform: "uppercase",
-              letterSpacing: 1.5, opacity: 0.75, marginLeft: "auto", whiteSpace: "nowrap", flexShrink: 0,
+              letterSpacing: 1.5, opacity: 0.75, marginLeft: isMobile ? "auto" : 0, whiteSpace: "nowrap", flexShrink: 0,
             }}>
               {selectedRepo.catRank} of {selectedRepo.catTotal} · {CAT_META[selectedRepo.c].label}
             </div>
@@ -981,7 +1149,8 @@ export default function EcosystemSky() {
             <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>{selectedRepo.l || "no language"}</span>
             <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>★ {selectedRepo.s}</span>
             <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>⑂ {selectedRepo.f}</span>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
               <button
                 onClick={() => setInspecting(selectedRepo.n)}
                 title="Zoom in for a close-up"
@@ -1051,7 +1220,6 @@ export default function EcosystemSky() {
               >
                 GitHub →
               </a>
-            </div>
           </div>
           {activeConns.length > 0 && (
             <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 5 }}>

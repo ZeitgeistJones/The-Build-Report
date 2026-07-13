@@ -4,11 +4,11 @@
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://the-build-report.vercel.app";
 
 export const metadata = {
-  title: "The CLAWD Ecosystem Sky",
+  title: "Night Sky",
   description:
     "An interactive constellation map of every repo in the clawdbotatg ecosystem. 200+ projects, one autonomous builder.",
   openGraph: {
-    title: "The CLAWD Ecosystem Sky",
+    title: "Night Sky",
     description:
       "200+ repos. One autonomous builder. Tap a star to explore the ecosystem.",
     type: "website",
@@ -18,13 +18,13 @@ export const metadata = {
         url: `${SITE_URL}/api/og-sky`,
         width: 1200,
         height: 630,
-        alt: "The CLAWD Ecosystem Sky",
+        alt: "Night Sky — The CLAWD Ecosystem",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "The CLAWD Ecosystem Sky",
+    title: "Night Sky",
     description:
       "200+ repos. One autonomous builder. Tap a star to explore the ecosystem.",
     images: [`${SITE_URL}/api/og-sky`],
