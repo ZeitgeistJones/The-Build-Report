@@ -1087,8 +1087,9 @@ export default function EcosystemSky() {
         );
       })}
 
-      {/* Detail panel — right-side sidebar on desktop so it never covers the star field, bottom sheet on mobile */}
-      {selectedRepo && (
+      {/* Detail panel — right-side sidebar on desktop so it never covers the star field, bottom sheet on mobile.
+          Hide the mobile sheet during Chronicle so connection lines stay visible like desktop. */}
+      {selectedRepo && !(touring && isMobile) && (
         <div
           onClick={(e) => e.stopPropagation()}
           style={isMobile ? {
