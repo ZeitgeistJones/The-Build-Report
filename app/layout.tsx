@@ -8,8 +8,7 @@ import Web3Provider from '@/components/wallet/Web3Provider'
 import ClawdAchievementsBridge from '@/components/wallet/ClawdAchievementsBridge'
 import { ColorThemeProvider } from '@/components/ColorThemeProvider'
 import { NormieModeProvider, NORMIE_MODE_STORAGE_KEY } from '@/components/NormieModeProvider'
-import NavBar from '@/components/NavBar'
-import RescorePromoBannerShell from '@/components/RescorePromoBannerShell'
+import AppChrome from '@/components/AppChrome'
 import { EthUsdProvider } from '@/components/EthUsdProvider'
 import { getEthUsdRateCached } from '@/lib/ethUsdRate'
 import { COLOR_THEME_STORAGE_KEY, CUSTOM_THEME_STORAGE_KEY } from '@/lib/colorThemes'
@@ -109,20 +108,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Web3Provider>
             <Script src={ACHIEVEMENT_HUB_EMBED} strategy="afterInteractive" />
             <ClawdAchievementsBridge />
-            <NavBar />
-            <RescorePromoBannerShell />
-            <main className="site-main" style={{ maxWidth: 'var(--content-max-width)', margin: '0 auto', padding: '32px var(--content-padding-x) 80px' }}>
-              {children}
-            </main>
-            <footer className="site-footer" style={{
-              borderTop: '1px solid var(--border)',
-              padding: '20px 24px',
-              textAlign: 'center',
-              fontSize: '12px',
-              color: 'var(--text-muted)',
-            }}>
-              The Build Report is an independent community project. Not affiliated with clawdbotatg, Austin Griffith, or the core team. Not financial advice.
-            </footer>
+            <AppChrome>{children}</AppChrome>
           </Web3Provider>
           </EthUsdProvider>
           </NormieModeProvider>

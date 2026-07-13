@@ -133,6 +133,12 @@ function buildConnections(repos) {
   return [...edges.values()];
 }
 
+const STAR_SHAPES = ["disc", "spike", "diamond", "ring", "halo"];
+
+function getStarShape(seed) {
+  return STAR_SHAPES[Math.floor(rand(seed * 3.7) * STAR_SHAPES.length)];
+}
+
 function timeAgo(isoString) {
   if (!isoString) return "";
   const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
@@ -331,6 +337,22 @@ export default function EcosystemSky() {
 
   const selectedRepo = selected ? positioned.find((r) => r.n === selected) : null;
   const searchActive = q.length > 0;
+
+  // --- Click-to-zoom: scale + translate the world layer toward the selected star ---
+  const ZOOM_SCALE = isMobile ? 1.6 : 1.9;
+  const zoomScale = selectedRepo ? ZOOM_SCALE : 1;
+  const zoomTx = selectedRepo
+    ? dimensions.w / 2 - selectedRepo.x * dimensions.w * zoomScale
+    : 0;
+  const zoomTy = selectedRepo
+    ? dimensions.h / 2 - selectedRepo.y * dimensions.h * zoomScale
+    : 0;
+  const worldTransform = {
+    transform: `translate(${zoomTx}px, ${zoomTy}px) scale(${zoomScale})`,
+    transformOrigin: "0 0",
+    transition: "transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)",
+    willChange: "transform",
+  };
 
   const activeConns = selected
     ? connections.filter((c) => c.a === selected || c.b === selected)
@@ -538,6 +560,9 @@ export default function EcosystemSky() {
         </button>
       )}
 
+      {/* World layer — everything in the starfield zooms together toward the selected star */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: dimensions.w, height: dimensions.h, ...worldTransform }}>
+
       {/* Nebula glow */}
       <div style={{ position: "absolute", top: "15%", left: "15%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(94,234,212,0.035) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: "10%", right: "12%", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(167,139,250,0.035) 0%, transparent 70%)", filter: "blur(50px)", pointerEvents: "none" }} />
@@ -661,13 +686,72 @@ export default function EcosystemSky() {
               background: `radial-gradient(circle, ${meta.glow} 0%, transparent 70%)`,
               opacity: isSel ? 0.9 : 0.45,
             }} />
-            {/* Core */}
-            <div style={{
-              position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-              width: size * 0.55, height: size * 0.55, borderRadius: "50%",
-              background: meta.core,
-              boxShadow: `0 0 ${size * 0.6}px ${meta.glow}`,
-            }} />
+            {/* Core — shape varies by repo seed so the field isn't a uniform dot-grid */}
+            {(() => {
+              const shape = getStarShape(r.seed);
+              const coreSize = size * 0.55;
+              const glowShadow = `0 0 ${size * 0.6}px ${meta.glow}`;
+              if (shape === "diamond") {
+                return (
+                  <div style={{
+                    position: "absolute", top: "50%", left: "50%",
+                    transform: "translate(-50%,-50%) rotate(45deg)",
+                    width: coreSize * 0.82, height: coreSize * 0.82,
+                    background: meta.core,
+                    boxShadow: glowShadow,
+                  }} />
+                );
+              }
+              if (shape === "spike") {
+                return (
+                  <div style={{
+                    position: "absolute", top: "50%", left: "50%",
+                    transform: "translate(-50%,-50%)",
+                    width: coreSize * 1.7, height: coreSize * 1.7,
+                    background: meta.core,
+                    clipPath: "polygon(50% 0%, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0% 50%, 38% 38%)",
+                    boxShadow: glowShadow,
+                  }} />
+                );
+              }
+              if (shape === "ring") {
+                return (
+                  <div style={{
+                    position: "absolute", top: "50%", left: "50%",
+                    transform: "translate(-50%,-50%)",
+                    width: coreSize * 1.35, height: coreSize * 1.35,
+                    borderRadius: "50%",
+                    border: `${Math.max(1.3, coreSize * 0.24)}px solid ${meta.core}`,
+                    boxShadow: glowShadow,
+                  }} />
+                );
+              }
+              if (shape === "halo") {
+                return (
+                  <>
+                    <div style={{
+                      position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+                      width: coreSize * 2.1, height: coreSize * 2.1, borderRadius: "50%",
+                      background: `radial-gradient(circle, ${meta.core}66 0%, transparent 72%)`,
+                    }} />
+                    <div style={{
+                      position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+                      width: coreSize * 0.5, height: coreSize * 0.5, borderRadius: "50%",
+                      background: meta.core, boxShadow: glowShadow,
+                    }} />
+                  </>
+                );
+              }
+              // disc (default)
+              return (
+                <div style={{
+                  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+                  width: coreSize, height: coreSize, borderRadius: "50%",
+                  background: meta.core,
+                  boxShadow: glowShadow,
+                }} />
+              );
+            })()}
             {/* Hover label */}
             {(isHovered || isSel) && (
               <div style={{
@@ -688,6 +772,9 @@ export default function EcosystemSky() {
           </div>
         );
       })}
+
+      </div>
+      {/* end world layer */}
 
       {/* Detail panel */}
       {selectedRepo && (
