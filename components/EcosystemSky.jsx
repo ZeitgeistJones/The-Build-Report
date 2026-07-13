@@ -349,6 +349,29 @@ export default function EcosystemSky() {
 
   const connections = useMemo(() => buildConnections(repos), [repos]);
 
+  // Maxes for 60/30/10 size mix (commits / stars / forks)
+  const sizeNorm = useMemo(() => {
+    let maxK = 0;
+    let maxS = 0;
+    let maxF = 0;
+    for (const r of repos) {
+      if ((r.k || 0) > maxK) maxK = r.k || 0;
+      if ((r.s || 0) > maxS) maxS = r.s || 0;
+      if ((r.f || 0) > maxF) maxF = r.f || 0;
+    }
+    return { maxK, maxS, maxF };
+  }, [repos]);
+
+  const sizeScore = useCallback(
+    (r) => {
+      const kNorm = sizeNorm.maxK > 0 ? (r.k || 0) / sizeNorm.maxK : 0;
+      const sNorm = sizeNorm.maxS > 0 ? (r.s || 0) / sizeNorm.maxS : 0;
+      const fNorm = sizeNorm.maxF > 0 ? (r.f || 0) / sizeNorm.maxF : 0;
+      return 0.6 * kNorm + 0.3 * sNorm + 0.1 * fNorm;
+    },
+    [sizeNorm]
+  );
+
   const clusterCenters = useMemo(() => {
     const counts = {};
     repos.forEach((r) => (counts[r.c] = (counts[r.c] || 0) + 1));
@@ -724,60 +747,66 @@ export default function EcosystemSky() {
         }}
       />
 
-      {/* Sound toggle */}
-      <button
-        type="button"
-        onClick={toggleMusic}
-        aria-pressed={musicOn}
-        title={musicOn ? "Mute ambient music" : "Play ambient music"}
+      {/* Sound + Chronicle — flex row so labels never overlap */}
+      <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
           top: 24,
-          right: !touring && !selected ? (isMobile ? 118 : 148) : 24,
+          right: 24,
           zIndex: 25,
-          fontSize: isMobile ? 10 : 11,
-          letterSpacing: 1.5,
-          color: musicOn ? "rgba(94,234,212,0.9)" : "rgba(255,255,255,0.45)",
-          background: musicOn ? "rgba(94,234,212,0.08)" : "rgba(255,255,255,0.04)",
-          border: musicOn ? "1px solid rgba(94,234,212,0.35)" : "1px solid rgba(255,255,255,0.15)",
-          padding: isMobile ? "6px 12px" : "7px 14px",
-          borderRadius: 20,
-          cursor: "pointer",
-          textTransform: "uppercase",
-          transition: "all 0.2s ease",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
         }}
       >
-        {musicOn ? "Sound on" : "Sound off"}
-      </button>
-
-      {/* Chronicle button */}
-      {!touring && !selected && (
         <button
-          onClick={(e) => { e.stopPropagation(); startTour(); }}
+          type="button"
+          onClick={toggleMusic}
+          aria-pressed={musicOn}
+          title={musicOn ? "Mute ambient music" : "Play ambient music"}
           style={{
-            position: "absolute",
-            top: 24,
-            right: 24,
-            zIndex: 25,
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontStyle: "italic",
-            fontSize: isMobile ? 10 : 12,
-            letterSpacing: 2,
-            color: "rgba(240, 220, 180, 0.7)",
-            background: "rgba(240, 220, 180, 0.04)",
-            border: "1px solid rgba(240, 220, 180, 0.25)",
-            padding: isMobile ? "6px 12px" : "7px 16px",
+            fontSize: isMobile ? 10 : 11,
+            letterSpacing: 1.5,
+            color: musicOn ? "rgba(94,234,212,0.9)" : "rgba(255,255,255,0.45)",
+            background: musicOn ? "rgba(94,234,212,0.08)" : "rgba(255,255,255,0.04)",
+            border: musicOn ? "1px solid rgba(94,234,212,0.35)" : "1px solid rgba(255,255,255,0.15)",
+            padding: isMobile ? "6px 12px" : "7px 14px",
             borderRadius: 20,
             cursor: "pointer",
             textTransform: "uppercase",
             transition: "all 0.2s ease",
+            whiteSpace: "nowrap",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(240, 220, 180, 0.1)"; e.currentTarget.style.color = "rgba(240, 220, 180, 0.95)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(240, 220, 180, 0.04)"; e.currentTarget.style.color = "rgba(240, 220, 180, 0.7)"; }}
         >
-          ▸ Chronicle
+          {musicOn ? "Sound on" : "Sound off"}
         </button>
-      )}
+
+        {!touring && !selected && (
+          <button
+            onClick={(e) => { e.stopPropagation(); startTour(); }}
+            style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontStyle: "italic",
+              fontSize: isMobile ? 10 : 12,
+              letterSpacing: 2,
+              color: "rgba(240, 220, 180, 0.7)",
+              background: "rgba(240, 220, 180, 0.04)",
+              border: "1px solid rgba(240, 220, 180, 0.25)",
+              padding: isMobile ? "6px 12px" : "7px 16px",
+              borderRadius: 20,
+              cursor: "pointer",
+              textTransform: "uppercase",
+              transition: "all 0.2s ease",
+              whiteSpace: "nowrap",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(240, 220, 180, 0.1)"; e.currentTarget.style.color = "rgba(240, 220, 180, 0.95)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(240, 220, 180, 0.04)"; e.currentTarget.style.color = "rgba(240, 220, 180, 0.7)"; }}
+          >
+            ▸ Chronicle
+          </button>
+        )}
+      </div>
 
       {/* Nebula glow */}
       <div style={{ position: "absolute", top: "15%", left: "15%", width: 350, height: 350, borderRadius: "50%", background: "radial-gradient(circle, rgba(94,234,212,0.035) 0%, transparent 70%)", filter: "blur(60px)", pointerEvents: "none" }} />
@@ -921,11 +950,10 @@ export default function EcosystemSky() {
           (!searchActive && hoveredCat && !catHighlighted) ||
           (selected && !isSel && !isConnected);
 
-        const weight = Math.log2(r.s + r.f + 2);
+        const score = sizeScore(r);
         const zoom = cameraRef.current.zoom;
-        // Steeper power curve — makes the gap between quiet repos and heavy
-        // hitters dramatic and instantly readable, instead of a subtle gradient.
-        const baseSize = 4 + Math.pow(weight, 1.6) * 2.3;
+        // 60% commits / 30% stars / 10% forks — soft range, hard-capped
+        const baseSize = Math.min(18, 5 + score * 14);
         // Search matches get subtly larger to stand out more
         const searchBoost = searchActive && searchMatch ? 1.25 : 1;
         const size = baseSize * (isSel ? 1.6 : 1) * (0.85 + zoom * 0.15) * searchBoost;
@@ -933,13 +961,12 @@ export default function EcosystemSky() {
         const pulseAmp = searchActive && searchMatch ? 0.25 : 0.12;
         const pulse = 1 + Math.sin(time * 2.2 + r.seed * 6) * pulseAmp;
 
-        // Brightness scales with activity too — heavy hitters aren't just
-        // bigger, they're visibly brighter and glow further into the dark.
-        const glowIntensity = Math.min(1, 0.35 + weight * 0.13);
-        const isMajor = weight >= 3.0; // top tier — gets a persistent name label
+        // Brightness scales with the same score
+        const glowIntensity = Math.min(1, 0.35 + score * 0.55);
+        const isMajor = score >= 0.45; // top tier — gets a persistent name label
 
         // Diffraction spikes for bright stars (real astronomy: bright stars have visible spikes)
-        const spikeMode = weight >= 4 ? 8 : weight >= 3 ? 4 : 0;
+        const spikeMode = score >= 0.7 ? 8 : score >= 0.45 ? 4 : 0;
         const spikeAngles = spikeMode === 8 ? [0, 45, 90, 135] : spikeMode === 4 ? [0, 90] : [];
         const spikeLength = size * (spikeMode === 8 ? 5 : 4) * pulse;
 

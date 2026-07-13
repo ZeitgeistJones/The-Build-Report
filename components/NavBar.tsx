@@ -14,7 +14,7 @@ function DesktopNavLinks() {
         Repos
       </a>
       <a href="/sky" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-        The Sky
+        Night Sky
       </a>
       <a href="/start" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Start Here
@@ -64,7 +64,7 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
           Repos
         </a>
         <a href="/sky" className="mobile-nav-link" onClick={onClose}>
-          The Sky
+          Night Sky
         </a>
         <a href="/start" className="mobile-nav-link" onClick={onClose}>
           Start Here

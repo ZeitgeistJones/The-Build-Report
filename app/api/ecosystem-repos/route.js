@@ -2,6 +2,7 @@
 // Fetches all clawdbotatg repos, filters, categorizes, caches 1hr on Vercel
 
 export const revalidate = 3600;
+export const maxDuration = 60;
 
 const GITHUB_HEADERS = {
   Accept: "application/vnd.github+json",
@@ -194,11 +195,46 @@ async function fetchAllRepos() {
   return allRepos;
 }
 
+/** Lifetime commit total via Link: rel="last" page number (per_page=1). */
+async function fetchCommitCount(name) {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/clawdbotatg/${encodeURIComponent(name)}/commits?per_page=1`,
+      { headers: GITHUB_HEADERS, next: { revalidate: 3600 } }
+    );
+    if (!res.ok) return 0;
+
+    const link = res.headers.get("link") || "";
+    const last = link.match(/[?&]page=(\d+)>;\s*rel="last"/);
+    if (last) return Number(last[1]) || 0;
+
+    const data = await res.json();
+    return Array.isArray(data) ? data.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function mapPool(items, concurrency, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  }
+  const n = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  return out;
+}
+
 export async function GET() {
   try {
     const raw = await fetchAllRepos();
 
-    const repos = raw
+    const base = raw
       .filter((r) => !r.fork)
       .filter((r) => !r.name.startsWith("leftclaw-service-job"))
       .filter((r) => r.name !== "vaultid")
@@ -211,6 +247,9 @@ export async function GET() {
         c: categorize(r.name, r.description, r.language),
         u: r.html_url,
       }));
+
+    const counts = await mapPool(base, 8, (r) => fetchCommitCount(r.n));
+    const repos = base.map((r, i) => ({ ...r, k: counts[i] || 0 }));
 
     return Response.json({
       repos,
