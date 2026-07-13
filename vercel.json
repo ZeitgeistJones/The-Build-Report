@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/daily-digest",
-      "schedule": "0 5 * * *"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/podcast-mentions",

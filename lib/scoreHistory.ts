@@ -70,6 +70,21 @@ export async function getSlugsRescoredSince(sinceMs: number): Promise<string[]> 
   }
 }
 
+/** Slugs with a timeline score in [startMs, endMs). */
+export async function getSlugsRescoredBetween(
+  startMs: number,
+  endMs: number,
+): Promise<string[]> {
+  if (!(endMs > startMs)) return []
+  try {
+    const r = getRedis()
+    const members = await r.zrange<string[]>(TIMELINE_KEY, startMs, endMs - 1, { byScore: true })
+    return Array.from(new Set(members ?? []))
+  } catch {
+    return []
+  }
+}
+
 export async function backfillRescoreTimeline(
   slugRescoreAt: { slug: string; rescoreAt: string }[],
 ): Promise<number> {

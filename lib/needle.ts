@@ -1,11 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getRedis } from '@/lib/redis'
-import { getSlugsRescoredSince } from '@/lib/scoreHistory'
+import { getSlugsRescoredBetween } from '@/lib/scoreHistory'
 import { getRescoreSummaries, type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
 import { REPOS } from '@/lib/scores'
 import { stripMarkdown } from '@/lib/textCleanup'
 import { normieVoiceGuidance } from '@/lib/normieVoice'
-import { dateKeyEastern, editionReadKeys } from '@/lib/buildBrief'
+import {
+  dateKeyMountain,
+  editionReadKeys,
+  mountainDateKeyBoundsMs,
+} from '@/lib/buildBrief'
 import { indexArchiveDate, NEEDLE_DATES_INDEX_KEY } from '@/lib/archiveIndex'
 
 const NEEDLE_KEY_PREFIX = 'build-report:needle:'
@@ -119,7 +123,7 @@ ${normieVoiceGuidance('needle')}
 }
 
 export type GenerateNeedleOptions = {
-  /** Defaults to today Eastern — use yesterdayEasternDateKey() from daily-digest cron for brief sync. */
+  /** Defaults to today Mountain — use yesterdayMountainDateKey() from daily-digest cron for brief sync. */
   dateKey?: string
 }
 
@@ -127,15 +131,21 @@ export async function generateAndCacheNeedle(
   options: GenerateNeedleOptions = {},
 ): Promise<NeedleData | null> {
   const redis = getRedis()
-  const since = Date.now() - 24 * 3600 * 1000
-  const slugs = await getSlugsRescoredSince(since)
+  const dateKey = options.dateKey ?? dateKeyMountain()
+  const { startMs, endMs } = mountainDateKeyBoundsMs(dateKey)
+  const slugs = await getSlugsRescoredBetween(startMs, endMs)
   if (!slugs.length) return null
 
   const summaries = await getRescoreSummaries(slugs)
   const nameBySlug = new Map(REPOS.map(r => [r.githubSlug, r.name]))
 
   const qualifying: QualifyingMove[] = Object.entries(summaries)
-    .filter(([, meta]) => qualifyingChange(meta))
+    .filter(([, meta]) => {
+      if (!qualifyingChange(meta)) return false
+      const at = Date.parse(meta.rescoreAt)
+      if (!Number.isFinite(at)) return false
+      return at >= startMs && at < endMs && dateKeyMountain(new Date(at)) === dateKey
+    })
     .map(([slug, meta]) => ({
       name: nameBySlug.get(slug) ?? slug,
       biOld: meta.oldBuilderIntegrity,
@@ -153,7 +163,6 @@ export async function generateAndCacheNeedle(
   const text = ai?.text ?? fallback.text
   const textNormie = ai?.textNormie ?? fallback.textNormie
 
-  const dateKey = options.dateKey ?? dateKeyEastern()
   const data: NeedleData = {
     text,
     textNormie,
@@ -179,7 +188,7 @@ async function readCachedNeedle(dateKey: string): Promise<NeedleData | null> {
   return redis.get<NeedleData>(needleRedisKey(dateKey))
 }
 
-/** Public read for Archives — one Eastern calendar edition. */
+/** Public read for Archives — one Mountain calendar edition. */
 export async function getCachedNeedleForDate(dateKey: string): Promise<NeedleData | null> {
   try {
     return await readCachedNeedle(dateKey)

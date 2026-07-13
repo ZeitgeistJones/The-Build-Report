@@ -31,7 +31,8 @@ import { isConsumerEconomicScored } from '@/lib/economicGrade'
 const DIGEST_KEY_PREFIX = 'build-report:daily-digest:'
 const BRIEF_KEY_PREFIX = 'build-report:build-brief:'
 const DIGEST_TTL_SEC = 90 * 24 * 3600
-const EASTERN_TZ = 'America/New_York'
+/** Edition calendar for Yesterday's Build + Needle (clawdbotatg / MDT–MST). */
+export const EDITION_TZ = 'America/Denver'
 
 export interface RepoBuildActivity {
   slug: string
@@ -86,36 +87,75 @@ export interface BuildBriefData {
   generatedAt: string | null
 }
 
-export function dateKeyEastern(d = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: EASTERN_TZ }).format(d)
+export function dateKeyMountain(d = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: EDITION_TZ }).format(d)
 }
 
-/** Eastern calendar date for the day before `now` (the day we summarize for morning visitors). */
-export function yesterdayEasternDateKey(now = new Date()): string {
-  const todayKey = dateKeyEastern(now)
+/** Mountain calendar date for the day before `now` (the day we summarize for morning visitors). */
+export function yesterdayMountainDateKey(now = new Date()): string {
+  const todayKey = dateKeyMountain(now)
   const [y, m, d] = todayKey.split('-').map(Number)
   if (!y || !m || !d) {
-    return dateKeyEastern(new Date(now.getTime() - 24 * 3600000))
+    return dateKeyMountain(new Date(now.getTime() - 24 * 3600000))
   }
-  // Subtract one calendar day from the Eastern YYYY-MM-DD — do not use a fixed
+  // Subtract one calendar day from the Mountain YYYY-MM-DD — do not use a fixed
   // hour offset (e.g. -25h), which skips yesterday in the first hours after midnight.
   const prior = new Date(Date.UTC(y, m - 1, d))
   prior.setUTCDate(prior.getUTCDate() - 1)
   return prior.toISOString().slice(0, 10)
 }
 
+/**
+ * UTC ms range [startMs, endMs) for a Mountain calendar YYYY-MM-DD
+ * (midnight → next midnight America/Denver).
+ */
+export function mountainDateKeyBoundsMs(dateKey: string): { startMs: number; endMs: number } {
+  const anchor = Date.parse(`${dateKey}T12:00:00.000Z`)
+  if (!Number.isFinite(anchor)) {
+    const now = Date.now()
+    return { startMs: now, endMs: now }
+  }
+  // Search ±18h around UTC noon of that calendar date for Mountain midnight boundaries.
+  const lo = anchor - 18 * 3600000
+  const hi = anchor + 18 * 3600000
+  let startMs = lo
+  for (let t = lo; t <= hi; t += 60000) {
+    if (dateKeyMountain(new Date(t)) === dateKey) {
+      startMs = t
+      break
+    }
+  }
+  while (startMs > lo && dateKeyMountain(new Date(startMs - 1000)) === dateKey) {
+    startMs -= 1000
+  }
+  let endMs = startMs + 24 * 3600000
+  for (let t = startMs + 3600000; t <= hi + 24 * 3600000; t += 60000) {
+    if (dateKeyMountain(new Date(t)) !== dateKey) {
+      endMs = t
+      break
+    }
+  }
+  while (endMs > startMs && dateKeyMountain(new Date(endMs - 1000)) !== dateKey) {
+    endMs -= 1000
+  }
+  while (dateKeyMountain(new Date(endMs)) === dateKey) {
+    endMs += 1000
+  }
+  return { startMs, endMs }
+}
+
 /** Keys for reading cached build-brief editions (matches daily-digest cron). */
 export function buildBriefEditionKeys(now = new Date()): string[] {
   const keys = [
-    yesterdayEasternDateKey(now),
-    yesterdayEasternDateKey(new Date(now.getTime() - 86400000)),
+    yesterdayMountainDateKey(now),
+    yesterdayMountainDateKey(new Date(now.getTime() - 86400000)),
   ]
   return [...new Set(keys)]
 }
 
 /** Keys for reading cached homepage articles — brief edition plus today's live needle. */
 export function editionReadKeys(now = new Date()): string[] {
-  const keys = [dateKeyEastern(now), ...buildBriefEditionKeys(now)]
+  const keys = [dateKeyMountain(now), ...buildBriefEditionKeys(now)]
   return [...new Set(keys)]
 }
 
@@ -127,25 +167,25 @@ function briefRedisKey(dateKey: string): string {
   return `${BRIEF_KEY_PREFIX}${dateKey}`
 }
 
-function commitOnEasternDate(isoDate: string, easternDateKey: string): boolean {
-  return dateKeyEastern(new Date(isoDate)) === easternDateKey
+function commitOnMountainDate(isoDate: string, mountainDateKey: string): boolean {
+  return dateKeyMountain(new Date(isoDate)) === mountainDateKey
 }
 
-export function collectBuildActivityForEasternDay(
+export function collectBuildActivityForMountainDay(
   stats: GitHubStats,
   repos: Repo[],
-  easternDateKey: string,
+  mountainDateKey: string,
 ): RepoBuildActivity[] {
   const tagBySlug = new Map(repos.map(r => [r.githubSlug, getEffectiveTag(r)]))
   const out: RepoBuildActivity[] = []
 
   for (const [slug, activity] of Object.entries(stats.repoActivity)) {
     const fromRecent =
-      activity.recentCommits?.filter(c => commitOnEasternDate(c.date, easternDateKey)) ?? []
+      activity.recentCommits?.filter(c => commitOnMountainDate(c.date, mountainDateKey)) ?? []
     let commits: string[] = fromRecent.map(c => c.message)
 
     if (!commits.length && activity.commitTimestamps?.length) {
-      const onDay = activity.commitTimestamps.filter(ts => commitOnEasternDate(ts, easternDateKey))
+      const onDay = activity.commitTimestamps.filter(ts => commitOnMountainDate(ts, mountainDateKey))
       if (onDay.length) {
         commits = onDay.map(() => 'Commit activity recorded')
       }
@@ -231,7 +271,7 @@ function buildFallbackDigest(
   stats: GitHubStats,
   repos: Repo[],
   activity: RepoBuildActivity[],
-  easternDateKey: string,
+  mountainDateKey: string,
 ): Omit<DailyDigestCache, 'generatedAt'> {
   const periods: Period[] = ['24h', '7d', '30d', '60d']
   const cards = {} as DailyDigestCards
@@ -257,7 +297,7 @@ function buildFallbackDigest(
       .map(a => `${a.slug} (${a.commits.length} commit${a.commits.length === 1 ? '' : 's'})`)
       .join(', ')
     const extra = activity.length > 5 ? ` and ${activity.length - 5} more repos` : ''
-    general = `On ${easternDateKey}, work landed on ${names}${extra}. `
+    general = `On ${mountainDateKey}, work landed on ${names}${extra}. `
     const burnCount = activity.filter(a => !hasShippingLeverageTag(a.tag as Repo['tag'])).length
     const leverageCount = activity.length - burnCount
     if (burnCount && leverageCount) {
@@ -270,7 +310,7 @@ function buildFallbackDigest(
   return {
     general,
     cards,
-    dateKey: easternDateKey,
+    dateKey: mountainDateKey,
     repoCount: activity.length,
     commitCount: activity.reduce((n, a) => n + a.commits.length, 0),
   }
@@ -303,17 +343,17 @@ function parseDigestJson(raw: string): DigestAiPayload | null {
 async function generateDigestWithAi(
   activity: RepoBuildActivity[],
   gradeContext: string,
-  easternDateKey: string,
+  mountainDateKey: string,
 ): Promise<DigestAiPayload | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const prompt = `You write copy for The Build Report — an independent dashboard that tracks clawdbotatg's GitHub repos for $CLAWD holders.
 
-Summarize ${easternDateKey} (America/New_York calendar day).
+Summarize ${mountainDateKey} (America/Denver / Mountain calendar day, midnight to midnight).
 
 COMMITS THAT DAY (sampled active repos only — do not invent repos or work):
-${formatActivityForPrompt(activity, easternDateKey)}
+${formatActivityForPrompt(activity, mountainDateKey)}
 
 CURRENT GRADES (use for context; card copy should match the period label):
 ${gradeContext}
@@ -431,34 +471,35 @@ export async function cacheDailyDigest(dateKey: string, payload: DailyDigestCach
 export async function generateAndCacheDailyDigest(
   stats: GitHubStats,
   repos: Repo[],
-  easternDateKey = yesterdayEasternDateKey(),
+  mountainDateKey = yesterdayMountainDateKey(),
 ): Promise<DailyDigestCache> {
-  const activity = collectBuildActivityForEasternDay(stats, repos, easternDateKey)
+  const activity = collectBuildActivityForMountainDay(stats, repos, mountainDateKey)
   const commitCount = activity.reduce((n, a) => n + a.commits.length, 0)
   const gradeContext = formatGradeContext(stats, repos)
 
-  const ai = await generateDigestWithAi(activity, gradeContext, easternDateKey)
-  const fallback = buildFallbackDigest(stats, repos, activity, easternDateKey)
+  const ai = await generateDigestWithAi(activity, gradeContext, mountainDateKey)
+  const fallback = buildFallbackDigest(stats, repos, activity, mountainDateKey)
 
   const payload: DailyDigestCache = {
     general: ai?.general ?? fallback.general,
     ...(ai?.generalNormie ? { generalNormie: ai.generalNormie } : {}),
     cards: ai?.cards ?? fallback.cards,
-    dateKey: easternDateKey,
+    dateKey: mountainDateKey,
     repoCount: activity.length,
     commitCount,
     generatedAt: new Date().toISOString(),
   }
 
-  await cacheDailyDigest(easternDateKey, payload)
+  await cacheDailyDigest(mountainDateKey, payload)
   return payload
 }
 
 export async function generateAndCacheBuildBrief(
   stats: GitHubStats,
   repos: Repo[],
+  mountainDateKey = yesterdayMountainDateKey(),
 ): Promise<{ text: string; repoCount: number; commitCount: number; generatedAt: string }> {
-  const digest = await generateAndCacheDailyDigest(stats, repos)
+  const digest = await generateAndCacheDailyDigest(stats, repos, mountainDateKey)
   return {
     text: digest.general,
     repoCount: digest.repoCount,
@@ -479,7 +520,7 @@ async function readCachedDigest(dateKey: string): Promise<DailyDigestCache | nul
   }
 }
 
-/** Public read for Archives — one Eastern calendar edition. */
+/** Public read for Archives — one Mountain calendar edition. */
 export async function getCachedDigestForDate(dateKey: string): Promise<DailyDigestCache | null> {
   return readCachedDigest(dateKey)
 }

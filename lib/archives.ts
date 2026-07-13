@@ -1,7 +1,7 @@
 import {
   BRIEF_DATES_INDEX_KEY,
   NEEDLE_DATES_INDEX_KEY,
-  easternDateKeyDaysAgo,
+  mountainDateKeyDaysAgo,
   indexArchiveDate,
   listIndexedDateKeys,
 } from '@/lib/archiveIndex'
@@ -50,7 +50,7 @@ function sinceIsoForPeriod(period: ArchivePeriod): string {
 }
 
 function sinceDateKeyForPeriod(period: ArchivePeriod): string {
-  return easternDateKeyDaysAgo(periodToDays(period))
+  return mountainDateKeyDaysAgo(periodToDays(period))
 }
 
 function digestToBrief(digest: DailyDigestCache): BuildBriefData {
@@ -95,7 +95,7 @@ async function loadNeedleItems(sinceDateKey: string): Promise<ArchiveFeedItem[]>
   const indexed = await listIndexedDateKeys(NEEDLE_DATES_INDEX_KEY, sinceDateKey)
   // Bootstrap: today + brief edition keys often hold needle editions too
   const bootstrap = [
-    easternDateKeyDaysAgo(0),
+    mountainDateKeyDaysAgo(0),
     ...buildBriefEditionKeys(),
   ].filter(k => k >= sinceDateKey)
   const dateKeys = [...new Set([...indexed, ...bootstrap])].sort((a, b) => b.localeCompare(a))

@@ -991,7 +991,7 @@ export default function AdminPage() {
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Build brief</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Daily AI summary of what got worked on in the last 24h (sampled repos). Regenerates automatically after the daily autoscore cron; use this to refresh immediately after a GitHub scan.
+              Daily AI summary of commits on the previous Mountain calendar day (midnight–midnight America/Denver). Regenerates automatically overnight Mountain; use this to refresh immediately after a GitHub scan.
             </p>
           </div>
           <button
@@ -1031,7 +1031,7 @@ export default function AdminPage() {
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>The Needle</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Short daily column on rescore movement. Regenerates automatically at 5:10am ET; use this to refresh immediately after testing a rescore.
+              Short daily column on rescore movement for the previous Mountain calendar day. Regenerates automatically overnight Mountain (~1am MDT / midnight MST); use this to refresh immediately after testing a rescore.
             </p>
           </div>
           <button

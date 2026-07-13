@@ -6,10 +6,10 @@ export const ARCHIVE_TTL_SEC = 90 * 24 * 3600
 export const BRIEF_DATES_INDEX_KEY = 'build-report:archive:brief-dates'
 export const NEEDLE_DATES_INDEX_KEY = 'build-report:archive:needle-dates'
 
-const EASTERN_TZ = 'America/New_York'
+const EDITION_TZ = 'America/Denver'
 
-function dateKeyEastern(d = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: EASTERN_TZ }).format(d)
+function dateKeyMountain(d = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: EDITION_TZ }).format(d)
 }
 
 /** YYYY-MM-DD → sortable integer score (e.g. 20260709). */
@@ -24,9 +24,9 @@ export function scoreToDateKey(score: number): string {
   return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`
 }
 
-/** Eastern calendar dateKey for `days` ago from `now`. */
-export function easternDateKeyDaysAgo(days: number, now = new Date()): string {
-  const today = dateKeyEastern(now)
+/** Mountain calendar dateKey for `days` ago from `now`. */
+export function mountainDateKeyDaysAgo(days: number, now = new Date()): string {
+  const today = dateKeyMountain(now)
   const [y, m, d] = today.split('-').map(Number)
   if (!y || !m || !d) return today
   const prior = new Date(Date.UTC(y, m - 1, d))
@@ -43,7 +43,7 @@ export async function indexArchiveDate(
     const r = getRedis()
     const score = dateKeyToScore(dateKey)
     if (!score) return
-    const cutoff = dateKeyToScore(easternDateKeyDaysAgo(90))
+    const cutoff = dateKeyToScore(mountainDateKeyDaysAgo(90))
     await Promise.all([
       r.zadd(indexKey, { score, member: dateKey }),
       cutoff > 0 ? r.zremrangebyscore(indexKey, 0, cutoff - 1) : Promise.resolve(0),
