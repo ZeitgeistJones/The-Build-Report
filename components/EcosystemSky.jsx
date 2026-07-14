@@ -343,9 +343,6 @@ export default function EcosystemSky() {
   }, [touring, tourIndex]);
 
   const startTour = () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'post-fix',hypothesisId:'B',location:'EcosystemSky.jsx:startTour',message:'Chronicle startTour called',data:{firstStop:TOUR_STOPS[0].repo,w:typeof window!=='undefined'?window.innerWidth:null,gateVersion:'v3-tourTarget'},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     setSelected(null);
     setInspecting(null);
     setTouring(true);
@@ -465,12 +462,6 @@ export default function EcosystemSky() {
   const inspectingRepo = inspecting ? positioned.find((r) => r.n === inspecting) : null;
   // Highlight + connection focus: tour uses tourTarget so detail panel (selected) stays closed
   const focus = touring ? tourTarget : selected;
-  // #region agent log
-  {
-    const showDetailPanel = !!selectedRepo;
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'post-fix',hypothesisId:'A-B-C-D-E',location:'EcosystemSky.jsx:render-gate',message:'detail panel render gate',data:{gateVersion:'v3-tourTarget',touring,selected,tourTarget,focus,hasSelectedRepo:!!selectedRepo,showDetailPanel,inspecting,isMobile,dimW:dimensions.w,winW:typeof window!=='undefined'?window.innerWidth:null,href:typeof window!=='undefined'?window.location.href:null},timestamp:Date.now()})}).catch(()=>{});
-  }
-  // #endregion
   const searchActive = q.length > 0;
 
   const activeConns = focus
@@ -507,12 +498,6 @@ export default function EcosystemSky() {
   }, [touring, activeConns, tourChainConns]);
 
   const connectedNames = new Set(displayConns.flatMap((c) => [c.a, c.b]));
-  // #region agent log
-  {
-    const focusInRepos = focus ? repos.some((r) => r.n === focus) : false;
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'conn-debug',hypothesisId:'H-I-J-K',location:'EcosystemSky.jsx:conn-state',message:'chronicle connection state',data:{touring,focus,focusInRepos,activeConns:activeConns.length,tourChain:tourChainConns.length,displayConns:displayConns.length,dimW:dimensions.w,dimH:dimensions.h},timestamp:Date.now()})}).catch(()=>{});
-  }
-  // #endregion
 
   // Spring-physics camera — pure ambient idle drift now (selecting a star no
   // longer moves the camera; that's reserved for the Inspect view instead)
@@ -690,18 +675,22 @@ export default function EcosystemSky() {
         style={{
           position: "absolute",
           top: 22,
-          left: 22,
+          left: 16,
           zIndex: 25,
-          fontSize: 11,
+          fontSize: isMobile ? 12 : 11,
           color: "rgba(94,234,212,0.4)",
           textDecoration: "none",
           letterSpacing: 0.5,
           transition: "color 0.2s",
+          maxWidth: isMobile ? 72 : "none",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(94,234,212,0.85)")}
         onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(94,234,212,0.4)")}
       >
-        ← The Build Report
+        {isMobile ? "← Home" : "← The Build Report"}
       </a>
 
       {/* Title + search/tour */}
@@ -709,18 +698,28 @@ export default function EcosystemSky() {
         style={{
           position: "absolute",
           top: 22,
-          left: 0,
-          right: 0,
+          left: isMobile ? 78 : 0,
+          right: isMobile ? 96 : 0,
           textAlign: "center",
           zIndex: 20,
           pointerEvents: "none",
         }}
       >
-        <div style={{ fontSize: 10, letterSpacing: 5, color: "rgba(94,234,212,0.5)", textTransform: "uppercase", marginBottom: 5, fontWeight: 500 }}>
-          The CLAWD Ecosystem
-        </div>
-        <div style={{ fontSize: isMobile ? 18 : 24, fontWeight: 200, color: "rgba(255,255,255,0.85)", letterSpacing: 1.5 }}>
-          {repos.length} Repos, One Autonomous Builder
+        {!touring && (
+          <div style={{ fontSize: 10, letterSpacing: isMobile ? 2 : 5, color: "rgba(94,234,212,0.5)", textTransform: "uppercase", marginBottom: 5, fontWeight: 500 }}>
+            The CLAWD Ecosystem
+          </div>
+        )}
+        <div style={{
+          fontSize: isMobile ? (touring ? 14 : 16) : 24,
+          fontWeight: 200,
+          color: "rgba(255,255,255,0.85)",
+          letterSpacing: isMobile ? 0.5 : 1.5,
+          lineHeight: 1.25,
+        }}>
+          {touring && isMobile
+            ? "Chronicle"
+            : `${repos.length} Repos, One Autonomous Builder`}
         </div>
         <div
           onClick={(e) => e.stopPropagation()}
@@ -732,12 +731,12 @@ export default function EcosystemSky() {
                 style={{
                   fontFamily: "Georgia, 'Times New Roman', serif",
                   fontStyle: "italic",
-                  fontSize: isMobile ? 13 : 15,
+                  fontSize: isMobile ? 12 : 15,
                   color: "rgba(240, 220, 180, 0.85)",
                   letterSpacing: 0.3,
                   textAlign: "center",
-                  maxWidth: 480,
-                  padding: "0 20px",
+                  maxWidth: isMobile ? "100%" : 480,
+                  padding: isMobile ? "0 4px" : "0 20px",
                   minHeight: 22,
                   textShadow: "0 0 12px rgba(0,0,0,0.7)",
                 }}
@@ -947,19 +946,24 @@ export default function EcosystemSky() {
             if (!rA || !rB) return null;
             const posA = getPos(rA);
             const posB = getPos(rB);
-            const meta = CAT_META[rA.n === focus ? rA.c : rB.c];
+            const meta = CAT_META[rA.n === focus ? rA.c : rB.c] || CAT_META.misc;
             const midX = (posA.x + posB.x) / 2;
             const midY = (posA.y + posB.y) / 2;
             const isChain = !!conn.tourChain;
             const touchesFocus = conn.a === focus || conn.b === focus;
-            const stroke = isChain ? "rgba(240, 220, 180, 0.85)" : meta.core;
-            const width = isChain ? (touchesFocus ? 2.4 : 1.4) : (touring ? 1.8 : 1.2);
-            const opacity = isChain ? (touchesFocus ? 0.9 : 0.35) : (touring ? 0.75 : 0.45);
+            // Match category colors — no cream/white tour strokes
+            const stroke = meta.core;
+            const width = isChain
+              ? (touchesFocus ? 2.2 : 1.2)
+              : (touring ? 1.8 : 1.2);
+            const opacity = isChain
+              ? (touchesFocus ? 0.85 : 0.28)
+              : (touring ? 0.7 : 0.45);
             return (
               <g key={`${conn.a}|${conn.b}|${i}`}>
                 <line x1={posA.x} y1={posA.y} x2={posB.x} y2={posB.y}
                   stroke={stroke} strokeWidth={width} opacity={opacity} filter="url(#conn-glow)" />
-                {(touchesFocus || !isChain) && [0, 0.33, 0.66].map((offset) => {
+                {touchesFocus && [0, 0.33, 0.66].map((offset) => {
                   const speed = 0.35;
                   const t = ((time * speed + offset + i * 0.17) % 1);
                   const goingFromSel = conn.a === focus;
@@ -973,16 +977,19 @@ export default function EcosystemSky() {
                       key={`p-${offset}`}
                       cx={px}
                       cy={py}
-                      r={touring ? 2.4 : 1.6}
-                      fill={isChain ? "rgba(240, 220, 180, 1)" : meta.core}
+                      r={touring ? 2.2 : 1.6}
+                      fill={meta.core}
                       opacity={op}
                       filter="url(#conn-glow)"
                     />
                   );
                 })}
-                {(!isMobile || touring) && !!conn.label && (
-                  <text x={midX} y={midY - 8} fill={meta.core} fontSize={isMobile ? 9 : 8.5}
-                    textAnchor="middle" opacity={0.7} fontFamily="inherit">
+                {/* Edge labels: desktop only, and only for the focused star — never during
+                    mobile tour (family edges like "slop.computer" stack into illegible piles). */}
+                {!isMobile && !isChain && touchesFocus && !!conn.label && (
+                  <text x={midX} y={midY - 8} fill={meta.core} fontSize={8.5}
+                    textAnchor="middle" opacity={0.65} fontFamily="inherit"
+                    style={{ paintOrder: "stroke", stroke: "rgba(3,8,16,0.85)", strokeWidth: 3 }}>
                     {conn.label}
                   </text>
                 )}
@@ -1110,9 +1117,8 @@ export default function EcosystemSky() {
               background: meta.core,
               boxShadow: `0 0 ${size * 0.6 * (0.6 + glowIntensity * 0.6)}px ${meta.glow}`,
             }} />
-            {/* Persistent label for major repos — visible without hovering, so the
-                heavy hitters read as a named constellation at a glance */}
-            {isMajor && !isHovered && !isSel && !dimmed && (
+            {/* Persistent label for major repos — skip during Chronicle (clutter) */}
+            {isMajor && !isHovered && !isSel && !dimmed && !touring && (
               <div style={{
                 position: "absolute",
                 top: size + 3,
