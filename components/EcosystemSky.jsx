@@ -476,7 +476,43 @@ export default function EcosystemSky() {
   const activeConns = focus
     ? connections.filter((c) => c.a === focus || c.b === focus)
     : [];
-  const connectedNames = new Set(activeConns.flatMap((c) => [c.a, c.b]));
+  // During Chronicle, also draw the ordered tour path so every stop has visible
+  // constellation lines (many stops only have 0–1 explicit edges).
+  const tourChainConns = useMemo(() => {
+    if (!touring) return [];
+    const nameSet = new Set(repos.map((r) => r.n));
+    const out = [];
+    for (let i = 0; i < TOUR_STOPS.length - 1; i++) {
+      const a = TOUR_STOPS[i].repo;
+      const b = TOUR_STOPS[i + 1].repo;
+      if (nameSet.has(a) && nameSet.has(b)) {
+        out.push({ a, b, label: "", tourChain: true });
+      }
+    }
+    return out;
+  }, [touring, repos]);
+
+  const displayConns = useMemo(() => {
+    if (!touring) return activeConns;
+    const keys = new Set(activeConns.map((c) => [c.a, c.b].sort().join("|")));
+    const merged = [...activeConns];
+    tourChainConns.forEach((c) => {
+      const k = [c.a, c.b].sort().join("|");
+      if (!keys.has(k)) {
+        keys.add(k);
+        merged.push(c);
+      }
+    });
+    return merged;
+  }, [touring, activeConns, tourChainConns]);
+
+  const connectedNames = new Set(displayConns.flatMap((c) => [c.a, c.b]));
+  // #region agent log
+  {
+    const focusInRepos = focus ? repos.some((r) => r.n === focus) : false;
+    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'conn-debug',hypothesisId:'H-I-J-K',location:'EcosystemSky.jsx:conn-state',message:'chronicle connection state',data:{touring,focus,focusInRepos,activeConns:activeConns.length,tourChain:tourChainConns.length,displayConns:displayConns.length,dimW:dimensions.w,dimH:dimensions.h},timestamp:Date.now()})}).catch(()=>{});
+  }
+  // #endregion
 
   // Spring-physics camera — pure ambient idle drift now (selecting a star no
   // longer moves the camera; that's reserved for the Inspect view instead)
@@ -896,7 +932,7 @@ export default function EcosystemSky() {
       </svg>
 
       {/* Connection lines */}
-      {focus && activeConns.length > 0 && (
+      {focus && displayConns.length > 0 && (
         <svg width={dimensions.w} height={dimensions.h}
           style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none", zIndex: 8 }}>
           <defs>
@@ -905,7 +941,7 @@ export default function EcosystemSky() {
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
-          {activeConns.map((conn, i) => {
+          {displayConns.map((conn, i) => {
             const rA = positioned.find((p) => p.n === conn.a);
             const rB = positioned.find((p) => p.n === conn.b);
             if (!rA || !rB) return null;
@@ -914,35 +950,37 @@ export default function EcosystemSky() {
             const meta = CAT_META[rA.n === focus ? rA.c : rB.c];
             const midX = (posA.x + posB.x) / 2;
             const midY = (posA.y + posB.y) / 2;
+            const isChain = !!conn.tourChain;
+            const touchesFocus = conn.a === focus || conn.b === focus;
+            const stroke = isChain ? "rgba(240, 220, 180, 0.85)" : meta.core;
+            const width = isChain ? (touchesFocus ? 2.4 : 1.4) : (touring ? 1.8 : 1.2);
+            const opacity = isChain ? (touchesFocus ? 0.9 : 0.35) : (touring ? 0.75 : 0.45);
             return (
-              <g key={i}>
+              <g key={`${conn.a}|${conn.b}|${i}`}>
                 <line x1={posA.x} y1={posA.y} x2={posB.x} y2={posB.y}
-                  stroke={meta.core} strokeWidth={touring ? 1.8 : 1.2} opacity={touring ? 0.7 : 0.45} filter="url(#conn-glow)" />
-                {/* Flowing particles — data traveling along the connection */}
-                {[0, 0.33, 0.66].map((offset) => {
+                  stroke={stroke} strokeWidth={width} opacity={opacity} filter="url(#conn-glow)" />
+                {(touchesFocus || !isChain) && [0, 0.33, 0.66].map((offset) => {
                   const speed = 0.35;
                   const t = ((time * speed + offset + i * 0.17) % 1);
-                  // Particles travel from A to B (or B to A if selected is B)
                   const goingFromSel = conn.a === focus;
                   const from = goingFromSel ? posA : posB;
                   const to = goingFromSel ? posB : posA;
                   const px = from.x + (to.x - from.x) * t;
                   const py = from.y + (to.y - from.y) * t;
-                  // Fade in/out at endpoints, brightest at midpoint
                   const op = Math.sin(t * Math.PI) * 0.85;
                   return (
                     <circle
                       key={`p-${offset}`}
                       cx={px}
                       cy={py}
-                      r={touring ? 2.2 : 1.6}
-                      fill={meta.core}
+                      r={touring ? 2.4 : 1.6}
+                      fill={isChain ? "rgba(240, 220, 180, 1)" : meta.core}
                       opacity={op}
                       filter="url(#conn-glow)"
                     />
                   );
                 })}
-                {(!isMobile || touring) && (
+                {(!isMobile || touring) && !!conn.label && (
                   <text x={midX} y={midY - 8} fill={meta.core} fontSize={isMobile ? 9 : 8.5}
                     textAnchor="middle" opacity={0.7} fontFamily="inherit">
                     {conn.label}
@@ -967,6 +1005,7 @@ export default function EcosystemSky() {
           (searchActive && !searchMatch) ||
           (!searchActive && hoveredCat && !catHighlighted) ||
           (focus && !isSel && !isConnected);
+        const dimOpacity = touring ? 0.3 : 0.12;
 
         const score = sizeScore(r);
         const zoom = cameraRef.current.zoom;
@@ -1010,7 +1049,7 @@ export default function EcosystemSky() {
               height: size,
               cursor: "pointer",
               zIndex: isSel ? 30 : isHovered ? 15 : 5,
-              opacity: dimmed ? 0.12 : 1,
+              opacity: dimmed ? dimOpacity : 1,
               transition: "opacity 0.3s ease",
             }}
           >
