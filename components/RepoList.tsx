@@ -726,9 +726,11 @@ export default function RepoList({
     const c = repoCommitsForPeriodKey(r, repoPeriod)
     return c != null && c > 0
   })
+  // Period "Active" scope applies to Needs rescore too — otherwise that filter
+  // ignores 24h/7d/30d/60d and lists stale repos that only need a rescore someday.
+  // New arrivals / recently rescored already apply period inside repoMatchesFilter.
   const skipActiveScope =
     isSearching ||
-    activeFilter === 'needs-rescore' ||
     activeFilter === 'new-arrivals' ||
     activeFilter === 'recently-rescored'
   const filtered = (activityScope === 'active' && !skipActiveScope ? activeInPeriod : tagFiltered)
