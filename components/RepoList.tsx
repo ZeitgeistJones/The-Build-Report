@@ -603,9 +603,9 @@ export default function RepoList({
   contextSummary = {},
   filterControl = null,
 }: Props) {
-  const [activeFilter, setActiveFilter] = useState<RepoFilter>('needs-rescore')
+  const [activeFilter, setActiveFilter] = useState<RepoFilter>('all')
   const [activityScope, setActivityScope] = useState<ActivityScope>('active')
-  const [sortBy, setSortBy] = useState<RepoSort>('needs-rescore')
+  const [sortBy, setSortBy] = useState<RepoSort>('recent')
   const [repoPeriod, setRepoPeriod] = useState<Period>('24h')
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())

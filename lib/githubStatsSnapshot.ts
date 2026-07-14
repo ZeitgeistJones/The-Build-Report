@@ -38,13 +38,25 @@ function normalizeStats(raw: unknown): GitHubStats | null {
 /** Materially smaller than last good = likely a partial/failed scan, not a real shrink. */
 const MIN_TRACKABLE_RETENTION = 0.8
 
+/** Rate-limit mid-scan often keeps a full repo list but almost no scanned activity. */
+function isUnusableActivityScan(stats: GitHubStats): boolean {
+  if (stats.rateLimited) return true
+  const trackable = stats.trackableRepos?.length ?? 0
+  if (trackable < 20) return false
+  const activities = Object.values(stats.repoActivity ?? {})
+  const scanned = activities.filter((a) => a.commitsScanned).length
+  return scanned < Math.floor(trackable * 0.3)
+}
+
 /**
  * Write path — call after getGitHubStats({ fresh: true }) in cron/admin/live fallback.
  * Never overwrites an existing good snapshot with a rate-limited or partial one; on skip
  * it keeps the last good snapshot and returns that snapshot's updatedAt.
+ * Never writes a rate-limited/thin scan as the first snapshot either.
  */
 export async function syncGitHubStatsSnapshot(stats: GitHubStats): Promise<string> {
   const r = getRedis()
+  const unusable = isUnusableActivityScan(stats)
 
   const existing = await getGitHubStatsForDisplay()
   if (existing) {
@@ -53,14 +65,25 @@ export async function syncGitHubStatsSnapshot(stats: GitHubStats): Promise<strin
     const materiallySmaller =
       existingCount > 0 && incomingCount < existingCount * MIN_TRACKABLE_RETENTION
 
-    if (stats.rateLimited || materiallySmaller) {
+    if (unusable || materiallySmaller) {
       const reason = stats.rateLimited
         ? 'rate-limited scan'
-        : `fewer trackable repos (${incomingCount} < ${existingCount})`
+        : unusable
+          ? 'thin activity scan'
+          : `fewer trackable repos (${incomingCount} < ${existingCount})`
       console.warn(`[github-snapshot] skipping overwrite (${reason}); keeping last good snapshot`)
+      // #region agent log
+      fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'B',location:'githubStatsSnapshot.ts:sync',message:'skip overwrite',data:{reason,rateLimited:!!stats.rateLimited,unusable,materiallySmaller,incomingCount,existingCount,scanned:Object.values(stats.repoActivity??{}).filter(a=>a.commitsScanned).length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       const existingUpdatedAt = await getGitHubStatsSnapshotUpdatedAt()
       return existingUpdatedAt ?? new Date().toISOString()
     }
+  } else if (unusable) {
+    console.warn('[github-snapshot] refusing to seed Redis with unusable/rate-limited scan')
+    // #region agent log
+    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'B',location:'githubStatsSnapshot.ts:sync',message:'refuse seed unusable scan',data:{rateLimited:!!stats.rateLimited,trackable:stats.trackableRepos?.length??0,scanned:Object.values(stats.repoActivity??{}).filter(a=>a.commitsScanned).length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return new Date().toISOString()
   }
 
   const updatedAt = new Date().toISOString()
@@ -161,11 +184,36 @@ async function snapshotNeedsLiveRefresh(
   }
 }
 
-async function refreshGitHubStatsSnapshot(): Promise<GitHubStats | null> {
+async function refreshGitHubStatsSnapshot(): Promise<{
+  stats: GitHubStats
+  usedSnapshotFallback: boolean
+}> {
   const fresh = await getGitHubStats({ fresh: true })
   const enriched = enrichGitHubStatsPeriodCounts(fresh)
   await syncGitHubStatsSnapshot(enriched)
-  return enriched
+
+  // Prefer last good snapshot whenever the fresh scan is unusable for grades.
+  const existing = await getGitHubStatsForDisplay()
+  const existingCount = existing?.trackableRepos?.length ?? 0
+  const incomingCount = enriched.trackableRepos?.length ?? 0
+  const materiallySmaller =
+    existingCount > 0 && incomingCount < existingCount * MIN_TRACKABLE_RETENTION
+  const unusable = isUnusableActivityScan(enriched)
+
+  if ((unusable || materiallySmaller) && existing) {
+    // #region agent log
+    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'A',location:'githubStatsSnapshot.ts:refresh',message:'rejected partial live scan; using snapshot',data:{rateLimited:enriched.rateLimited,unusable,materiallySmaller,incomingCount,existingCount,scanned:Object.values(enriched.repoActivity??{}).filter(a=>a.commitsScanned).length,totalCommits30d:enriched.totalCommits30d,snapshotCommits30d:existing.totalCommits30d},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+    return {
+      stats: enrichGitHubStatsPeriodCounts(existing),
+      usedSnapshotFallback: true,
+    }
+  }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'A',location:'githubStatsSnapshot.ts:refresh',message:'using fresh scan',data:{rateLimited:enriched.rateLimited,unusable,incomingCount,totalCommits30d:enriched.totalCommits30d},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  return { stats: enriched, usedSnapshotFallback: false }
 }
 
 /**
@@ -198,8 +246,14 @@ export async function loadGitHubStatsForPage(): Promise<{
 
     if (needsRefresh) {
       try {
-        const refreshed = await refreshGitHubStatsSnapshot()
-        return { stats: refreshed, source: 'live' }
+        const { stats: refreshed, usedSnapshotFallback } = await refreshGitHubStatsSnapshot()
+        // #region agent log
+        fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'A',location:'githubStatsSnapshot.ts:loadForPage',message:'page refresh result',data:{usedSnapshotFallback,source:usedSnapshotFallback?'snapshot':'live',totalCommits30d:refreshed.totalCommits30d,trackable:refreshed.trackableRepos?.length??0},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+        return {
+          stats: refreshed,
+          source: usedSnapshotFallback ? 'snapshot' : 'live',
+        }
       } catch (err) {
         console.error('[github-snapshot] page refresh failed, using cached snapshot', err)
         scheduleStaleSnapshotRefresh()
@@ -216,6 +270,12 @@ export async function loadGitHubStatsForPage(): Promise<{
       await syncGitHubStatsSnapshot(enriched)
     } catch (err) {
       console.error('[github-snapshot] sync after live fetch failed', err)
+    }
+    if (enriched.rateLimited) {
+      const existing = await getGitHubStatsForDisplay()
+      if (existing) {
+        return { stats: enrichGitHubStatsPeriodCounts(existing), source: 'snapshot' }
+      }
     }
     return { stats: enriched, source: 'live' }
   } catch (err) {
@@ -246,7 +306,8 @@ export async function loadGitHubStatsForCron(): Promise<GitHubStats | null> {
   if (cached && !needsRefresh) return enrichGitHubStatsPeriodCounts(cached)
 
   try {
-    return await refreshGitHubStatsSnapshot()
+    const { stats } = await refreshGitHubStatsSnapshot()
+    return stats
   } catch (err) {
     console.error('[github-snapshot] cron refresh failed', err)
     return cached

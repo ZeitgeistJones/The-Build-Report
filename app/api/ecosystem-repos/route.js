@@ -199,8 +199,7 @@ export async function GET() {
     const raw = await fetchAllRepos();
 
     // Homepage owns the GITHUB_TOKEN budget for live commit scans / scores.
-    // Do NOT add per-repo /commits fetches here — that rate-limits the main site.
-    // `k` is GitHub's repo size (KB) as a cheap substance proxy for Night Sky sizing.
+    // Do NOT add per-repo /commits fetches here.
     const repos = raw
       .filter((r) => !r.fork)
       .filter((r) => !r.name.startsWith("leftclaw-service-job"))
@@ -211,7 +210,6 @@ export async function GET() {
         l: r.language || "",
         s: r.stargazers_count,
         f: r.forks_count,
-        k: typeof r.size === "number" ? r.size : 0,
         c: categorize(r.name, r.description, r.language),
         u: r.html_url,
       }));

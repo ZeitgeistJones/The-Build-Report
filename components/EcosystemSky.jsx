@@ -354,28 +354,22 @@ export default function EcosystemSky() {
 
   const connections = useMemo(() => buildConnections(repos), [repos]);
 
-  // Maxes for Night Sky size mix.
-  // k = repo size KB from the list endpoint (substance proxy — no per-repo commit
-  // API calls; those would steal GITHUB_TOKEN quota from the homepage).
-  // Mix: 50% substance / 35% stars / 15% forks
+  // Maxes for Night Sky size — stars + forks only (homepage owns GitHub commit quota)
   const sizeNorm = useMemo(() => {
-    let maxK = 0;
     let maxS = 0;
     let maxF = 0;
     for (const r of repos) {
-      if ((r.k || 0) > maxK) maxK = r.k || 0;
       if ((r.s || 0) > maxS) maxS = r.s || 0;
       if ((r.f || 0) > maxF) maxF = r.f || 0;
     }
-    return { maxK, maxS, maxF };
+    return { maxS, maxF };
   }, [repos]);
 
   const sizeScore = useCallback(
     (r) => {
-      const kNorm = sizeNorm.maxK > 0 ? (r.k || 0) / sizeNorm.maxK : 0;
       const sNorm = sizeNorm.maxS > 0 ? (r.s || 0) / sizeNorm.maxS : 0;
       const fNorm = sizeNorm.maxF > 0 ? (r.f || 0) / sizeNorm.maxF : 0;
-      return 0.5 * kNorm + 0.35 * sNorm + 0.15 * fNorm;
+      return 0.75 * sNorm + 0.25 * fNorm;
     },
     [sizeNorm]
   );
@@ -1019,7 +1013,7 @@ export default function EcosystemSky() {
 
         const score = sizeScore(r);
         const zoom = cameraRef.current.zoom;
-        // 50% repo-size / 35% stars / 15% forks — soft range, hard-capped
+        // 75% stars / 25% forks — soft range, hard-capped
         const baseSize = Math.min(18, 5 + score * 14);
         // Search matches get subtly larger to stand out more
         const searchBoost = searchActive && searchMatch ? 1.25 : 1;
