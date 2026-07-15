@@ -6,6 +6,7 @@ import {
   githubStatsNeedsActivityRescan,
   fetchTrackableRepoPushes,
   snapshotPushesBehindLive,
+  mergePartialGitHubStats,
 } from '@/lib/github'
 
 const SNAPSHOT_KEY = 'build-report:github-stats:snapshot'
@@ -38,9 +39,8 @@ function normalizeStats(raw: unknown): GitHubStats | null {
 /** Materially smaller than last good = likely a partial/failed scan, not a real shrink. */
 const MIN_TRACKABLE_RETENTION = 0.8
 
-/** Rate-limit mid-scan often keeps a full repo list but almost no scanned activity. */
-function isUnusableActivityScan(stats: GitHubStats): boolean {
-  if (stats.rateLimited) return true
+/** Full-list but almost no scanned activity (often rate-limit mid-scan). */
+function isThinActivityScan(stats: GitHubStats): boolean {
   const trackable = stats.trackableRepos?.length ?? 0
   if (trackable < 20) return false
   const activities = Object.values(stats.repoActivity ?? {})
@@ -48,47 +48,60 @@ function isUnusableActivityScan(stats: GitHubStats): boolean {
   return scanned < Math.floor(trackable * 0.3)
 }
 
+function scannedActivityCount(stats: GitHubStats): number {
+  return Object.values(stats.repoActivity ?? {}).filter((a) => a.commitsScanned).length
+}
+
 /**
  * Write path — call after getGitHubStats({ fresh: true }) in cron/admin/live fallback.
- * Never overwrites an existing good snapshot with a rate-limited or partial one; on skip
- * it keeps the last good snapshot and returns that snapshot's updatedAt.
- * Never writes a rate-limited/thin scan as the first snapshot either.
+ * Rate-limited / thin scans merge into the last good snapshot (newest scanned repos keep)
+ * instead of discarding the whole refresh. Never seeds Redis from a thin/empty first scan.
  */
 export async function syncGitHubStatsSnapshot(stats: GitHubStats): Promise<string> {
   const r = getRedis()
-  const unusable = isUnusableActivityScan(stats)
-
   const existing = await getGitHubStatsForDisplay()
+  const incomingCount = stats.trackableRepos?.length ?? 0
+  const scanned = scannedActivityCount(stats)
+  const thin = isThinActivityScan(stats)
+
   if (existing) {
     const existingCount = existing.trackableRepos?.length ?? 0
-    const incomingCount = stats.trackableRepos?.length ?? 0
     const materiallySmaller =
       existingCount > 0 && incomingCount < existingCount * MIN_TRACKABLE_RETENTION
 
-    if (unusable || materiallySmaller) {
+    if (stats.rateLimited || thin || materiallySmaller) {
+      // Only merge when we actually scanned some repos — list-only merges would
+      // bump updatedAt and suppress the live push probe for an hour with no new commits.
+      if (scanned > 0) {
+        const merged = mergePartialGitHubStats(existing, stats)
+        const updatedAt = new Date().toISOString()
+        await Promise.all([
+          r.set(SNAPSHOT_KEY, merged),
+          r.set(SNAPSHOT_UPDATED_AT_KEY, updatedAt),
+        ])
+        console.warn(
+          `[github-snapshot] merged partial scan (scanned=${scanned}, rateLimited=${!!stats.rateLimited}, thin=${thin}, smaller=${materiallySmaller})`,
+        )
+        return updatedAt
+      }
+
       const reason = stats.rateLimited
         ? 'rate-limited scan'
-        : unusable
+        : thin
           ? 'thin activity scan'
           : `fewer trackable repos (${incomingCount} < ${existingCount})`
       console.warn(`[github-snapshot] skipping overwrite (${reason}); keeping last good snapshot`)
-      // #region agent log
-      fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'B',location:'githubStatsSnapshot.ts:sync',message:'skip overwrite',data:{reason,rateLimited:!!stats.rateLimited,unusable,materiallySmaller,incomingCount,existingCount,scanned:Object.values(stats.repoActivity??{}).filter(a=>a.commitsScanned).length},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const existingUpdatedAt = await getGitHubStatsSnapshotUpdatedAt()
       return existingUpdatedAt ?? new Date().toISOString()
     }
-  } else if (unusable) {
+  } else if (stats.rateLimited || thin) {
     console.warn('[github-snapshot] refusing to seed Redis with unusable/rate-limited scan')
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'B',location:'githubStatsSnapshot.ts:sync',message:'refuse seed unusable scan',data:{rateLimited:!!stats.rateLimited,trackable:stats.trackableRepos?.length??0,scanned:Object.values(stats.repoActivity??{}).filter(a=>a.commitsScanned).length},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     return new Date().toISOString()
   }
 
   const updatedAt = new Date().toISOString()
   await Promise.all([
-    r.set(SNAPSHOT_KEY, stats),
+    r.set(SNAPSHOT_KEY, enrichGitHubStatsPeriodCounts(stats)),
     r.set(SNAPSHOT_UPDATED_AT_KEY, updatedAt),
   ])
   return updatedAt
@@ -192,27 +205,21 @@ async function refreshGitHubStatsSnapshot(): Promise<{
   const enriched = enrichGitHubStatsPeriodCounts(fresh)
   await syncGitHubStatsSnapshot(enriched)
 
-  // Prefer last good snapshot whenever the fresh scan is unusable for grades.
-  const existing = await getGitHubStatsForDisplay()
-  const existingCount = existing?.trackableRepos?.length ?? 0
+  // After sync, Redis holds either the full scan or a merge with the last good snapshot.
+  const stored = await getGitHubStatsForDisplay()
+  const existingCount = stored?.trackableRepos?.length ?? 0
   const incomingCount = enriched.trackableRepos?.length ?? 0
   const materiallySmaller =
     existingCount > 0 && incomingCount < existingCount * MIN_TRACKABLE_RETENTION
-  const unusable = isUnusableActivityScan(enriched)
+  const partial = Boolean(enriched.rateLimited || isThinActivityScan(enriched) || materiallySmaller)
 
-  if ((unusable || materiallySmaller) && existing) {
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'A',location:'githubStatsSnapshot.ts:refresh',message:'rejected partial live scan; using snapshot',data:{rateLimited:enriched.rateLimited,unusable,materiallySmaller,incomingCount,existingCount,scanned:Object.values(enriched.repoActivity??{}).filter(a=>a.commitsScanned).length,totalCommits30d:enriched.totalCommits30d,snapshotCommits30d:existing.totalCommits30d},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
+  if (partial && stored) {
     return {
-      stats: enrichGitHubStatsPeriodCounts(existing),
+      stats: enrichGitHubStatsPeriodCounts(stored),
       usedSnapshotFallback: true,
     }
   }
 
-  // #region agent log
-  fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'A',location:'githubStatsSnapshot.ts:refresh',message:'using fresh scan',data:{rateLimited:enriched.rateLimited,unusable,incomingCount,totalCommits30d:enriched.totalCommits30d},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   return { stats: enriched, usedSnapshotFallback: false }
 }
 
@@ -247,9 +254,6 @@ export async function loadGitHubStatsForPage(): Promise<{
     if (needsRefresh) {
       try {
         const { stats: refreshed, usedSnapshotFallback } = await refreshGitHubStatsSnapshot()
-        // #region agent log
-        fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',runId:'grades-fix',hypothesisId:'A',location:'githubStatsSnapshot.ts:loadForPage',message:'page refresh result',data:{usedSnapshotFallback,source:usedSnapshotFallback?'snapshot':'live',totalCommits30d:refreshed.totalCommits30d,trackable:refreshed.trackableRepos?.length??0},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         return {
           stats: refreshed,
           source: usedSnapshotFallback ? 'snapshot' : 'live',

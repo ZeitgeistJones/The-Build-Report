@@ -135,6 +135,23 @@ function countCommitsInHourRange(
   return timestamps.filter(ts => isInHourRange(ts, minExclusive, maxInclusive)).length
 }
 
+function countCommitsWithinDays(
+  timestamps: string[] | null | undefined,
+  days: number,
+): number {
+  if (!timestamps?.length) return 0
+  return timestamps.filter(ts => isWithinDays(ts, days)).length
+}
+
+function countCommitsInDayRange(
+  timestamps: string[] | null | undefined,
+  minExclusive: number,
+  maxInclusive: number,
+): number {
+  if (!timestamps?.length) return 0
+  return timestamps.filter(ts => isInDayRange(ts, minExclusive, maxInclusive)).length
+}
+
 /** True when commit data came from a real GitHub commits fetch (not a listing stub). */
 export function inferCommitsScanned(activity: RepoActivity): boolean {
   if (activity.commitsScanned === true) return true
@@ -142,7 +159,7 @@ export function inferCommitsScanned(activity: RepoActivity): boolean {
   return (activity.commitTimestamps?.length ?? 0) > 0 || activity.lastCommitAt != null
 }
 
-/** Backfill rolling hour windows from commitTimestamps on every read — stored counts go stale. */
+/** Backfill rolling windows from commitTimestamps on every read — stored counts go stale. */
 export function enrichRepoActivityFromTimestamps(activity: RepoActivity): RepoActivity {
   const ts = activity.commitTimestamps
   if (ts?.length) {
@@ -151,6 +168,10 @@ export function enrichRepoActivityFromTimestamps(activity: RepoActivity): RepoAc
       commitsScanned: true,
       commits24h: countCommitsWithinHours(ts, 24),
       commits24_48: countCommitsInHourRange(ts, 24, 48),
+      commits7d: countCommitsWithinDays(ts, 7),
+      commits7_14: countCommitsInDayRange(ts, 7, 14),
+      commits30d: countCommitsWithinDays(ts, 30),
+      commits30_60: countCommitsInDayRange(ts, 30, 60),
     }
   }
   if (!inferCommitsScanned(activity)) {
@@ -181,12 +202,124 @@ export function githubStatsNeedsActivityRescan(stats: GitHubStats): boolean {
   )
 }
 
+/** Rebuild ecosystem totals from per-repo activity (noise repos excluded). */
+export function recomputeGitHubStatsAggregates(stats: GitHubStats): GitHubStats {
+  const activeDaySet24 = new Set<string>()
+  const activeDaySet24_48 = new Set<string>()
+  const activeDaySet7 = new Set<string>()
+  const activeDaySet7_14 = new Set<string>()
+  const activeDaySet30 = new Set<string>()
+  const activeDaySet30_60 = new Set<string>()
+  let totalCommits24h = 0
+  let totalCommits24_48 = 0
+  let totalCommits7d = 0
+  let totalCommits7_14 = 0
+  let totalCommits30d = 0
+  let totalCommits30_60 = 0
+
+  for (const [slug, activity] of Object.entries(stats.repoActivity ?? {})) {
+    // Ecosystem aggregates always ignore noise — force-include is listing-only.
+    if (shouldSkipRepo(slug)) continue
+    const a = enrichRepoActivityFromTimestamps(activity)
+    totalCommits24h += a.commits24h ?? 0
+    totalCommits24_48 += a.commits24_48 ?? 0
+    totalCommits7d += a.commits7d ?? 0
+    totalCommits7_14 += a.commits7_14 ?? 0
+    totalCommits30d += a.commits30d ?? 0
+    totalCommits30_60 += a.commits30_60 ?? 0
+
+    for (const ts of a.commitTimestamps ?? []) {
+      if (isWithinHours(ts, 24)) activeDaySet24.add(ts.slice(0, 10))
+      else if (isInHourRange(ts, 24, 48)) activeDaySet24_48.add(ts.slice(0, 10))
+      if (isWithinDays(ts, 7)) activeDaySet7.add(ts.slice(0, 10))
+      else if (isInDayRange(ts, 7, 14)) activeDaySet7_14.add(ts.slice(0, 10))
+      if (isWithinDays(ts, 30)) activeDaySet30.add(ts.slice(0, 10))
+      else if (isInDayRange(ts, 30, 60)) activeDaySet30_60.add(ts.slice(0, 10))
+    }
+  }
+
+  const filteredLast = getTrackableLastCommit(stats)
+  return {
+    ...stats,
+    totalCommits24h,
+    totalCommits24_48,
+    totalCommits7d,
+    totalCommits7_14,
+    totalCommits30d,
+    totalCommits30_60,
+    activeDays24h: capActiveDays(activeDaySet24.size, 1),
+    activeDays24_48: capActiveDays(activeDaySet24_48.size, 1),
+    activeDays7d: capActiveDays(activeDaySet7.size, 7),
+    activeDays7_14: capActiveDays(activeDaySet7_14.size, 7),
+    activeDays30d: capActiveDays(activeDaySet30.size, 30),
+    activeDays30_60: capActiveDays(activeDaySet30_60.size, 30),
+    lastCommitAt: filteredLast.lastCommitAt,
+    lastCommitRepo: filteredLast.lastCommitRepo,
+  }
+}
+
+/**
+ * Fold a rate-limited / thin scan into the last good snapshot so newest scanned
+ * repos (and the fresh repo list) still land instead of being discarded entirely.
+ */
+export function mergePartialGitHubStats(
+  existing: GitHubStats,
+  incoming: GitHubStats,
+): GitHubStats {
+  const repoActivity: Record<string, RepoActivity> = { ...existing.repoActivity }
+  let mergedScans = 0
+  for (const [slug, activity] of Object.entries(incoming.repoActivity ?? {})) {
+    if (activity.commitsScanned) {
+      repoActivity[slug] = activity
+      mergedScans++
+    }
+  }
+
+  const existingTrackable = existing.trackableRepos?.length ?? 0
+  const incomingTrackable = incoming.trackableRepos?.length ?? 0
+  const useIncomingList =
+    (incoming.repos?.length ?? 0) > 0 &&
+    (existingTrackable === 0 || incomingTrackable >= existingTrackable * MIN_TRACKABLE_RETENTION_FOR_MERGE)
+
+  const repos = useIncomingList ? incoming.repos : existing.repos
+  const trackableRepos = useIncomingList
+    ? incoming.trackableRepos
+    : existing.trackableRepos
+
+  for (const repo of repos) {
+    const prev = repoActivity[repo.name]
+    if (!prev) continue
+    repoActivity[repo.name] = { ...prev, pushedAt: repo.pushedAt }
+  }
+
+  const merged: GitHubStats = {
+    ...existing,
+    totalRepos: incoming.totalRepos || existing.totalRepos,
+    newRepos24h: useIncomingList ? incoming.newRepos24h : existing.newRepos24h,
+    newRepos24_48: useIncomingList ? incoming.newRepos24_48 : existing.newRepos24_48,
+    newRepos7d: useIncomingList ? incoming.newRepos7d : existing.newRepos7d,
+    newRepos7_14: useIncomingList ? incoming.newRepos7_14 : existing.newRepos7_14,
+    newRepos30d: useIncomingList ? incoming.newRepos30d : existing.newRepos30d,
+    newRepos30_60: useIncomingList ? incoming.newRepos30_60 : existing.newRepos30_60,
+    repos,
+    trackableRepos,
+    repoActivity,
+    // Partial merges are display-ready; don't leave the homepage stuck on the banner.
+    rateLimited: Boolean(incoming.rateLimited && mergedScans === 0),
+  }
+
+  return enrichGitHubStatsPeriodCounts(merged)
+}
+
+/** Keep merge threshold in sync with snapshot retention (avoid circular import). */
+const MIN_TRACKABLE_RETENTION_FOR_MERGE = 0.8
+
 export function enrichGitHubStatsPeriodCounts(stats: GitHubStats): GitHubStats {
   const repoActivity: Record<string, RepoActivity> = {}
   for (const [slug, activity] of Object.entries(stats.repoActivity)) {
     repoActivity[slug] = enrichRepoActivityFromTimestamps(activity)
   }
-  return { ...stats, repoActivity }
+  return recomputeGitHubStatsAggregates({ ...stats, repoActivity })
 }
 
 function isInHourRange(dateStr: string, minExclusive: number, maxInclusive: number) {
