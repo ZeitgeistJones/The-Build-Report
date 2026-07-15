@@ -219,8 +219,6 @@ export default function EcosystemSky() {
   const ytIframeRef = useRef(null);
   const musicOnRef = useRef(true);
   const isMobileRef = useRef(false);
-  const tourFocusRef = useRef({ active: false, x: 0.5, y: 0.5 });
-
   // --- User camera (drag to pan, pinch/scroll to zoom) ---
   const userCamRef = useRef({ active: false, x: 0.5, y: 0.5, zoom: 1 });
   const [userCamActive, setUserCamActive] = useState(false);
@@ -520,19 +518,6 @@ export default function EcosystemSky() {
   );
 
   const selectedRepo = selected ? positioned.find((r) => r.n === selected) : null;
-
-  // Feed the camera the tour target's world position (refs so the rAF loop
-  // sees fresh values without re-mounting)
-  useEffect(() => {
-    if (touring && tourTarget) {
-      const star = positioned.find((r) => r.n === tourTarget);
-      if (star) {
-        tourFocusRef.current = { active: true, x: star.x, y: star.y };
-        return;
-      }
-    }
-    tourFocusRef.current = { active: false, x: 0.5, y: 0.5 };
-  }, [touring, tourTarget, positioned]);
   const inspectingRepo = inspecting ? positioned.find((r) => r.n === inspecting) : null;
   // Highlight + connection focus: tour uses tourTarget so detail panel (selected) stays closed
   const focus = touring ? tourTarget : selected;
@@ -577,32 +562,19 @@ export default function EcosystemSky() {
     const step = () => {
       localT += 0.006;
 
-      const tf = tourFocusRef.current;
-      if (tf.active) {
-        // Chronicle: glide the camera onto the current stop and zoom in.
-        // Mobile zooms harder so constellation lines are legible; the star
-        // sits slightly below center to clear the caption at the top.
-        const zoom = isMobileRef.current ? 1.9 : 1.45;
-        targetRef.current = {
-          x: tf.x + Math.sin(localT * 0.3) * 0.004,
-          y: tf.y - 0.055 / zoom + Math.cos(localT * 0.24) * 0.003,
-          zoom,
-        };
-      } else if (userCamRef.current.active) {
+      // Camera moves ONLY when the person drives it (drag/pinch/scroll).
+      // No ambient idle sway, no auto-glide on tour stops or selection —
+      // self-moving cameras are a common motion-sickness trigger.
+      if (userCamRef.current.active) {
         const u = userCamRef.current;
         targetRef.current = { x: u.x, y: u.y, zoom: u.zoom };
       } else {
-        targetRef.current = {
-          x: 0.5 + Math.sin(localT * 0.12) * 0.025,
-          y: 0.5 + Math.cos(localT * 0.09) * 0.02,
-          zoom: 1 + Math.sin(localT * 0.05) * 0.02,
-        };
+        targetRef.current = { x: 0.5, y: 0.5, zoom: 1 };
       }
 
       const cur = cameraRef.current;
       const tgt = targetRef.current;
-      // Spring: snappy for the tour and user control, soft ambient drift otherwise
-      const stiffness = tf.active ? 0.03 : userCamRef.current.active ? 0.09 : 0.012;
+      const stiffness = userCamRef.current.active ? 0.09 : 0.02;
       const damping = 0.86;
 
       velRef.x = velRef.x * damping + (tgt.x - cur.x) * stiffness;
@@ -711,18 +683,11 @@ export default function EcosystemSky() {
     clampUserCam();
   };
 
-  // Glide the camera so a star sits clear of the detail UI
-  const glideToStar = useCallback((star) => {
-    beginUserCam();
-    const u = userCamRef.current;
-    const z = isMobileRef.current ? Math.max(u.zoom, 1.6) : Math.max(u.zoom, 1.25);
-    u.zoom = z;
-    // Mobile: bottom sheet covers ~40vh, park the star at ~1/3 height.
-    // Desktop: panel on the right, nudge the star left of center.
-    u.x = star.x + (isMobileRef.current ? 0 : 0.08 / z);
-    u.y = star.y + (isMobileRef.current ? 0.17 / z : 0);
-    clampUserCam();
-  }, [beginUserCam]);
+  // No-op kept so call sites don't need changes — selecting a star no
+  // longer auto-moves the camera (that motion was the culprit for motion
+  // sickness). The detail panel is positioned to avoid covering the star
+  // in the common case instead.
+  const glideToStar = useCallback(() => {}, []);
 
   const onPointerDown = (e) => {
     if (inspecting) return;
@@ -1456,7 +1421,15 @@ export default function EcosystemSky() {
 
         // Brightness scales with the same score
         const glowIntensity = Math.min(1, 0.35 + score * 0.55);
-        const isMajor = score >= 0.45; // top tier — gets a persistent name label
+        const isMajor = score >= 0.28; // top tier — always-on label
+        // Second tier: modest repos get a fainter label once the person has
+        // zoomed in a bit themselves — more names as you lean into a cluster,
+        // without cluttering the default view. Fades in, doesn't pop.
+        const minorLabelThreshold = 1.15;
+        const isMinor = !isMajor && score >= 0.1 && zoom > minorLabelThreshold;
+        const minorLabelOpacity = isMinor
+          ? Math.min(1, (zoom - minorLabelThreshold) / 0.5) * 0.6
+          : 0;
 
         // Diffraction spikes for bright stars (real astronomy: bright stars have visible spikes)
         const spikeMode = score >= 0.7 ? 8 : score >= 0.45 ? 4 : 0;
@@ -1571,6 +1544,25 @@ export default function EcosystemSky() {
                 textShadow: "0 1px 4px rgba(0,0,0,0.9)",
                 pointerEvents: "none",
                 letterSpacing: 0.2,
+              }}>
+                {r.n}
+              </div>
+            )}
+            {isMinor && !isHovered && !isSel && !dimmed && !touring && (
+              <div style={{
+                position: "absolute",
+                top: labelTop + 2,
+                left: "50%",
+                transform: "translateX(-50%)",
+                whiteSpace: "nowrap",
+                fontSize: 8,
+                fontWeight: 400,
+                color: "rgba(255,255,255,0.7)",
+                opacity: minorLabelOpacity,
+                textShadow: "0 1px 3px rgba(0,0,0,0.9)",
+                pointerEvents: "none",
+                letterSpacing: 0.1,
+                transition: "opacity 0.2s ease",
               }}>
                 {r.n}
               </div>
