@@ -21,7 +21,9 @@ const CAT_ORDER = Object.keys(CAT_META);
 
 // Ambient bed — Space Ambient Music | No Copyright V1 (Lazor Brown)
 const SKY_MUSIC_VIDEO_ID = "7GKrV3JY0Rc";
-const SKY_MUSIC_VOLUME = 40;
+const SKY_MUSIC_VOLUME_STEPS = [20, 40, 70];
+const SKY_MUSIC_VOLUME_LABELS = ["Vol low", "Vol mid", "Vol high"];
+const SKY_MUSIC_FALLBACK_DURATION_SEC = 60 * 60; // used until YT reports real duration
 
 // One-line descriptions shown on legend hover
 const CAT_DESCRIPTIONS = {
@@ -212,12 +214,17 @@ export default function EcosystemSky() {
   const [legendOpen, setLegendOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inspecting, setInspecting] = useState(null);
-  const [musicOn, setMusicOn] = useState(true);
+  const [musicOn, setMusicOn] = useState(false);
+  const [volumeStep, setVolumeStep] = useState(1); // mid of SKY_MUSIC_VOLUME_STEPS
   const searchInputRef = useRef(null);
   const cursorGlowRef = useRef(null);
   const containerRef = useRef(null);
   const ytIframeRef = useRef(null);
-  const musicOnRef = useRef(true);
+  const musicOnRef = useRef(false);
+  const volumeStepRef = useRef(1);
+  const musicDurationRef = useRef(null);
+  const pendingRandomSeekRef = useRef(false);
+  const randomSeekTimerRef = useRef(null);
   const isMobileRef = useRef(false);
   // --- User camera (drag to pan, pinch/scroll to zoom) ---
   const userCamRef = useRef({ active: false, x: 0.5, y: 0.5, zoom: 1 });
@@ -252,15 +259,81 @@ export default function EcosystemSky() {
     );
   }, []);
 
+  const seekRandomSpot = useCallback(() => {
+    if (randomSeekTimerRef.current) {
+      clearTimeout(randomSeekTimerRef.current);
+      randomSeekTimerRef.current = null;
+    }
+    const duration = musicDurationRef.current;
+    if (typeof duration === "number" && duration > 45) {
+      const t = Math.random() * Math.max(0, duration - 30);
+      sendYtCommand("seekTo", [t, true]);
+      pendingRandomSeekRef.current = false;
+      return;
+    }
+    pendingRandomSeekRef.current = true;
+    sendYtCommand("getDuration");
+    // fallback seek if duration never arrives
+    const fallback = Math.random() * (SKY_MUSIC_FALLBACK_DURATION_SEC - 30);
+    randomSeekTimerRef.current = setTimeout(() => {
+      randomSeekTimerRef.current = null;
+      if (!pendingRandomSeekRef.current) return;
+      pendingRandomSeekRef.current = false;
+      sendYtCommand("seekTo", [fallback, true]);
+    }, 800);
+  }, [sendYtCommand]);
+
   useEffect(() => {
     musicOnRef.current = musicOn;
   }, [musicOn]);
 
   useEffect(() => {
+    volumeStepRef.current = volumeStep;
+    if (musicOnRef.current) {
+      sendYtCommand("setVolume", [SKY_MUSIC_VOLUME_STEPS[volumeStep] ?? 40]);
+    }
+  }, [volumeStep, sendYtCommand]);
+
+  // Listen for YT duration so random seek lands in-range
+  useEffect(() => {
+    const onMessage = (e) => {
+      if (e.origin !== "https://www.youtube.com") return;
+      let data = e.data;
+      if (typeof data === "string") {
+        try { data = JSON.parse(data); } catch { return; }
+      }
+      const duration = data?.info?.duration ?? data?.info?.videoData?.duration;
+      if (typeof duration === "number" && duration > 0) {
+        musicDurationRef.current = duration;
+        if (pendingRandomSeekRef.current && musicOnRef.current) {
+          const t = Math.random() * Math.max(0, duration - 30);
+          pendingRandomSeekRef.current = false;
+          sendYtCommand("seekTo", [t, true]);
+        }
+      }
+    };
+    window.addEventListener("message", onMessage);
+    const ping = setInterval(() => {
+      const win = ytIframeRef.current?.contentWindow;
+      if (!win) return;
+      win.postMessage(
+        JSON.stringify({ event: "listening", id: 1, channel: "widget" }),
+        "https://www.youtube.com"
+      );
+      if (musicDurationRef.current == null) sendYtCommand("getDuration");
+    }, 1500);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      clearInterval(ping);
+    };
+  }, [sendYtCommand]);
+
+  useEffect(() => {
     const t = setTimeout(() => {
       if (musicOn) {
         sendYtCommand("unMute");
-        sendYtCommand("setVolume", [SKY_MUSIC_VOLUME]);
+        sendYtCommand("setVolume", [SKY_MUSIC_VOLUME_STEPS[volumeStepRef.current] ?? 40]);
+        seekRandomSpot();
         sendYtCommand("playVideo");
       } else {
         sendYtCommand("mute");
@@ -268,14 +341,14 @@ export default function EcosystemSky() {
       }
     }, musicOn ? 500 : 0);
     return () => clearTimeout(t);
-  }, [musicOn, sendYtCommand]);
+  }, [musicOn, sendYtCommand, seekRandomSpot]);
 
   // Browsers often block unmuted autoplay — resume on first interaction if still on
   useEffect(() => {
     const kick = () => {
       if (!musicOnRef.current) return;
       sendYtCommand("unMute");
-      sendYtCommand("setVolume", [SKY_MUSIC_VOLUME]);
+      sendYtCommand("setVolume", [SKY_MUSIC_VOLUME_STEPS[volumeStepRef.current] ?? 40]);
       sendYtCommand("playVideo");
     };
     window.addEventListener("pointerdown", kick, { once: true, capture: true });
@@ -285,6 +358,11 @@ export default function EcosystemSky() {
   const toggleMusic = (e) => {
     e.stopPropagation();
     setMusicOn((on) => !on);
+  };
+
+  const cycleVolume = (e) => {
+    e.stopPropagation();
+    setVolumeStep((s) => (s + 1) % SKY_MUSIC_VOLUME_STEPS.length);
   };
 
   // --- Fetch repos ---
@@ -1174,11 +1252,11 @@ export default function EcosystemSky() {
         </div>
       </div>
 
-      {/* Ambient music — on by default, loops; toggle to mute */}
+      {/* Ambient music — off by default; on play seeks to a random spot and loops */}
       <iframe
         ref={ytIframeRef}
         title="Night Sky ambient music"
-        src={`https://www.youtube.com/embed/${SKY_MUSIC_VIDEO_ID}?enablejsapi=1&autoplay=1&loop=1&playlist=${SKY_MUSIC_VIDEO_ID}&controls=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3`}
+        src={`https://www.youtube.com/embed/${SKY_MUSIC_VIDEO_ID}?enablejsapi=1&autoplay=1&mute=1&loop=1&playlist=${SKY_MUSIC_VIDEO_ID}&controls=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3`}
         allow="autoplay; encrypted-media"
         tabIndex={-1}
         style={{
@@ -1193,7 +1271,7 @@ export default function EcosystemSky() {
         }}
       />
 
-      {/* Sound + Chronicle — flex row so labels never overlap */}
+      {/* Sound + volume + Chronicle — flex row so labels never overlap */}
       <div
         data-ui
         onClick={(e) => e.stopPropagation()}
@@ -1227,6 +1305,27 @@ export default function EcosystemSky() {
           }}
         >
           {musicOn ? "Sound on" : "Sound off"}
+        </button>
+        <button
+          type="button"
+          onClick={cycleVolume}
+          title="Cycle ambient volume"
+          aria-label={`Volume ${SKY_MUSIC_VOLUME_LABELS[volumeStep]}`}
+          style={{
+            fontSize: isMobile ? 10 : 11,
+            letterSpacing: 1.5,
+            color: musicOn ? "rgba(94,234,212,0.75)" : "rgba(255,255,255,0.35)",
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            padding: isMobile ? "6px 12px" : "7px 14px",
+            borderRadius: 20,
+            cursor: "pointer",
+            textTransform: "uppercase",
+            transition: "all 0.2s ease",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {SKY_MUSIC_VOLUME_LABELS[volumeStep]}
         </button>
 
         {!touring && !selected && (
