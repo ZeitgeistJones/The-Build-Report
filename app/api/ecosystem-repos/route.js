@@ -1,5 +1,12 @@
 // app/api/ecosystem-repos/route.js
 // Fetches all clawdbotatg repos, filters, categorizes, caches 1hr on Vercel
+//
+// Commit activity for star sizing comes from the homepage's Redis snapshot
+// (read-only — getGitHubStatsForDisplay never triggers a scan). ZERO extra
+// GitHub API calls from this route. Do NOT add per-repo /commits fetches here;
+// the homepage owns the GITHUB_TOKEN budget.
+
+import { getGitHubStatsForDisplay } from "@/lib/githubStatsSnapshot";
 
 export const revalidate = 3600;
 
@@ -198,6 +205,22 @@ export async function GET() {
   try {
     const raw = await fetchAllRepos();
 
+    // Per-repo 60d commit counts from the homepage's Redis snapshot.
+    // Best-effort: if Redis is down or the snapshot is missing, every repo
+    // gets 0 and the sky falls back to stars/forks sizing.
+    let activityByName = {};
+    try {
+      const snapshot = await getGitHubStatsForDisplay();
+      if (snapshot?.repoActivity) {
+        for (const [name, act] of Object.entries(snapshot.repoActivity)) {
+          activityByName[name] =
+            (act?.commits30d || 0) + (act?.commits30_60 || 0);
+        }
+      }
+    } catch (err) {
+      console.warn("ecosystem-repos: snapshot read failed, sizing falls back", err);
+    }
+
     // Homepage owns the GITHUB_TOKEN budget for live commit scans / scores.
     // Do NOT add per-repo /commits fetches here.
     const repos = raw
@@ -212,6 +235,7 @@ export async function GET() {
         f: r.forks_count,
         c: categorize(r.name, r.description, r.language),
         u: r.html_url,
+        a: activityByName[r.name] || 0, // commits, last 60d (0 = unknown/quiet)
       }));
 
     return Response.json({

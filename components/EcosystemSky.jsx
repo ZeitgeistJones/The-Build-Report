@@ -197,7 +197,15 @@ export default function EcosystemSky() {
   const [hoveredStar, setHoveredStar] = useState(null);
   const [query, setQuery] = useState("");
   const [time, setTime] = useState(0);
-  const [dimensions, setDimensions] = useState({ w: 1000, h: 700 });
+  const [dimensions, setDimensions] = useState(() =>
+    typeof window !== "undefined"
+      ? { w: window.innerWidth, h: window.innerHeight }
+      : { w: 1000, h: 700 }
+  );
+  // Reliable mobile detection — matchMedia, not first container measure
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 640 : false
+  );
   const [touring, setTouring] = useState(false);
   const [tourIndex, setTourIndex] = useState(0);
   const [tourTarget, setTourTarget] = useState(null);
@@ -210,8 +218,20 @@ export default function EcosystemSky() {
   const containerRef = useRef(null);
   const ytIframeRef = useRef(null);
   const musicOnRef = useRef(true);
+  const isMobileRef = useRef(false);
+  const tourFocusRef = useRef({ active: false, x: 0.5, y: 0.5 });
 
-  const isMobile = dimensions.w < 640;
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    isMobileRef.current = isMobile;
+  }, [isMobile]);
 
   const sendYtCommand = useCallback((func, args = []) => {
     const win = ytIframeRef.current?.contentWindow;
@@ -325,51 +345,83 @@ export default function EcosystemSky() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  // Resolve TOUR_STOPS against repos that actually loaded. Exact match first,
+  // then case-insensitive, then prefix/substring fuzz. Unresolvable stops are
+  // skipped so the Chronicle chain always connects real, rendered stars —
+  // this survives repo renames on GitHub.
+  const tourStops = useMemo(() => {
+    if (repos.length === 0) return [];
+    const byLower = new Map(repos.map((r) => [r.n.toLowerCase(), r.n]));
+    const names = repos.map((r) => r.n);
+    return TOUR_STOPS.map((stop) => {
+      const want = stop.repo.toLowerCase();
+      if (byLower.has(want)) return { ...stop, repo: byLower.get(want) };
+      const fuzzy =
+        names.find((n) => n.toLowerCase().startsWith(want)) ||
+        names.find((n) => n.toLowerCase().includes(want)) ||
+        names.find((n) => n.length > 4 && want.includes(n.toLowerCase()));
+      return fuzzy ? { ...stop, repo: fuzzy } : null;
+    }).filter(Boolean);
+  }, [repos]);
+
   // --- Tour ---
   // Tour uses tourTarget (NOT selected) so the detail card never opens mid-Chronicle.
   useEffect(() => {
-    if (!touring) return;
+    if (!touring || tourStops.length === 0) return;
     const timer = setTimeout(() => {
-      if (tourIndex < TOUR_STOPS.length - 1) {
+      if (tourIndex < tourStops.length - 1) {
         const next = tourIndex + 1;
         setTourIndex(next);
-        setTourTarget(TOUR_STOPS[next].repo);
+        setTourTarget(tourStops[next].repo);
       } else {
         setTouring(false);
         setTourTarget(null);
       }
     }, 4400);
     return () => clearTimeout(timer);
-  }, [touring, tourIndex]);
+  }, [touring, tourIndex, tourStops]);
 
   const startTour = () => {
+    if (tourStops.length === 0) return;
     setSelected(null);
     setInspecting(null);
     setTouring(true);
     setTourIndex(0);
-    setTourTarget(TOUR_STOPS[0].repo);
+    setTourTarget(tourStops[0].repo);
   };
 
   // --- Computed data ---
 
   const connections = useMemo(() => buildConnections(repos), [repos]);
 
-  // Maxes for Night Sky size — stars + forks only (homepage owns GitHub commit quota)
+
+  // Maxes for Night Sky size. Commit activity (r.a — 60d commits from the
+  // homepage Redis snapshot, joined server-side with ZERO GitHub calls) leads
+  // when present; falls back to the old stars/forks mix when the snapshot is
+  // missing so the sky never degrades.
   const sizeNorm = useMemo(() => {
     let maxS = 0;
     let maxF = 0;
+    let maxA = 0;
     for (const r of repos) {
       if ((r.s || 0) > maxS) maxS = r.s || 0;
       if ((r.f || 0) > maxF) maxF = r.f || 0;
+      if ((r.a || 0) > maxA) maxA = r.a || 0;
     }
-    return { maxS, maxF };
+    return { maxS, maxF, maxA, hasActivity: maxA > 0 };
   }, [repos]);
 
   const sizeScore = useCallback(
     (r) => {
       const sNorm = sizeNorm.maxS > 0 ? (r.s || 0) / sizeNorm.maxS : 0;
       const fNorm = sizeNorm.maxF > 0 ? (r.f || 0) / sizeNorm.maxF : 0;
-      return 0.75 * sNorm + 0.25 * fNorm;
+      if (!sizeNorm.hasActivity) {
+        return 0.75 * sNorm + 0.25 * fNorm;
+      }
+      // sqrt compresses the top so one hyperactive repo doesn't dwarf the sky,
+      // and lifts mid-activity repos out of the noise floor
+      const aNorm = Math.sqrt((r.a || 0) / sizeNorm.maxA);
+      return 0.55 * aNorm + 0.35 * sNorm + 0.1 * fNorm;
     },
     [sizeNorm]
   );
@@ -456,6 +508,19 @@ export default function EcosystemSky() {
   );
 
   const selectedRepo = selected ? positioned.find((r) => r.n === selected) : null;
+
+  // Feed the camera the tour target's world position (refs so the rAF loop
+  // sees fresh values without re-mounting)
+  useEffect(() => {
+    if (touring && tourTarget) {
+      const star = positioned.find((r) => r.n === tourTarget);
+      if (star) {
+        tourFocusRef.current = { active: true, x: star.x, y: star.y };
+        return;
+      }
+    }
+    tourFocusRef.current = { active: false, x: 0.5, y: 0.5 };
+  }, [touring, tourTarget, positioned]);
   const inspectingRepo = inspecting ? positioned.find((r) => r.n === inspecting) : null;
   // Highlight + connection focus: tour uses tourTarget so detail panel (selected) stays closed
   const focus = touring ? tourTarget : selected;
@@ -468,17 +533,12 @@ export default function EcosystemSky() {
   // constellation lines (many stops only have 0–1 explicit edges).
   const tourChainConns = useMemo(() => {
     if (!touring) return [];
-    const nameSet = new Set(repos.map((r) => r.n));
     const out = [];
-    for (let i = 0; i < TOUR_STOPS.length - 1; i++) {
-      const a = TOUR_STOPS[i].repo;
-      const b = TOUR_STOPS[i + 1].repo;
-      if (nameSet.has(a) && nameSet.has(b)) {
-        out.push({ a, b, label: "", tourChain: true });
-      }
+    for (let i = 0; i < tourStops.length - 1; i++) {
+      out.push({ a: tourStops[i].repo, b: tourStops[i + 1].repo, label: "", tourChain: true });
     }
     return out;
-  }, [touring, repos]);
+  }, [touring, tourStops]);
 
   const displayConns = useMemo(() => {
     if (!touring) return activeConns;
@@ -505,15 +565,30 @@ export default function EcosystemSky() {
     const step = () => {
       localT += 0.006;
 
-      targetRef.current = {
-        x: 0.5 + Math.sin(localT * 0.12) * 0.025,
-        y: 0.5 + Math.cos(localT * 0.09) * 0.02,
-        zoom: 1 + Math.sin(localT * 0.05) * 0.02,
-      };
+      const tf = tourFocusRef.current;
+      if (tf.active) {
+        // Chronicle: glide the camera onto the current stop and zoom in.
+        // Mobile zooms harder so constellation lines are legible; the star
+        // sits slightly below center to clear the caption at the top.
+        const zoom = isMobileRef.current ? 1.9 : 1.45;
+        targetRef.current = {
+          x: tf.x + Math.sin(localT * 0.3) * 0.004,
+          y: tf.y - 0.055 / zoom + Math.cos(localT * 0.24) * 0.003,
+          zoom,
+        };
+      } else {
+        targetRef.current = {
+          x: 0.5 + Math.sin(localT * 0.12) * 0.025,
+          y: 0.5 + Math.cos(localT * 0.09) * 0.02,
+          zoom: 1 + Math.sin(localT * 0.05) * 0.02,
+        };
+      }
 
       const cur = cameraRef.current;
       const tgt = targetRef.current;
-      const stiffness = 0.012;
+      // Stiffer spring during the tour so the camera lands well within each
+      // 4.4s stop; soft ambient drift otherwise
+      const stiffness = tf.active ? 0.03 : 0.012;
       const damping = 0.86;
 
       velRef.x = velRef.x * damping + (tgt.x - cur.x) * stiffness;
@@ -738,10 +813,10 @@ export default function EcosystemSky() {
                   textShadow: "0 0 12px rgba(0,0,0,0.7)",
                 }}
               >
-                {TOUR_STOPS[tourIndex].caption}
+                {tourStops[tourIndex]?.caption || ""}
               </div>
               <div style={{ display: "flex", gap: 5 }}>
-                {TOUR_STOPS.map((_, i) => (
+                {tourStops.map((_, i) => (
                   <div
                     key={i}
                     style={{
@@ -954,8 +1029,8 @@ export default function EcosystemSky() {
               ? (touchesFocus ? 2.2 : 1.2)
               : (touring ? 1.8 : 1.2);
             const opacity = isChain
-              ? (touchesFocus ? 0.85 : 0.28)
-              : (touring ? 0.7 : 0.45);
+              ? (touchesFocus ? 0.9 : 0.18)
+              : (touring ? 0.75 : 0.45);
             return (
               <g key={`${conn.a}|${conn.b}|${i}`}>
                 <line x1={posA.x} y1={posA.y} x2={posB.x} y2={posB.y}
@@ -1009,7 +1084,7 @@ export default function EcosystemSky() {
           (searchActive && !searchMatch) ||
           (!searchActive && hoveredCat && !catHighlighted) ||
           (focus && !isSel && !isConnected);
-        const dimOpacity = touring ? 0.3 : 0.12;
+        const dimOpacity = touring ? 0.38 : 0.12;
 
         const score = sizeScore(r);
         const zoom = cameraRef.current.zoom;
@@ -1474,9 +1549,12 @@ export default function EcosystemSky() {
       )}
       {touring && (
         <div style={{
-          position: "absolute", bottom: 24, left: 24, fontSize: 10.5,
+          position: "absolute", bottom: 24, fontSize: 10.5,
           color: "rgba(240, 220, 180, 0.4)", letterSpacing: 0.5, pointerEvents: "none",
           fontStyle: "italic", fontFamily: "Georgia, 'Times New Roman', serif",
+          ...(isMobile
+            ? { left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap" }
+            : { left: 24 }),
         }}>
           tap anywhere to stop
         </div>
