@@ -221,6 +221,18 @@ export default function EcosystemSky() {
   const isMobileRef = useRef(false);
   const tourFocusRef = useRef({ active: false, x: 0.5, y: 0.5 });
 
+  // --- User camera (drag to pan, pinch/scroll to zoom) ---
+  const userCamRef = useRef({ active: false, x: 0.5, y: 0.5, zoom: 1 });
+  const [userCamActive, setUserCamActive] = useState(false);
+  const pointersRef = useRef(new Map());
+  const gestureRef = useRef({
+    mode: null, // "drag" | "pinch"
+    moved: false,
+    suppressClick: false,
+    lastX: 0, lastY: 0,
+    lastDist: 0, lastMidX: 0, lastMidY: 0,
+  });
+
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
     const onChange = () => setIsMobile(mq.matches);
@@ -576,6 +588,9 @@ export default function EcosystemSky() {
           y: tf.y - 0.055 / zoom + Math.cos(localT * 0.24) * 0.003,
           zoom,
         };
+      } else if (userCamRef.current.active) {
+        const u = userCamRef.current;
+        targetRef.current = { x: u.x, y: u.y, zoom: u.zoom };
       } else {
         targetRef.current = {
           x: 0.5 + Math.sin(localT * 0.12) * 0.025,
@@ -586,9 +601,8 @@ export default function EcosystemSky() {
 
       const cur = cameraRef.current;
       const tgt = targetRef.current;
-      // Stiffer spring during the tour so the camera lands well within each
-      // 4.4s stop; soft ambient drift otherwise
-      const stiffness = tf.active ? 0.03 : 0.012;
+      // Spring: snappy for the tour and user control, soft ambient drift otherwise
+      const stiffness = tf.active ? 0.03 : userCamRef.current.active ? 0.09 : 0.012;
       const damping = 0.86;
 
       velRef.x = velRef.x * damping + (tgt.x - cur.x) * stiffness;
@@ -613,6 +627,31 @@ export default function EcosystemSky() {
     return () => { document.body.style.overflow = prev; };
   }, []);
 
+  // Arrow keys steer the Chronicle
+  useEffect(() => {
+    if (!touring) return;
+    const onKey = (e) => {
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        if (tourIndex < tourStops.length - 1) {
+          setTourIndex(tourIndex + 1);
+          setTourTarget(tourStops[tourIndex + 1].repo);
+        } else {
+          setTouring(false);
+          setTourTarget(null);
+        }
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        if (tourIndex > 0) {
+          setTourIndex(tourIndex - 1);
+          setTourTarget(tourStops[tourIndex - 1].repo);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [touring, tourIndex, tourStops]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
@@ -626,6 +665,8 @@ export default function EcosystemSky() {
         setTouring(false);
         setTourTarget(null);
         setQuery("");
+        userCamRef.current = { active: false, x: 0.5, y: 0.5, zoom: 1 };
+        setUserCamActive(false);
       } else if (e.key === "/" && !inField) {
         e.preventDefault();
         searchInputRef.current?.focus();
@@ -634,6 +675,182 @@ export default function EcosystemSky() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // --- Pan / zoom gestures ---
+  const ZOOM_MIN = 0.55;
+  const ZOOM_MAX = 3.5;
+  const clampUserCam = () => {
+    const u = userCamRef.current;
+    u.x = Math.min(1.25, Math.max(-0.25, u.x));
+    u.y = Math.min(1.25, Math.max(-0.25, u.y));
+    u.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, u.zoom));
+  };
+
+  // Hand the camera to the user from wherever it currently is (no jump)
+  const beginUserCam = useCallback(() => {
+    if (!userCamRef.current.active) {
+      const cur = cameraRef.current;
+      userCamRef.current = { active: true, x: cur.x, y: cur.y, zoom: cur.zoom };
+      setUserCamActive(true);
+    }
+  }, []);
+
+  const releaseUserCam = useCallback(() => {
+    userCamRef.current = { active: false, x: 0.5, y: 0.5, zoom: 1 };
+    setUserCamActive(false);
+  }, []);
+
+  // Zoom keeping the world point under (px, py) fixed — px/py are 0..1 screen fractions
+  const zoomAt = (px, py, newZoom) => {
+    const u = userCamRef.current;
+    const wx = (px - 0.5) / u.zoom + u.x;
+    const wy = (py - 0.5) / u.zoom + u.y;
+    u.zoom = newZoom;
+    u.x = wx - (px - 0.5) / newZoom;
+    u.y = wy - (py - 0.5) / newZoom;
+    clampUserCam();
+  };
+
+  // Glide the camera so a star sits clear of the detail UI
+  const glideToStar = useCallback((star) => {
+    beginUserCam();
+    const u = userCamRef.current;
+    const z = isMobileRef.current ? Math.max(u.zoom, 1.6) : Math.max(u.zoom, 1.25);
+    u.zoom = z;
+    // Mobile: bottom sheet covers ~40vh, park the star at ~1/3 height.
+    // Desktop: panel on the right, nudge the star left of center.
+    u.x = star.x + (isMobileRef.current ? 0 : 0.08 / z);
+    u.y = star.y + (isMobileRef.current ? 0.17 / z : 0);
+    clampUserCam();
+  }, [beginUserCam]);
+
+  const onPointerDown = (e) => {
+    if (inspecting) return;
+    if (e.target.closest && e.target.closest("[data-ui]")) return;
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = gestureRef.current;
+    const pts = [...pointersRef.current.values()];
+    if (pts.length === 1) {
+      g.mode = "drag";
+      g.moved = false;
+      g.startX = e.clientX;
+      g.startY = e.clientY;
+      g.lastX = e.clientX;
+      g.lastY = e.clientY;
+    } else if (pts.length === 2) {
+      g.mode = "pinch";
+      g.moved = true;
+      g.suppressClick = true;
+      g.lastDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      g.lastMidX = (pts[0].x + pts[1].x) / 2;
+      g.lastMidY = (pts[0].y + pts[1].y) / 2;
+    }
+  };
+
+  const onPointerMove = (e) => {
+    const g = gestureRef.current;
+    if (!g.mode || !pointersRef.current.has(e.pointerId)) return;
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = [...pointersRef.current.values()];
+
+    if (g.mode === "drag" && pts.length === 1) {
+      const dx = e.clientX - g.lastX;
+      const dy = e.clientY - g.lastY;
+      // 7px from gesture start before it counts as a drag — protects taps
+      if (!g.moved && Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < 7) {
+        g.lastX = e.clientX;
+        g.lastY = e.clientY;
+        return;
+      }
+      if (!g.moved) {
+        g.moved = true;
+        g.suppressClick = true;
+        // Grabbing the sky mid-Chronicle hands you the camera where it is
+        if (touring) {
+          setTouring(false);
+          setTourTarget(null);
+        }
+        beginUserCam();
+      }
+      const u = userCamRef.current;
+      u.x -= dx / (u.zoom * dimensions.w);
+      u.y -= dy / (u.zoom * dimensions.h);
+      clampUserCam();
+      // Write the camera directly during touch for 1:1 finger feel
+      cameraRef.current = { x: u.x, y: u.y, zoom: u.zoom };
+      g.lastX = e.clientX;
+      g.lastY = e.clientY;
+    } else if (g.mode === "pinch" && pts.length === 2) {
+      if (touring) {
+        setTouring(false);
+        setTourTarget(null);
+      }
+      beginUserCam();
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      const midX = (pts[0].x + pts[1].x) / 2;
+      const midY = (pts[0].y + pts[1].y) / 2;
+      const u = userCamRef.current;
+      // Pan by midpoint movement, then zoom around the midpoint
+      u.x -= (midX - g.lastMidX) / (u.zoom * dimensions.w);
+      u.y -= (midY - g.lastMidY) / (u.zoom * dimensions.h);
+      if (g.lastDist > 0) {
+        const factor = dist / g.lastDist;
+        zoomAt(
+          midX / dimensions.w,
+          midY / dimensions.h,
+          Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, u.zoom * factor))
+        );
+      }
+      clampUserCam();
+      cameraRef.current = { x: u.x, y: u.y, zoom: u.zoom };
+      g.lastDist = dist;
+      g.lastMidX = midX;
+      g.lastMidY = midY;
+    }
+  };
+
+  const onPointerEnd = (e) => {
+    pointersRef.current.delete(e.pointerId);
+    const g = gestureRef.current;
+    const remaining = [...pointersRef.current.values()];
+    if (remaining.length === 1) {
+      g.mode = "drag";
+      g.lastX = remaining[0].x;
+      g.lastY = remaining[0].y;
+    } else if (remaining.length === 0) {
+      if (g.moved) {
+        g.suppressClick = true;
+        // Safety: if no click event follows this gesture, don't eat the next tap
+        setTimeout(() => { gestureRef.current.suppressClick = false; }, 150);
+      }
+      g.mode = null;
+      g.moved = false;
+    }
+  };
+
+  // Desktop scroll-to-zoom (non-passive listener so we can preventDefault)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      if (inspecting) return;
+      if (e.target.closest && e.target.closest("[data-ui]")) return;
+      e.preventDefault();
+      beginUserCam();
+      const u = userCamRef.current;
+      const factor = Math.exp(-e.deltaY * 0.0016);
+      const rect = el.getBoundingClientRect();
+      zoomAt(
+        (e.clientX - rect.left) / Math.max(rect.width, 1),
+        (e.clientY - rect.top) / Math.max(rect.height, 1),
+        Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, u.zoom * factor))
+      );
+      // No direct camera write — the spring makes wheel zoom buttery
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inspecting, beginUserCam, loading, repos.length]);
 
   // --- Loading screen ---
   if (loading) {
@@ -694,7 +911,16 @@ export default function EcosystemSky() {
   return (
     <div
       ref={containerRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerEnd}
+      onPointerCancel={onPointerEnd}
+      onPointerLeave={onPointerEnd}
       onClick={() => {
+        if (gestureRef.current.suppressClick) {
+          gestureRef.current.suppressClick = false;
+          return;
+        }
         setSelected(null);
         setTouring(false);
         setTourTarget(null);
@@ -719,8 +945,13 @@ export default function EcosystemSky() {
         overflow: "hidden",
         fontFamily: "'Inter','SF Pro Display',-apple-system,sans-serif",
         userSelect: "none",
+        touchAction: "none",
+        overscrollBehavior: "none",
+        cursor: userCamActive ? "grab" : "default",
       }}
     >
+      {/* Star entrance animation */}
+      <style>{`@keyframes starIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
       {/* Cursor glow — soft light following the mouse */}
       <div
         ref={cursorGlowRef}
@@ -742,6 +973,7 @@ export default function EcosystemSky() {
       />
       {/* Back link */}
       <a
+        data-ui
         href="/"
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -794,6 +1026,7 @@ export default function EcosystemSky() {
             : `${repos.length} Repos, One Autonomous Builder`}
         </div>
         <div
+          data-ui
           onClick={(e) => e.stopPropagation()}
           style={{ marginTop: 12, display: "flex", justifyContent: "center", flexDirection: "column", alignItems: "center", gap: 8, pointerEvents: "auto" }}
         >
@@ -815,40 +1048,163 @@ export default function EcosystemSky() {
               >
                 {tourStops[tourIndex]?.caption || ""}
               </div>
-              <div style={{ display: "flex", gap: 5 }}>
+              <div data-ui style={{ display: "flex", gap: 2, alignItems: "center" }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (tourIndex > 0) {
+                      setTourIndex(tourIndex - 1);
+                      setTourTarget(tourStops[tourIndex - 1].repo);
+                    }
+                  }}
+                  disabled={tourIndex === 0}
+                  aria-label="Previous stop"
+                  style={{
+                    background: "none", border: "none", cursor: tourIndex === 0 ? "default" : "pointer",
+                    color: tourIndex === 0 ? "rgba(240,220,180,0.15)" : "rgba(240,220,180,0.6)",
+                    fontSize: 14, padding: "4px 7px", lineHeight: 1,
+                  }}
+                >
+                  ‹
+                </button>
                 {tourStops.map((_, i) => (
-                  <div
+                  <button
                     key={i}
-                    style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: "50%",
-                      background: i === tourIndex ? "rgba(240,220,180,0.85)" : "rgba(255,255,255,0.15)",
-                      transition: "background 0.3s",
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTourIndex(i);
+                      setTourTarget(tourStops[i].repo);
                     }}
-                  />
+                    aria-label={`Tour stop ${i + 1}`}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      padding: 5, display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 5,
+                        height: 5,
+                        borderRadius: "50%",
+                        background: i === tourIndex ? "rgba(240,220,180,0.85)" : "rgba(255,255,255,0.2)",
+                        transition: "background 0.3s",
+                      }}
+                    />
+                  </button>
                 ))}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (tourIndex < tourStops.length - 1) {
+                      setTourIndex(tourIndex + 1);
+                      setTourTarget(tourStops[tourIndex + 1].repo);
+                    } else {
+                      setTouring(false);
+                      setTourTarget(null);
+                    }
+                  }}
+                  aria-label="Next stop"
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "rgba(240,220,180,0.6)", fontSize: 14, padding: "4px 7px", lineHeight: 1,
+                  }}
+                >
+                  ›
+                </button>
               </div>
             </>
           ) : (
-            <input
-              ref={searchInputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="search the sky..."
-              style={{
-                width: isMobile ? 200 : 240,
-                padding: "7px 14px",
-                borderRadius: 20,
-                border: "1px solid rgba(255,255,255,0.15)",
-                background: "rgba(255,255,255,0.04)",
-                color: "white",
-                fontSize: 12,
-                outline: "none",
-                letterSpacing: 0.5,
-                textAlign: "center",
-              }}
-            />
+            <>
+              <input
+                ref={searchInputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="search the sky..."
+                style={{
+                  width: isMobile ? 200 : 240,
+                  padding: "7px 14px",
+                  borderRadius: 20,
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  background: "rgba(255,255,255,0.04)",
+                  color: "white",
+                  fontSize: 12,
+                  outline: "none",
+                  letterSpacing: 0.5,
+                  textAlign: "center",
+                }}
+              />
+              {searchActive && (() => {
+                const matches = positioned
+                  .filter(matchesQuery)
+                  .sort((a, b) => sizeScore(b) - sizeScore(a));
+                if (matches.length === 0) {
+                  return (
+                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.3)", letterSpacing: 0.5 }}>
+                      nothing in this sky
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    data-ui
+                    style={{
+                      width: isMobile ? 230 : 260,
+                      background: "rgba(6,13,23,0.94)",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 12,
+                      backdropFilter: "blur(16px)",
+                      overflow: "hidden",
+                      textAlign: "left",
+                    }}
+                  >
+                    {matches.slice(0, 6).map((m) => {
+                      const mMeta = CAT_META[m.c] || CAT_META.misc;
+                      return (
+                        <div
+                          key={m.n}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelected(m.n);
+                            glideToStar(m);
+                            setQuery("");
+                            searchInputRef.current?.blur();
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "8px 12px",
+                            cursor: "pointer",
+                            borderBottom: "1px solid rgba(255,255,255,0.05)",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          <div style={{
+                            width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                            background: mMeta.core, boxShadow: `0 0 5px ${mMeta.glow}`,
+                          }} />
+                          <span style={{
+                            fontSize: 11.5, color: "rgba(255,255,255,0.8)",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
+                          }}>
+                            {m.n}
+                          </span>
+                          <span style={{ fontSize: 8.5, color: mMeta.core, opacity: 0.6, textTransform: "uppercase", letterSpacing: 1, flexShrink: 0 }}>
+                            {mMeta.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {matches.length > 6 && (
+                      <div style={{ padding: "6px 12px", fontSize: 9.5, color: "rgba(255,255,255,0.3)", letterSpacing: 0.5 }}>
+                        +{matches.length - 6} more lighting up in the sky
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </>
           )}
         </div>
       </div>
@@ -874,6 +1230,7 @@ export default function EcosystemSky() {
 
       {/* Sound + Chronicle — flex row so labels never overlap */}
       <div
+        data-ui
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
@@ -1105,31 +1462,41 @@ export default function EcosystemSky() {
         const spikeMode = score >= 0.7 ? 8 : score >= 0.45 ? 4 : 0;
         const spikeAngles = spikeMode === 8 ? [0, 45, 90, 135] : spikeMode === 4 ? [0, 90] : [];
         const spikeLength = size * (spikeMode === 8 ? 5 : 4) * pulse;
+        // Thumb-sized invisible hit area on mobile — stars are 5–18px visually
+        const hit = isMobile ? Math.max(size, 30) : size;
+        const labelTop = (hit + size) / 2;
 
         return (
           <div
             key={r.n}
             onClick={(e) => {
               e.stopPropagation();
+              if (gestureRef.current.suppressClick) {
+                gestureRef.current.suppressClick = false;
+                return;
+              }
               if (touring) {
                 setTouring(false);
                 setTourTarget(null);
               }
-              setSelected(selected === r.n ? null : r.n);
+              const next = selected === r.n ? null : r.n;
+              setSelected(next);
+              if (next) glideToStar(r);
             }}
             onDoubleClick={(e) => { e.stopPropagation(); setInspecting(r.n); }}
             onMouseEnter={() => { setHoveredCat(r.c); setHoveredStar(r.n); }}
             onMouseLeave={() => { setHoveredCat(null); setHoveredStar(null); }}
             style={{
               position: "absolute",
-              left: pos.x - size / 2,
-              top: pos.y - size / 2,
-              width: size,
-              height: size,
+              left: pos.x - hit / 2,
+              top: pos.y - hit / 2,
+              width: hit,
+              height: hit,
               cursor: "pointer",
               zIndex: isSel ? 30 : isHovered ? 15 : 5,
               opacity: dimmed ? dimOpacity : 1,
               transition: "opacity 0.3s ease",
+              animation: `starIn 0.7s ease ${(rand(r.seed) * 0.9).toFixed(2)}s backwards`,
             }}
           >
             {/* Sonar pulse rings for selected star (expanding outward, fading) */}
@@ -1193,7 +1560,7 @@ export default function EcosystemSky() {
             {isMajor && !isHovered && !isSel && !dimmed && !touring && (
               <div style={{
                 position: "absolute",
-                top: size + 3,
+                top: labelTop + 3,
                 left: "50%",
                 transform: "translateX(-50%)",
                 whiteSpace: "nowrap",
@@ -1212,7 +1579,7 @@ export default function EcosystemSky() {
             {(isHovered || isSel) && (
               <div style={{
                 position: "absolute",
-                top: size + 4,
+                top: labelTop + 4,
                 left: "50%",
                 transform: "translateX(-50%)",
                 whiteSpace: "nowrap",
@@ -1232,6 +1599,7 @@ export default function EcosystemSky() {
       {/* Detail panel — only for manual taps (selected). Chronicle uses tourTarget instead. */}
       {selectedRepo && (
         <div
+          data-ui
           onClick={(e) => e.stopPropagation()}
           style={isMobile ? {
             position: "absolute",
@@ -1416,6 +1784,7 @@ export default function EcosystemSky() {
       {/* Legend — full on desktop, toggle on mobile */}
       {isMobile && !selected && !touring && (
         <button
+          data-ui
           onClick={(e) => { e.stopPropagation(); setLegendOpen(!legendOpen); }}
           style={{
             position: "absolute", bottom: 20, right: 20, zIndex: 25,
@@ -1432,6 +1801,7 @@ export default function EcosystemSky() {
       )}
       {!touring && ((!isMobile) || legendOpen) && (
         <div
+          data-ui
           onClick={(e) => e.stopPropagation()}
           style={{
             position: "absolute",
@@ -1537,6 +1907,38 @@ export default function EcosystemSky() {
         </div>
       )}
 
+      {/* Reset view — appears once the user has taken the camera */}
+      {userCamActive && !touring && !(isMobile && selected) && (
+        <button
+          data-ui
+          onClick={(e) => {
+            e.stopPropagation();
+            releaseUserCam();
+          }}
+          style={{
+            position: "absolute",
+            bottom: 20,
+            left: 20,
+            zIndex: 25,
+            fontSize: 10,
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+            color: "rgba(255,255,255,0.5)",
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            padding: isMobile ? "7px 13px" : "6px 12px",
+            borderRadius: 20,
+            cursor: "pointer",
+            backdropFilter: "blur(8px)",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.85)"; e.currentTarget.style.background = "rgba(255,255,255,0.1)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.5)"; e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+        >
+          ⟲ reset view
+        </button>
+      )}
+
       {/* Hints */}
       {!selected && !touring && (
         <div style={{
@@ -1544,7 +1946,9 @@ export default function EcosystemSky() {
           fontSize: 10, color: "rgba(255,255,255,0.18)", letterSpacing: 0.5,
           pointerEvents: "none", whiteSpace: "nowrap",
         }}>
-          tap a star · double-tap to inspect · press / to search
+          {isMobile
+            ? "drag to pan · pinch to zoom · tap a star"
+            : "drag to pan · scroll to zoom · double-click to inspect · / to search"}
         </div>
       )}
       {touring && (
@@ -1563,6 +1967,7 @@ export default function EcosystemSky() {
       {/* ═══ INSPECT VIEW — the awe-inspiring close-up ═══ */}
       {inspectingRepo && (
         <div
+          data-ui
           onClick={() => setInspecting(null)}
           style={{
             position: "fixed",
