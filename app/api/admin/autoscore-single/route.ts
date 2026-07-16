@@ -29,13 +29,43 @@ import { appendScoreHistory } from '@/lib/scoreHistory'
 import { getShippingLeverage, getTokenMechanicForDisplay, showsEconomicNa } from '@/lib/economicGrade'
 import { reportFirstScanIfNeeded } from '@/lib/achievementReport'
 
-export const maxDuration = 120
+export const maxDuration = 300
 
 const ratelimit = new Ratelimit({
   redis: getRedis(),
   limiter: Ratelimit.slidingWindow(3, '1 h'),
   prefix: 'build-report:rl:rescore',
 })
+
+function clientFacingRescoreError(err: unknown): string {
+  const message = err instanceof Error ? err.message : 'Request failed'
+  // Prefer actionable messages we threw ourselves; hide opaque infra dumps.
+  if (
+    message.startsWith('Could not score repo') ||
+    message.startsWith('Repo ') ||
+    message.includes('promo') ||
+    message.includes('Promo') ||
+    message.includes('payment') ||
+    message.includes('Payment') ||
+    message.includes('Rate limit') ||
+    message.includes('Wallet') ||
+    message.includes('treasury') ||
+    message.includes('Transaction') ||
+    message.includes('signature') ||
+    message.includes('eligible') ||
+    message.includes('excluded') ||
+    message.includes('CLAWDGate')
+  ) {
+    return message
+  }
+  if (message.includes('rate_limited') || message.includes('GitHub API')) {
+    return 'GitHub rate limit hit while scoring — try again in a few minutes'
+  }
+  if (message.includes('ANTHROPIC') || message.includes('anthropic') || message.includes('Overloaded')) {
+    return 'AI scoring temporarily unavailable — try again in a minute'
+  }
+  return 'Rescore failed — try again'
+}
 
 async function runRescorePipeline(repoSlug: string) {
   const redis = getRedis()
@@ -47,7 +77,9 @@ async function runRescorePipeline(repoSlug: string) {
 
   const repo = await runAutoscoreSingle(repoSlug)
   if (!repo) {
-    throw new Error('Could not score repo')
+    throw new Error(
+      'Could not score repo — AI returned an invalid score or GitHub evidence was unavailable. Try again.',
+    )
   }
 
   const { summary: changeSummary, deltaHeader } = await generateRescoreChangeSummary({
@@ -157,16 +189,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: 'Promo signature did not match wallet' }, { status: 401 })
       }
 
-      const locked = await consumePromoNonce(walletAddress, repoSlug, promoNonce)
-      if (!locked) {
-        return NextResponse.json({ ok: false, error: 'Invalid or expired promo authorization' }, { status: 400 })
-      }
-
-      // Pay the amount locked at nonce issue (matches button quote) — do not recompute from live Redis.
-      promoTotalWei = BigInt(locked.totalWei)
-      promoRewardWei = BigInt(locked.rewardWei)
-      promoRewardEth = locked.rewardEth
-      promoBurnFundWei = BigInt(locked.burnFundWei)
+      // Do NOT consume the nonce until after scoring succeeds — otherwise a failed
+      // AI/GitHub run burns the authorization and the next attempt looks like a hard fail.
+      promoTotalWei = BigInt(lockedPeek.totalWei)
+      promoRewardWei = BigInt(lockedPeek.rewardWei)
+      promoRewardEth = lockedPeek.rewardEth
+      promoBurnFundWei = BigInt(lockedPeek.burnFundWei)
       promoBurnFundEth = Number(promoBurnFundWei) / 1e18
       promoTotalEth = Number(promoTotalWei) / 1e18
 
@@ -217,6 +245,38 @@ export async function POST(req: NextRequest) {
     reportFirstScanIfNeeded(walletAddress)
 
     if (isPromoPath) {
+      const locked = await consumePromoNonce(walletAddress, repoSlug, promoNonce)
+      if (!locked) {
+        // Score already saved — don't fail the whole request if the nonce TTL lapsed mid-run.
+        console.error('[autoscore-single] promo nonce gone after successful rescore', {
+          repoSlug,
+          walletAddress,
+        })
+        return NextResponse.json({
+          ok: true,
+          repo: pipeline.repo,
+          changeSummary: pipeline.changeSummary,
+          rescoreMeta: pipeline.rescoreMeta,
+          promo: {
+            rewardEth: promoRewardEth,
+            burnFundEth: promoBurnFundEth,
+            burnFundTxHash: null,
+            payoutTxHash: null,
+            payoutPending: true,
+            payoutError:
+              'Rescore saved, but promo authorization expired before payout — retry Rescore once to claim the reward',
+          },
+        })
+      }
+
+      // Pay the amount locked at nonce issue (matches button quote).
+      promoTotalWei = BigInt(locked.totalWei)
+      promoRewardWei = BigInt(locked.rewardWei)
+      promoRewardEth = locked.rewardEth
+      promoBurnFundWei = BigInt(locked.burnFundWei)
+      promoBurnFundEth = Number(promoBurnFundWei) / 1e18
+      promoTotalEth = Number(promoTotalWei) / 1e18
+
       let payoutResult: Awaited<ReturnType<typeof sendPromoSplitReward>> | null = null
       let burnFundedWithoutWallet = false
       let burnFundTxHash: string | null = null
@@ -301,6 +361,6 @@ export async function POST(req: NextRequest) {
     }
     const message = err instanceof Error ? err.message : 'Request failed'
     console.error('[autoscore-single] rescore failed:', message)
-    return NextResponse.json({ ok: false, error: 'Rescore failed' }, { status: 400 })
+    return NextResponse.json({ ok: false, error: clientFacingRescoreError(err) }, { status: 400 })
   }
 }

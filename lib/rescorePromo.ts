@@ -16,7 +16,7 @@ const NONCE_PREFIX = 'build-report:promo-nonce:'
 const PAYOUT_PREFIX = 'build-report:promo-payout:'
 const SPONSORED_COUNT_KEY = 'build-report:promo:sponsored-count'
 const SPONSORED_ETH_KEY = 'build-report:promo:eth-paid-total'
-const NONCE_TTL_SEC = 300
+const NONCE_TTL_SEC = 600
 /** Per stale commit: half to wallet, half to receiver-buy-and-burn (burn fuel). */
 export const PROMO_WALLET_SHARE_BPS = 5000
 const DEFAULT_PROMO_TOTAL_ETH = Number(SCORE_PAYMENT_WEI) / 1e18

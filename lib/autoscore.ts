@@ -263,96 +263,101 @@ Respond ONLY with valid JSON, no markdown:
   "adminNote": "Live AI score (v3) — inferred from repo metadata and ecosystem context v${SCORING_CONTEXT_VERSION}."
 }`
 
-  try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1536,
-      messages: [{ role: 'user', content: prompt }],
-    })
+  const maxAttempts = 2
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const message = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: prompt }],
+      })
 
-    const text = message.content[0].type === 'text' ? message.content[0].text : ''
-    const clean = text.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(clean)
+      const text = message.content[0].type === 'text' ? message.content[0].text : ''
+      const clean = text.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
 
-    if (!VALID_TAGS.has(parsed.tag)) {
-      console.error(`[autoscore] invalid tag for ${repo.name}:`, parsed.tag)
-      return null
-    }
+      if (!VALID_TAGS.has(parsed.tag)) {
+        console.error(`[autoscore] invalid tag for ${repo.name}:`, parsed.tag)
+        continue
+      }
 
-    const tag = (getLockedTag(repo.name) ?? parsed.tag) as Tag
-    let tokenMechanic: Score | null = null
-    let shippingLeverage: Score | null = null
+      const tag = (getLockedTag(repo.name) ?? parsed.tag) as Tag
+      let tokenMechanic: Score | null = null
+      let shippingLeverage: Score | null = null
 
-    if (hasShippingLeverageTag(tag)) {
-      if (validateShippingLeverageRows(parsed.shippingLeverage)) {
-        shippingLeverage = makeSlScore(parsed.shippingLeverage)
-      } else {
-        const legacyRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
-        if (legacyRows?.length && validateTokenMechanicRows(legacyRows, tag)) {
-          shippingLeverage = makeSlScore(relabelLegacyTmRowsToSl(legacyRows))
+      if (hasShippingLeverageTag(tag)) {
+        if (validateShippingLeverageRows(parsed.shippingLeverage)) {
+          shippingLeverage = makeSlScore(parsed.shippingLeverage)
         } else {
-          console.error(`[autoscore] invalid shippingLeverage rubric for ${repo.name}`)
-          return null
+          const legacyRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
+          if (legacyRows?.length && validateTokenMechanicRows(legacyRows, tag)) {
+            shippingLeverage = makeSlScore(relabelLegacyTmRowsToSl(legacyRows))
+          } else {
+            console.error(`[autoscore] invalid shippingLeverage rubric for ${repo.name}`)
+            continue
+          }
         }
+      } else {
+        const rawTm: unknown =
+          parsed.tokenMechanic ??
+          parsed.holderRelevance ??
+          (Array.isArray(parsed.shippingLeverage) && parsed.shippingLeverage.length === 3
+            ? parsed.shippingLeverage
+            : null)
+        const coercedTm = coerceTokenMechanicRows(rawTm, tag)
+        if (!coercedTm) {
+          console.error(
+            `[autoscore] invalid tokenMechanic rubric for ${repo.name}:`,
+            JSON.stringify({
+              tokenMechanic: parsed.tokenMechanic,
+              shippingLeverage: parsed.shippingLeverage,
+              holderRelevance: parsed.holderRelevance,
+            }),
+          )
+          continue
+        }
+        tokenMechanic = makeTmScore(coercedTm)
       }
-    } else {
-      const rawTm: unknown =
-        parsed.tokenMechanic ??
-        parsed.holderRelevance ??
-        (Array.isArray(parsed.shippingLeverage) && parsed.shippingLeverage.length === 3
-          ? parsed.shippingLeverage
-          : null)
-      const coercedTm = coerceTokenMechanicRows(rawTm, tag)
-      if (!coercedTm) {
+
+      if (!validateBuilderIntegrityRows(parsed.builderIntegrity)) {
         console.error(
-          `[autoscore] invalid tokenMechanic rubric for ${repo.name}:`,
-          JSON.stringify({
-            tokenMechanic: parsed.tokenMechanic,
-            shippingLeverage: parsed.shippingLeverage,
-            holderRelevance: parsed.holderRelevance,
-          }),
+          `[autoscore] invalid builderIntegrity rubric for ${repo.name}:`,
+          JSON.stringify(parsed.builderIntegrity),
         )
-        return null
+        continue
       }
-      tokenMechanic = makeTmScore(coercedTm)
-    }
 
-    if (!validateBuilderIntegrityRows(parsed.builderIntegrity)) {
-      console.error(
-        `[autoscore] invalid builderIntegrity rubric for ${repo.name}:`,
-        JSON.stringify(parsed.builderIntegrity),
+      const repoOut: Repo = {
+        id: repo.name,
+        name: repo.name,
+        githubSlug: repo.name,
+        tag,
+        status: derivedStatus,
+        confidence: 'low',
+        scoredAt: new Date().toISOString(),
+        tokenMechanic,
+        shippingLeverage,
+        builderIntegrity: makeBiScore(parsed.builderIntegrity),
+        verdict: parsed.verdict,
+        ...(typeof parsed.normieVerdict === 'string' && parsed.normieVerdict.trim()
+          ? { normieVerdict: parsed.normieVerdict.trim() }
+          : {}),
+        adminNote: parsed.adminNote,
+        scoringContextVersion: SCORING_CONTEXT_VERSION,
+      }
+
+      const economic = shippingLeverage ?? tokenMechanic
+      console.log(
+        `[autoscore] done: ${repo.name} tag:${repoOut.tag} Econ:${economic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`,
       )
-      return null
+      return normalizeAndApplyV3(repoOut)
+    } catch (err) {
+      console.error(`[autoscore] FAILED for ${repo.name} (attempt ${attempt}/${maxAttempts}):`, err)
+      if (attempt === maxAttempts) return null
     }
-
-    const repoOut: Repo = {
-      id: repo.name,
-      name: repo.name,
-      githubSlug: repo.name,
-      tag,
-      status: derivedStatus,
-      confidence: 'low',
-      scoredAt: new Date().toISOString(),
-      tokenMechanic,
-      shippingLeverage,
-      builderIntegrity: makeBiScore(parsed.builderIntegrity),
-      verdict: parsed.verdict,
-      ...(typeof parsed.normieVerdict === 'string' && parsed.normieVerdict.trim()
-        ? { normieVerdict: parsed.normieVerdict.trim() }
-        : {}),
-      adminNote: parsed.adminNote,
-      scoringContextVersion: SCORING_CONTEXT_VERSION,
-    }
-
-    const economic = shippingLeverage ?? tokenMechanic
-    console.log(
-      `[autoscore] done: ${repo.name} tag:${repoOut.tag} Econ:${economic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`,
-    )
-    return normalizeAndApplyV3(repoOut)
-  } catch (err) {
-    console.error(`[autoscore] FAILED for ${repo.name}:`, err)
-    return null
   }
+
+  return null
 }
 
 async function cacheScoredRepo(
