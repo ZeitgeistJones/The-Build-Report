@@ -1,5 +1,5 @@
 import { getRedis } from '@/lib/redis'
-import type { GitHubStats } from '@/lib/github'
+import type { GitHubRepo, GitHubStats } from '@/lib/github'
 import {
   getGitHubStats,
   enrichGitHubStatsPeriodCounts,
@@ -7,7 +7,11 @@ import {
   fetchTrackableRepoPushes,
   snapshotPushesBehindLive,
   mergePartialGitHubStats,
+  refreshReposCommitActivity,
 } from '@/lib/github'
+
+/** Max repos to commit-scan on a homepage catch-up (newest behind first). */
+const PAGE_CATCHUP_SLUG_CAP = 15
 
 const SNAPSHOT_KEY = 'build-report:github-stats:snapshot'
 const SNAPSHOT_UPDATED_AT_KEY = 'build-report:github-stats:snapshot:updatedAt'
@@ -155,7 +159,6 @@ export const SNAPSHOT_PROBE_MS = 60 * 60 * 1000
 
 /** Fallback when probe is unavailable — refresh if snapshot is older than daily cron + buffer. */
 export const SNAPSHOT_STALE_MS = 6 * 60 * 60 * 1000
-let staleRefreshInFlight = false
 
 export function snapshotAgeMs(updatedAt: string | null): number | null {
   if (!updatedAt) return null
@@ -166,6 +169,15 @@ export function snapshotAgeMs(updatedAt: string | null): number | null {
 export function isSnapshotStale(updatedAt: string | null): boolean {
   const age = snapshotAgeMs(updatedAt)
   return age === null || age > SNAPSHOT_STALE_MS
+}
+
+function applyLivePushedAt(repos: GitHubRepo[], livePushes: Map<string, string>): GitHubRepo[] {
+  return repos
+    .map(r => {
+      const live = livePushes.get(r.name)
+      return live ? { ...r, pushedAt: live } : r
+    })
+    .sort((a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime())
 }
 
 async function snapshotNeedsLiveRefresh(
@@ -224,33 +236,58 @@ async function refreshGitHubStatsSnapshot(): Promise<{
 }
 
 /**
- * Fire-and-forget refresh. Never blocks the homepage — a full commit scan can take
- * tens of seconds and was the main cause of slow loads when the snapshot looked stale.
- * Cron/admin remain the reliable writers; this is best-effort self-heal.
+ * Homepage catch-up: scan only the newest behind repos, merge into Redis, return merged stats.
  */
-function scheduleBackgroundSnapshotRefresh(
+async function catchUpSnapshotFromBehindPushes(
   cached: GitHubStats,
-  updatedAt: string | null,
-): void {
-  if (staleRefreshInFlight) return
-  staleRefreshInFlight = true
-  void (async () => {
-    try {
-      const { needsRefresh, reason } = await snapshotNeedsLiveRefresh(cached, updatedAt)
-      if (!needsRefresh) return
-      console.warn(`[github-snapshot] background refresh starting (${reason})`)
-      await refreshGitHubStatsSnapshot()
-    } catch (err) {
-      console.error('[github-snapshot] background refresh failed', err)
-    } finally {
-      staleRefreshInFlight = false
-    }
-  })()
+  livePushes: Map<string, string>,
+  behindSlugs: string[],
+): Promise<GitHubStats> {
+  const ranked = [...behindSlugs]
+    .sort((a, b) => {
+      const ta = new Date(livePushes.get(a) ?? 0).getTime()
+      const tb = new Date(livePushes.get(b) ?? 0).getTime()
+      return tb - ta
+    })
+    .slice(0, PAGE_CATCHUP_SLUG_CAP)
+
+  const { repoActivity, rateLimited } = await refreshReposCommitActivity(ranked, {
+    fresh: true,
+    pushedAtBySlug: livePushes,
+  })
+
+  const scanned = Object.keys(repoActivity).length
+  if (scanned === 0) {
+    console.warn(
+      `[github-snapshot] catch-up scanned 0/${ranked.length} repos (rateLimited=${rateLimited}); serving snapshot`,
+    )
+    return enrichGitHubStatsPeriodCounts(cached)
+  }
+
+  const incoming: GitHubStats = {
+    ...cached,
+    repos: applyLivePushedAt(cached.repos ?? [], livePushes),
+    trackableRepos: applyLivePushedAt(cached.trackableRepos ?? [], livePushes),
+    repoActivity,
+    rateLimited,
+  }
+
+  const merged = mergePartialGitHubStats(cached, incoming)
+  const updatedAt = new Date().toISOString()
+  const r = getRedis()
+  await Promise.all([
+    r.set(SNAPSHOT_KEY, merged),
+    r.set(SNAPSHOT_UPDATED_AT_KEY, updatedAt),
+  ])
+  console.warn(
+    `[github-snapshot] homepage catch-up merged ${scanned}/${ranked.length} behind repos (rateLimited=${rateLimited})`,
+  )
+  return merged
 }
 
 /**
- * Homepage path — Redis snapshot only on the request. Never awaits a live GitHub
- * commit scan or push probe here (those run in the background / via cron).
+ * Homepage path — serve Redis snapshot when fresh. If older than 1h and live
+ * pushed_at is ahead, await a short targeted commit rescan (not a full scan).
  * Cold start (no snapshot) still falls back to a live fetch.
  */
 export async function loadGitHubStatsForPage(): Promise<{
@@ -260,7 +297,26 @@ export async function loadGitHubStatsForPage(): Promise<{
   const cached = await getGitHubStatsForDisplay()
   if (cached) {
     const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
-    scheduleBackgroundSnapshotRefresh(cached, updatedAt)
+    const age = snapshotAgeMs(updatedAt)
+
+    if (age !== null && age <= SNAPSHOT_PROBE_MS) {
+      return { stats: enrichGitHubStatsPeriodCounts(cached), source: 'snapshot' }
+    }
+
+    try {
+      const livePushes = await fetchTrackableRepoPushes()
+      const behindSlugs = snapshotPushesBehindLive(cached, livePushes)
+      if (behindSlugs.length > 0) {
+        const merged = await catchUpSnapshotFromBehindPushes(cached, livePushes, behindSlugs)
+        return { stats: merged, source: 'live' }
+      }
+      // Probe ok — bump updatedAt so the next hour skips the list API.
+      const r = getRedis()
+      await r.set(SNAPSHOT_UPDATED_AT_KEY, new Date().toISOString())
+    } catch (err) {
+      console.error('[github-snapshot] homepage catch-up probe/scan failed', err)
+    }
+
     return { stats: enrichGitHubStatsPeriodCounts(cached), source: 'snapshot' }
   }
 

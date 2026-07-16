@@ -475,6 +475,73 @@ function parseRecentCommits(commits: { commit: { author: { date: string }; messa
     .filter(c => c.date && c.message)
 }
 
+function buildRepoActivityFromCommits(
+  slug: string,
+  commits: { commit: { author: { date: string }; message: string } }[],
+  pushedAt: string,
+): RepoActivity {
+  const c24 = commits.filter(c => isWithinHours(c.commit.author.date, 24))
+  const c24_48 = commits.filter(c => isInHourRange(c.commit.author.date, 24, 48))
+  const c30 = commits.filter(c => isWithinDays(c.commit.author.date, 30))
+  const c7 = commits.filter(c => isWithinDays(c.commit.author.date, 7))
+  const c7_14 = commits.filter(c => isInDayRange(c.commit.author.date, 7, 14))
+  const c30_60 = commits.filter(c => isInDayRange(c.commit.author.date, 30, 60))
+
+  return {
+    slug,
+    commits24h: c24.length,
+    commits24_48: c24_48.length,
+    commits30d: c30.length,
+    commits7d: c7.length,
+    commits7_14: c7_14.length,
+    commits30_60: c30_60.length,
+    commitTimestamps: commits.map(c => c.commit.author.date),
+    recentCommits: parseRecentCommits(commits),
+    lastCommitAt: commits[0]?.commit?.author?.date ?? null,
+    pushedAt,
+    isActive: c30.length > 0,
+    commitsScanned: true,
+    commitsCapped: commits.length >= COMMIT_CAP,
+  }
+}
+
+/**
+ * Targeted commit scan for a small slug list (homepage catch-up).
+ * Does not rebuild the full ecosystem stats — caller merges into the snapshot.
+ */
+export async function refreshReposCommitActivity(
+  slugs: string[],
+  options?: { fresh?: boolean; pushedAtBySlug?: Map<string, string> },
+): Promise<{ repoActivity: Record<string, RepoActivity>; rateLimited: boolean }> {
+  const since60 = new Date(Date.now() - 60 * 86400000).toISOString()
+  const fresh = options?.fresh ?? true
+  const repoActivity: Record<string, RepoActivity> = {}
+  let rateLimited = false
+
+  for (const slug of slugs) {
+    if (!slug) continue
+    try {
+      const commits = await ghFetch(
+        `/repos/${GITHUB_ORG}/${slug}/commits?since=${since60}&per_page=100`,
+        { fresh },
+      )
+      if (!Array.isArray(commits)) continue
+      const pushedAt =
+        options?.pushedAtBySlug?.get(slug) ??
+        commits[0]?.commit?.author?.date ??
+        new Date().toISOString()
+      repoActivity[slug] = buildRepoActivityFromCommits(slug, commits, pushedAt)
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'rate_limited') {
+        rateLimited = true
+        break
+      }
+    }
+  }
+
+  return { repoActivity, rateLimited }
+}
+
 export async function getGitHubStats(options?: { fresh?: boolean }): Promise<GitHubStats> {
   const since60 = new Date(Date.now() - 60 * 86400000).toISOString()
   const fresh = options?.fresh ?? false
