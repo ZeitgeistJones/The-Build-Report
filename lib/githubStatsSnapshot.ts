@@ -224,24 +224,35 @@ async function refreshGitHubStatsSnapshot(): Promise<{
 }
 
 /**
- * Fire-and-forget refresh when the snapshot is stale. Best-effort: never blocks render,
- * and the module-level flag avoids stacking refreshes when many visitors hit a stale page.
+ * Fire-and-forget refresh. Never blocks the homepage — a full commit scan can take
+ * tens of seconds and was the main cause of slow loads when the snapshot looked stale.
+ * Cron/admin remain the reliable writers; this is best-effort self-heal.
  */
-function scheduleStaleSnapshotRefresh(): void {
+function scheduleBackgroundSnapshotRefresh(
+  cached: GitHubStats,
+  updatedAt: string | null,
+): void {
   if (staleRefreshInFlight) return
   staleRefreshInFlight = true
   void (async () => {
     try {
+      const { needsRefresh, reason } = await snapshotNeedsLiveRefresh(cached, updatedAt)
+      if (!needsRefresh) return
+      console.warn(`[github-snapshot] background refresh starting (${reason})`)
       await refreshGitHubStatsSnapshot()
     } catch (err) {
-      console.error('[github-snapshot] stale self-heal refresh failed', err)
+      console.error('[github-snapshot] background refresh failed', err)
     } finally {
       staleRefreshInFlight = false
     }
   })()
 }
 
-/** Snapshot first; refresh when stale, incomplete, or live GitHub is ahead of cached pushes. */
+/**
+ * Homepage path — Redis snapshot only on the request. Never awaits a live GitHub
+ * commit scan or push probe here (those run in the background / via cron).
+ * Cold start (no snapshot) still falls back to a live fetch.
+ */
 export async function loadGitHubStatsForPage(): Promise<{
   stats: GitHubStats | null
   source: 'snapshot' | 'live' | 'none'
@@ -249,21 +260,7 @@ export async function loadGitHubStatsForPage(): Promise<{
   const cached = await getGitHubStatsForDisplay()
   if (cached) {
     const updatedAt = await getGitHubStatsSnapshotUpdatedAt()
-    const { needsRefresh } = await snapshotNeedsLiveRefresh(cached, updatedAt)
-
-    if (needsRefresh) {
-      try {
-        const { stats: refreshed, usedSnapshotFallback } = await refreshGitHubStatsSnapshot()
-        return {
-          stats: refreshed,
-          source: usedSnapshotFallback ? 'snapshot' : 'live',
-        }
-      } catch (err) {
-        console.error('[github-snapshot] page refresh failed, using cached snapshot', err)
-        scheduleStaleSnapshotRefresh()
-      }
-    }
-
+    scheduleBackgroundSnapshotRefresh(cached, updatedAt)
     return { stats: enrichGitHubStatsPeriodCounts(cached), source: 'snapshot' }
   }
 

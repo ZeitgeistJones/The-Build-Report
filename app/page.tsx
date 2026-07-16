@@ -49,6 +49,7 @@ import { getBuildBrief } from '@/lib/buildBrief'
 import { isCommunityContextEnabled, getContextSummaryBySlug, buildCommunityPulse } from '@/lib/communityContext'
 import { calcEcosystemPulse } from '@/lib/ecosystemPulse'
 import type { GitHubStats } from '@/lib/github'
+import type { RepoContextSummary } from '@/lib/communityContextTypes'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,42 +68,58 @@ function degradedBannerMessage(opts: {
 }
 
 export default async function Home() {
-  let stats: GitHubStats | null = null
-  let githubUnavailable = false
-  let cacheUnavailable = false
   const communityContextEnabled = isCommunityContextEnabled()
-  const contextSummary = communityContextEnabled ? await getContextSummaryBySlug().catch(() => ({})) : {}
-  const communityPulse = communityContextEnabled ? buildCommunityPulse(contextSummary) : null
 
- const [rescoreBurns, buildBrief, needle, overheardEntry, overheardDigest, spotted] = await Promise.all([
-  getRescoreBurnStats().catch(() => null),
-  getBuildBrief().catch(() => null),
-  getNeedle().catch(() => null),
-  getFeaturedOverheardEntry().catch(() => null),
-  getOverheardDigest().catch(() => null),
-  getLatestPublished().catch(() => null),
-])
-
-  const { stats: loadedStats, source: loadedSource } = await loadGitHubStatsForPage().catch(err => {
-    console.error('[home] GitHub stats load failed', err)
-    return { stats: null as GitHubStats | null, source: 'none' as const }
-  })
-  stats = loadedStats
-  if (loadedSource === 'none') githubUnavailable = true
-  const trackableLastCommit = stats ? getTrackableLastCommit(stats) : { lastCommitAt: null, lastCommitRepo: null }
-
-  const snapshotUpdatedAt = await getGitHubStatsSnapshotUpdatedAt().catch(() => null)
-  const dataAsOfLabel = snapshotUpdatedAt ? timeAgo(snapshotUpdatedAt) : null
-  const dataStale = snapshotUpdatedAt
-    ? Date.now() - new Date(snapshotUpdatedAt).getTime() > 26 * 60 * 60 * 1000
-    : false
-
-  const [adminNotes, excludedMap, collectionSlugs, forceIncludeSet] = await Promise.all([
+  const [
+    rescoreBurns,
+    buildBrief,
+    needle,
+    overheardEntry,
+    overheardDigest,
+    spotted,
+    loaded,
+    snapshotUpdatedAt,
+    adminNotes,
+    excludedMap,
+    collectionSlugs,
+    forceIncludeSet,
+    contextSummary,
+  ] = await Promise.all([
+    getRescoreBurnStats().catch(() => null),
+    getBuildBrief().catch(() => null),
+    getNeedle().catch(() => null),
+    getFeaturedOverheardEntry().catch(() => null),
+    getOverheardDigest().catch(() => null),
+    getLatestPublished().catch(() => null),
+    loadGitHubStatsForPage().catch(err => {
+      console.error('[home] GitHub stats load failed', err)
+      return { stats: null as GitHubStats | null, source: 'none' as const }
+    }),
+    getGitHubStatsSnapshotUpdatedAt().catch(() => null),
     getAdminNotes(),
     getExcludedSlugs(),
     getAllCollectionSlugs().catch(() => ({ 'cv-related': [] as string[], 'clawd-gated': [] as string[] })),
     getTrackableForceIncludeSet().catch(() => new Set<string>()),
+    communityContextEnabled
+      ? getContextSummaryBySlug().catch(() => ({} as Record<string, RepoContextSummary>))
+      : Promise.resolve({} as Record<string, RepoContextSummary>),
   ])
+
+  const communityPulse = communityContextEnabled ? buildCommunityPulse(contextSummary) : null
+
+  let stats: GitHubStats | null = null
+  let githubUnavailable = false
+  let cacheUnavailable = false
+
+  const { stats: loadedStats, source: loadedSource } = loaded
+  stats = loadedStats
+  if (loadedSource === 'none') githubUnavailable = true
+  const trackableLastCommit = stats ? getTrackableLastCommit(stats) : { lastCommitAt: null, lastCommitRepo: null }
+
+  const dataAsOfLabel = snapshotUpdatedAt ? timeAgo(snapshotUpdatedAt) : null
+  const dataStale = snapshotUpdatedAt
+    ? Date.now() - new Date(snapshotUpdatedAt).getTime() > 26 * 60 * 60 * 1000
+    : false
 
   const excludedSlugs = new Set(Object.keys(excludedMap).filter(k => excludedMap[k]))
 

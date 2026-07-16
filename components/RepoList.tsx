@@ -618,6 +618,8 @@ export default function RepoList({
   const d = cardLayout(isMobile)
   const collectionSets = buildCollectionSets(repoCollections)
   const isSearching = normalizeRepoSearch(searchQuery).length > 0
+  // Mobile: paint a short first batch, then fill in the rest after idle.
+  const [mobileCardCap, setMobileCardCap] = useState<number | null>(12)
 
   useEffect(() => {
     if (!filterControl) return
@@ -831,7 +833,27 @@ export default function RepoList({
   }
 
   const visibleRepos = unlocked ? filtered : filtered.slice(0, 3)
-  const gatedRepos = unlocked ? [] : filtered.slice(3)
+  // Teaser only — never mount the full gated list (was crushing mobile hydration).
+  const gatedRepos = unlocked ? [] : filtered.slice(3, 6)
+  const paintedRepos =
+    mobileCardCap != null && unlocked && isMobile
+      ? visibleRepos.slice(0, mobileCardCap)
+      : visibleRepos
+
+  useEffect(() => {
+    if (!isMobile || !unlocked) {
+      setMobileCardCap(null)
+      return
+    }
+    setMobileCardCap(12)
+    const finish = () => setMobileCardCap(null)
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(finish, { timeout: 900 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const t = window.setTimeout(finish, 120)
+    return () => window.clearTimeout(t)
+  }, [isMobile, unlocked, filtered.length])
 
   function renderRepoCard(repo: RepoWithLive) {
     const isExpanded = expandedSlugs.has(repo.githubSlug)
@@ -1565,7 +1587,7 @@ export default function RepoList({
         </div>
       ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {visibleRepos.map(repo => renderRepoCard(repo))}
+        {paintedRepos.map(repo => renderRepoCard(repo))}
         {gatedRepos.length > 0 && (
           <div style={{ position: 'relative' }}>
             <GateBlur locked>
