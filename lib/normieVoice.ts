@@ -13,8 +13,8 @@
  * per surface. See NORMIE_SURFACE_SHAPES below.
  */
 
-/** Recommended model + temperature for the TN2M voice (matches the source app). */
-export const NORMIE_MODEL = 'claude-sonnet-4-6'
+/** Recommended model + temperature for the TN2M voice. */
+export const NORMIE_MODEL = 'claude-haiku-4-5-20251001'
 export const NORMIE_TEMPERATURE = 0.7
 
 /** Verbatim TN2M system prompt (sent as the `system` parameter). */
