@@ -42,7 +42,9 @@ export async function GET(req: NextRequest) {
   const scoredBySlug = new Map(autoScored.map(r => [r.githubSlug, r]))
   for (const r of REPOS) scoredBySlug.set(r.githubSlug, r)
 
-  const livePushes = await fetchTrackableRepoPushes().catch(() => new Map<string, string>())
+  const livePushes = await fetchTrackableRepoPushes().catch(
+    () => new Map<string, { pushedAt: string }>(),
+  )
 
   const samples = SAMPLE_SLUGS.map(slug => {
     const activity = stats?.repoActivity[slug]
@@ -99,10 +101,10 @@ export async function GET(req: NextRequest) {
         lastCommitAt: activity?.lastCommitAt ?? null,
         pushedAt,
       }),
-      livePushedAt: livePushes.get(slug) ?? null,
+      livePushedAt: livePushes.get(slug)?.pushedAt ?? null,
       livePushedAfterSnapshot:
-        pushedAt && livePushes.get(slug)
-          ? new Date(livePushes.get(slug)!).getTime() > new Date(pushedAt).getTime()
+        pushedAt && livePushes.get(slug)?.pushedAt
+          ? new Date(livePushes.get(slug)!.pushedAt).getTime() > new Date(pushedAt).getTime()
           : null,
     }
   })

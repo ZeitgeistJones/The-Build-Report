@@ -8,6 +8,7 @@ import {
   snapshotPushesBehindLive,
   mergePartialGitHubStats,
   refreshReposCommitActivity,
+  type TrackableRepoPush,
 } from '@/lib/github'
 
 /** Max repos to commit-scan on a homepage catch-up (newest behind first). */
@@ -171,13 +172,31 @@ export function isSnapshotStale(updatedAt: string | null): boolean {
   return age === null || age > SNAPSHOT_STALE_MS
 }
 
-function applyLivePushedAt(repos: GitHubRepo[], livePushes: Map<string, string>): GitHubRepo[] {
-  return repos
-    .map(r => {
-      const live = livePushes.get(r.name)
-      return live ? { ...r, pushedAt: live } : r
+/** Refresh pushed_at and append brand-new trackable repos from the live list probe. */
+function mergeLiveTrackableRepos(
+  repos: GitHubRepo[],
+  livePushes: Map<string, TrackableRepoPush>,
+): GitHubRepo[] {
+  const byName = new Map(repos.map(r => [r.name, r]))
+
+  for (const [name, live] of livePushes) {
+    const existing = byName.get(name)
+    if (existing) {
+      byName.set(name, { ...existing, pushedAt: live.pushedAt })
+      continue
+    }
+    byName.set(name, {
+      name,
+      description: live.description,
+      createdAt: live.createdAt,
+      pushedAt: live.pushedAt,
+      language: live.language,
     })
-    .sort((a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime())
+  }
+
+  return [...byName.values()].sort(
+    (a, b) => new Date(b.pushedAt).getTime() - new Date(a.pushedAt).getTime(),
+  )
 }
 
 async function snapshotNeedsLiveRefresh(
@@ -240,20 +259,24 @@ async function refreshGitHubStatsSnapshot(): Promise<{
  */
 async function catchUpSnapshotFromBehindPushes(
   cached: GitHubStats,
-  livePushes: Map<string, string>,
+  livePushes: Map<string, TrackableRepoPush>,
   behindSlugs: string[],
 ): Promise<GitHubStats> {
   const ranked = [...behindSlugs]
     .sort((a, b) => {
-      const ta = new Date(livePushes.get(a) ?? 0).getTime()
-      const tb = new Date(livePushes.get(b) ?? 0).getTime()
+      const ta = new Date(livePushes.get(a)?.pushedAt ?? 0).getTime()
+      const tb = new Date(livePushes.get(b)?.pushedAt ?? 0).getTime()
       return tb - ta
     })
     .slice(0, PAGE_CATCHUP_SLUG_CAP)
 
+  const pushedAtBySlug = new Map(
+    [...livePushes].map(([name, meta]) => [name, meta.pushedAt] as const),
+  )
+
   const { repoActivity, rateLimited } = await refreshReposCommitActivity(ranked, {
     fresh: true,
-    pushedAtBySlug: livePushes,
+    pushedAtBySlug,
   })
 
   const scanned = Object.keys(repoActivity).length
@@ -264,10 +287,14 @@ async function catchUpSnapshotFromBehindPushes(
     return enrichGitHubStatsPeriodCounts(cached)
   }
 
+  const repos = mergeLiveTrackableRepos(cached.repos ?? [], livePushes)
+  const trackableRepos = mergeLiveTrackableRepos(cached.trackableRepos ?? [], livePushes)
+
   const incoming: GitHubStats = {
     ...cached,
-    repos: applyLivePushedAt(cached.repos ?? [], livePushes),
-    trackableRepos: applyLivePushedAt(cached.trackableRepos ?? [], livePushes),
+    totalRepos: Math.max(cached.totalRepos ?? 0, repos.length),
+    repos,
+    trackableRepos,
     repoActivity,
     rateLimited,
   }

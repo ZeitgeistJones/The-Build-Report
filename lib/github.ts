@@ -907,10 +907,17 @@ export async function fetchRecentCommitMessages(slug: string, limit = 10): Promi
   }
 }
 
-/** Lightweight live probe — repo list pushed_at only (no per-repo commit scan). */
-export async function fetchTrackableRepoPushes(): Promise<Map<string, string>> {
+/** Lightweight live probe — trackable repo list metadata (no per-repo commit scan). */
+export type TrackableRepoPush = {
+  pushedAt: string
+  createdAt: string
+  description: string | null
+  language: string | null
+}
+
+export async function fetchTrackableRepoPushes(): Promise<Map<string, TrackableRepoPush>> {
   const forceInclude = await getTrackableForceIncludeSet()
-  const map = new Map<string, string>()
+  const map = new Map<string, TrackableRepoPush>()
   let page = 1
 
   while (true) {
@@ -921,7 +928,12 @@ export async function fetchTrackableRepoPushes(): Promise<Map<string, string>> {
     if (!Array.isArray(batch) || !batch.length) break
     for (const repo of batch) {
       if (!shouldSkipRepo(repo.name, { forceInclude })) {
-        map.set(repo.name, repo.pushed_at)
+        map.set(repo.name, {
+          pushedAt: repo.pushed_at,
+          createdAt: repo.created_at,
+          description: repo.description ?? null,
+          language: repo.language ?? null,
+        })
       }
     }
     if (batch.length < 100) break
@@ -931,20 +943,30 @@ export async function fetchTrackableRepoPushes(): Promise<Map<string, string>> {
   return map
 }
 
-/** Slugs whose live GitHub pushed_at moved after the snapshot was written. */
+/**
+ * Slugs that need a commit catch-up: live pushed_at moved ahead of the snapshot,
+ * or the live list has a trackable repo the snapshot has never seen.
+ */
 export function snapshotPushesBehindLive(
   stats: GitHubStats,
-  livePushes: Map<string, string>,
+  livePushes: Map<string, TrackableRepoPush>,
 ): string[] {
   const behind: string[] = []
+  const known = new Set((stats.trackableRepos ?? []).map(r => r.name))
+
   for (const repo of stats.trackableRepos ?? []) {
     const live = livePushes.get(repo.name)
     if (!live) continue
     const snapshotMs = new Date(repo.pushedAt).getTime()
-    const liveMs = new Date(live).getTime()
+    const liveMs = new Date(live.pushedAt).getTime()
     if (Number.isNaN(snapshotMs) || Number.isNaN(liveMs)) continue
     if (liveMs > snapshotMs + 60_000) behind.push(repo.name)
   }
+
+  for (const name of livePushes.keys()) {
+    if (!known.has(name)) behind.push(name)
+  }
+
   return behind
 }
 
