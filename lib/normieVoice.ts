@@ -3,9 +3,9 @@
  *
  * Source of truth for the plain-English ("normie") voice used across The Build
  * Report. The canonical engine lives at talk-normie-2-me.vercel.app; this file
- * mirrors its system/personality prompt so our in-house Anthropic pipeline
- * (autoscore + daily digest) can produce copy in the same voice without a
- * runtime dependency on that service.
+ * mirrors its system/personality prompt so our in-house LLM pipeline
+ * (Gemini primary, Anthropic fallback — autoscore + daily digest) can produce
+ * copy in the same voice without a runtime dependency on that service.
  *
  * TN2M natively emits 6-paragraph repo explainers (<450 words). The Build
  * Report surfaces are much shorter (a verdict, a grade-card blurb), so we keep
@@ -13,9 +13,10 @@
  * per surface. See NORMIE_SURFACE_SHAPES below.
  */
 
-/** Recommended model + temperature for the TN2M voice. */
-export const NORMIE_MODEL = 'claude-haiku-4-5-20251001'
+/** Recommended temperature for the TN2M voice (model comes from lib/llm). */
 export const NORMIE_TEMPERATURE = 0.7
+/** @deprecated Prefer lib/llm provider routing; kept for any lingering imports. */
+export const NORMIE_MODEL = 'claude-haiku-4-5-20251001'
 
 /** Verbatim TN2M system prompt (sent as the `system` parameter). */
 export const NORMIE_SYSTEM_PROMPT =

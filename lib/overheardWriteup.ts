@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText, hasLlmApiKey } from '@/lib/llm'
 import type { OverheardEntry, OverheardQuote } from '@/lib/podcastMentions'
 import { formatRepoContextBlock, getOverheardRepoContext } from '@/lib/overheardRepoContext'
 import { stripMarkdown } from '@/lib/textCleanup'
@@ -18,7 +18,6 @@ function formatQuotesForPrompt(quotes: OverheardQuote[], episodeName: string): s
 export async function generateOverheardWriteup(
   entry: Pick<OverheardEntry, 'kind' | 'repoSlug' | 'episodeName' | 'quotes' | 'userContext'>,
 ): Promise<OverheardWriteupPair> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const repoCtx = await getOverheardRepoContext(entry.repoSlug)
   const quoteBlock = formatQuotesForPrompt(entry.quotes, entry.episodeName)
   const isThread = entry.kind === 'thread' || entry.quotes.length > 1
@@ -65,12 +64,11 @@ NORMIE VOICE GUIDE (applies to writeupNormie only):
 ${normieVoiceGuidance('overheard')}`
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: isThread ? 600 : 400,
-      messages: [{ role: 'user', content: prompt }],
+    const { text: raw } = await generateText({
+      prompt,
+      maxTokens: isThread ? 600 : 400,
+      label: 'overheard',
     })
-    const raw = response.content.map(b => (b.type === 'text' ? b.text : '')).join('').trim()
     if (!raw) return { writeup: '' }
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/)
@@ -93,8 +91,7 @@ ${normieVoiceGuidance('overheard')}`
 export async function rewriteOverheardWriteupNormie(
   entry: Pick<OverheardEntry, 'writeup' | 'repoSlug' | 'episodeName' | 'quotes'>,
 ): Promise<string | null> {
-  if (!entry.writeup.trim() || !process.env.ANTHROPIC_API_KEY) return null
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  if (!entry.writeup.trim() || !hasLlmApiKey()) return null
   const quoteBlock = formatQuotesForPrompt(entry.quotes, entry.episodeName)
   const prompt = `Rewrite this Overheard column writeup into plain English for someone who knows nothing about code or crypto. Keep the same facts and repo names. Do not add new claims.
 
@@ -114,14 +111,12 @@ NORMIE VOICE GUIDE:
 ${normieVoiceGuidance('overheard')}`
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      messages: [{ role: 'user', content: prompt }],
+    const { text: raw } = await generateText({
+      prompt,
+      maxTokens: 400,
+      label: 'overheard-normie',
     })
-    const text = stripMarkdown(
-      response.content.map(b => (b.type === 'text' ? b.text : '')).join(''),
-    ).trim()
+    const text = stripMarkdown(raw).trim()
     return text || null
   } catch {
     return null

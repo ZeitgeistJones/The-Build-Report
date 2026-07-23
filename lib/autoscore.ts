@@ -1,6 +1,6 @@
 import { Redis } from '@upstash/redis'
-import Anthropic from '@anthropic-ai/sdk'
 import { Repo, Tag, Status, RubricRow, Score, calcTokenMechanicPct, REPOS } from './scores'
+import { generateText } from './llm'
 import { normalizeAndApplyV3 } from './repoV3'
 import { pctToLetter } from './gradeLetters'
 import { shouldSkipRepo } from './repoFilters'
@@ -167,7 +167,6 @@ async function inferScore(
   options?: { chronicleContext?: string; communityContext?: string; freshEvidence?: boolean },
 ): Promise<Repo | null> {
   console.log(`[autoscore] inferring: ${repo.name}`)
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
   const derivedStatus = deriveStatus(repo)
   const [ecosystemCtx, evidence] = await Promise.all([
@@ -266,13 +265,11 @@ Respond ONLY with valid JSON, no markdown:
   const maxAttempts = 2
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const message = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: prompt }],
+      const { text } = await generateText({
+        prompt,
+        maxTokens: 2048,
+        label: `autoscore:${repo.name}`,
       })
-
-      const text = message.content[0].type === 'text' ? message.content[0].text : ''
       const clean = text.replace(/```json|```/g, '').trim()
       const parsed = JSON.parse(clean)
 

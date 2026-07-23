@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText, hasLlmApiKey } from '@/lib/llm'
 import { getRedis } from '@/lib/redis'
 import { getSlugsRescoredBetween } from '@/lib/scoreHistory'
 import { getRescoreSummaries, type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
@@ -75,10 +75,9 @@ function buildFallbackNeedle(qualifying: QualifyingMove[]): { text: string; text
 async function generateNeedleCopy(
   qualifying: QualifyingMove[],
 ): Promise<{ text: string; textNormie?: string } | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null
+  if (!hasLlmApiKey()) return null
 
   const lines = formatMoveLines(qualifying)
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const prompt = `You write a very short daily column called "The Needle" for a crypto ecosystem scoring site. It reports on today's rescores — sometimes the overall grade moved, sometimes it held flat even though specific rubric rows changed underneath. Here is today's rescore data:
 
 ${lines}
@@ -96,16 +95,11 @@ ${normieVoiceGuidance('needle')}
 `
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
-      messages: [{ role: 'user', content: prompt }],
+    const { text: raw } = await generateText({
+      prompt,
+      maxTokens: 500,
+      label: 'needle',
     })
-
-    const raw = response.content
-      .map(block => (block.type === 'text' ? block.text : ''))
-      .join('')
-      .trim()
     if (!raw) return null
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/)

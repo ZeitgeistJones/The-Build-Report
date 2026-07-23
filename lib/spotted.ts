@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText, hasLlmApiKey } from '@/lib/llm'
 import { randomUUID } from 'crypto'
 import { getRedis } from '@/lib/redis'
 import { fetchTweetEmbed } from '@/lib/twitterEmbed'
@@ -38,7 +38,6 @@ async function generateWriteup(params: {
   extraContext: string
   repoSlug: string | null
 }): Promise<{ writeup: string; writeupNormie?: string }> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const repo = REPOS.find(r => r.githubSlug === params.repoSlug)
   const repoContext = repo
     ? `${repo.name} — ${repo.verdict ?? 'no summary available'}`
@@ -64,12 +63,11 @@ NORMIE VOICE GUIDE (applies to writeupNormie only):
 ${normieVoiceGuidance('spotted')}`
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
-      messages: [{ role: 'user', content: prompt }],
+    const { text: raw } = await generateText({
+      prompt,
+      maxTokens: 500,
+      label: 'spotted',
     })
-    const raw = response.content.map(b => (b.type === 'text' ? b.text : '')).join('').trim()
     if (!raw) return { writeup: '' }
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/)
@@ -223,8 +221,7 @@ export async function getPublishedEntries(): Promise<SpottedEntry[]> {
 
 /** Rewrite an existing Spotted writeup into plain-English (same facts). */
 async function rewriteSpottedWriteupNormie(writeup: string): Promise<string | null> {
-  if (!writeup.trim() || !process.env.ANTHROPIC_API_KEY) return null
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  if (!writeup.trim() || !hasLlmApiKey()) return null
   const prompt = `Rewrite this Spotted column writeup into plain English for someone who knows nothing about code or crypto. Keep the same facts and names. Do not add new claims.
 
 Writeup:
@@ -238,14 +235,12 @@ NORMIE VOICE GUIDE:
 ${normieVoiceGuidance('spotted')}`
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
-      messages: [{ role: 'user', content: prompt }],
+    const { text: raw } = await generateText({
+      prompt,
+      maxTokens: 300,
+      label: 'spotted-normie',
     })
-    const text = stripMarkdown(
-      response.content.map(b => (b.type === 'text' ? b.text : '')).join(''),
-    ).trim()
+    const text = stripMarkdown(raw).trim()
     return text || null
   } catch {
     return null
