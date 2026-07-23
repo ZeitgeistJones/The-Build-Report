@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText, hasLlmApiKey } from '@/lib/llm'
 import { getRedis } from '@/lib/redis'
 import { getEffectiveTag } from '@/lib/economicGrade'
 import { hasShippingLeverageTag } from '@/lib/rubrics/shippingLeverage'
@@ -345,9 +345,8 @@ async function generateDigestWithAi(
   gradeContext: string,
   mountainDateKey: string,
 ): Promise<DigestAiPayload | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null
+  if (!hasLlmApiKey()) return null
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const prompt = `You write copy for The Build Report — an independent dashboard that tracks clawdbotatg's GitHub repos for $CLAWD holders.
 
 Summarize ${mountainDateKey} (America/Denver / Mountain calendar day, midnight to midnight).
@@ -406,15 +405,14 @@ Rules:
 - The general overview MAY name specific repos and describe what shipped; the card fields should stay high-level and plain.`
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const { text } = await generateText({
+      prompt,
       // Normie fields roughly doubled the JSON payload (general + generalNormie + 4 periods ×
       // 8 fields). 1400 tokens truncated the response mid-JSON, so parsing failed and the digest
       // silently fell back to the non-normie template. Give it ample room for the full structure.
-      max_tokens: 4096,
-      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 4096,
+      label: 'build-brief',
     })
-    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
     if (!text) return null
     const parsed = parseDigestJson(text)
     if (!parsed) return null
