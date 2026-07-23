@@ -44,7 +44,7 @@ export default function BriefFreshnessNudge({ openRewards = null }: Props) {
             <div className="brief-freshness-nudge__amount" aria-label="Unclaimed promo wallet rewards">
               <p className="brief-freshness-nudge__usd">{openRewards.usdLabel}</p>
               <p className="brief-freshness-nudge__amount-meta">
-                waiting · {openRewards.repoCount} click{openRewards.repoCount === 1 ? '' : 's'}
+                waiting to be earned via rescore
               </p>
             </div>
           )}
