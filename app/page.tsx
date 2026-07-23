@@ -48,6 +48,8 @@ import { getRescoreSummaries } from '@/lib/rescoreSummaries'
 import { getBuildBrief } from '@/lib/buildBrief'
 import { isCommunityContextEnabled, getContextSummaryBySlug, buildCommunityPulse } from '@/lib/communityContext'
 import { calcEcosystemPulse } from '@/lib/ecosystemPulse'
+import { summarizeOpenPromoRewards } from '@/lib/rescorePromo'
+import { getEthUsdRateCached } from '@/lib/ethUsdRate'
 import type { GitHubStats } from '@/lib/github'
 import type { RepoContextSummary } from '@/lib/communityContextTypes'
 
@@ -166,7 +168,11 @@ export default async function Home() {
     applyExcludedToRepos(reposWithLive, excludedMap),
   )
 
-  const rescoreSummaries = await getRescoreSummaries(repos.map(r => r.githubSlug)).catch(() => ({}))
+  const [rescoreSummaries, ethUsdRate] = await Promise.all([
+    getRescoreSummaries(repos.map(r => r.githubSlug)).catch(() => ({})),
+    getEthUsdRateCached().catch(() => undefined),
+  ])
+  const openPromoRewards = summarizeOpenPromoRewards(repos, ethUsdRate)
 
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
 
@@ -380,7 +386,7 @@ export default async function Home() {
         </div>
       )}
 
-      <BriefFreshnessNudge />
+      <BriefFreshnessNudge openRewards={openPromoRewards} />
 
       <BuildBriefCard brief={buildBrief} />
       <NeedleCard needle={needle} />

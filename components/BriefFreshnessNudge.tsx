@@ -1,32 +1,55 @@
 'use client'
 
-export default function BriefFreshnessNudge() {
+import type { OpenPromoRewardsSummary } from '@/lib/rescorePromo'
+
+type Props = {
+  openRewards?: OpenPromoRewardsSummary | null
+}
+
+export default function BriefFreshnessNudge({ openRewards = null }: Props) {
   function zapToRepos() {
     document.getElementById('repo-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  const showAmount = Boolean(openRewards?.active && openRewards.repoCount > 0)
+  const promoActive = Boolean(openRewards?.active)
+
   return (
-    <aside className="brief-freshness-nudge" aria-label="How activity and rescoring feed the daily columns">
-      <p className="brief-freshness-nudge__lead">
-        Want a sharper <strong>Yesterday&apos;s Build</strong> and <strong>The Needle</strong>?
-      </p>
-      <p className="brief-freshness-nudge__body">
-        <strong>Yesterday&apos;s Build</strong> summarizes what landed on GitHub yesterday — commits
-        and a fresh scan drive that story. Rescoring keeps repo scores current for the grade context
-        around it, but it isn&apos;t the main input.
-      </p>
-      <p className="brief-freshness-nudge__body">
-        <strong>The Needle</strong> is different: it reports on rescoring — grade moves and what
-        changed underneath. More rescoring means more material for that column.
-      </p>
-      <p className="brief-freshness-nudge__body">
-        Score or Rescore is one click on a repo card — and during this launch promo you aren&apos;t
-        paying: the site operator subsidizes it. Eligible runs send ETH to your wallet{' '}
-        <em>and</em> an equal amount into the buy-and-burn queue for CLAWD.
-      </p>
-      <button type="button" className="brief-freshness-nudge__zap" onClick={zapToRepos}>
-        Repos that need a rescore →
-      </button>
+    <aside className="brief-freshness-nudge" aria-label="Rescoring, The Needle, and open promo rewards">
+      <div className="brief-freshness-nudge__card">
+        <div className="brief-freshness-nudge__row">
+          <div className="brief-freshness-nudge__copy">
+            {promoActive ? (
+              <p className="brief-freshness-nudge__eyebrow">Open promo rewards</p>
+            ) : (
+              <p className="brief-freshness-nudge__eyebrow">Daily columns</p>
+            )}
+            <p className="brief-freshness-nudge__lead">
+              {promoActive
+                ? 'Feed The Needle — Score / Rescore is free right now'
+                : 'Rescoring feeds The Needle'}
+            </p>
+            <p className="brief-freshness-nudge__body">
+              Commits write Yesterday&apos;s Build. Rescores write The Needle.
+              {promoActive
+                ? ' Eligible runs pay your wallet and the CLAWD burn queue.'
+                : ' Score or Rescore on a repo card when you want the column to move.'}
+            </p>
+            <button type="button" className="brief-freshness-nudge__zap" onClick={zapToRepos}>
+              Repos that need a rescore →
+            </button>
+          </div>
+
+          {showAmount && openRewards && (
+            <div className="brief-freshness-nudge__amount" aria-label="Unclaimed promo wallet rewards">
+              <p className="brief-freshness-nudge__usd">{openRewards.usdLabel}</p>
+              <p className="brief-freshness-nudge__amount-meta">
+                waiting · {openRewards.repoCount} click{openRewards.repoCount === 1 ? '' : 's'}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
     </aside>
   )
 }

@@ -360,29 +360,54 @@ button {
   color: var(--text-muted);
 }
 
-/* Homepage: why rescoring keeps Yesterday's build / The Needle current */
+/* Homepage: compact Needle / promo rewards band above Yesterday's Build */
 .brief-freshness-nudge {
-  margin: 4px 0 28px;
-  max-width: 42rem;
+  margin: 4px 0 20px;
+  max-width: none;
+}
+
+.brief-freshness-nudge__card {
+  padding: 12px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-elevated);
+}
+
+.brief-freshness-nudge__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.brief-freshness-nudge__copy {
+  flex: 1;
+  min-width: 200px;
+}
+
+.brief-freshness-nudge__eyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .brief-freshness-nudge__lead {
-  margin: 0 0 8px;
-  font-size: 15px;
+  margin: 0;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.4;
-}
-
-.brief-freshness-nudge__lead strong {
-  font-weight: 600;
-  color: var(--text-primary);
+  line-height: 1.35;
 }
 
 .brief-freshness-nudge__body {
-  margin: 0 0 12px;
-  font-size: 14px;
-  line-height: 1.55;
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
   color: var(--text-secondary);
 }
 
@@ -390,12 +415,12 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin: 0;
+  margin: 8px 0 0;
   padding: 0;
   border: none;
   background: none;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--accent);
   cursor: pointer;
@@ -414,6 +439,35 @@ button {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 2px;
+}
+
+.brief-freshness-nudge__amount {
+  flex-shrink: 0;
+  text-align: right;
+  padding-top: 2px;
+}
+
+.brief-freshness-nudge__usd {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.brief-freshness-nudge__amount-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .brief-freshness-nudge__amount {
+    text-align: left;
+    width: 100%;
+    padding-top: 0;
+  }
 }
 
 /* Pressroom masthead — heavy slab nameplate */

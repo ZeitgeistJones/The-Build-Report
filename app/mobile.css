@@ -200,15 +200,23 @@
   }
 
   .brief-freshness-nudge {
-    margin: 0 0 24px;
+    margin: 0 0 16px;
+  }
+
+  .brief-freshness-nudge__card {
+    padding: 12px 14px;
   }
 
   .brief-freshness-nudge__lead {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .brief-freshness-nudge__body {
-    font-size: 14px;
+    font-size: 13px;
+  }
+
+  .brief-freshness-nudge__usd {
+    font-size: 26px;
   }
 
   .brief-freshness-nudge__zap {

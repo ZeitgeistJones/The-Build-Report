@@ -473,3 +473,60 @@ export async function resolvePromoActivitySnapshot(
     scoringContextVersion: repo.scoringContextVersion,
   })
 }
+
+export type OpenPromoRewardsSummary = {
+  active: boolean
+  /** Repos with a positive wallet reward if Score/Rescored now. */
+  repoCount: number
+  /** Sum of wallet-side promo rewards (ETH). */
+  rewardEth: number
+  usdLabel: string
+}
+
+/**
+ * Homepage aggregate: wallet ETH still sitting on eligible Score/Rescore paths.
+ * Sync over already-hydrated repo cards — no per-repo RPC.
+ */
+export function summarizeOpenPromoRewards(
+  repos: Array<{
+    scoredAt?: string | null
+    lastCommitAt?: string | null
+    pushedAt?: string | null
+    commits7d?: number | null
+    commits30d?: number | null
+    commitTimestamps?: string[] | null
+    createdAt?: string | null
+    adminNote?: string | null
+    scoringContextVersion?: number
+  }>,
+  ethUsdRate?: number,
+): OpenPromoRewardsSummary {
+  const config = getPromoConfig()
+  const active = isPromoWindowOpen(config)
+  if (!active) {
+    return { active: false, repoCount: 0, rewardEth: 0, usdLabel: '~$0' }
+  }
+
+  let repoCount = 0
+  let rewardEth = 0
+  for (const repo of repos) {
+    const unscored = (repo.adminNote ?? '').startsWith('Unscored — visible because')
+    const activity = repoToActivitySnapshot({
+      ...repo,
+      scoredAt: unscored ? null : repo.scoredAt,
+      adminNote: repo.adminNote ?? (unscored ? 'Unscored — visible because it was recently pushed on GitHub.' : null),
+    })
+    const reward = computePromoReward(activity, config)
+    if (reward.rewardEth <= 0) continue
+    repoCount += 1
+    rewardEth += reward.rewardEth
+  }
+
+  return {
+    active: true,
+    repoCount,
+    rewardEth,
+    usdLabel: formatApproxUsdFromEth(rewardEth, ethUsdRate),
+  }
+}
+
