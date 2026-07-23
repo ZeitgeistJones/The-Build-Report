@@ -1,5 +1,5 @@
 import { Redis } from '@upstash/redis'
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText, hasLlmApiKey } from './llm'
 import { getRedis } from '@/lib/redis'
 import { stripMarkdown } from './textCleanup'
 import { LetterBucketDistribution, OverallGradeContext } from './overallGrade'
@@ -85,9 +85,7 @@ Rules:
 - No bullet points, no markdown.`
 
 async function generateOverallSummary(ctx: OverallGradeContext): Promise<string | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  if (!hasLlmApiKey()) return null
 
   const prompt = `You are summarizing the overall health of the clawdbotatg GitHub ecosystem for $CLAWD holders.
 
@@ -98,13 +96,11 @@ ${PERIOD_FOCUS[ctx.period]}
 ${SUMMARY_RULES}`
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 150,
-      messages: [{ role: 'user', content: prompt }],
+    const { text } = await generateText({
+      prompt,
+      maxTokens: 150,
+      label: 'overall-summary',
     })
-
-    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
     return text ? stripMarkdown(text) : null
   } catch {
     return null
@@ -112,7 +108,7 @@ ${SUMMARY_RULES}`
 }
 
 export async function getOverallSummary(ctx: OverallGradeContext): Promise<string | null> {
-  // Skip Claude/Redis during next build static collection — summaries run at request time.
+  // Skip LLM/Redis during next build static collection — summaries run at request time.
   if (process.env.NEXT_PHASE === 'phase-production-build') return null
 
   const key = SUMMARY_KEYS[ctx.period]

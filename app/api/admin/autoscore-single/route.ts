@@ -61,7 +61,14 @@ function clientFacingRescoreError(err: unknown): string {
   if (message.includes('rate_limited') || message.includes('GitHub API')) {
     return 'GitHub rate limit hit while scoring — try again in a few minutes'
   }
-  if (message.includes('ANTHROPIC') || message.includes('anthropic') || message.includes('Overloaded')) {
+  if (
+    message.includes('ANTHROPIC') ||
+    message.includes('anthropic') ||
+    message.includes('GEMINI') ||
+    message.includes('gemini') ||
+    message.includes('Overloaded') ||
+    message.includes('No LLM API key')
+  ) {
     return 'AI scoring temporarily unavailable — try again in a minute'
   }
   return 'Rescore failed — try again'

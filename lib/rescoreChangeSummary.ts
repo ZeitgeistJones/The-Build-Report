@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText, hasLlmApiKey } from './llm'
 import { Repo, Score } from './scores'
 import { getShippingLeverage, getTokenMechanicForDisplay } from './economicGrade'
 import { stripMarkdown } from './textCleanup'
@@ -83,7 +83,7 @@ export async function generateRescoreChangeSummary(params: {
   const deltaHeader = formatRescoreDeltaHeader(deltas)
   const rowChanges = formatChangedRowsForPrompt(deltas)
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!hasLlmApiKey()) {
     return { summary: null, deltaHeader }
   }
 
@@ -118,14 +118,12 @@ Write 1-2 sentences explaining what changed and why. Rules:
 Plain English, no markdown.`
 
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 180,
-      messages: [{ role: 'user', content: prompt }],
+    const { text: raw } = await generateText({
+      prompt,
+      maxTokens: 180,
+      label: 'rescore-summary',
     })
-    let text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-    text = text ? stripMarkdown(text) : ''
+    let text = raw ? stripMarkdown(raw) : ''
 
     if (text && (summaryContradictsDeltas(text, deltas) || summaryClaimsStaleSnapshot(text))) {
       text = fallbackFlatSummary(deltas)

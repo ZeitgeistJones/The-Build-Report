@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText } from '@/lib/llm'
 import { createHash, randomUUID } from 'crypto'
 import { getRedis } from '@/lib/redis'
 import { fetchAllEpisodes, fetchIpfsText, episodePublicUrl, type SlopEpisode } from '@/lib/web3/slopComputer'
@@ -436,7 +436,6 @@ async function confirmMentionsWithHaiku(
 ): Promise<{ text: string; handle: string | null; ts: number }[]> {
   if (!candidates.length) return []
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   const lines = candidates.map((c, i) => `${i}: ${c.text}`).join('\n')
 
   const prompt = `A podcast transcript contains these lines that mention a word matching the GitHub project "${repoSlug}" (${repoContext || 'no description available'}). Some may be coincidental word matches, not actual references to this specific project.
@@ -446,12 +445,11 @@ ${lines}
 Reply with ONLY a comma-separated list of the line numbers (e.g. "0,2") that are genuinely talking about this specific project. If none are genuine, reply with "none".`
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 100,
-      messages: [{ role: 'user', content: prompt }],
+    const { text } = await generateText({
+      prompt,
+      maxTokens: 100,
+      label: 'podcast-mentions',
     })
-    const text = response.content.map(b => (b.type === 'text' ? b.text : '')).join('').trim()
     if (text.toLowerCase().includes('none')) return []
     const indices = text
       .split(',')

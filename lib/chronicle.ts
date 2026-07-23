@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { generateText, hasLlmApiKey } from '@/lib/llm'
 import { getRedis } from '@/lib/redis'
 
 const CHRONICLE_REPO = 'clawdbotatg/clawd-chronicle'
@@ -101,9 +101,7 @@ async function fetchChronicleCommits(): Promise<ChronicleCommit[]> {
 }
 
 async function generateChronicleSummary(latest: ChronicleCommit, diff: string): Promise<string | null> {
-  if (!process.env.ANTHROPIC_API_KEY || !diff.trim()) return null
-
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  if (!hasLlmApiKey() || !diff.trim()) return null
 
   const prompt = `The clawdbotatg Chronicle is a living document tracking what the builder is working on.
 
@@ -115,13 +113,11 @@ ${truncateDiff(diff)}
 Write 3–4 sentences of plain English summarizing what was added or updated in this Chronicle commit. No bullet points, no markdown.`
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 150,
-      messages: [{ role: 'user', content: prompt }],
+    const { text } = await generateText({
+      prompt,
+      maxTokens: 150,
+      label: 'chronicle',
     })
-
-    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
     return text ? stripMarkdown(text) : null
   } catch {
     return null
