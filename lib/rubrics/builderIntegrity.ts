@@ -151,11 +151,11 @@ Do NOT score these like burn apps or on-chain products. Missing burns, staking, 
 
 - On-chain commitments: No contract in repo → mid for appropriate architectural restraint; high if credential/session boundaries are thoughtful; low ONLY for reckless secret handling or false on-chain claims. Critical-path shipping infra (clawd-harness, clawd-containers, nerve-cord, dead-simple-agent, ethskills) with active maintenance: prefer mid–high, never low solely for "no contract."
 - User funds / safety: Pure dev tools with no user funds → mid default; high if API keys/sessions handled carefully; low only for careless credential exposure.
-- Transparency: Public repo + documented purpose → mid minimum; high if scope and lineage are clear.
-- Governance / ecosystem alignment: Low is the WRONG default — mid if repo supports autonomous-builder thesis; high for critical-path multipliers; low only if misleading about CLAWD role or actively misaligned.
+- Transparency: Public repo + documented purpose → mid minimum; high if scope and lineage are clear. Root files / README that name architecture, plans, tests, or adapters count as documentation — do not score low for "docs missing" when those names appear in evidence.
+- Governance / ecosystem alignment: Low is the WRONG default — mid if the repo supports the autonomous-builder thesis (scaffolds, harnesses, adapters, engines, builder tools). High for critical-path multipliers. Low ONLY if the repo is misleading about CLAWD's role or actively misaligned with holder value. Mere omission of the words CLAWD / Larv.ai / "holder value" in the README is NOT low — that language is optional for infra. Implicit ecosystem fit (links to clawd-* repos, agent scaffolds, shipping tools) → mid, not low.
 - Security / testing: Active tools → mid for reasonable dev practice; low only for obvious negligence. Quiet R&D without users is not auto-low.
 
-Never assign low on a row only because the repo lacks holder-facing UI, token mechanics, or on-chain code.`
+Never assign low on a row only because the repo lacks holder-facing UI, token mechanics, on-chain code, or explicit CLAWD/Larv branding.`
 
 export const BI_SUPPLY_LOCK_RULES = `BI rules for supply-lock (add to consumer rules when tag is supply-lock):
 - Completed vesting/locks with tokens still locked: quiet GitHub is SUCCESS, not abandonment.
@@ -168,3 +168,34 @@ After choosing tag, apply the matching BI block:
 - direct → consumer rules
 - supply-lock → consumer rules + supply-lock rules
 - indirect | infrastructure | theoretical → shipping-leverage BI rules (not consumer rules)`
+
+const GOVERNANCE_LABEL: BiRowLabel = 'Governance, token-economics, and ecosystem alignment'
+
+/** True when a low governance score cites active misalignment / misleading claims (allowed). */
+function governanceLowIsJustified(source: string): boolean {
+  return /\b(mislead|misalign|false claim|actively (harm|hostile)|anti-holder|contradicts (the )?CLAWD|hostile to holders)\b/i.test(
+    source,
+  )
+}
+
+/**
+ * Deterministic guard: shipping-leverage repos must not land governance=low merely for
+ * omitting CLAWD/Larv/holder language. Matches BI_SHIPPING_LEVERAGE_RULES.
+ */
+export function applyShippingLeverageBiGuards(
+  rows: RubricRow[],
+  tag: string,
+): RubricRow[] {
+  if (tag !== 'indirect' && tag !== 'infrastructure' && tag !== 'theoretical') return rows
+
+  return rows.map(row => {
+    if (row.label !== GOVERNANCE_LABEL || row.level !== 'low') return row
+    if (governanceLowIsJustified(row.source)) return row
+    const note =
+      'floored to mid per shipping-leverage BI rules (low requires misleading/misaligned, not mere CLAWD/Larv omission)'
+    const source = row.source.includes('floored to mid per shipping-leverage')
+      ? row.source
+      : `${row.source.trim()} — ${note}`
+    return { ...row, level: 'mid' as const, source }
+  })
+}

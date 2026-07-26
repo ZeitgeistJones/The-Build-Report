@@ -12,6 +12,7 @@ import { fetchRepoBySlug, fetchRepoEvidence } from './github'
 import { formatAcceptedCommunityContext } from './communityContext'
 import {
   BI_PROMPT,
+  applyShippingLeverageBiGuards,
   calcBuilderIntegrityPct,
   validateBuilderIntegrityRows,
 } from './rubrics/builderIntegrity'
@@ -205,7 +206,10 @@ async function inferScore(
 
   const evidenceBlock = buildEvidenceBlock()
   const evidenceInstructions =
-    'Ground builderIntegrity rows in the evidence block above. If evidence is absent for a row, say so in source and default per the tag rules — do not invent artifacts.\n' +
+    'Ground ALL rubric rows (builderIntegrity and shippingLeverage/tokenMechanic) in the evidence block above. Cite specific root filenames and README claims in `source` fields.\n' +
+    'The Root files list and README excerpt are the CURRENT repo state for this live score — treat them as authoritative. Score the full picture they show, not commit titles (commits are not in this prompt).\n' +
+    'NEVER claim a file, doc, feature, protocol, or architecture is missing, outdated, or "has not caught up" when that name appears in Root files or is described in the README excerpt.\n' +
+    'If evidence is absent for a row, say so in source and default per the tag rules — do not invent artifacts.\n' +
     'If Chronicle/ecosystem context and repo evidence conflict, repo evidence wins for builderIntegrity rows; Chronicle/ecosystem context governs economic role, tag choice, and TM/SL framing.\n\n'
 
   const prompt = `You are scoring a GitHub repository for the clawdbotatg CLAWD ecosystem (scoring v3).
@@ -324,6 +328,8 @@ Respond ONLY with valid JSON, no markdown:
         continue
       }
 
+      const biRows = applyShippingLeverageBiGuards(parsed.builderIntegrity, tag)
+
       const repoOut: Repo = {
         id: repo.name,
         name: repo.name,
@@ -334,7 +340,7 @@ Respond ONLY with valid JSON, no markdown:
         scoredAt: new Date().toISOString(),
         tokenMechanic,
         shippingLeverage,
-        builderIntegrity: makeBiScore(parsed.builderIntegrity),
+        builderIntegrity: makeBiScore(biRows),
         verdict: parsed.verdict,
         ...(typeof parsed.normieVerdict === 'string' && parsed.normieVerdict.trim()
           ? { normieVerdict: parsed.normieVerdict.trim() }

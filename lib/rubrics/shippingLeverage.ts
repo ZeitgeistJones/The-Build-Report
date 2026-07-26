@@ -77,8 +77,8 @@ export function slRubricLevelScore(
 
 export const SL_PROMPT = `- shippingLeverage (indirect, infrastructure, theoretical tags ONLY — replaces tokenMechanic):
   Set tokenMechanic to null. Score indirect ecosystem value: how much this repo multiplies the builder's ability to ship consumer apps that benefit holders.
-  "Multiplies builder shipping capacity" (40%): High = on the critical path for autonomous shipping (e.g. clawd-harness, clawd-containers, dead-simple-agent, ethskills, nerve-cord); Mid = useful dev tooling with credible downstream apps; Low = generic scaffold or no distinguishable multiplier.
-  "Downstream path to holder value" (35%): High = clear causal line to consumer apps that burn/lock CLAWD; Mid = indirect but credible (faster shipping → more burn apps); Low = no credible holder path described.
+  "Multiplies builder shipping capacity" (40%): High = on the critical path for autonomous shipping (e.g. clawd-harness, clawd-containers, dead-simple-agent, ethskills, nerve-cord); Mid = useful dev tooling / agent scaffolds with credible downstream apps or adapters (documented engines, hooks, or clawd-* integration links count); Low = generic scaffold or no distinguishable multiplier.
+  "Downstream path to holder value" (35%): High = clear causal line to consumer apps that burn/lock CLAWD; Mid = indirect but credible (faster shipping → more burn apps). Links to clawd-* adapters/harnesses or a documented path for builders to ship agents → mid minimum. Low = no credible holder path. Do NOT require the README to say "CLAWD" or "holder value" for mid.
   "Role in ecosystem workflow" (25%): High = actively used in builder workflow with recent pushes; Mid = maintained but secondary; Low = dormant R&D or unclear adoption.
 
-  Low direct CLAWD burn in-repo is expected — do not penalize for absence of burns. Judge multiplier effect on the autonomous-builder thesis.`
+  Low direct CLAWD burn in-repo is expected — do not penalize for absence of burns. Judge multiplier effect on the autonomous-builder thesis. Ground levels in the Root files + README excerpt — never claim docs/features are missing when they appear there.`

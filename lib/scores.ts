@@ -527,4 +527,8 @@ export const CHANGELOG = [
     date: 'Jul 11, 2026',
     note: 'Paid/promo rescores now fetch live GitHub evidence (README + root files), matching live commit messages used in the “what changed” blurb — no more hour-stale Next.js cache on that path. Scores still judge repo evidence, not commit titles; change summaries are blocked from inventing “scored before these commits” excuses when grades stay flat.',
   },
+  {
+    date: 'Jul 26, 2026',
+    note: 'Scoring and “what changed” blurbs must treat live Root files + README as authoritative — no inventing “docs haven’t caught up” when those files are present. Shipping-leverage builder-standards governance defaults to mid (low only for misleading/misaligned claims, not missing CLAWD/Larv wording). Rescore summaries get the same evidence block and reject missing-docs hallucinations.',
+  },
 ]

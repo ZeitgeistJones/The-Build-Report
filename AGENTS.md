@@ -27,11 +27,15 @@ manual rescore for accuracy unless a repo's own score predates the last flush.
   not commit messages. Flat grades with ambitious commit titles usually mean thin tree evidence,
   not a skipped rescore.
 - Commit messages feed only the **change-summary** blurb. That blurb must not invent
-  “scored an older snapshot / before these commits” stories after a live rescore.
+  “scored an older snapshot / before these commits” stories after a live rescore, and must not
+  claim README/root docs are missing when the live evidence list already includes them.
 - **Jul 11, 2026:** paid/promo rescores pass `fresh: true` into `fetchRepoEvidence` /
   `fetchRepoBySlug` (`cache: 'no-store'`). Cron/bulk may still use the 1h cached path. Before
   that fix, rescores could score hour-old README/root listings while summaries already saw live
   commits — which looked like the scorer “ignored” new work.
+- **Jul 26, 2026:** change summaries receive the same root/README evidence block; prompts +
+  post-checks block “docs haven’t caught up” hallucinations. Shipping-leverage BI governance
+  lows for mere CLAWD/Larv omission are floored to mid.
 
 ## Burn tracker (CLAWD burned / last burn)
 

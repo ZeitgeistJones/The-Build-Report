@@ -227,7 +227,10 @@ export default function HowWeScoreContent({
           <p style={{ margin: '10px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
             <strong style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>When they disagree:</strong> repo files
             win on safety and testing claims; the handbook wins on economic story unless community cites verifiable
-            on-chain facts.
+            on-chain facts. Live Root files + README are the current state — scores and rescore blurbs must not invent
+            missing docs when those files are listed. For infra/shipping-leverage repos, builder-standards
+            &quot;governance / ecosystem alignment&quot; defaults mid unless the repo is misleading about CLAWD&apos;s role
+            (omitting the words CLAWD or Larv.ai is not enough for low).
           </p>
         </div>
       </section>

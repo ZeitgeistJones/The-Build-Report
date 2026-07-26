@@ -84,6 +84,8 @@ ${lines}
 
 Write 2-3 sentences total, no more. Pick the single most interesting thing that happened — this could be an overall grade move, OR a specific rubric row that improved/declined even though the overall grade held flat. If nothing moved overall, explain specifically what DID change at the rubric level and why it wasn't enough to shift the letter grade or percentage yet. Be specific — name the actual thing that changed (a security audit, a new test, a dependency, whatever the rescore notes mention), not just "held steady." Casual, direct, no fluff, no headers, no bullet points. Just plain prose.
 
+Do NOT invent that README, root files, architecture docs, or plans are missing unless the rescore notes explicitly say so with high confidence. Prefer the deltaHeader grade moves and named rubric changes over speculative documentation-gap stories.
+
 Return ONLY valid JSON (no markdown fences) with this shape:
 {
   "text": "2-3 sentences following the instructions above.",

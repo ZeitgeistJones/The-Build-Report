@@ -3,7 +3,7 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { resolveRepoBeforeRescore, runAutoscoreSingle } from '@/lib/autoscore'
 import { shouldSkipRepo } from '@/lib/repoFilters'
 import { isRepoExcluded } from '@/lib/repoExclude'
-import { fetchRecentCommitMessages, fetchCommits30dCount } from '@/lib/github'
+import { fetchRecentCommitMessages, fetchCommits30dCount, fetchRepoEvidence } from '@/lib/github'
 import { bustOverallSummaryCache } from '@/lib/overallSummary'
 import { recordRescoreBurn, recordRescoreFundedCount } from '@/lib/rescoreBurns'
 import { generateRescoreChangeSummary } from '@/lib/rescoreChangeSummary'
@@ -77,9 +77,10 @@ function clientFacingRescoreError(err: unknown): string {
 async function runRescorePipeline(repoSlug: string) {
   const redis = getRedis()
   const oldRepo = await resolveRepoBeforeRescore(repoSlug)
-  const [commitMessages, commits30dAtRescore] = await Promise.all([
+  const [commitMessages, commits30dAtRescore, evidence] = await Promise.all([
     fetchRecentCommitMessages(repoSlug),
     fetchCommits30dCount(repoSlug),
+    fetchRepoEvidence(repoSlug, { fresh: true }),
   ])
 
   const repo = await runAutoscoreSingle(repoSlug)
@@ -93,6 +94,9 @@ async function runRescorePipeline(repoSlug: string) {
     oldRepo,
     newRepo: repo,
     commitMessages,
+    evidence: evidence
+      ? { rootFiles: evidence.rootFiles, readmeExcerpt: evidence.readmeExcerpt }
+      : null,
   })
 
   const rescoreMeta = buildRescoreSummaryRecord({
