@@ -7,6 +7,7 @@ import {
   formatChangedRowsForPrompt,
   formatRescoreDeltaHeader,
   type RescoreAggregateDelta,
+  type RubricRowDelta,
 } from './rescoreDeltas'
 
 export type RescoreEvidenceForSummary = {
@@ -126,11 +127,72 @@ function summaryDeniesListedRootFiles(
   return false
 }
 
+/**
+ * "Rose 7 pts because governance moved low→mid" — restates the delta/header as the reason.
+ * Evidence must explain the new level; the row transition is already shown above.
+ */
+export function summaryIsCircularRestatement(text: string): boolean {
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
+  for (const sentence of sentences) {
+    const lower = sentence.toLowerCase()
+    const restatesMove =
+      /\b(rose|fell|increased|decreased|climbed|dropped)\s+\d+\s*pts?\b/.test(lower) ||
+      /\b(rose|fell)\s+to\s+[a-f][+\-]?\b/.test(lower) ||
+      /\b[+\-]\d+\s*pts?\b/.test(lower)
+
+    if (!restatesMove) continue
+
+    const becauseMatch = lower.match(/\bbecause\b(.{0,220})/)
+    if (!becauseMatch) continue
+    const becauseClause = becauseMatch[1]
+    const explainsViaLevel =
+      /\b(moved from|went from|moved to)\s+(low|mid|high|n\/?a)\b/.test(becauseClause) ||
+      /\b(low|mid|high|n\/?a)\s*(→|->|to)\s*(low|mid|high|n\/?a)\b/.test(becauseClause)
+    if (!explainsViaLevel) continue
+
+    // Strip level-transition + axis/row name boilerplate; leftover should still have evidence.
+    const stripped = becauseClause
+      .replace(
+        /\b(moved from|went from|moved to)\s+(low|mid|high|n\/?a)(\s+(to|→|->)\s+(low|mid|high|n\/?a))?\b/g,
+        ' ',
+      )
+      .replace(/\b(low|mid|high|n\/?a)\s*(→|->|to)\s*(low|mid|high|n\/?a)\b/g, ' ')
+      .replace(
+        /\b(governance|token-economics|ecosystem alignment|builder standards|shipping leverage|holder economics|multiplies builder shipping capacity|downstream path to holder value|role in ecosystem workflow|on-chain commitments and constraints|user funds, risk, and safety posture|transparency and verifiability|security, testing, and cryptographic rigor)\b/gi,
+        ' ',
+      )
+      .replace(/[:;—]+/g, ' ')
+      .trim()
+
+    const primary = (stripped.split(/\b(while|which|though|although|but|and so)\b/)[0] ?? '').trim()
+    if (primary.length < 28) return true
+  }
+  return false
+}
+
+function changedRows(deltas: RescoreAggregateDelta): RubricRowDelta[] {
+  return [
+    ...deltas.rowDeltas.shippingLeverage,
+    ...deltas.rowDeltas.tokenMechanic,
+    ...deltas.rowDeltas.builderIntegrity,
+  ].filter(r => r.oldLevel != null && r.oldLevel !== r.newLevel)
+}
+
 function fallbackFlatSummary(deltas: RescoreAggregateDelta): string {
   const bothFlat = deltas.economic.label === 'flat' && deltas.builderIntegrity.label === 'flat'
   if (bothFlat) {
     return 'Scores stayed flat. Commit messages may describe more ambition than the current repo evidence supports for the rubric.'
   }
+
+  const rows = changedRows(deltas)
+  if (rows.length) {
+    const bits = rows
+      .slice(0, 2)
+      .map(r => `${r.label} moved ${r.oldLevel} → ${r.newLevel}`)
+      .join('; ')
+    return `${bits}. Read those rows' source notes on the new score for the evidence behind the level change.`
+  }
+
   if (
     (deltas.economic.deltaPct != null && deltas.economic.deltaPct < 0) ||
     (deltas.builderIntegrity.deltaPct != null && deltas.builderIntegrity.deltaPct < 0)
@@ -163,25 +225,26 @@ export async function generateRescoreChangeSummary(params: {
 
   const prompt = `These are the old and new scores from a live rescore that just ran on the current repo. Recent commits are context only.
 
-COMPUTED DELTAS (authoritative — your narrative MUST match these directions):
+COMPUTED DELTAS (authoritative — your narrative MUST match these directions; do NOT restate them as the explanation):
 ${deltaHeader}
 
-Rubric row changes:
+Rubric row changes (mechanism already shown to the reader — do NOT use “row X moved low→mid” as the sole reason):
 ${rowChanges}
 
 OLD SCORES:
 ${oldRepo ? formatRepoScores(oldRepo) : 'No prior score on record.'}
 
-NEW SCORES (this rescore — already grounded in current repo evidence):
+NEW SCORES (this rescore — already grounded in current repo evidence; each row has a source note):
 ${formatRepoScores(newRepo)}
 
 ${evidenceBlock}RECENT COMMITS (context only — do NOT treat as more authoritative than REPO EVIDENCE / NEW SCORES):
 ${commitsBlock}
 
-Write 1-2 sentences explaining what changed and why. Rules:
+Write 1-2 sentences explaining WHY the new levels fit the evidence. Rules:
+- Lead with concrete evidence from NEW score source notes and/or REPO EVIDENCE / commits (what the repo shows). Do not open with “Builder standards rose N pts” or “Shipping leverage fell N pts” — the delta header already shows that.
+- Never explain a rise/fall only as “because [rubric row] moved from low to mid” (or mid→high, etc.). That restates the score change. Say what evidence justified the new level.
 - NEW SCORES already reflect this rescore of the current repo. Never say scores ignored newer commits, used an older snapshot, scored before these commits landed, or should wait for a "next cycle" to count them.
 - If REPO EVIDENCE is present, treat Root files + README as the current state. Never claim README, root tree, architecture docs, plans, tests, or engines are missing, outdated, or "have not caught up" when they appear there or when NEW score sources already cite them.
-- Prefer explaining score moves from the changed rubric rows and their source notes — not from inventing documentation gaps.
 - If a score is flat, say it stayed flat because the current evidence still supports that level — e.g. commit messages sound ahead of what the tree/README actually show. Do not invent timing excuses.
 - If a score fell, do not say it should rise or improved. Explain the harsher reading of current evidence without inventing missing files.
 - If a score rose, do not say it declined.
@@ -192,7 +255,7 @@ Plain English, no markdown.`
   try {
     const { text: raw } = await generateText({
       prompt,
-      maxTokens: 180,
+      maxTokens: 200,
       label: 'rescore-summary',
     })
     let text = raw ? stripMarkdown(raw) : ''
@@ -202,7 +265,8 @@ Plain English, no markdown.`
       (summaryContradictsDeltas(text, deltas) ||
         summaryClaimsStaleSnapshot(text) ||
         summaryClaimsMissingDocs(text) ||
-        summaryDeniesListedRootFiles(text, evidence))
+        summaryDeniesListedRootFiles(text, evidence) ||
+        summaryIsCircularRestatement(text))
     ) {
       text = fallbackFlatSummary(deltas)
     }

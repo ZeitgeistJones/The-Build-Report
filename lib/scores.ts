@@ -531,4 +531,8 @@ export const CHANGELOG = [
     date: 'Jul 26, 2026',
     note: 'Scoring and “what changed” blurbs must treat live Root files + README as authoritative — no inventing “docs haven’t caught up” when those files are present. Shipping-leverage builder-standards governance defaults to mid (low only for misleading/misaligned claims, not missing CLAWD/Larv wording). Rescore summaries get the same evidence block and reject missing-docs hallucinations.',
   },
+  {
+    date: 'Jul 27, 2026',
+    note: 'Rescore “what changed” blurbs must lead with evidence reasons (source notes / live tree), not circular “rose N pts because row X moved low→mid” restatements of the delta header. Circular blurbs are rejected and replaced with a row-level fallback.',
+  },
 ]
