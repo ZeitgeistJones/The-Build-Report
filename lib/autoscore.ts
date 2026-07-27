@@ -271,7 +271,8 @@ Respond ONLY with valid JSON, no markdown:
     try {
       const { text } = await generateText({
         prompt,
-        maxTokens: 2048,
+        // Headroom for Gemini 3.x thinking + full rubric JSON (thinking shares this budget).
+        maxTokens: 8192,
         label: `autoscore:${repo.name}`,
       })
       const clean = text.replace(/```json|```/g, '').trim()

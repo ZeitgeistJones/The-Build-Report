@@ -17,7 +17,8 @@ export type GenerateTextResult = {
   provider: LlmProvider
 }
 
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+/** Google restricted gemini-2.5-flash for many new API keys; 3.6 Flash is the current Flash default. */
+const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash'
 const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
 
 function geminiApiKey(): string | undefined {
@@ -51,6 +52,8 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
 
   const ai = new GoogleGenAI({ apiKey })
+  // 3.x Flash thinks by default (medium). Thinking tokens share maxOutputTokens with
+  // visible text — keep thinking minimal for short JSON/copy so we don't get empty replies.
   const response = await ai.models.generateContent({
     model: geminiModel(),
     contents: opts.prompt,
@@ -58,11 +61,17 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
       ...(opts.system ? { systemInstruction: opts.system } : {}),
       ...(opts.maxTokens != null ? { maxOutputTokens: opts.maxTokens } : {}),
       ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
+      thinkingConfig: { thinkingLevel: 'minimal' },
     },
   })
 
   const text = (response.text ?? '').trim()
-  if (!text) throw new Error('Gemini returned empty text')
+  if (!text) {
+    const finish = response.candidates?.[0]?.finishReason
+    throw new Error(
+      finish ? `Gemini returned empty text (finishReason=${finish})` : 'Gemini returned empty text',
+    )
+  }
   return text
 }
 
