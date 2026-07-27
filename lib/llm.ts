@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 
 export type LlmProvider = 'gemini' | 'anthropic'
 
@@ -61,7 +61,7 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
       ...(opts.system ? { systemInstruction: opts.system } : {}),
       ...(opts.maxTokens != null ? { maxOutputTokens: opts.maxTokens } : {}),
       ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
-      thinkingConfig: { thinkingLevel: 'minimal' },
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
     },
   })
 
