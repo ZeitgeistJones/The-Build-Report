@@ -405,17 +405,27 @@ Rules:
 - The general overview MAY name specific repos and describe what shipped; the card fields should stay high-level and plain.`
 
   try {
-    const { text } = await generateText({
+    const { text, provider } = await generateText({
       prompt,
       // Normie fields roughly doubled the JSON payload (general + generalNormie + 4 periods ×
-      // 8 fields). 1400 tokens truncated the response mid-JSON, so parsing failed and the digest
-      // silently fell back to the non-normie template. Give it ample room for the full structure.
-      maxTokens: 4096,
+      // 8 fields). Gemini 3.x thinking shares this budget with visible text — keep headroom high
+      // so we do not truncate mid-JSON and silently fall back to the template.
+      maxTokens: 8192,
       label: 'build-brief',
     })
-    if (!text) return null
+    if (!text) {
+      console.error('[build-brief] empty LLM response', { provider })
+      return null
+    }
     const parsed = parseDigestJson(text)
-    if (!parsed) return null
+    if (!parsed) {
+      console.error('[build-brief] failed to parse digest JSON', {
+        provider,
+        length: text.length,
+        preview: text.slice(0, 400),
+      })
+      return null
+    }
     const mapRow = (row: CardBlurbs): CardBlurbs => ({
       builder: stripMarkdown(row.builder),
       economic: stripMarkdown(row.economic),
@@ -442,7 +452,8 @@ Rules:
         '60d': mapRow(parsed.cards['60d']),
       },
     }
-  } catch {
+  } catch (err) {
+    console.error('[build-brief] digest AI generation failed:', err)
     return null
   }
 }
@@ -477,6 +488,13 @@ export async function generateAndCacheDailyDigest(
 
   const ai = await generateDigestWithAi(activity, gradeContext, mountainDateKey)
   const fallback = buildFallbackDigest(stats, repos, activity, mountainDateKey)
+  if (!ai) {
+    console.warn('[build-brief] using template fallback digest', {
+      mountainDateKey,
+      repoCount: activity.length,
+      commitCount,
+    })
+  }
 
   const payload: DailyDigestCache = {
     general: ai?.general ?? fallback.general,

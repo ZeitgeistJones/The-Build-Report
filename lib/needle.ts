@@ -99,13 +99,19 @@ ${normieVoiceGuidance('needle')}
   try {
     const { text: raw } = await generateText({
       prompt,
-      maxTokens: 500,
+      maxTokens: 2048,
       label: 'needle',
     })
-    if (!raw) return null
+    if (!raw) {
+      console.error('[needle] empty LLM response')
+      return null
+    }
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return null
+    if (!jsonMatch) {
+      console.error('[needle] failed to parse JSON', { preview: raw.slice(0, 400) })
+      return null
+    }
     const parsed = JSON.parse(jsonMatch[0]) as { text?: string; textNormie?: string }
     const text = typeof parsed.text === 'string' ? stripMarkdown(parsed.text).trim() : ''
     if (!text) return null
