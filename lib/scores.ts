@@ -528,11 +528,19 @@ export const CHANGELOG = [
     note: 'Paid/promo rescores now fetch live GitHub evidence (README + root files), matching live commit messages used in the “what changed” blurb — no more hour-stale Next.js cache on that path. Scores still judge repo evidence, not commit titles; change summaries are blocked from inventing “scored before these commits” excuses when grades stay flat.',
   },
   {
+    date: 'Jul 19, 2026',
+    note: 'Autoscores and Plain English copy switched from Claude Sonnet to Claude Haiku 4.5 to cut LLM cost.',
+  },
+  {
+    date: 'Jul 22, 2026',
+    note: 'Gemini became the primary LLM for autoscores, digests, rescore blurbs, and related copy (default gemini-2.5-flash). Anthropic/Haiku stayed only as fallback when Gemini is unset or fails.',
+  },
+  {
     date: 'Jul 26, 2026',
     note: 'Scoring and “what changed” blurbs must treat live Root files + README as authoritative — no inventing “docs haven’t caught up” when those files are present. Shipping-leverage builder-standards governance defaults to mid (low only for misleading/misaligned claims, not missing CLAWD/Larv wording). Rescore summaries get the same evidence block and reject missing-docs hallucinations.',
   },
   {
     date: 'Jul 27, 2026',
-    note: 'Rescore “what changed” blurbs must lead with evidence reasons (source notes / live tree), not circular “rose N pts because row X moved low→mid” restatements of the delta header. Circular blurbs are rejected and replaced with a row-level fallback.',
+    note: 'Rescore “what changed” blurbs must lead with evidence reasons (source notes / live tree), not circular “rose N pts because row X moved low→mid” restatements of the delta header. Circular blurbs are rejected and replaced with a row-level fallback. Default Gemini model moved to gemini-3.6-flash after Google restricted 2.5-flash for many new API keys; thinking set to minimal so short JSON/copy is not truncated empty.',
   },
 ]
