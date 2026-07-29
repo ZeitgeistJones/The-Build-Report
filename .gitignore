@@ -6,3 +6,5 @@ node_modules
 *.plan.md
 tsconfig.tsbuildinfo
 .vercel
+
+.env.cron.local
