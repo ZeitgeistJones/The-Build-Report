@@ -543,4 +543,8 @@ export const CHANGELOG = [
     date: 'Jul 27, 2026',
     note: 'Rescore “what changed” blurbs must lead with evidence reasons (source notes / live tree), not circular “rose N pts because row X moved low→mid” restatements of the delta header. Circular blurbs are rejected and replaced with a row-level fallback. Default Gemini model moved to gemini-3.6-flash after Google restricted 2.5-flash for many new API keys; thinking set to minimal so short JSON/copy is not truncated empty.',
   },
+  {
+    date: 'Jul 29, 2026',
+    note: 'Rescore “what changed” blurbs now lead with the commits that triggered the rescore (not README framing). Docs-only blurbs that ignore listed commits are rejected. Anthropic/Haiku remains the fallback when Gemini fails (quota/errors).',
+  },
 ]

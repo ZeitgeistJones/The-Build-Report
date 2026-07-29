@@ -41,7 +41,7 @@ function formatRepoScores(repo: Repo): string {
 function formatEvidenceBlock(evidence?: RescoreEvidenceForSummary | null): string {
   if (!evidence) return ''
   const roots = evidence.rootFiles.length ? evidence.rootFiles.join(', ') : 'none'
-  const lines = [`REPO EVIDENCE AT RESCORE (authoritative current state):`, `Root files: ${roots}`]
+  const lines = [`REPO EVIDENCE AT RESCORE (supporting context — commits above are primary for the blurb):`, `Root files: ${roots}`]
   if (evidence.readmeExcerpt?.trim()) {
     lines.push('README excerpt:')
     lines.push('"""')
@@ -178,10 +178,21 @@ function changedRows(deltas: RescoreAggregateDelta): RubricRowDelta[] {
   ].filter(r => r.oldLevel != null && r.oldLevel !== r.newLevel)
 }
 
-function fallbackFlatSummary(deltas: RescoreAggregateDelta): string {
+function formatCommitHint(commitMessages: string[]): string {
+  if (!commitMessages.length) return ''
+  const titles = commitMessages
+    .slice(0, 3)
+    .map(m => m.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  if (!titles.length) return ''
+  return ` Recent commits in this rescore window: ${titles.join('; ')}.`
+}
+
+function fallbackFlatSummary(deltas: RescoreAggregateDelta, commitMessages: string[] = []): string {
+  const commitHint = formatCommitHint(commitMessages)
   const bothFlat = deltas.economic.label === 'flat' && deltas.builderIntegrity.label === 'flat'
   if (bothFlat) {
-    return 'Scores stayed flat. Commit messages may describe more ambition than the current repo evidence supports for the rubric.'
+    return `Scores stayed flat — the commit titles above did not move the live rubric reading.${commitHint}`
   }
 
   const rows = changedRows(deltas)
@@ -190,16 +201,35 @@ function fallbackFlatSummary(deltas: RescoreAggregateDelta): string {
       .slice(0, 2)
       .map(r => `${r.label} moved ${r.oldLevel} → ${r.newLevel}`)
       .join('; ')
-    return `${bits}. Read those rows' source notes on the new score for the evidence behind the level change.`
+    return `${bits}. Check those rows' source notes for the evidence; the rescore was driven by the recent commits listed above.${commitHint}`
   }
 
   if (
     (deltas.economic.deltaPct != null && deltas.economic.deltaPct < 0) ||
     (deltas.builderIntegrity.deltaPct != null && deltas.builderIntegrity.deltaPct < 0)
   ) {
-    return 'Scores shifted as shown above based on the current repo evidence. Recent commits are context only and do not override the live tree and README the scorer already read.'
+    return `Scores shifted as shown above on a stricter reading of current evidence against the recent commits.${commitHint}`
   }
-  return 'Scores shifted as shown above. Recent commits may not yet move every rubric level.'
+  return `Scores shifted as shown above. Recent commits may not move every rubric level yet.${commitHint}`
+}
+
+/** Reject blurbs that ignore listed commits and only praise README/docs framing. */
+export function summaryIgnoresCommitsForDocsOnly(
+  text: string,
+  commitMessages: string[],
+): boolean {
+  if (!commitMessages.length) return false
+  const lower = text.toLowerCase()
+  const docsLed =
+    /\b(readme|documentation|docs|public framing|framing in its readme|documented purpose|documentation clarity)\b/.test(
+      lower,
+    )
+  if (!docsLed) return false
+  const mentionsCommitWork =
+    /\b(commit|commits|shipped|landed|merged|diff|pr|pull request|implement|fix|refactor|added|updated)\b/.test(
+      lower,
+    )
+  return !mentionsCommitWork
 }
 
 export async function generateRescoreChangeSummary(params: {
@@ -223,30 +253,33 @@ export async function generateRescoreChangeSummary(params: {
 
   const evidenceBlock = formatEvidenceBlock(evidence)
 
-  const prompt = `These are the old and new scores from a live rescore that just ran on the current repo. Recent commits are context only.
+  const prompt = `These are the old and new scores from a live rescore. The reader already sees the numeric delta header — do NOT restate it.
 
-COMPUTED DELTAS (authoritative — your narrative MUST match these directions; do NOT restate them as the explanation):
+COMPUTED DELTAS (match these directions; do NOT quote “±N pts” or letter transitions as your explanation):
 ${deltaHeader}
 
-Rubric row changes (mechanism already shown to the reader — do NOT use “row X moved low→mid” as the sole reason):
+Rubric row changes (already visible — do NOT use “row X moved low→mid” as the sole reason):
 ${rowChanges}
+
+RECENT COMMITS (PRIMARY focus for this blurb — these are why the rescore ran):
+${commitsBlock}
 
 OLD SCORES:
 ${oldRepo ? formatRepoScores(oldRepo) : 'No prior score on record.'}
 
-NEW SCORES (this rescore — already grounded in current repo evidence; each row has a source note):
+NEW SCORES (live rescore of current repo; each row has a source note):
 ${formatRepoScores(newRepo)}
 
-${evidenceBlock}RECENT COMMITS (context only — do NOT treat as more authoritative than REPO EVIDENCE / NEW SCORES):
-${commitsBlock}
-
-Write 1-2 sentences explaining WHY the new levels fit the evidence. Rules:
-- Lead with concrete evidence from NEW score source notes and/or REPO EVIDENCE / commits (what the repo shows). Do not open with “Builder standards rose N pts” or “Shipping leverage fell N pts” — the delta header already shows that.
-- Never explain a rise/fall only as “because [rubric row] moved from low to mid” (or mid→high, etc.). That restates the score change. Say what evidence justified the new level.
-- NEW SCORES already reflect this rescore of the current repo. Never say scores ignored newer commits, used an older snapshot, scored before these commits landed, or should wait for a "next cycle" to count them.
-- If REPO EVIDENCE is present, treat Root files + README as the current state. Never claim README, root tree, architecture docs, plans, tests, or engines are missing, outdated, or "have not caught up" when they appear there or when NEW score sources already cite them.
-- If a score is flat, say it stayed flat because the current evidence still supports that level — e.g. commit messages sound ahead of what the tree/README actually show. Do not invent timing excuses.
-- If a score fell, do not say it should rise or improved. Explain the harsher reading of current evidence without inventing missing files.
+${evidenceBlock}Write 1-2 sentences about what changed. Rules:
+- Lead with the recent commits: name concrete themes from the commit list (what shipped, fixed, refactored). This blurb is for holders who clicked Rescore because of those commits.
+- Then tie that commit work to why the new rubric levels fit — use NEW score source notes and REPO EVIDENCE as support, not as the opening story.
+- Do not open with README/docs “framing/clarity/purpose” unless the commits themselves are docs-only and that is what moved a row.
+- Do not open with “Builder standards rose N pts” or “Shipping leverage fell N pts”.
+- Never explain a rise/fall only as “because [rubric row] moved from low to mid”. Say what evidence justified the new level.
+- NEW SCORES already include this rescore. Never say scores ignored newer commits, used an older snapshot, or should wait for a next cycle.
+- If REPO EVIDENCE is present, never invent missing README/root docs that are listed there.
+- If a score is flat, say the commits did not yet change the live rubric reading (ambition in titles vs tree evidence is fine).
+- If a score fell, explain the harsher reading; do not say it improved.
 - If a score rose, do not say it declined.
 - Mention specific rubric rows only when they changed in RUBRIC ROW CHANGES above.
 - Do not promise a future rescore will fix the grade.
@@ -255,7 +288,7 @@ Plain English, no markdown.`
   try {
     const { text: raw } = await generateText({
       prompt,
-      maxTokens: 200,
+      maxTokens: 512,
       label: 'rescore-summary',
     })
     let text = raw ? stripMarkdown(raw) : ''
@@ -266,14 +299,15 @@ Plain English, no markdown.`
         summaryClaimsStaleSnapshot(text) ||
         summaryClaimsMissingDocs(text) ||
         summaryDeniesListedRootFiles(text, evidence) ||
-        summaryIsCircularRestatement(text))
+        summaryIsCircularRestatement(text) ||
+        summaryIgnoresCommitsForDocsOnly(text, commitMessages))
     ) {
-      text = fallbackFlatSummary(deltas)
+      text = fallbackFlatSummary(deltas, commitMessages)
     }
 
     return { summary: text || null, deltaHeader }
   } catch (err) {
     console.warn('[rescoreChangeSummary] generation failed:', err)
-    return { summary: null, deltaHeader }
+    return { summary: fallbackFlatSummary(deltas, commitMessages), deltaHeader }
   }
 }
