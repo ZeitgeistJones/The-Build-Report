@@ -17,8 +17,8 @@ export type GenerateTextResult = {
   provider: LlmProvider
 }
 
-/** Google restricted gemini-2.5-flash for many new API keys; 3.6 Flash is the current Flash default. */
-const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash'
+/** Prefer a Gemini model with spare free-tier quota; 3.6-flash is often RPD-capped first. */
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
 
 function geminiApiKey(): string | undefined {
@@ -34,9 +34,9 @@ function anthropicApiKey(): string | undefined {
   return process.env.ANTHROPIC_API_KEY?.trim() || undefined
 }
 
-/** True when either Gemini (primary) or Anthropic (fallback) is configured. */
+/** True when either Anthropic (primary) or Gemini (fallback) is configured. */
 export function hasLlmApiKey(): boolean {
-  return Boolean(geminiApiKey() || anthropicApiKey())
+  return Boolean(anthropicApiKey() || geminiApiKey())
 }
 
 function geminiModel(): string {
@@ -52,7 +52,7 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
 
   const ai = new GoogleGenAI({ apiKey })
-  // 3.x Flash thinks by default (medium). Thinking tokens share maxOutputTokens with
+  // 2.5/3.x Flash think by default. Thinking tokens share maxOutputTokens with
   // visible text — keep thinking minimal for short JSON/copy so we don't get empty replies.
   const response = await ai.models.generateContent({
     model: geminiModel(),
@@ -97,28 +97,28 @@ async function generateWithAnthropic(opts: GenerateTextOptions): Promise<string>
 }
 
 /**
- * Generate text with Gemini as primary and Anthropic as fallback.
- * Falls back when Gemini is unset or the Gemini call fails.
+ * Generate text with Anthropic Haiku as primary and Gemini as fallback.
+ * Falls back when Anthropic is unset or the Anthropic call fails.
  */
 export async function generateText(opts: GenerateTextOptions): Promise<GenerateTextResult> {
   const label = opts.label ?? 'llm'
-  const geminiKey = geminiApiKey()
   const anthropicKey = anthropicApiKey()
+  const geminiKey = geminiApiKey()
 
-  if (!geminiKey && !anthropicKey) {
-    throw new Error('No LLM API key configured (GEMINI_API_KEY or ANTHROPIC_API_KEY)')
+  if (!anthropicKey && !geminiKey) {
+    throw new Error('No LLM API key configured (ANTHROPIC_API_KEY or GEMINI_API_KEY)')
   }
 
-  if (geminiKey) {
+  if (anthropicKey) {
     try {
-      const text = await generateWithGemini(opts)
-      return { text, provider: 'gemini' }
+      const text = await generateWithAnthropic(opts)
+      return { text, provider: 'anthropic' }
     } catch (err) {
-      if (!anthropicKey) throw err
-      console.warn(`[${label}] Gemini failed; falling back to Anthropic:`, err)
+      if (!geminiKey) throw err
+      console.warn(`[${label}] Anthropic failed; falling back to Gemini:`, err)
     }
   }
 
-  const text = await generateWithAnthropic(opts)
-  return { text, provider: 'anthropic' }
+  const text = await generateWithGemini(opts)
+  return { text, provider: 'gemini' }
 }

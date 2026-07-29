@@ -4,7 +4,7 @@
  * Source of truth for the plain-English ("normie") voice used across The Build
  * Report. The canonical engine lives at talk-normie-2-me.vercel.app; this file
  * mirrors its system/personality prompt so our in-house LLM pipeline
- * (Gemini primary, Anthropic fallback — autoscore + daily digest) can produce
+ * (Haiku primary, Gemini fallback — autoscore + daily digest) can produce
  * copy in the same voice without a runtime dependency on that service.
  *
  * TN2M natively emits 6-paragraph repo explainers (<450 words). The Build

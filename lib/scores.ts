@@ -545,6 +545,6 @@ export const CHANGELOG = [
   },
   {
     date: 'Jul 29, 2026',
-    note: 'Rescore “what changed” blurbs now lead with the commits that triggered the rescore (not README framing). Docs-only blurbs that ignore listed commits are rejected. Anthropic/Haiku remains the fallback when Gemini fails (quota/errors).',
+    note: 'LLM routing back to Haiku-primary (claude-haiku-4-5) with Gemini as fallback — Gemini 3.6 free-tier RPD was capping overnight digests/rescored. Gemini fallback default is gemini-2.5-flash (separate quota bucket from 3.6). Rescore “what changed” blurbs lead with the commits that triggered the rescore; docs-only blurbs that ignore those commits are rejected.',
   },
 ]
