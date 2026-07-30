@@ -629,7 +629,9 @@ export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null>
 
   const gh = await fetchRepoBySlug(repoSlug, { fresh: true })
   if (!gh) {
-    throw new Error('Could not score repo — GitHub evidence was unavailable. Try again.')
+    throw new Error(
+      'Could not score repo — GitHub evidence was unavailable (API error or bad GITHUB_TOKEN). Try again.',
+    )
   }
 
   const raw: RawRepo = {

@@ -9,20 +9,38 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 
 const PRIORITY_SLUGS = Array.from(new Set(REPOS.map(r => r.githubSlug)))
 
-async function ghFetch(path: string, options?: { fresh?: boolean }) {
+async function ghFetch(path: string, options?: { fresh?: boolean }): Promise<unknown> {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github.v3+json',
   }
-  if (GITHUB_TOKEN) headers['Authorization'] = `Bearer ${GITHUB_TOKEN}`
+  const token = GITHUB_TOKEN?.trim()
+  if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(`https://api.github.com${path}`, {
+  const cacheOpts = options?.fresh
+    ? { cache: 'no-store' as const }
+    : { next: { revalidate: 3600, tags: ['github-stats'] as string[] } }
+
+  let res = await fetch(`https://api.github.com${path}`, {
     headers,
-    ...(options?.fresh
-      ? { cache: 'no-store' as const }
-      : { next: { revalidate: 3600, tags: ['github-stats'] } }),
+    ...cacheOpts,
   })
 
+  // Bad/expired GITHUB_TOKEN → 401 even on public repos. Retry anonymously.
+  if (res.status === 401 && token) {
+    console.warn(`[github] 401 with GITHUB_TOKEN for ${path}; retrying without auth`)
+    const { Authorization: _drop, ...anonHeaders } = headers
+    res = await fetch(`https://api.github.com${path}`, {
+      headers: anonHeaders,
+      ...cacheOpts,
+    })
+  }
+
   if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error(
+        'GitHub API unauthorized (401) — check GITHUB_TOKEN in Vercel (expired/revoked) or remove it to use public rate limits',
+      )
+    }
     if (res.status === 403 || res.status === 429) throw new Error('rate_limited')
     throw new Error(`GitHub API error: ${res.status} ${path}`)
   }
@@ -781,7 +799,16 @@ export async function fetchRepoBySlug(
   options?: { fresh?: boolean },
 ): Promise<GitHubRepo | null> {
   try {
-    const data = await ghFetch(`/repos/${GITHUB_ORG}/${slug}`, { fresh: options?.fresh })
+    const data = (await ghFetch(`/repos/${GITHUB_ORG}/${slug}`, {
+      fresh: options?.fresh,
+    })) as {
+      name: string
+      description?: string | null
+      created_at: string
+      pushed_at: string
+      language?: string | null
+      archived?: boolean
+    }
     return {
       name: data.name,
       description: data.description ?? null,
@@ -790,7 +817,8 @@ export async function fetchRepoBySlug(
       language: data.language ?? null,
       archived: data.archived === true,
     }
-  } catch {
+  } catch (err) {
+    console.error(`[github] fetchRepoBySlug(${slug}) failed:`, err)
     return null
   }
 }

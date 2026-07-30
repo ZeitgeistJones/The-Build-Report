@@ -61,6 +61,9 @@ function clientFacingRescoreError(err: unknown): string {
   if (message.includes('rate_limited') || message.includes('GitHub API')) {
     return 'GitHub rate limit hit while scoring — try again in a few minutes'
   }
+  if (message.includes('GitHub API unauthorized') || message.includes('GITHUB_TOKEN')) {
+    return 'GitHub auth failed — GITHUB_TOKEN in Vercel looks expired or revoked. Update or remove it, then try again.'
+  }
   if (
     message.includes('ANTHROPIC') ||
     message.includes('anthropic') ||
