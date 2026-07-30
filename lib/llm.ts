@@ -51,17 +51,21 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
   const apiKey = geminiApiKey()
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
 
+  const model = geminiModel()
+  // 2.5 uses thinkingBudget; 3.x uses thinkingLevel. Wrong field → API 400 and a dead fallback.
+  const thinkingConfig = model.includes('2.5')
+    ? { thinkingBudget: 0 }
+    : { thinkingLevel: ThinkingLevel.MINIMAL }
+
   const ai = new GoogleGenAI({ apiKey })
-  // 2.5/3.x Flash think by default. Thinking tokens share maxOutputTokens with
-  // visible text — keep thinking minimal for short JSON/copy so we don't get empty replies.
   const response = await ai.models.generateContent({
-    model: geminiModel(),
+    model,
     contents: opts.prompt,
     config: {
       ...(opts.system ? { systemInstruction: opts.system } : {}),
       ...(opts.maxTokens != null ? { maxOutputTokens: opts.maxTokens } : {}),
       ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
-      thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+      thinkingConfig,
     },
   })
 

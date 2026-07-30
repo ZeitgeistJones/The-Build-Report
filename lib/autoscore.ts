@@ -267,18 +267,31 @@ Respond ONLY with valid JSON, no markdown:
 }`
 
   const maxAttempts = 2
+  let lastFailure = 'AI returned an invalid score'
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const { text } = await generateText({
+      const { text, provider } = await generateText({
         prompt,
-        // Headroom for Gemini 3.x thinking + full rubric JSON (thinking shares this budget).
+        // Headroom for full rubric JSON (+ Gemini thinking when fallback is used).
         maxTokens: 8192,
         label: `autoscore:${repo.name}`,
       })
-      const clean = text.replace(/```json|```/g, '').trim()
-      const parsed = JSON.parse(clean)
+      const stripped = text.replace(/```json|```/g, '').trim()
+      const start = stripped.indexOf('{')
+      const end = stripped.lastIndexOf('}')
+      const clean =
+        start >= 0 && end > start ? stripped.slice(start, end + 1) : stripped
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(clean) as Record<string, unknown>
+      } catch {
+        lastFailure = `AI (${provider}) returned unparseable JSON`
+        console.error(`[autoscore] JSON parse failed for ${repo.name} via ${provider}:`, clean.slice(0, 400))
+        continue
+      }
 
-      if (!VALID_TAGS.has(parsed.tag)) {
+      if (!VALID_TAGS.has(parsed.tag as string)) {
+        lastFailure = `AI returned invalid tag "${String(parsed.tag)}"`
         console.error(`[autoscore] invalid tag for ${repo.name}:`, parsed.tag)
         continue
       }
@@ -288,13 +301,14 @@ Respond ONLY with valid JSON, no markdown:
       let shippingLeverage: Score | null = null
 
       if (hasShippingLeverageTag(tag)) {
-        if (validateShippingLeverageRows(parsed.shippingLeverage)) {
-          shippingLeverage = makeSlScore(parsed.shippingLeverage)
+        if (validateShippingLeverageRows(parsed.shippingLeverage as unknown[])) {
+          shippingLeverage = makeSlScore(parsed.shippingLeverage as Parameters<typeof makeSlScore>[0])
         } else {
-          const legacyRows: RubricRow[] = parsed.tokenMechanic ?? parsed.holderRelevance
+          const legacyRows: RubricRow[] = (parsed.tokenMechanic ?? parsed.holderRelevance) as RubricRow[]
           if (legacyRows?.length && validateTokenMechanicRows(legacyRows, tag)) {
             shippingLeverage = makeSlScore(relabelLegacyTmRowsToSl(legacyRows))
           } else {
+            lastFailure = 'AI returned an invalid shipping-leverage rubric'
             console.error(`[autoscore] invalid shippingLeverage rubric for ${repo.name}`)
             continue
           }
@@ -303,11 +317,12 @@ Respond ONLY with valid JSON, no markdown:
         const rawTm: unknown =
           parsed.tokenMechanic ??
           parsed.holderRelevance ??
-          (Array.isArray(parsed.shippingLeverage) && parsed.shippingLeverage.length === 3
+          (Array.isArray(parsed.shippingLeverage) && (parsed.shippingLeverage as unknown[]).length === 3
             ? parsed.shippingLeverage
             : null)
         const coercedTm = coerceTokenMechanicRows(rawTm, tag)
         if (!coercedTm) {
+          lastFailure = 'AI returned an invalid holder-economics rubric'
           console.error(
             `[autoscore] invalid tokenMechanic rubric for ${repo.name}:`,
             JSON.stringify({
@@ -321,7 +336,8 @@ Respond ONLY with valid JSON, no markdown:
         tokenMechanic = makeTmScore(coercedTm)
       }
 
-      if (!validateBuilderIntegrityRows(parsed.builderIntegrity)) {
+      if (!validateBuilderIntegrityRows(parsed.builderIntegrity as unknown[])) {
+        lastFailure = 'AI returned an invalid builder-standards rubric'
         console.error(
           `[autoscore] invalid builderIntegrity rubric for ${repo.name}:`,
           JSON.stringify(parsed.builderIntegrity),
@@ -329,7 +345,10 @@ Respond ONLY with valid JSON, no markdown:
         continue
       }
 
-      const biRows = applyShippingLeverageBiGuards(parsed.builderIntegrity, tag)
+      const biRows = applyShippingLeverageBiGuards(
+        parsed.builderIntegrity as Parameters<typeof applyShippingLeverageBiGuards>[0],
+        tag,
+      )
 
       const repoOut: Repo = {
         id: repo.name,
@@ -342,26 +361,29 @@ Respond ONLY with valid JSON, no markdown:
         tokenMechanic,
         shippingLeverage,
         builderIntegrity: makeBiScore(biRows),
-        verdict: parsed.verdict,
+        verdict: parsed.verdict as string,
         ...(typeof parsed.normieVerdict === 'string' && parsed.normieVerdict.trim()
           ? { normieVerdict: parsed.normieVerdict.trim() }
           : {}),
-        adminNote: parsed.adminNote,
+        adminNote: parsed.adminNote as string,
         scoringContextVersion: SCORING_CONTEXT_VERSION,
       }
 
       const economic = shippingLeverage ?? tokenMechanic
       console.log(
-        `[autoscore] done: ${repo.name} tag:${repoOut.tag} Econ:${economic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`,
+        `[autoscore] done: ${repo.name} via ${provider} tag:${repoOut.tag} Econ:${economic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`,
       )
       return normalizeAndApplyV3(repoOut)
     } catch (err) {
+      lastFailure = err instanceof Error ? err.message : 'AI scoring failed'
       console.error(`[autoscore] FAILED for ${repo.name} (attempt ${attempt}/${maxAttempts}):`, err)
-      if (attempt === maxAttempts) return null
+      if (attempt === maxAttempts) {
+        throw err instanceof Error ? err : new Error(lastFailure)
+      }
     }
   }
 
-  return null
+  throw new Error(`Could not score repo — ${lastFailure}. Try again.`)
 }
 
 async function cacheScoredRepo(
@@ -393,6 +415,8 @@ export async function inferAndCacheRepo(
     skipCache?: boolean
     persistent?: boolean
     scoreOrigin?: Repo['scoreOrigin']
+    /** Paid/promo path — surface AI/GitHub failures instead of returning null. */
+    throwOnError?: boolean
   },
 ): Promise<Repo | null> {
   const r = getRedis()
@@ -405,13 +429,20 @@ export async function inferAndCacheRepo(
   const chronicleContext =
     options?.chronicleContext ?? (await getChronicleContext().catch(() => null)) ?? undefined
 
-  const scored = await inferScore(raw, {
-    chronicleContext,
-    communityContext: options?.communityContext,
-    // Paid/promo rescore and forced regen must not score hour-old README/root listings
-    // while change summaries already use live commit messages.
-    freshEvidence: Boolean(options?.skipCache),
-  })
+  let scored: Repo | null = null
+  try {
+    scored = await inferScore(raw, {
+      chronicleContext,
+      communityContext: options?.communityContext,
+      // Paid/promo rescore and forced regen must not score hour-old README/root listings
+      // while change summaries already use live commit messages.
+      freshEvidence: Boolean(options?.skipCache),
+    })
+  } catch (err) {
+    if (options?.throwOnError) throw err
+    console.error(`[autoscore] infer failed for ${raw.name}:`, err)
+    return null
+  }
   if (!scored) return null
 
   await cacheScoredRepo(scored, {
@@ -566,11 +597,15 @@ export async function runAutoScores(
 
   for (const repo of batch) {
     if (excludedSlugs.has(repo.name)) continue
-    const scored = await inferScore(repo, { chronicleContext })
-    if (scored) {
-      await cacheScoredRepo(scored, { scoreOrigin: 'cron' })
-      results.push({ ...scored, scoreOrigin: 'cron' })
-      inferred.push(repo.name)
+    try {
+      const scored = await inferScore(repo, { chronicleContext })
+      if (scored) {
+        await cacheScoredRepo(scored, { scoreOrigin: 'cron' })
+        results.push({ ...scored, scoreOrigin: 'cron' })
+        inferred.push(repo.name)
+      }
+    } catch (err) {
+      console.error(`[autoscore] cron infer failed for ${repo.name}:`, err)
     }
   }
 
@@ -593,7 +628,9 @@ export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null>
   if (shouldSkipRepo(repoSlug)) return null
 
   const gh = await fetchRepoBySlug(repoSlug, { fresh: true })
-  if (!gh) return null
+  if (!gh) {
+    throw new Error('Could not score repo — GitHub evidence was unavailable. Try again.')
+  }
 
   const raw: RawRepo = {
     name: gh.name,
@@ -615,6 +652,7 @@ export async function runAutoscoreSingle(repoSlug: string): Promise<Repo | null>
     skipCache: true,
     persistent: true,
     scoreOrigin: 'paid',
+    throwOnError: true,
   })
 }
 
