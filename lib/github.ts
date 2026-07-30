@@ -9,7 +9,7 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 
 const PRIORITY_SLUGS = Array.from(new Set(REPOS.map(r => r.githubSlug)))
 
-async function ghFetch(path: string, options?: { fresh?: boolean }): Promise<unknown> {
+async function ghFetch(path: string, options?: { fresh?: boolean }): Promise<any> {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github.v3+json',
   }
@@ -799,16 +799,7 @@ export async function fetchRepoBySlug(
   options?: { fresh?: boolean },
 ): Promise<GitHubRepo | null> {
   try {
-    const data = (await ghFetch(`/repos/${GITHUB_ORG}/${slug}`, {
-      fresh: options?.fresh,
-    })) as {
-      name: string
-      description?: string | null
-      created_at: string
-      pushed_at: string
-      language?: string | null
-      archived?: boolean
-    }
+    const data = await ghFetch(`/repos/${GITHUB_ORG}/${slug}`, { fresh: options?.fresh })
     return {
       name: data.name,
       description: data.description ?? null,
