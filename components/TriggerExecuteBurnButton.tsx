@@ -12,6 +12,7 @@ import { MIN_TAP } from '@/lib/responsive'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import InfoTooltip from '@/components/InfoTooltip'
 import { NOTHING_PENDING_TOOLTIP } from '@/lib/burnTrackerCopy'
+import { playBurnClickSound, primeBurnAudio } from '@/lib/burnFx'
 
 interface Props {
   ethPending: number
@@ -94,6 +95,9 @@ export default function TriggerExecuteBurnButton({ ethPending, compact = false, 
       reset()
       return
     }
+
+    primeBurnAudio()
+    playBurnClickSound()
 
     writeContract(
       {
