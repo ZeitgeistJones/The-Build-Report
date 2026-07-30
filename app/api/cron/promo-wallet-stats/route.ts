@@ -9,13 +9,15 @@ const PAYOUT_PREFIX = 'build-report:promo-payout:'
 
 async function scanPrefix(match: string): Promise<string[]> {
   const r = getRedis()
-  let cursor: string | number = 0
+  let cursor = '0'
   const keys: string[] = []
   do {
-    const [next, batch] = await r.scan(cursor, { match, count: 200 })
-    cursor = typeof next === 'string' ? next : Number(next)
-    for (const key of batch ?? []) keys.push(String(key))
-  } while (String(cursor) !== '0')
+    const result = await r.scan(cursor, { match, count: 200 })
+    const next = String(result[0])
+    const batch = (result[1] ?? []) as string[]
+    cursor = next
+    for (const key of batch) keys.push(String(key))
+  } while (cursor !== '0')
   return keys
 }
 
