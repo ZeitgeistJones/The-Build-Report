@@ -907,6 +907,23 @@ export async function fetchRecentCommitMessages(slug: string, limit = 10): Promi
   }
 }
 
+/** Live commit author dates (newest first) for promo first-Score eligibility. */
+export async function fetchRecentCommitDates(slug: string, limit = 30): Promise<string[]> {
+  try {
+    const commits = await ghFetch(
+      `/repos/${GITHUB_ORG}/${slug}/commits?per_page=${Math.min(limit, 100)}`,
+      { fresh: true },
+    )
+    if (!Array.isArray(commits)) return []
+    return commits
+      .map((c: { commit?: { author?: { date?: string } } }) => c.commit?.author?.date)
+      .filter((d): d is string => Boolean(d))
+      .slice(0, limit)
+  } catch {
+    return []
+  }
+}
+
 /** Lightweight live probe — trackable repo list metadata (no per-repo commit scan). */
 export type TrackableRepoPush = {
   pushedAt: string

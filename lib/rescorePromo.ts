@@ -7,7 +7,7 @@ import { formatApproxUsdFromEth, formatPerCommitRewardUsd, formatRescorePriceLab
 import { getEthUsdRateCached } from '@/lib/ethUsdRate'
 import { APPROX_USD_NOTE_SHORT } from '@/lib/scoringCopy'
 import { resolveRepoBeforeRescore } from '@/lib/autoscore'
-import { fetchRepoBySlug } from '@/lib/github'
+import { fetchRecentCommitDates, fetchRepoBySlug } from '@/lib/github'
 import { getGitHubStatsForDisplay } from '@/lib/githubStatsSnapshot'
 import { isUnscoredRecent } from '@/lib/recentRepos'
 import { COMMIT_CAP } from '@/lib/commitsSinceScore'
@@ -123,25 +123,33 @@ export function isUnscoredPromoActivity(activity: RepoActivitySnapshot): boolean
 export function countCommitsAfterRepoCreated(activity: RepoActivitySnapshot): number {
   const createdMs = activity.createdAt ? new Date(activity.createdAt).getTime() : NaN
   const hasCreated = Number.isFinite(createdMs)
+  // GitHub's first commit can land a few seconds before created_at on brand-new repos.
+  const createFloor = hasCreated ? createdMs - 120_000 : Number.NEGATIVE_INFINITY
 
   if (activity.commitTimestamps?.length) {
     const count = activity.commitTimestamps.filter(ts => {
       const ms = new Date(ts).getTime()
       if (!Number.isFinite(ms)) return false
-      // On/after create: brand-new repos' first commit often shares created_at.
+      // On/after create (with skew): brand-new repos' first commit often shares created_at.
       // Fork parent history is still older than the fork's created_at, so it stays excluded.
-      return !hasCreated || ms >= createdMs
+      return ms >= createFloor
     }).length
-    return Math.min(count, COMMIT_CAP)
+    if (count > 0) return Math.min(count, COMMIT_CAP)
+    // Timestamps were all pre-create (fork parent history) — fall through to push signals.
   }
 
-  // No timestamp scan — credit activity that landed on/after the repo existed.
+  // No usable timestamp scan — credit activity that landed on/after the repo existed.
   for (const raw of [activity.lastCommitAt, activity.pushedAt]) {
     if (!raw) continue
     const ms = new Date(raw).getTime()
     if (!Number.isFinite(ms)) continue
-    if (!hasCreated || ms >= createdMs) return 1
+    if (ms >= createFloor) return 1
   }
+
+  // Card may already show rolling commit counts before a full timestamp scan lands.
+  const rolling = Math.max(activity.commits7d ?? 0, activity.commits30d ?? 0)
+  if (rolling > 0) return Math.min(rolling, COMMIT_CAP)
+
   return 0
 }
 
@@ -445,9 +453,10 @@ export async function resolvePromoActivitySnapshot(
   }
 
   // Awaiting-score repos are not in Redis yet — still promo-eligible from GitHub activity.
+  let snap: RepoActivitySnapshot | null = null
   if (!repo) {
     if (!githubRepo && !activity) return null
-    return repoToActivitySnapshot({
+    snap = repoToActivitySnapshot({
       scoredAt: null,
       lastCommitAt: activity?.lastCommitAt ?? null,
       pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
@@ -457,21 +466,36 @@ export async function resolvePromoActivitySnapshot(
       createdAt: githubRepo?.createdAt ?? null,
       adminNote: 'Unscored — visible because it was recently pushed on GitHub.',
     })
+  } else {
+    const unscored = isUnscoredRecent(repo)
+    snap = repoToActivitySnapshot({
+      // Ignore placeholder scoredAt on unscored cards so earn counts post-create commits.
+      scoredAt: unscored ? null : repo.scoredAt,
+      lastCommitAt: activity?.lastCommitAt ?? null,
+      pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
+      commits7d: activity?.commits7d ?? null,
+      commits30d: activity?.commits30d ?? null,
+      commitTimestamps: activity?.commitTimestamps ?? null,
+      createdAt: githubRepo?.createdAt ?? null,
+      adminNote: repo.adminNote,
+      scoringContextVersion: repo.scoringContextVersion,
+    })
   }
 
-  const unscored = isUnscoredRecent(repo)
-  return repoToActivitySnapshot({
-    // Ignore placeholder scoredAt on unscored cards so earn counts post-create commits.
-    scoredAt: unscored ? null : repo.scoredAt,
-    lastCommitAt: activity?.lastCommitAt ?? null,
-    pushedAt: githubRepo?.pushedAt ?? activity?.pushedAt ?? null,
-    commits7d: activity?.commits7d ?? null,
-    commits30d: activity?.commits30d ?? null,
-    commitTimestamps: activity?.commitTimestamps ?? null,
-    createdAt: githubRepo?.createdAt ?? null,
-    adminNote: repo.adminNote ?? (unscored ? 'Unscored — visible because it was recently pushed on GitHub.' : null),
-    scoringContextVersion: repo.scoringContextVersion,
-  })
+  // Snapshot lag: card can show commits while promo timestamps are missing/pre-create.
+  // Live-fetch so a single post-create commit still earns (~$0.01 wallet half).
+  if (snap && isUnscoredPromoActivity(snap) && computeStaleCommitCount(snap) === 0) {
+    const dates = await fetchRecentCommitDates(repoSlug, 30)
+    if (dates.length) {
+      snap = {
+        ...snap,
+        commitTimestamps: dates,
+        lastCommitAt: dates[0] ?? snap.lastCommitAt,
+      }
+    }
+  }
+
+  return snap
 }
 
 export type OpenPromoRewardsSummary = {
