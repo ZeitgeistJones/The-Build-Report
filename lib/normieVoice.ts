@@ -44,6 +44,7 @@ export const NORMIE_VOICE_RULES = [
   'Answer "why does this matter if I hold the token?" without hype and without financial advice.',
   'Be honest about limits — say plainly when something is early, unproven, or a bet on the future.',
   'Never use insider terms like infra, R&D, rubric, token mechanic, supply-lock, direct-tag, TM, or SL.',
+  'Repo names (GitHub slugs) in the source are identity anchors — keep every one you rewrite. You may add a short plain gloss after a name (e.g. "fwaah — the prediction-game dashboard — …"). Never replace a named repo with a vague stand-in like "the main interface", "the research team", or "some backend fixes".',
 ] as const
 
 /**
@@ -54,9 +55,9 @@ export const NORMIE_SURFACE_SHAPES = {
   verdict: '2-4 sentences, a single paragraph. No headers or dates.',
   gradeCard: '2-3 sentences, plain words, no stats or letter grades.',
   digestGeneral:
-    '2-5 sentences as needed — use fewer when the day was quiet or the story is simple; use more when multiple repos shipped meaningful work. Same repo names and wins as the standard overview, just simpler words. Do not pad; do not compress away real detail.',
+    '2-5 sentences as needed — use fewer when the day was quiet or the story is simple; use more when multiple repos shipped meaningful work. Keep every repo slug the standard overview names (add a short plain gloss if helpful). Same wins and topics, simpler words — never swap a named project for a vague description. Do not pad; do not compress away real detail.',
   needle:
-    '2-3 sentences, one short paragraph. Same repo names and grade moves as the standard Needle, but no letter-grade jargon — say the score went up or down in plain words.',
+    '2-3 sentences, one short paragraph. Keep every repo name from the standard Needle; describe grade moves in plain words (no letter-grade jargon).',
   spotted:
     '2-3 sentences, one short paragraph. Same who/what/why as the standard Spotted writeup — who posted, what they said, why it matters — with zero jargon.',
   overheard:
@@ -72,7 +73,7 @@ export const NORMIE_EXAMPLES: { label: string; dev: string; normie: string }[] =
     label: 'Infrastructure repo (clawd-containers)',
     dev: "This repo is the infrastructure layer for clawdbotatg's autonomous agent fleet — the host-side tooling that runs five Claude Code workers in isolated tart VMs on an Apple Silicon Mac mini.",
     normie:
-      "Ok so this repo is basically the engine room of the whole CLAWD operation. It's the code that runs on a Mac mini somewhere and manages a little army of AI workers — each one living in its own virtual Mac, waking up when there's a job, doing the job, and going back to sleep.",
+      "Ok so clawd-containers is basically the engine room of the whole CLAWD operation. It's the code that runs on a Mac mini somewhere and manages a little army of AI workers — each one living in its own virtual Mac, waking up when there's a job, doing the job, and going back to sleep.",
   },
   {
     label: 'Reusable scaffold (claude-p-agent)',
@@ -96,9 +97,19 @@ export const NORMIE_EXAMPLES: { label: string; dev: string; normie: string }[] =
     label: 'Daily digest overview',
     dev: 'Yesterday was heavy on real-time communication and design infrastructure. clawd-live-chat shipped voice calls, while slop-circle completed a design-token refactor.',
     normie:
-      "Yesterday was a big day — most of the work was around real-time communication and getting the visual design system in order. The live chat project got a serious upgrade, and a design project did a big cleanup, tidying up the foundation so everything builds on the same base.",
+      'Yesterday was a big day for two named projects. clawd-live-chat — the live chat app — shipped voice calls, and slop-circle cleaned up its shared design tokens so the visual system stays consistent.',
   },
 ]
+
+/** Repo slugs named in `source` that are missing from `normie` (case-insensitive). */
+export function missingNamedRepos(source: string, normie: string, slugs: string[]): string[] {
+  const sourceLower = source.toLowerCase()
+  const normieLower = normie.toLowerCase()
+  return slugs.filter(slug => {
+    const key = slug.toLowerCase()
+    return sourceLower.includes(key) && !normieLower.includes(key)
+  })
+}
 
 /**
  * Build the reusable voice guidance block for injection into an existing
@@ -106,7 +117,16 @@ export const NORMIE_EXAMPLES: { label: string; dev: string; normie: string }[] =
  */
 export function normieVoiceGuidance(surface: keyof typeof NORMIE_SURFACE_SHAPES): string {
   const rules = NORMIE_VOICE_RULES.map(r => `- ${r}`).join('\n')
-  const examples = NORMIE_EXAMPLES.slice(0, 3)
+  // Prefer the digest overview few-shot on digest surfaces — it teaches repo-name retention.
+  const examplePool =
+    surface === 'digestGeneral'
+      ? [
+          NORMIE_EXAMPLES.find(e => e.label === 'Daily digest overview')!,
+          NORMIE_EXAMPLES.find(e => e.label.startsWith('Money-moving'))!,
+          NORMIE_EXAMPLES.find(e => e.label.startsWith('Holder-economics'))!,
+        ].filter(Boolean)
+      : NORMIE_EXAMPLES.slice(0, 3)
+  const examples = examplePool
     .map(e => `  Dev: ${e.dev}\n  Normie: ${e.normie}`)
     .join('\n\n')
   return [

@@ -9,7 +9,7 @@ import { shouldSkipRepo } from '@/lib/repoFilters'
 import { REPOS, type Repo } from '@/lib/scores'
 import type { GitHubStats } from '@/lib/github'
 import { stripMarkdown } from '@/lib/textCleanup'
-import { normieVoiceGuidance } from '@/lib/normieVoice'
+import { missingNamedRepos, normieVoiceGuidance } from '@/lib/normieVoice'
 import { BRIEF_DATES_INDEX_KEY, indexArchiveDate } from '@/lib/archiveIndex'
 import {
   calcBuilderGrade,
@@ -360,7 +360,7 @@ ${gradeContext}
 Return ONLY valid JSON, no markdown fences:
 {
   "general": "5-6 sentences. Plain English morning overview of what shipped yesterday. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.",
-  "generalNormie": "Same facts and repo coverage as general, rewritten for someone who knows nothing about code or crypto — warmer and simpler words, not a shorter summary. 2-5 sentences as needed (fewer only when honestly warranted). Follow the generalNormie voice guide below.",
+  "generalNormie": "Same facts AND the same repo slugs as general, rewritten for someone who knows nothing about code or crypto — warmer and simpler words, not a shorter summary. Keep every repo name general uses; you may add a short plain gloss after a slug. Never replace a named repo with a vague stand-in. 2-5 sentences as needed (fewer only when honestly warranted). Follow the generalNormie voice guide below.",
   "cards": {
     "24h": {
       "builder": "2-3 sentences about builder activity for the last 24 hours.",
@@ -394,7 +394,7 @@ Rules:
 - 60d cards: describe the two-month arc. Do not imply week-over-week trend or compare to a prior 60d window.
 - 24h with no activity: one short honest sentence per card beats three padded ones.
 - general: 5-6 complete sentences, meatier than any single card. Use the extra sentences to name specific repos/work from the commit list and explain why it matters to holders — not repetition.
-- generalNormie: same facts and repo names as general — simpler words, not a compressed summary. 2-5 sentences as needed; shorter only when the day was genuinely quiet.
+- generalNormie: same facts and the same repo slugs as general — simpler words, not a compressed summary. Keep every slug general names (optional short plain gloss after a name is fine). Never swap a named project for "the main interface", "the research team", "some backend fixes", or similar vague stand-ins. 2-5 sentences as needed; shorter only when the day was genuinely quiet.
 - CARD COPY MUST BE PLAIN WORDS — no percentages, letter grades, or raw stats dumps in the card fields. You MAY name specific projects when PER-PERIOD TOP PROJECTS shows one repo dominated that window.
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
 - Say "holder economics" or "how apps and locks serve $CLAWD holders" instead of "token mechanics" or "burn apps" alone.
@@ -442,9 +442,32 @@ Rules:
           }
         : {}),
     })
+    const general = stripMarkdown(parsed.general)
+    let generalNormie = parsed.generalNormie ? stripMarkdown(parsed.generalNormie) : undefined
+    const activitySlugs = activity.map(a => a.slug)
+    if (generalNormie) {
+      const missing = missingNamedRepos(general, generalNormie, activitySlugs)
+      if (missing.length > 0) {
+        console.warn('[build-brief] generalNormie dropped repo names; repairing', { missing })
+        const repaired = await repairGeneralNormie(general, generalNormie, missing)
+        if (repaired) {
+          const stillMissing = missingNamedRepos(general, repaired, activitySlugs)
+          if (stillMissing.length === 0) {
+            generalNormie = repaired
+          } else {
+            console.warn('[build-brief] generalNormie repair still missing names; dropping normie overview', {
+              stillMissing,
+            })
+            generalNormie = undefined
+          }
+        } else {
+          generalNormie = undefined
+        }
+      }
+    }
     return {
-      general: stripMarkdown(parsed.general),
-      ...(parsed.generalNormie ? { generalNormie: stripMarkdown(parsed.generalNormie) } : {}),
+      general,
+      ...(generalNormie ? { generalNormie } : {}),
       cards: {
         '24h': mapRow(parsed.cards['24h']),
         '7d': mapRow(parsed.cards['7d']),
@@ -454,6 +477,40 @@ Rules:
     }
   } catch (err) {
     console.error('[build-brief] digest AI generation failed:', err)
+    return null
+  }
+}
+
+/** One-shot rewrite when Plain English overview dropped repo identity anchors. */
+async function repairGeneralNormie(
+  general: string,
+  generalNormie: string,
+  missingSlugs: string[],
+): Promise<string | null> {
+  if (!hasLlmApiKey()) return null
+  try {
+    const { text } = await generateText({
+      prompt: `Rewrite the plain-English overview so it keeps the same repo identity as the standard overview.
+
+STANDARD OVERVIEW (source of truth for which repos and topics):
+${general}
+
+PLAIN-ENGLISH DRAFT (warmer/simpler, but it dropped or blurred these repo names: ${missingSlugs.join(', ')}):
+${generalNormie}
+
+Return ONLY the repaired plain-English overview as plain text (no JSON, no markdown). Rules:
+- Keep every repo slug the standard overview names (${missingSlugs.join(', ')} must appear).
+- You may add a short plain gloss after a slug (e.g. "fwaah — the prediction-game dashboard — …").
+- Same facts and topics; simpler words; warm friend voice.
+- Never replace a named repo with a vague stand-in like "the main interface" or "the research team".
+${normieVoiceGuidance('digestGeneral')}`,
+      maxTokens: 1024,
+      label: 'build-brief-normie-repair',
+    })
+    const cleaned = text ? stripMarkdown(text.trim()) : ''
+    return cleaned || null
+  } catch (err) {
+    console.error('[build-brief] generalNormie repair failed:', err)
     return null
   }
 }
