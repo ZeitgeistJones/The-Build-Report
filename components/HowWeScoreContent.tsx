@@ -147,9 +147,9 @@ export default function HowWeScoreContent({
               ). When less than 20% of a window&apos;s commits land on holder-facing repos, the grade is scaled down (to a floor of 0.35×) to reflect thin holder attention — the unadjusted quality number is kept separately.
             </li>
             <li style={{ marginTop: '6px' }}>
-              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Shipping leverage</strong> — the second lens on holder value: a commit-weighted average of the infrastructure, indirect, and theoretical repos, scored on how much they multiply the builder&apos;s ability to ship consumer apps that burn or lock CLAWD (
+              <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Shipping leverage</strong> — sibling holder-value grade: a commit-weighted average of the infrastructure, indirect, and theoretical repos, scored on how much they multiply the builder&apos;s ability to ship consumer apps that burn or lock CLAWD (
               <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>see rubric</a>
-              ). These are the repos excluded from Holder economics — here they get their own accumulated grade instead of only per-card scores.
+              ). These repos are excluded from Holder economics and roll up here instead of only as per-card scores.
             </li>
             <li style={{ marginTop: '6px' }}>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Builder standards</strong> — commit-weighted rubric quality across all scored repos, including infrastructure (
@@ -217,7 +217,7 @@ export default function HowWeScoreContent({
             </li>
             <li style={{ marginBottom: '6px' }}>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Scoring handbook</strong> — rules, repo
-              cheat sheet, Chronicle timeline below (economics, tags, the direct-burn vs shipping-leverage lens for holder economics).
+              cheat sheet, Chronicle timeline below (economics, tags, Holder economics vs Shipping leverage).
             </li>
             <li>
               <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>Community submissions</strong> — holder
@@ -296,7 +296,7 @@ export default function HowWeScoreContent({
           Repo tags
         </h3>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>
-          Tag picks which holder-economics lens applies — direct/supply-lock are scored on their direct CLAWD burn or lock; infra/indirect/theoretical on shipping leverage. Every repo gets builder standards.{' '}
+          Tag picks which holder-value grade applies — direct/supply-lock get Holder economics (direct CLAWD burn or lock); infra/indirect/theoretical get Shipping leverage. Every repo gets builder standards.{' '}
           <a href="#hw-score-rubrics" style={{ color: 'var(--accent)' }}>Row definitions →</a>
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>

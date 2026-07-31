@@ -15,7 +15,7 @@ export const REPO_FILTER_TOOLTIPS = {
   'new-arrivals': 'Repos created on GitHub in the selected window.',
   'holder-economics': 'Direct-burn and supply-lock repos — the Holder economics sample.',
   'shipping-leverage':
-    'Indirect, infrastructure, and theoretical repos scored on how much they help holder-facing apps ship.',
+    'Indirect, infrastructure, and theoretical repos — the Shipping leverage sample.',
   'clawd-cv-perks': CLAWD_CV_PERKS_TOOLTIP,
   'community-context': COMMUNITY_CONTEXT_FILTER_TOOLTIP,
 } as const
@@ -44,7 +44,7 @@ export const TAG_TOOLTIPS: Record<Tag, string> = {
   'supply-lock': 'Removes CLAWD from circulation temporarily (staking, vesting, locks).',
   indirect: 'Enables other repos that burn CLAWD — scored on shipping leverage, not direct burn.',
   infrastructure: 'Foundational tooling — scored on shipping leverage, not direct CLAWD mechanic.',
-  theoretical: 'R&D or early-stage — no live holder mechanic yet.',
+  theoretical: 'R&D or early-stage — scored on shipping leverage; no live burn/lock mechanic yet.',
 }
 
 export const LIFECYCLE_TOOLTIPS: Record<RepoLifecycle, string> = {
@@ -57,7 +57,10 @@ export const AWAITING_SCORE_TOOLTIP =
   'Recently pushed on GitHub but not scored yet. Pay to run Live AI for rubric grades.'
 
 export const HOLDER_ECONOMICS_COLUMN_TOOLTIP =
-  'This repo\'s holder economic impact. Direct-burn and supply-lock repos are scored on their direct CLAWD burn or lock mechanic and feed the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage instead — they feed the separate Shipping leverage Ecosystem Grade, the second lens on holder value at the top.'
+  'This repo\'s Holder economics grade — direct CLAWD burn or lock impact. Rolls up into the Holder economics Ecosystem Grade at the top.'
+
+export const SHIPPING_LEVERAGE_COLUMN_TOOLTIP =
+  'This repo\'s Shipping leverage grade — how much it multiplies the builder\'s ability to ship consumer apps that burn or lock CLAWD. Rolls up into the Shipping leverage Ecosystem Grade at the top — a sibling to Holder economics.'
 
 export const BUILDER_STANDARDS_COLUMN_TOOLTIP =
   'Observable safety, testing, and transparency for this repo — scored on every tracked project. Rubric rows vary by repo type (consumer apps vs infra/tooling). Feeds the Builder standards Ecosystem Grade at the top.'

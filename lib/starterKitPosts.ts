@@ -121,9 +121,9 @@ ${TBR_SITE_URL}`,
 They're the engine room — infra and tooling. They don't burn $CLAWD directly; they speed up the apps that do.
 
 ${TBR_SITE_URL}`,
-      `A low Holder economics grade on an infra repo isn't a scandal — that rubric isn't built for it.
+      `Infra repos don't get a Holder economics grade — that rubric is for burn/lock apps.
 
-Shipping leverage is the other lens. Both sit at the top so you can see the split clearly.
+They get Shipping leverage instead. Both grades sit as siblings at the top so you can see the split clearly.
 
 ${TBR_SITE_URL}`,
     ],

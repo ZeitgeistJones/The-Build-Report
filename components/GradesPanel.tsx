@@ -573,7 +573,7 @@ export default function GradesPanel({
         {sg.counts.mid > 0 && statSpan(`${sg.counts.mid} mid-leverage commits`)}
         {sg.counts.low > 0 && statSpan(`${sg.counts.low} low-leverage commits`)}
         {statSpan(
-          'Scored on tooling that helps ship holder value, not direct CLAWD burn. Its own Ecosystem Grade — separate from Holder economics.',
+          'Scored on tooling that helps ship holder value, not direct CLAWD burn. Sibling Ecosystem Grade to Holder economics.',
           true,
         )}
       </>

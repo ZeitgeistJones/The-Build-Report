@@ -13,9 +13,14 @@ export function integritySectionFraming(repo: Repo): string | null {
   return 'Accountability on stated vision, safety, and follow-through for holder-facing repos.'
 }
 
+/** Expanded scorecard section title — siblings, not umbrella + lens. */
+export function economicSectionTitle(repo: Repo): string {
+  return showsEconomicNa(repo) ? 'Shipping leverage' : 'Holder economics'
+}
+
 export function economicSectionFraming(repo: Repo): string | null {
   if (showsEconomicNa(repo)) {
-    return 'Indirect holder value — how much this repo multiplies the builder\'s ability to ship consumer apps that burn or lock CLAWD. This is a Repo Grade that rolls up into the Shipping leverage Ecosystem Grade at the top — a separate lens from Holder economics.'
+    return 'Indirect holder value — how much this repo multiplies the builder\'s ability to ship consumer apps that burn or lock CLAWD. Rolls up into the Shipping leverage Ecosystem Grade at the top — a sibling lens to Holder economics.'
   }
   if (getEffectiveTag(repo) === 'supply-lock') {
     return 'CLAWD lock / supply impact — CV burns are not CLAWD burns. Expand rows for detail.'
@@ -24,13 +29,6 @@ export function economicSectionFraming(repo: Repo): string | null {
     return 'Direct CLAWD burn or lock on use — expand rows for detail.'
   }
   return null
-}
-
-/** Which lens the holder-economics score was measured through, for the section qualifier. */
-export function economicLensLabel(repo: Repo): string {
-  if (showsEconomicNa(repo)) return 'shipping leverage'
-  if (getEffectiveTag(repo) === 'supply-lock') return 'CLAWD lock'
-  return 'direct burn'
 }
 
 export function integrityGradeFootnote(): string {

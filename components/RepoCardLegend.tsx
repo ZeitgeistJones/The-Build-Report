@@ -8,15 +8,15 @@ const STORAGE_KEY = 'build-report-card-legend-open'
 const LEGEND_ITEMS = [
   {
     label: 'Tag',
-    text: 'Repo type — picks which lens Holder economics is scored through (direct burn, supply lock, or shipping leverage).',
+    text: 'Repo type — picks which holder-value grade applies: Holder economics (direct burn / supply lock) or Shipping leverage (infra / indirect / theoretical).',
   },
   {
     label: 'Holder economics',
-    text: 'Repo Grade for holder economic impact. Burn and supply-lock repos are scored on direct CLAWD burn or lock, and feed the Ecosystem Grade for Holder economics at the top. Infrastructure, indirect, and theoretical repos are scored on shipping leverage instead — how much they multiply the builder\u2019s ability to ship consumer apps that burn or lock CLAWD — and feed the separate Shipping leverage Ecosystem Grade.',
+    text: 'Repo Grade for direct CLAWD burn or lock impact. Rolls up into the Holder economics Ecosystem Grade at the top.',
   },
   {
     label: 'shipping leverage',
-    text: 'Indirect and infrastructure repos are scored on shipping leverage — how much they help consumer burn/lock apps ship. That Repo Grade rolls into the Shipping leverage Ecosystem Grade at the top, not Holder economics.',
+    text: 'Repo Grade for how much infra/tooling multiplies shipping of consumer burn/lock apps. Rolls up into the Shipping leverage Ecosystem Grade at the top — a sibling to Holder economics, not a sub-score of it.',
   },
   {
     label: 'Builder standards',
@@ -28,7 +28,7 @@ const LEGEND_ITEMS = [
   },
   {
     label: 'Letter grades',
-    text: 'Each card shows two Repo Grades — Holder economics and Builder standards. Colors show A–F only. Builder activity and Shipping leverage are Ecosystem Grades shown at the top panel, not on cards.',
+    text: 'Each card shows Builder standards plus either Holder economics or Shipping leverage (by tag). Colors show A–F only. Builder activity is Ecosystem-only at the top; the two holder-value Ecosystem Grades roll up the matching repo samples.',
   },
 ] as const
 

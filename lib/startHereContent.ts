@@ -146,7 +146,7 @@ export const START_HERE_GLOSSARY: { term: string; definition: string }[] = [
   {
     term: 'Infrastructure (Infra)',
     definition:
-      'Repos supporting the ecosystem behind the scenes — no direct holder impact, but necessary for everything else',
+      'Repos supporting the ecosystem behind the scenes — scored on shipping leverage, not direct burn',
   },
 ]
 
@@ -207,7 +207,7 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
       },
       {
         title: 'Shipping leverage',
-        body: 'This is the second lens on holder value, for the behind-the-scenes repos — infrastructure, tooling, and R&D — that don\'t burn or lock $CLAWD themselves. It asks: how much does this work multiply the builder\'s ability to ship the apps that DO benefit holders? These repos used to be scored per-card but left out of the top averages, which was confusing. Now they roll up into their own Shipping leverage Ecosystem Grade at the top, paired with Holder economics as two lenses on the same question. A strong grade here means the plumbing is speeding up holder-facing shipping, even with zero direct burns in the repo.',
+        body: 'Sibling holder-value grade for behind-the-scenes repos — infrastructure, tooling, and R&D — that don\'t burn or lock $CLAWD themselves. It asks: how much does this work multiply the builder\'s ability to ship the apps that DO benefit holders? These repos used to be scored per-card but left out of the top averages, which was confusing. Now they roll up into their own Shipping leverage Ecosystem Grade at the top, paired with Holder economics as peers on the same question. A strong grade here means the plumbing is speeding up holder-facing shipping, even with zero direct burns in the repo.',
         analogy: START_HERE_ANALOGIES[5],
       },
       {
@@ -237,7 +237,7 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
       },
       {
         title: 'Step 3 — The repo list',
-        body: 'Each row is one project. Each card shows two Repo Grades — Holder economics and Builder standards — plus that repo\'s commit count for the window, its last-activity timestamp, and a status badge (Shipping, Stable, or Done). Use the filters above the list to narrow things down: Holder economics for direct-burn and supply-lock repos, Shipping leverage for infra/tooling, New arrivals for repos created in the selected window, Recently rescored for live Score/Rescore activity (what can feed The Needle), Clawd/CV perks for holder-gated apps, Community context for repos with holder-submitted context. Sort by Recent, Most active, or Grades. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Most active, set the window to 7d, and start there.',
+        body: 'Each row is one project. Each card shows Builder standards plus either Holder economics or Shipping leverage (by tag) — plus that repo\'s commit count for the window, its last-activity timestamp, and a status badge (Shipping, Stable, or Done). Use the filters above the list to narrow things down: Holder economics for direct-burn and supply-lock repos, Shipping leverage for infra/tooling, New arrivals for repos created in the selected window, Recently rescored for live Score/Rescore activity (what can feed The Needle), Clawd/CV perks for holder-gated apps, Community context for repos with holder-submitted context. Sort by Recent, Most active, or Grades. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Most active, set the window to 7d, and start there.',
       },
     ],
   },

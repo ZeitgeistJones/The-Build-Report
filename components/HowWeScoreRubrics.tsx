@@ -11,7 +11,7 @@ export default function HowWeScoreRubrics() {
         Score rubrics
       </h3>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
-        Repo Grades — each card shows Holder economics (scored through a direct-burn or shipping-leverage lens, depending on repo type) plus builder standards. Expand each row for definitions and observable signal examples.
+        Repo Grades — each card shows Builder standards plus either Holder economics or Shipping leverage (by repo type). Expand each row for definitions and observable signal examples.
       </p>
       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: 1.5 }}>
         <strong style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>Score floors:</strong>{' '}

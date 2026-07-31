@@ -46,7 +46,7 @@ import {
   RESCORE_SUMMARY_NOTE,
 } from '@/lib/scoringCopy'
 import { diffRubricRows, rowDeltaByLabel } from '@/lib/rescoreDeltas'
-import { integritySectionFraming, economicSectionFraming, economicLensLabel } from '@/lib/cardFraming'
+import { integritySectionFraming, economicSectionFraming, economicSectionTitle } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 import { commitsSinceScoreLabel, countCommitsSinceScore, repoNeedsRescore, repoNeedsRescoreSortKey } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
@@ -64,6 +64,7 @@ import {
   BUILDER_STANDARDS_COLUMN_TOOLTIP,
   criticalPathTooltip,
   HOLDER_ECONOMICS_COLUMN_TOOLTIP,
+  SHIPPING_LEVERAGE_COLUMN_TOOLTIP,
   LIFECYCLE_TOOLTIPS,
   commitsColumnTooltip,
   formatPeriodCommitDisplay,
@@ -1185,7 +1186,7 @@ export default function RepoList({
               <RepoBadge
                 tooltip={
                   showsEconomicNa(repo)
-                    ? REPO_FILTER_TOOLTIPS['shipping-leverage']
+                    ? SHIPPING_LEVERAGE_COLUMN_TOOLTIP
                     : HOLDER_ECONOMICS_COLUMN_TOOLTIP
                 }
                 style={{ ...metricColStyle(isMobile, METRIC_COL_WIDTH.holder), display: 'block' }}
@@ -1291,10 +1292,7 @@ export default function RepoList({
                   {economicScore && (
                     <div style={rubricSectionGridStyle('tm', hasSL, hasTM, isMobile)}>
                       <RubricSectionTitle>
-                        Holder economics
-                        <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--text-muted)' }}>
-                          {' · '}{economicLensLabel(repo)}
-                        </span>
+                        {economicSectionTitle(repo)}
                       </RubricSectionTitle>
                       {economicSectionFraming(repo) && (
                         <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.35 }}>
@@ -1322,9 +1320,9 @@ export default function RepoList({
 
                   {!hasSL && !hasTM && (
                     <div style={rubricSectionGridStyle('tm', false, false, isMobile)}>
-                      <RubricSectionTitle>Holder economics</RubricSectionTitle>
+                      <RubricSectionTitle>{economicSectionTitle(repo)}</RubricSectionTitle>
                       <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
-                        Not yet scored on holder economics.
+                        Not yet scored on {economicSectionTitle(repo).toLowerCase()}.
                       </p>
                     </div>
                   )}
