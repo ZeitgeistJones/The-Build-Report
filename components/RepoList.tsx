@@ -864,9 +864,9 @@ export default function RepoList({
     const pending = isUnscoredRecent(repo)
     const effectiveVerdict =
       normie && repo.normieVerdict?.trim() ? repo.normieVerdict : repo.verdict
-    const blurbDescription =
-      normie && repo.normieVerdict?.trim() ? null : repo.description
-    const blurb = pickRepoBlurb(blurbDescription, effectiveVerdict, pending)
+    // Always keep the GitHub description as background context — Plain English only
+    // swaps the scoring verdict, it must not hide what the repo is.
+    const blurb = pickRepoBlurb(repo.description, effectiveVerdict, pending)
     const verdictText = effectiveVerdict?.trim() ?? ''
     const showSeparateVerdict =
       isExpanded &&

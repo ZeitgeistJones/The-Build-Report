@@ -2,6 +2,7 @@ import { generateText, hasLlmApiKey } from './llm'
 import { Repo, Score } from './scores'
 import { getShippingLeverage, getTokenMechanicForDisplay } from './economicGrade'
 import { stripMarkdown } from './textCleanup'
+import { normieVoiceGuidance } from './normieVoice'
 import {
   computeRescoreDeltas,
   formatChangedRowsForPrompt,
@@ -192,7 +193,7 @@ function fallbackFlatSummary(deltas: RescoreAggregateDelta, commitMessages: stri
   const commitHint = formatCommitHint(commitMessages)
   const bothFlat = deltas.economic.label === 'flat' && deltas.builderIntegrity.label === 'flat'
   if (bothFlat) {
-    return `Scores stayed flat — the commit titles above did not move the live rubric reading.${commitHint}`
+    return `The score stayed the same — those recent commits did not change how this project reads on the scorecard yet.${commitHint}`
   }
 
   const rows = changedRows(deltas)
@@ -201,16 +202,16 @@ function fallbackFlatSummary(deltas: RescoreAggregateDelta, commitMessages: stri
       .slice(0, 2)
       .map(r => `${r.label} moved ${r.oldLevel} → ${r.newLevel}`)
       .join('; ')
-    return `${bits}. Check those rows' source notes for the evidence; the rescore was driven by the recent commits listed above.${commitHint}`
+    return `A couple of scorecard rows shifted (${bits}). Open those rows for the evidence; the rescore was driven by the recent commits listed above.${commitHint}`
   }
 
   if (
     (deltas.economic.deltaPct != null && deltas.economic.deltaPct < 0) ||
     (deltas.builderIntegrity.deltaPct != null && deltas.builderIntegrity.deltaPct < 0)
   ) {
-    return `Scores shifted as shown above on a stricter reading of current evidence against the recent commits.${commitHint}`
+    return `The score moved as shown above on a stricter reading of what is in the repo today versus those recent commits.${commitHint}`
   }
-  return `Scores shifted as shown above. Recent commits may not move every rubric level yet.${commitHint}`
+  return `The score moved as shown above. Recent commits do not always move every scorecard row yet.${commitHint}`
 }
 
 /** Reject blurbs that ignore listed commits and only praise README/docs framing. */
@@ -270,20 +271,25 @@ ${oldRepo ? formatRepoScores(oldRepo) : 'No prior score on record.'}
 NEW SCORES (live rescore of current repo; each row has a source note):
 ${formatRepoScores(newRepo)}
 
-${evidenceBlock}Write 1-2 sentences about what changed. Rules:
-- Lead with the recent commits: name concrete themes from the commit list (what shipped, fixed, refactored). This blurb is for holders who clicked Rescore because of those commits.
-- Then tie that commit work to why the new rubric levels fit — use NEW score source notes and REPO EVIDENCE as support, not as the opening story.
+${evidenceBlock}Write 1-2 sentences about what changed for a token holder who is not a developer. This blurb is ALWAYS plain English (normie-first site) — no dual technical version.
+
+${normieVoiceGuidance('rescoreSummary')}
+
+Rules:
+- Lead with the recent commits: name concrete themes from the commit list (what shipped, fixed, cleaned up) in plain words. This blurb is for holders who clicked Rescore because of those commits.
+- Keep the repo slug (${newRepo.githubSlug || newRepo.name}); you may add a short plain gloss after it.
+- Then tie that commit work to why the new scorecard levels fit — use NEW score source notes and REPO EVIDENCE as support, not as the opening story.
 - Do not open with README/docs “framing/clarity/purpose” unless the commits themselves are docs-only and that is what moved a row.
 - Do not open with “Builder standards rose N pts” or “Shipping leverage fell N pts”.
-- Never explain a rise/fall only as “because [rubric row] moved from low to mid”. Say what evidence justified the new level.
+- Never explain a rise/fall only as “because [rubric row] moved from low to mid”. Say what evidence justified the new level, in plain words.
 - NEW SCORES already include this rescore. Never say scores ignored newer commits, used an older snapshot, or should wait for a next cycle.
 - If REPO EVIDENCE is present, never invent missing README/root docs that are listed there.
-- If a score is flat, say the commits did not yet change the live rubric reading (ambition in titles vs tree evidence is fine).
+- If a score is flat, say the commits did not yet change the live scorecard reading (ambition in titles vs what is actually in the repo is fine).
 - If a score fell, explain the harsher reading; do not say it improved.
 - If a score rose, do not say it declined.
-- Mention specific rubric rows only when they changed in RUBRIC ROW CHANGES above.
+- Mention specific scorecard rows only when they changed in RUBRIC ROW CHANGES above — and explain them without insider jargon (no “RPC proxy”, “build chain”, “toolchain” unless you gloss them in one short clause).
 - Do not promise a future rescore will fix the grade.
-Plain English, no markdown.`
+Plain English only, no markdown.`
 
   try {
     const { text: raw } = await generateText({

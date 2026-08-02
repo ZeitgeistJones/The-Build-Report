@@ -62,6 +62,8 @@ export const NORMIE_SURFACE_SHAPES = {
     '2-3 sentences, one short paragraph. Same who/what/why as the standard Spotted writeup — who posted, what they said, why it matters — with zero jargon.',
   overheard:
     '1-4 sentences matching the standard Overheard length. Same facts and repo names; explain why the podcast mention matters to token holders in plain words, no insider terms.',
+  rescoreSummary:
+    '1-2 sentences. Same facts and repo name as a technical rescore note, but zero jargon — warm friend voice for token holders. Keep the repo slug; gloss in plain words if helpful.',
 } as const
 
 /**

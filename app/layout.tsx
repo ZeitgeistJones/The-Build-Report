@@ -81,7 +81,7 @@ const themeBootScript = `(function(){try{
   if(t)document.documentElement.dataset.colorTheme=t;
 }catch(e){}
 try{
-  if(localStorage.getItem('${NORMIE_MODE_STORAGE_KEY}')==='1')document.documentElement.dataset.normie='1';
+  if(localStorage.getItem('${NORMIE_MODE_STORAGE_KEY}')!=='0')document.documentElement.dataset.normie='1';
 }catch(e){}})()`
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

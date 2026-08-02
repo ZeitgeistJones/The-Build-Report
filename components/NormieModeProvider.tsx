@@ -21,12 +21,13 @@ function applyNormieAttr(on: boolean) {
 }
 
 export function NormieModeProvider({ children }: { children: ReactNode }) {
-  const [normie, setNormieState] = useState(false)
+  const [normie, setNormieState] = useState(true)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem(NORMIE_MODE_STORAGE_KEY)
-    const on = stored === '1'
+    // Default ON — only opt out when the user explicitly set '0'.
+    const on = stored !== '0'
     setNormieState(on)
     applyNormieAttr(on)
     setReady(true)
@@ -52,7 +53,7 @@ export function NormieModeProvider({ children }: { children: ReactNode }) {
 export function useNormieMode(): NormieModeContextValue {
   const ctx = useContext(NormieModeContext)
   if (!ctx) {
-    return { normie: false, setNormie: () => {}, toggleNormie: () => {} }
+    return { normie: true, setNormie: () => {}, toggleNormie: () => {} }
   }
   return ctx
 }
