@@ -1,4 +1,4 @@
-/** Web Audio “execute burn” whoosh — primed on click so wallets don’t block it. */
+/** Web Audio “execute burn” — primed on click so wallets don’t block it. */
 
 let primedAudioContext: AudioContext | null = null
 
@@ -29,69 +29,82 @@ export function primeBurnAudio() {
   getAudioContext()
 }
 
-function envGain(ctx: AudioContext, start: number, peak: number, attack: number, decay: number) {
+function envGain(
+  ctx: AudioContext,
+  start: number,
+  peak: number,
+  attack: number,
+  decay: number,
+  destination: AudioNode = ctx.destination,
+) {
   const g = ctx.createGain()
   g.gain.setValueAtTime(0.0001, start)
   g.gain.exponentialRampToValueAtTime(Math.max(peak, 0.0001), start + attack)
   g.gain.exponentialRampToValueAtTime(0.0001, start + decay)
-  g.connect(ctx.destination)
+  g.connect(destination)
   return g
 }
 
-function playNoiseBurst(
+/** Pink-ish noise — warmer / less “laser static” than raw white. */
+function fillPinkNoise(data: Float32Array) {
+  let b0 = 0
+  let b1 = 0
+  let b2 = 0
+  for (let i = 0; i < data.length; i++) {
+    const white = Math.random() * 2 - 1
+    b0 = 0.99765 * b0 + white * 0.099046
+    b1 = 0.963 * b1 + white * 0.2965164
+    b2 = 0.5701 * b2 + white * 1.0526913
+    const pink = b0 + b1 + b2 + white * 0.1848
+    // Soft fade so buffer edges never click.
+    const t = i / data.length
+    const edge = t < 0.02 ? t / 0.02 : t > 0.85 ? (1 - t) / 0.15 : 1
+    data[i] = pink * 0.22 * edge
+  }
+}
+
+function playFilteredNoise(
   ctx: AudioContext,
   start: number,
   duration: number,
   peak: number,
-  centerHz: number,
-  q = 0.6,
-  type: BiquadFilterType = 'bandpass',
+  opts: {
+    type: BiquadFilterType
+    freqStart: number
+    freqEnd?: number
+    q?: number
+    attack?: number
+  },
 ) {
   const length = Math.max(1, Math.floor(ctx.sampleRate * duration))
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate)
-  const data = buffer.getChannelData(0)
-  for (let i = 0; i < length; i++) {
-    // Soften toward the end so crackles don’t click.
-    const t = i / length
-    data[i] = (Math.random() * 2 - 1) * (1 - t * 0.35)
-  }
+  fillPinkNoise(buffer.getChannelData(0))
+
   const src = ctx.createBufferSource()
   src.buffer = buffer
+
   const filter = ctx.createBiquadFilter()
-  filter.type = type
-  filter.frequency.setValueAtTime(centerHz, start)
-  filter.Q.value = q
-  const gain = envGain(ctx, start, peak, 0.012, duration)
+  filter.type = opts.type
+  filter.Q.value = opts.q ?? 0.7
+  filter.frequency.setValueAtTime(opts.freqStart, start)
+  if (opts.freqEnd != null && opts.freqEnd !== opts.freqStart) {
+    filter.frequency.exponentialRampToValueAtTime(
+      Math.max(opts.freqEnd, 40),
+      start + duration * 0.92,
+    )
+  }
+
+  const attack = opts.attack ?? 0.012
+  const gain = envGain(ctx, start, peak, attack, duration)
   src.connect(filter)
   filter.connect(gain)
   src.start(start)
-  src.stop(start + duration)
-}
-
-function playTone(
-  ctx: AudioContext,
-  start: number,
-  freq: number,
-  peak: number,
-  decay: number,
-  type: OscillatorType = 'sine',
-  slideTo?: number,
-) {
-  const gain = envGain(ctx, start, peak, 0.01, decay)
-  const osc = ctx.createOscillator()
-  osc.type = type
-  osc.frequency.setValueAtTime(freq, start)
-  if (slideTo) {
-    osc.frequency.exponentialRampToValueAtTime(slideTo, start + decay * 0.85)
-  }
-  osc.connect(gain)
-  osc.start(start)
-  osc.stop(start + decay)
+  src.stop(start + duration + 0.02)
 }
 
 /**
- * Cool burn: ignition thud → fire whoosh → crackle → falling ember tones.
- * Plays immediately after the user clicks Execute burn.
+ * Classic burn: match-strike → sharp flame whoosh → brief ember hiss.
+ * Short and dry — no sci-fi laser swoosh or musical settle tones.
  */
 export function playBurnClickSound() {
   if (typeof window === 'undefined' || prefersReducedMotion()) return
@@ -100,46 +113,57 @@ export function playBurnClickSound() {
 
   const now = ctx.currentTime
 
-  // Ignition — low body hit
-  playTone(ctx, now, 90, 0.22, 0.18, 'triangle', 55)
-  playTone(ctx, now, 140, 0.1, 0.12, 'sine', 80)
+  // 1) Match strike — bright, instant snap (the “classic” ignition)
+  playFilteredNoise(ctx, now, 0.045, 0.2, {
+    type: 'highpass',
+    freqStart: 2800,
+    q: 0.5,
+    attack: 0.002,
+  })
+  playFilteredNoise(ctx, now, 0.03, 0.12, {
+    type: 'bandpass',
+    freqStart: 5200,
+    q: 1.8,
+    attack: 0.001,
+  })
 
-  // Whoosh — broad noise sweeping down (heat rush)
-  playNoiseBurst(ctx, now + 0.02, 0.42, 0.2, 900, 0.55, 'lowpass')
-  const whoosh = ctx.createBufferSource()
-  {
-    const length = Math.floor(ctx.sampleRate * 0.5)
-    const buffer = ctx.createBuffer(1, length, ctx.sampleRate)
-    const data = buffer.getChannelData(0)
-    for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1
-    whoosh.buffer = buffer
-    const filter = ctx.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.Q.value = 0.85
-    filter.frequency.setValueAtTime(1800, now + 0.04)
-    filter.frequency.exponentialRampToValueAtTime(280, now + 0.48)
-    const gain = envGain(ctx, now + 0.04, 0.16, 0.04, 0.5)
-    whoosh.connect(filter)
-    filter.connect(gain)
-    whoosh.start(now + 0.04)
-    whoosh.stop(now + 0.54)
-  }
+  // 2) Flame body — mid roar that collapses fast (paper/torch, not a spaceship)
+  playFilteredNoise(ctx, now + 0.018, 0.28, 0.24, {
+    type: 'bandpass',
+    freqStart: 1100,
+    freqEnd: 380,
+    q: 0.75,
+    attack: 0.018,
+  })
+  // Soft low heat under the whoosh — noise only, never a musical oscillator
+  playFilteredNoise(ctx, now + 0.02, 0.22, 0.07, {
+    type: 'lowpass',
+    freqStart: 220,
+    freqEnd: 90,
+    q: 0.5,
+    attack: 0.025,
+  })
 
-  // Crackles — short hot sparks
-  const crackles: [number, number, number][] = [
-    [0.1, 0.035, 2400],
-    [0.16, 0.028, 3200],
-    [0.22, 0.04, 1900],
-    [0.29, 0.022, 4100],
-    [0.35, 0.03, 2700],
-    [0.42, 0.018, 3600],
-  ]
-  for (const [offset, peak, hz] of crackles) {
-    playNoiseBurst(ctx, now + offset, 0.045, peak, hz, 1.4, 'bandpass')
-  }
+  // 3) Two sparse crackles — fire, not machine-gun sparks
+  playFilteredNoise(ctx, now + 0.11, 0.028, 0.045, {
+    type: 'bandpass',
+    freqStart: 3100,
+    q: 2.2,
+    attack: 0.001,
+  })
+  playFilteredNoise(ctx, now + 0.19, 0.022, 0.032, {
+    type: 'bandpass',
+    freqStart: 2400,
+    q: 1.6,
+    attack: 0.001,
+  })
 
-  // Ember tones — warm descending settle
-  playTone(ctx, now + 0.18, 420, 0.09, 0.28, 'sine', 260)
-  playTone(ctx, now + 0.32, 310, 0.07, 0.34, 'sine', 180)
-  playTone(ctx, now + 0.48, 220, 0.05, 0.4, 'triangle', 110)
+  // 4) Ember hiss tail — quiet air after the flame, no descending tones
+  playFilteredNoise(ctx, now + 0.2, 0.2, 0.035, {
+    type: 'highpass',
+    freqStart: 1600,
+    freqEnd: 900,
+    q: 0.4,
+    attack: 0.04,
+  })
 }
