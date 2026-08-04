@@ -45,16 +45,27 @@ export default function RubricCriterionRow({
   const { earned, max } = rubricRowPoints(weight, level)
   const fillPct = max > 0 ? (earned / max) * 100 : 0
   const barColor = LEVEL_BAR_COLORS[level]
-  const displaySource =
-    preferNormieSource && sourceNormie?.trim() ? sourceNormie.trim() : source.trim()
-  const trimmedSource = displaySource
-  const showSource = trimmedSource.length > 0
+  const technical = source.trim()
+  const plain = sourceNormie?.trim() || ''
+  const showingPlain = Boolean(preferNormieSource && plain)
+  const missingPlain = Boolean(preferNormieSource && !plain && technical)
+  const displaySource = showingPlain ? plain : technical
+  const showSource = displaySource.length > 0 || missingPlain
   const showDelta = deltaEarned != null
   const deltaBadge = showDelta ? formatDeltaBadge(deltaEarned, isNewRow) : null
-  const useCollapse = collapsibleSource && showSource && trimmedSource.length > 72
+  // Plain blurbs are short — keep them open. Technical stays collapsed.
+  const useCollapse =
+    collapsibleSource &&
+    !showingPlain &&
+    !missingPlain &&
+    displaySource.length > 72
+
+  const bodyFontSize = showingPlain ? (isMobile ? '13px' : '13px') : '10px'
+  const bodyLineHeight = showingPlain ? 1.5 : 1.35
+  const bodyColor = showingPlain ? 'var(--text-secondary)' : 'var(--text-muted)'
 
   return (
-    <div style={{ marginBottom: '5px' }}>
+    <div style={{ marginBottom: showingPlain ? '10px' : '5px' }}>
       <div
         style={{
           display: 'flex',
@@ -140,7 +151,15 @@ export default function RubricCriterionRow({
           )}
         </p>
       )}
-      {showSource && useCollapse && !sourceOpen && (
+
+      {missingPlain && (
+        <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+          Plain English note not on this score yet — Rescore to generate it, or turn Plain English off for the
+          full technical note.
+        </p>
+      )}
+
+      {showSource && !missingPlain && useCollapse && !sourceOpen && (
         <button
           type="button"
           onClick={() => setSourceOpen(true)}
@@ -158,7 +177,7 @@ export default function RubricCriterionRow({
           Why this score ▾
         </button>
       )}
-      {showSource && (!useCollapse || sourceOpen) && (
+      {showSource && !missingPlain && (!useCollapse || sourceOpen) && (
         <>
           {useCollapse && sourceOpen && (
             <button
@@ -178,11 +197,30 @@ export default function RubricCriterionRow({
               Hide ▴
             </button>
           )}
+          {showingPlain && (
+            <p
+              style={{
+                margin: '4px 0 0',
+                fontSize: '10px',
+                fontWeight: 500,
+                color: 'var(--accent)',
+                letterSpacing: '0.02em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Plain English
+            </p>
+          )}
           <p
-            className={!useCollapse ? 'rubric-source-clamp' : undefined}
-            style={{ margin: '2px 0 0', fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1.35 }}
+            className={!useCollapse && !showingPlain ? 'rubric-source-clamp' : undefined}
+            style={{
+              margin: showingPlain ? '2px 0 0' : '2px 0 0',
+              fontSize: bodyFontSize,
+              color: bodyColor,
+              lineHeight: bodyLineHeight,
+            }}
           >
-            {trimmedSource}
+            {displaySource}
           </p>
         </>
       )}
