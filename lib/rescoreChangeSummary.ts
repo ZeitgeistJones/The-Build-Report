@@ -143,30 +143,46 @@ export function summaryIsCircularRestatement(text: string): boolean {
 
     if (!restatesMove) continue
 
-    const becauseMatch = lower.match(/\bbecause\b(.{0,220})/)
-    if (!becauseMatch) continue
-    const becauseClause = becauseMatch[1]
-    const explainsViaLevel =
-      /\b(moved from|went from|moved to)\s+(low|mid|high|n\/?a)\b/.test(becauseClause) ||
-      /\b(low|mid|high|n\/?a)\s*(→|->|to)\s*(low|mid|high|n\/?a)\b/.test(becauseClause)
-    if (!explainsViaLevel) continue
+    // Circular: “… rose N pts because/as governance moved low→mid”
+    const reasonMatch = lower.match(/\b(because|as|after|when)\b(.{0,220})/)
+    if (reasonMatch) {
+      const reasonClause = reasonMatch[2]
+      const explainsViaLevel =
+        /\b(moved from|went from|moved to)\s+(low|mid|high|n\/?a)\b/.test(reasonClause) ||
+        /\b(low|mid|high|n\/?a)\s*(→|->|to)\s*(low|mid|high|n\/?a)\b/.test(reasonClause)
+      if (explainsViaLevel) {
+        // Strip level-transition + axis/row name boilerplate; leftover should still have evidence.
+        const stripped = reasonClause
+          .replace(
+            /\b(moved from|went from|moved to)\s+(low|mid|high|n\/?a)(\s+(to|→|->)\s+(low|mid|high|n\/?a))?\b/g,
+            ' ',
+          )
+          .replace(/\b(low|mid|high|n\/?a)\s*(→|->|to)\s*(low|mid|high|n\/?a)\b/g, ' ')
+          .replace(
+            /\b(governance|token-economics|ecosystem alignment|builder standards|shipping leverage|holder economics|multiplies builder shipping capacity|downstream path to holder value|role in ecosystem workflow|on-chain commitments and constraints|user funds, risk, and safety posture|transparency and verifiability|security, testing, and cryptographic rigor)\b/gi,
+            ' ',
+          )
+          .replace(/[:;—]+/g, ' ')
+          .trim()
 
-    // Strip level-transition + axis/row name boilerplate; leftover should still have evidence.
-    const stripped = becauseClause
+        const primary = (stripped.split(/\b(while|which|though|although|but|and so)\b/)[0] ?? '').trim()
+        if (primary.length < 28) return true
+      }
+    }
+
+    // Circular: sentence is basically only the ±N pts / letter restatement (no evidence nouns).
+    const withoutMoveBoilerplate = lower
+      .replace(/\b(rose|fell|increased|decreased|climbed|dropped)\s+\d+\s*pts?\b/g, ' ')
+      .replace(/\b(rose|fell)\s+to\s+[a-f][+\-]?\b/g, ' ')
+      .replace(/\b[+\-]\d+\s*pts?\b/g, ' ')
       .replace(
-        /\b(moved from|went from|moved to)\s+(low|mid|high|n\/?a)(\s+(to|→|->)\s+(low|mid|high|n\/?a))?\b/g,
+        /\b(builder standards|shipping leverage|holder economics|overall|grade|score|the|a|an|to|from|on|in|and|this|rescore)\b/g,
         ' ',
       )
-      .replace(/\b(low|mid|high|n\/?a)\s*(→|->|to)\s*(low|mid|high|n\/?a)\b/g, ' ')
-      .replace(
-        /\b(governance|token-economics|ecosystem alignment|builder standards|shipping leverage|holder economics|multiplies builder shipping capacity|downstream path to holder value|role in ecosystem workflow|on-chain commitments and constraints|user funds, risk, and safety posture|transparency and verifiability|security, testing, and cryptographic rigor)\b/gi,
-        ' ',
-      )
-      .replace(/[:;—]+/g, ' ')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim()
-
-    const primary = (stripped.split(/\b(while|which|though|although|but|and so)\b/)[0] ?? '').trim()
-    if (primary.length < 28) return true
+    if (withoutMoveBoilerplate.length < 20) return true
   }
   return false
 }
@@ -200,9 +216,12 @@ function fallbackFlatSummary(deltas: RescoreAggregateDelta, commitMessages: stri
   if (rows.length) {
     const bits = rows
       .slice(0, 2)
-      .map(r => `${r.label} moved ${r.oldLevel} → ${r.newLevel}`)
+      .map(r => `${r.label} ${r.oldLevel} → ${r.newLevel}`)
       .join('; ')
-    return `A couple of scorecard rows shifted (${bits}). Open those rows for the evidence; the rescore was driven by the recent commits listed above.${commitHint}`
+    return (
+      `${bits} on this rescore. Expand those rows for the source notes that justify the new levels` +
+      ` — the move itself is not the reason.${commitHint}`
+    )
   }
 
   if (
@@ -276,12 +295,12 @@ ${evidenceBlock}Write 1-2 sentences about what changed for a token holder who is
 ${normieVoiceGuidance('rescoreSummary')}
 
 Rules:
-- Lead with the recent commits: name concrete themes from the commit list (what shipped, fixed, cleaned up) in plain words. This blurb is for holders who clicked Rescore because of those commits.
+- Lead with evidence, not the percentage: name concrete themes from RECENT COMMITS and/or cite NEW score row \`source\` notes that justify the new rubric *level*. The reader already sees ±N pts and letter moves in the header — do not open by restating them.
 - Keep the repo slug (${newRepo.githubSlug || newRepo.name}); you may add a short plain gloss after it.
-- Then tie that commit work to why the new scorecard levels fit — use NEW score source notes and REPO EVIDENCE as support, not as the opening story.
+- Treat “row X moved low→mid” as mechanism already shown above — never use that alone as the reason a grade rose or fell. Say what evidence justified the new level.
+- Ban openings that only restate “+N pts”, “rose to F (40%)”, or “Builder standards rose” without an evidence clause in the same sentence.
 - Do not open with README/docs “framing/clarity/purpose” unless the commits themselves are docs-only and that is what moved a row.
 - Do not open with “Builder standards rose N pts” or “Shipping leverage fell N pts”.
-- Never explain a rise/fall only as “because [rubric row] moved from low to mid”. Say what evidence justified the new level, in plain words.
 - NEW SCORES already include this rescore. Never say scores ignored newer commits, used an older snapshot, or should wait for a next cycle.
 - If REPO EVIDENCE is present, never invent missing README/root docs that are listed there.
 - If a score is flat, say the commits did not yet change the live scorecard reading (ambition in titles vs what is actually in the repo is fine).
