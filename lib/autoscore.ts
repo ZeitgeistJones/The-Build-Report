@@ -32,6 +32,7 @@ import { getLockedTag } from './criticalPath'
 import { ECOSYSTEM_DECODER_RING } from './rubrics/decoderRing'
 import { SCORING_CONTEXT_VERSION } from './scoringContext'
 import { normieVoiceGuidance } from './normieVoice'
+import { attachRubricSourceNormies } from './rubricSourceNormie'
 
 const CACHE_KEY_PREFIX = 'build-report:autoscore:v3:'
 const CACHE_KEY_PREFIX_V2 = 'build-report:autoscore:v2:'
@@ -373,7 +374,9 @@ Respond ONLY with valid JSON, no markdown:
       console.log(
         `[autoscore] done: ${repo.name} via ${provider} tag:${repoOut.tag} Econ:${economic?.letter ?? 'N/A'} BI:${repoOut.builderIntegrity.letter}`,
       )
-      return normalizeAndApplyV3(repoOut)
+      // Gemini-only plain-English source notes for new scores (never Anthropic; skip if no key).
+      const withNormieSources = await attachRubricSourceNormies(repoOut)
+      return normalizeAndApplyV3(withNormieSources)
     } catch (err) {
       lastFailure = err instanceof Error ? err.message : 'AI scoring failed'
       console.error(`[autoscore] FAILED for ${repo.name} (attempt ${attempt}/${maxAttempts}):`, err)

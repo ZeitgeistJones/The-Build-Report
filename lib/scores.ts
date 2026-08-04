@@ -12,6 +12,8 @@ export interface RubricRow {
   weight: string
   level: Level
   source: string
+  /** Optional plain-English rewrite of `source` (Gemini-only; new scores). */
+  sourceNormie?: string
 }
 
 export interface Score {

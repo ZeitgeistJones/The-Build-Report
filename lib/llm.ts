@@ -100,6 +100,24 @@ async function generateWithAnthropic(opts: GenerateTextOptions): Promise<string>
   return text
 }
 
+/** True when Gemini is configured (used for Gemini-only surfaces). */
+export function hasGeminiApiKey(): boolean {
+  return Boolean(geminiApiKey())
+}
+
+/**
+ * Generate text with Gemini only — never Anthropic.
+ * Used for rubric sourceNormie translations so Haiku quota stays on scoring.
+ */
+export async function generateTextGeminiOnly(opts: GenerateTextOptions): Promise<GenerateTextResult> {
+  const label = opts.label ?? 'llm-gemini'
+  if (!geminiApiKey()) {
+    throw new Error('GEMINI_API_KEY is not set')
+  }
+  const text = await generateWithGemini(opts)
+  return { text, provider: 'gemini' }
+}
+
 /**
  * Generate text with Anthropic Haiku as primary and Gemini as fallback.
  * Falls back when Anthropic is unset or the Anthropic call fails.

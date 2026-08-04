@@ -9,12 +9,16 @@ interface Props {
   weight: string
   level: Level
   source: string
+  /** Plain-English rewrite when Plain English mode is on. */
+  sourceNormie?: string | null
   isMobile: boolean
   deltaEarned?: number | null
   levelChangeLabel?: string | null
   isNewRow?: boolean
   /** When true, long source text starts collapsed. Default true. */
   collapsibleSource?: boolean
+  /** When true, prefer sourceNormie if present. */
+  preferNormieSource?: boolean
 }
 
 function formatDeltaBadge(delta: number, isNewRow: boolean): { text: string; color: string } | null {
@@ -29,17 +33,21 @@ export default function RubricCriterionRow({
   weight,
   level,
   source,
+  sourceNormie = null,
   isMobile,
   deltaEarned = null,
   levelChangeLabel = null,
   isNewRow = false,
   collapsibleSource = true,
+  preferNormieSource = false,
 }: Props) {
   const [sourceOpen, setSourceOpen] = useState(false)
   const { earned, max } = rubricRowPoints(weight, level)
   const fillPct = max > 0 ? (earned / max) * 100 : 0
   const barColor = LEVEL_BAR_COLORS[level]
-  const trimmedSource = source.trim()
+  const displaySource =
+    preferNormieSource && sourceNormie?.trim() ? sourceNormie.trim() : source.trim()
+  const trimmedSource = displaySource
   const showSource = trimmedSource.length > 0
   const showDelta = deltaEarned != null
   const deltaBadge = showDelta ? formatDeltaBadge(deltaEarned, isNewRow) : null

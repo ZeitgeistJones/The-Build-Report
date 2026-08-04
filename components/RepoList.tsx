@@ -1308,6 +1308,8 @@ export default function RepoList({
                           weight={row.weight}
                           level={row.level}
                           source={row.source}
+                          sourceNormie={row.sourceNormie}
+                          preferNormieSource={normie}
                           isMobile={isMobile}
                           deltaEarned={economicRowDeltas ? (delta?.deltaEarned ?? 0) : null}
                           levelChangeLabel={delta?.levelChangeLabel ?? null}
@@ -1343,6 +1345,8 @@ export default function RepoList({
                         weight={row.weight}
                         level={row.level}
                         source={row.source}
+                        sourceNormie={row.sourceNormie}
+                        preferNormieSource={normie}
                         isMobile={isMobile}
                         deltaEarned={biRowDeltas ? (delta?.deltaEarned ?? 0) : null}
                         levelChangeLabel={delta?.levelChangeLabel ?? null}
