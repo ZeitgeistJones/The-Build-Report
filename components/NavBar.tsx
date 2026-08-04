@@ -19,6 +19,9 @@ function DesktopNavLinks() {
       <a href="/start" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Start Here
       </a>
+      <a href="/utility" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        Utility
+      </a>
       <a href="/how-we-score" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         How we score
       </a>
@@ -68,6 +71,9 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         </a>
         <a href="/start" className="mobile-nav-link" onClick={onClose}>
           Start Here
+        </a>
+        <a href="/utility" className="mobile-nav-link" onClick={onClose}>
+          Utility
         </a>
         <a href="/how-we-score" className="mobile-nav-link" onClick={onClose}>
           How we score

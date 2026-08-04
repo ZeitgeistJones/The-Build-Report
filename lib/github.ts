@@ -949,6 +949,8 @@ export type TrackableRepoPush = {
   createdAt: string
   description: string | null
   language: string | null
+  archived: boolean
+  isFork: boolean
 }
 
 export async function fetchTrackableRepoPushes(): Promise<Map<string, TrackableRepoPush>> {
@@ -969,6 +971,8 @@ export async function fetchTrackableRepoPushes(): Promise<Map<string, TrackableR
           createdAt: repo.created_at,
           description: repo.description ?? null,
           language: repo.language ?? null,
+          archived: Boolean(repo.archived),
+          isFork: Boolean(repo.fork),
         })
       }
     }
@@ -977,6 +981,90 @@ export async function fetchTrackableRepoPushes(): Promise<Map<string, TrackableR
   }
 
   return map
+}
+
+export type LatestUpgrade = {
+  at: string
+  label: string
+  source: 'release' | 'tag' | 'push'
+}
+
+/** Latest GitHub release, else newest tag, else last push — never invents dates. */
+export async function fetchLatestUpgrade(slug: string, pushedAt: string): Promise<LatestUpgrade> {
+  try {
+    const releases = await ghFetch(`/repos/${GITHUB_ORG}/${slug}/releases?per_page=1`, { fresh: true })
+    if (Array.isArray(releases) && releases[0]) {
+      const r = releases[0] as {
+        published_at?: string
+        created_at?: string
+        tag_name?: string
+        name?: string
+      }
+      const at = r.published_at || r.created_at
+      const tag = (r.tag_name || r.name || 'release').trim()
+      if (at) {
+        return {
+          at,
+          label: tag.toLowerCase().startsWith('release') ? tag : `Release ${tag}`,
+          source: 'release',
+        }
+      }
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === 'rate_limited') throw err
+  }
+
+  try {
+    const tags = await ghFetch(`/repos/${GITHUB_ORG}/${slug}/tags?per_page=1`, { fresh: true })
+    if (Array.isArray(tags) && tags[0]?.name) {
+      const name = String(tags[0].name)
+      const sha = tags[0].commit?.sha as string | undefined
+      let at = pushedAt
+      if (sha) {
+        try {
+          const commit = await ghFetch(`/repos/${GITHUB_ORG}/${slug}/commits/${sha}`, { fresh: true })
+          at =
+            commit?.commit?.author?.date ||
+            commit?.commit?.committer?.date ||
+            pushedAt
+        } catch (err) {
+          if (err instanceof Error && err.message === 'rate_limited') throw err
+        }
+      }
+      return { at, label: `Tag ${name}`, source: 'tag' }
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === 'rate_limited') throw err
+  }
+
+  return { at: pushedAt, label: 'Last push', source: 'push' }
+}
+
+/** Raw README head for utility LLM — ≤ maxChars. Null if missing. */
+export async function fetchReadmeHead(slug: string, maxChars = 2000): Promise<string | null> {
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.v3.raw',
+  }
+  const token = GITHUB_TOKEN?.trim()
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  let res = await fetch(`https://api.github.com/repos/${GITHUB_ORG}/${slug}/readme`, {
+    headers,
+    cache: 'no-store',
+  })
+  if (res.status === 401 && token) {
+    const { Authorization: _drop, ...anon } = headers
+    res = await fetch(`https://api.github.com/repos/${GITHUB_ORG}/${slug}/readme`, {
+      headers: anon,
+      cache: 'no-store',
+    })
+  }
+  if (res.status === 403 || res.status === 429) throw new Error('rate_limited')
+  if (!res.ok) return null
+  const text = await res.text()
+  const trimmed = text.trim()
+  if (!trimmed) return null
+  return trimmed.slice(0, maxChars)
 }
 
 /**
