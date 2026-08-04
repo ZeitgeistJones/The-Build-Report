@@ -1,6 +1,7 @@
+import { appendFileSync } from 'fs'
+import { join } from 'path'
 import { generateTextGeminiOnly, hasGeminiApiKey } from '@/lib/llm'
-import { NORMIE_TEMPERATURE } from '@/lib/normieVoice'
-import { stripMarkdown } from '@/lib/textCleanup'
+import { shortenSourceForNormieDisplay } from '@/lib/normieSourceDisplay'
 import type { Repo, RubricRow, Score } from '@/lib/scores'
 
 type SourceItem = { key: string; label: string; source: string }
@@ -43,19 +44,68 @@ function applyNormieMap(
   }
 }
 
-function shortenNormie(text: string): string {
-  const cleaned = stripMarkdown(text).replace(/\s+/g, ' ').trim()
-  if (!cleaned) return ''
-  // Prefer a single sentence; allow a second only if both stay short.
-  const parts = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean)
-  let clipped = parts[0] ?? ''
-  if (parts[1] && clipped.length + parts[1].length < 160) {
-    clipped = `${clipped} ${parts[1]}`
+function fillMissingSourceNormies(score: Score | null | undefined): Score | null | undefined {
+  if (!score?.rubric?.length) return score
+  return {
+    ...score,
+    rubric: score.rubric.map(row => {
+      if (row.sourceNormie?.trim() || !row.source?.trim()) return row
+      return { ...row, sourceNormie: shortenSourceForNormieDisplay(row.source) }
+    }),
   }
-  return clipped.length > 180 ? `${clipped.slice(0, 177).trim()}…` : clipped
 }
 
-function parseNormieMaps(
+function applyFilled(repo: Repo): Repo {
+  return {
+    ...repo,
+    shippingLeverage: fillMissingSourceNormies(repo.shippingLeverage) as Score | null | undefined,
+    tokenMechanic: fillMissingSourceNormies(repo.tokenMechanic) as Score | null,
+    builderIntegrity: fillMissingSourceNormies(repo.builderIntegrity) as Score,
+  }
+}
+
+function countSourceNormies(repo: Repo): number {
+  let n = 0
+  for (const score of [repo.shippingLeverage, repo.tokenMechanic, repo.builderIntegrity]) {
+    if (!score?.rubric) continue
+    for (const row of score.rubric) {
+      if (row.sourceNormie?.trim()) n++
+    }
+  }
+  return n
+}
+
+// #region agent log
+function agentLog(
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+) {
+  const payload = {
+    sessionId: 'ba045f',
+    hypothesisId,
+    location,
+    message,
+    data,
+    timestamp: Date.now(),
+    runId: 'source-normie-debug',
+  }
+  fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba045f' },
+    body: JSON.stringify(payload),
+  }).catch(() => {})
+  try {
+    appendFileSync(join(process.cwd(), 'debug-ba045f.log'), `${JSON.stringify(payload)}\n`)
+  } catch {
+    // non-fatal in serverless
+  }
+}
+// #endregion
+
+/** Exported for debug scripts / tests. */
+export function parseNormieMaps(
   raw: string,
   items: SourceItem[],
 ): { byKey: Map<string, string>; byLabel: Map<string, string> } {
@@ -77,7 +127,7 @@ function parseNormieMaps(
 
   for (const [rawKey, rawVal] of Object.entries(parsed)) {
     if (typeof rawVal !== 'string' || !rawVal.trim()) continue
-    const short = shortenNormie(rawVal)
+    const short = shortenSourceForNormieDisplay(rawVal)
     if (!short) continue
 
     const k = rawKey.trim()
@@ -102,29 +152,50 @@ function parseNormieMaps(
 }
 
 /**
- * Attach Gemini-only plain-English rewrites of rubric `source` notes.
- * Never uses Anthropic. No-ops if Gemini is unset or translation fails.
+ * Attach plain-English rewrites of rubric `source` notes.
+ * Tries Gemini first; always fills gaps with a deterministic short clip so Plain English
+ * mode never shows empty / "not yet" after a new score.
  * Call only on newly scored repos (not a backfill).
  */
 export async function attachRubricSourceNormies(repo: Repo): Promise<Repo> {
-  if (!hasGeminiApiKey()) {
-    console.warn('[rubric-source-normie] GEMINI_API_KEY unset; skipping sourceNormie', {
-      slug: repo.githubSlug,
-    })
-    return repo
-  }
-
   const items = collectSourceItems(repo)
+  const geminiOk = hasGeminiApiKey()
+
+  // #region agent log
+  agentLog('A', 'rubricSourceNormie.ts:attach', 'attach entry', {
+    slug: repo.githubSlug,
+    itemCount: items.length,
+    hasGemini: geminiOk,
+    existingNormies: countSourceNormies(repo),
+  })
+  // #endregion
+
   if (!items.length) return repo
 
-  const listBlock = items
-    .map(
-      it =>
-        `- key "${it.key}" | row "${it.label}"\n  technical: ${JSON.stringify(it.source)}`,
-    )
-    .join('\n')
+  let working: Repo = repo
+  let geminiMapped = 0
+  let geminiPath: 'skipped-no-key' | 'ok' | 'empty-parse' | 'error' = geminiOk
+    ? 'ok'
+    : 'skipped-no-key'
 
-  const prompt = `You rewrite scorecard "why this score" notes for $CLAWD token holders who are not developers.
+  if (!geminiOk) {
+    console.warn('[rubric-source-normie] GEMINI_API_KEY unset; using deterministic short clips', {
+      slug: repo.githubSlug,
+    })
+    // #region agent log
+    agentLog('A', 'rubricSourceNormie.ts:no-gemini', 'gemini unset — fallback fill', {
+      slug: repo.githubSlug,
+    })
+    // #endregion
+  } else {
+    const listBlock = items
+      .map(
+        it =>
+          `- key "${it.key}" | row "${it.label}"\n  technical: ${JSON.stringify(it.source)}`,
+      )
+      .join('\n')
+
+    const prompt = `You rewrite scorecard "why this score" notes for $CLAWD token holders who are not developers.
 
 For EACH input row, write a plain-English rewrite that is MUCH SHORTER than the technical note:
 - Prefer ONE short sentence. Two only if needed. Never three.
@@ -139,44 +210,79 @@ ${listBlock}
 Return ONLY JSON mapping each key to its short rewrite. Keys must be exactly: ${items.map(i => i.key).join(', ')}
 Example: {"sl0":"This tool helps the builder ship wallet features faster.","bi2":"Docs are clear; testing is still thin."}`
 
-  try {
-    const { text } = await generateTextGeminiOnly({
-      prompt,
-      maxTokens: 1200,
-      temperature: 0.4,
-      label: 'rubric-source-normie',
-    })
-    const { byKey, byLabel } = parseNormieMaps(text, items)
-    if (!byKey.size) {
-      console.warn('[rubric-source-normie] Gemini returned no usable keys', {
-        slug: repo.githubSlug,
-        preview: text.slice(0, 240),
+    try {
+      const { text } = await generateTextGeminiOnly({
+        prompt,
+        maxTokens: 1200,
+        temperature: 0.4,
+        label: 'rubric-source-normie',
       })
-      return repo
+      const { byKey, byLabel } = parseNormieMaps(text, items)
+      geminiMapped = byKey.size
+      if (!byKey.size) {
+        geminiPath = 'empty-parse'
+        console.warn('[rubric-source-normie] Gemini returned no usable keys; filling short clips', {
+          slug: repo.githubSlug,
+          preview: text.slice(0, 240),
+        })
+        // #region agent log
+        agentLog('B', 'rubricSourceNormie.ts:empty-parse', 'gemini parse empty', {
+          slug: repo.githubSlug,
+          preview: text.slice(0, 240),
+        })
+        // #endregion
+      } else {
+        console.log('[rubric-source-normie] attached', {
+          slug: repo.githubSlug,
+          mapped: byKey.size,
+          expected: items.length,
+        })
+        working = {
+          ...repo,
+          shippingLeverage: applyNormieMap(repo.shippingLeverage, 'sl', byKey, byLabel) as
+            | Score
+            | null
+            | undefined,
+          tokenMechanic: applyNormieMap(repo.tokenMechanic, 'tm', byKey, byLabel) as Score | null,
+          builderIntegrity: applyNormieMap(repo.builderIntegrity, 'bi', byKey, byLabel) as Score,
+        }
+        // #region agent log
+        agentLog('B', 'rubricSourceNormie.ts:gemini-ok', 'gemini mapped keys', {
+          slug: repo.githubSlug,
+          mapped: byKey.size,
+          expected: items.length,
+        })
+        // #endregion
+      }
+    } catch (err) {
+      geminiPath = 'error'
+      console.warn('[rubric-source-normie] Gemini translate failed; filling short clips', {
+        slug: repo.githubSlug,
+        err,
+      })
+      // #region agent log
+      agentLog('B', 'rubricSourceNormie.ts:gemini-err', 'gemini threw', {
+        slug: repo.githubSlug,
+        err: err instanceof Error ? err.message : String(err),
+      })
+      // #endregion
     }
-
-    console.log('[rubric-source-normie] attached', {
-      slug: repo.githubSlug,
-      mapped: byKey.size,
-      expected: items.length,
-    })
-
-    return {
-      ...repo,
-      shippingLeverage: applyNormieMap(repo.shippingLeverage, 'sl', byKey, byLabel) as
-        | Score
-        | null
-        | undefined,
-      tokenMechanic: applyNormieMap(repo.tokenMechanic, 'tm', byKey, byLabel) as Score | null,
-      builderIntegrity: applyNormieMap(repo.builderIntegrity, 'bi', byKey, byLabel) as Score,
-    }
-  } catch (err) {
-    console.warn('[rubric-source-normie] Gemini translate failed; keeping technical sources', {
-      slug: repo.githubSlug,
-      err,
-    })
-    return repo
   }
+
+  const filled = applyFilled(working)
+  const afterCount = countSourceNormies(filled)
+
+  // #region agent log
+  agentLog('E', 'rubricSourceNormie.ts:exit', 'attach exit after fallback fill', {
+    slug: repo.githubSlug,
+    geminiPath,
+    geminiMapped,
+    itemCount: items.length,
+    sourceNormieCount: afterCount,
+  })
+  // #endregion
+
+  return filled
 }
 
 /** Preserve sourceNormie when a row is copied/relabeled. */

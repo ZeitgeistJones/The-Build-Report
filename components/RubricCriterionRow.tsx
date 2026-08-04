@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { Level } from '@/lib/scores'
 import { LEVEL_BAR_COLORS, rubricRowPoints } from '@/lib/rubricDisplay'
+import { shortenSourceForNormieDisplay } from '@/lib/normieSourceDisplay'
 
 interface Props {
   label: string
@@ -46,23 +47,51 @@ export default function RubricCriterionRow({
   const fillPct = max > 0 ? (earned / max) * 100 : 0
   const barColor = LEVEL_BAR_COLORS[level]
   const technical = source.trim()
-  const plain = sourceNormie?.trim() || ''
+  // Prefer stored AI rewrite; otherwise clip technical so Plain English never shows empty / tiny walls of text.
+  const plain =
+    sourceNormie?.trim() ||
+    (preferNormieSource && technical ? shortenSourceForNormieDisplay(technical) : '')
   const showingPlain = Boolean(preferNormieSource && plain)
-  const missingPlain = Boolean(preferNormieSource && !plain && technical)
   const displaySource = showingPlain ? plain : technical
-  const showSource = displaySource.length > 0 || missingPlain
+  const showSource = displaySource.length > 0
   const showDelta = deltaEarned != null
   const deltaBadge = showDelta ? formatDeltaBadge(deltaEarned, isNewRow) : null
   // Plain blurbs are short — keep them open. Technical stays collapsed.
-  const useCollapse =
-    collapsibleSource &&
-    !showingPlain &&
-    !missingPlain &&
-    displaySource.length > 72
+  const useCollapse = collapsibleSource && !showingPlain && displaySource.length > 72
 
-  const bodyFontSize = showingPlain ? (isMobile ? '13px' : '13px') : '10px'
-  const bodyLineHeight = showingPlain ? 1.5 : 1.35
-  const bodyColor = showingPlain ? 'var(--text-secondary)' : 'var(--text-muted)'
+  // #region agent log
+  if (typeof window !== 'undefined' && preferNormieSource && showingPlain) {
+    const w = window as Window & { __brNormieDbg?: Set<string> }
+    w.__brNormieDbg ??= new Set()
+    const dbgKey = `${label}|${plain.slice(0, 40)}`
+    if (!w.__brNormieDbg.has(dbgKey)) {
+      w.__brNormieDbg.add(dbgKey)
+      fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba045f' },
+        body: JSON.stringify({
+          sessionId: 'ba045f',
+          hypothesisId: 'C',
+          location: 'RubricCriterionRow.tsx:display',
+          message: 'plain english display path',
+          data: {
+            label,
+            hasStoredNormie: Boolean(sourceNormie?.trim()),
+            plainLen: plain.length,
+            technicalLen: technical.length,
+            showingPlain,
+          },
+          timestamp: Date.now(),
+          runId: 'source-normie-debug',
+        }),
+      }).catch(() => {})
+    }
+  }
+  // #endregion
+
+  const bodyFontSize = showingPlain ? (isMobile ? '15px' : '16px') : '10px'
+  const bodyLineHeight = showingPlain ? 1.55 : 1.35
+  const bodyColor = showingPlain ? 'var(--text)' : 'var(--text-muted)'
 
   return (
     <div style={{ marginBottom: showingPlain ? '10px' : '5px' }}>
@@ -152,14 +181,7 @@ export default function RubricCriterionRow({
         </p>
       )}
 
-      {missingPlain && (
-        <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-          Plain English note not on this score yet — Rescore to generate it, or turn Plain English off for the
-          full technical note.
-        </p>
-      )}
-
-      {showSource && !missingPlain && useCollapse && !sourceOpen && (
+      {showSource && useCollapse && !sourceOpen && (
         <button
           type="button"
           onClick={() => setSourceOpen(true)}
@@ -177,7 +199,7 @@ export default function RubricCriterionRow({
           Why this score ▾
         </button>
       )}
-      {showSource && !missingPlain && (!useCollapse || sourceOpen) && (
+      {showSource && (!useCollapse || sourceOpen) && (
         <>
           {useCollapse && sourceOpen && (
             <button
