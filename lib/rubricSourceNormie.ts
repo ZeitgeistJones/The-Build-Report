@@ -160,18 +160,18 @@ export async function attachRubricSourceNormies(repo: Repo): Promise<Repo> {
 
     const prompt = `You rewrite scorecard "why this score" notes for $CLAWD token holders who are not developers.
 
-For EACH input row, write a plain-English rewrite that is shorter than the technical note but still complete:
-- Prefer ONE sentence; allow TWO when needed. Never three.
-- Aim ~35–45 words (roughly 1–2 short sentences).
-- No jargon (no CI, stdlib, lockfile, RPC, toolchain, rubric, whisper.cpp, Ollama). Soften with everyday words.
+For EACH input row, write a plain-English rewrite that is SHORTER than the technical note but still covers its main points:
+- Use 2–3 short sentences. Never one thin sentence that drops most of the evidence.
+- Aim ~55–80 words — compress, don't omit. Hit: what the repo is, the key evidence, and what's missing or why the score landed there.
+- Soften jargon into everyday words (say "runs on your Mac with local AI" instead of listing whisper.cpp / Ollama / ScreenCaptureKit). Keep meaning.
 - Same facts only — do not invent evidence or change the score meaning.
 - Keep the repo name if the technical note names it.
 
 INPUT:
 ${listBlock}
 
-Return ONLY JSON mapping each key to its short rewrite. Keys must be exactly: ${items.map(i => i.key).join(', ')}
-Example: {"sl0":"This tool helps the builder ship wallet features faster.","bi2":"Docs are clear; testing is still thin."}`
+Return ONLY JSON mapping each key to its rewrite. Keys must be exactly: ${items.map(i => i.key).join(', ')}
+Example: {"sl0":"clawd-scribe is a local meeting-notes app for your own machine, not a builder toolkit. Docs show consumer features like speaker ID and calendar awareness, with no hooks for other CLAWD agents. The project layout looks like a standalone Mac app, not shipping infrastructure other builders depend on."}`
 
     const result = await rewriteSourcesWithLlm(prompt)
     if (result) {
