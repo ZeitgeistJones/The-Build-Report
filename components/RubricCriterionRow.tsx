@@ -59,37 +59,7 @@ export default function RubricCriterionRow({
   // Plain blurbs are short — keep them open. Technical stays collapsed.
   const useCollapse = collapsibleSource && !showingPlain && displaySource.length > 72
 
-  // #region agent log
-  if (typeof window !== 'undefined' && preferNormieSource && showingPlain) {
-    const w = window as Window & { __brNormieDbg?: Set<string> }
-    w.__brNormieDbg ??= new Set()
-    const dbgKey = `${label}|${plain.slice(0, 40)}`
-    if (!w.__brNormieDbg.has(dbgKey)) {
-      w.__brNormieDbg.add(dbgKey)
-      fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba045f' },
-        body: JSON.stringify({
-          sessionId: 'ba045f',
-          hypothesisId: 'C',
-          location: 'RubricCriterionRow.tsx:display',
-          message: 'plain english display path',
-          data: {
-            label,
-            hasStoredNormie: Boolean(sourceNormie?.trim()),
-            plainLen: plain.length,
-            technicalLen: technical.length,
-            showingPlain,
-          },
-          timestamp: Date.now(),
-          runId: 'source-normie-debug',
-        }),
-      }).catch(() => {})
-    }
-  }
-  // #endregion
-
-  const bodyFontSize = showingPlain ? (isMobile ? '15px' : '16px') : '10px'
+  const bodyFontSize = showingPlain ? (isMobile ? '16px' : '17px') : '10px'
   const bodyLineHeight = showingPlain ? 1.55 : 1.35
   const bodyColor = showingPlain ? 'var(--text)' : 'var(--text-muted)'
 
