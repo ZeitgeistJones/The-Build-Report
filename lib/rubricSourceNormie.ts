@@ -160,9 +160,9 @@ export async function attachRubricSourceNormies(repo: Repo): Promise<Repo> {
 
     const prompt = `You rewrite scorecard "why this score" notes for $CLAWD token holders who are not developers.
 
-For EACH input row, write a plain-English rewrite that is MUCH SHORTER than the technical note:
-- Prefer ONE short sentence. Two only if needed. Never three.
-- Aim under ~25 words.
+For EACH input row, write a plain-English rewrite that is shorter than the technical note but still complete:
+- Prefer ONE sentence; allow TWO when needed. Never three.
+- Aim ~35–45 words (roughly 1–2 short sentences).
 - No jargon (no CI, stdlib, lockfile, RPC, toolchain, rubric, whisper.cpp, Ollama). Soften with everyday words.
 - Same facts only — do not invent evidence or change the score meaning.
 - Keep the repo name if the technical note names it.

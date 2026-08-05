@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import type { Level } from '@/lib/scores'
 import { LEVEL_BAR_COLORS, rubricRowPoints } from '@/lib/rubricDisplay'
 import { shortenSourceForNormieDisplay } from '@/lib/normieSourceDisplay'
@@ -16,7 +15,7 @@ interface Props {
   deltaEarned?: number | null
   levelChangeLabel?: string | null
   isNewRow?: boolean
-  /** When true, long source text starts collapsed. Default true. */
+  /** @deprecated Notes are always open in both modes. Kept for call-site compat. */
   collapsibleSource?: boolean
   /** When true, prefer sourceNormie if present. */
   preferNormieSource?: boolean
@@ -39,15 +38,13 @@ export default function RubricCriterionRow({
   deltaEarned = null,
   levelChangeLabel = null,
   isNewRow = false,
-  collapsibleSource = true,
   preferNormieSource = false,
 }: Props) {
-  const [sourceOpen, setSourceOpen] = useState(false)
   const { earned, max } = rubricRowPoints(weight, level)
   const fillPct = max > 0 ? (earned / max) * 100 : 0
   const barColor = LEVEL_BAR_COLORS[level]
   const technical = source.trim()
-  // Prefer stored AI rewrite; otherwise clip technical so Plain English never shows empty / tiny walls of text.
+  // Prefer stored AI rewrite; otherwise clip technical so Plain English never shows empty.
   const plain =
     sourceNormie?.trim() ||
     (preferNormieSource && technical ? shortenSourceForNormieDisplay(technical) : '')
@@ -56,15 +53,14 @@ export default function RubricCriterionRow({
   const showSource = displaySource.length > 0
   const showDelta = deltaEarned != null
   const deltaBadge = showDelta ? formatDeltaBadge(deltaEarned, isNewRow) : null
-  // Plain blurbs are short — keep them open. Technical stays collapsed.
-  const useCollapse = collapsibleSource && !showingPlain && displaySource.length > 72
 
-  const bodyFontSize = showingPlain ? (isMobile ? '16px' : '17px') : '10px'
-  const bodyLineHeight = showingPlain ? 1.55 : 1.35
-  const bodyColor = showingPlain ? 'var(--text)' : 'var(--text-muted)'
+  // Same chrome in both modes — only type scale differs.
+  const bodyFontSize = showingPlain ? (isMobile ? '15px' : '16px') : isMobile ? '12px' : '13px'
+  const bodyLineHeight = showingPlain ? 1.5 : 1.45
+  const bodyColor = showingPlain ? 'var(--text)' : 'var(--text-secondary)'
 
   return (
-    <div style={{ marginBottom: showingPlain ? '10px' : '5px' }}>
+    <div style={{ marginBottom: showingPlain ? '12px' : '10px' }}>
       <div
         style={{
           display: 'flex',
@@ -151,70 +147,17 @@ export default function RubricCriterionRow({
         </p>
       )}
 
-      {showSource && useCollapse && !sourceOpen && (
-        <button
-          type="button"
-          onClick={() => setSourceOpen(true)}
+      {showSource && (
+        <p
           style={{
-            margin: '2px 0 0',
-            padding: 0,
-            fontSize: '10px',
-            color: 'var(--accent)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            lineHeight: 1.35,
+            margin: '4px 0 0',
+            fontSize: bodyFontSize,
+            color: bodyColor,
+            lineHeight: bodyLineHeight,
           }}
         >
-          Why this score ▾
-        </button>
-      )}
-      {showSource && (!useCollapse || sourceOpen) && (
-        <>
-          {useCollapse && sourceOpen && (
-            <button
-              type="button"
-              onClick={() => setSourceOpen(false)}
-              style={{
-                margin: '2px 0 0',
-                padding: 0,
-                fontSize: '10px',
-                color: 'var(--accent)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                lineHeight: 1.35,
-              }}
-            >
-              Hide ▴
-            </button>
-          )}
-          {showingPlain && (
-            <p
-              style={{
-                margin: '4px 0 0',
-                fontSize: '10px',
-                fontWeight: 500,
-                color: 'var(--accent)',
-                letterSpacing: '0.02em',
-                textTransform: 'uppercase',
-              }}
-            >
-              Plain English
-            </p>
-          )}
-          <p
-            className={!useCollapse && !showingPlain ? 'rubric-source-clamp' : undefined}
-            style={{
-              margin: showingPlain ? '2px 0 0' : '2px 0 0',
-              fontSize: bodyFontSize,
-              color: bodyColor,
-              lineHeight: bodyLineHeight,
-            }}
-          >
-            {displaySource}
-          </p>
-        </>
+          {displaySource}
+        </p>
       )}
     </div>
   )
