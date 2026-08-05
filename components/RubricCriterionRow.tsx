@@ -54,13 +54,12 @@ export default function RubricCriterionRow({
   const showDelta = deltaEarned != null
   const deltaBadge = showDelta ? formatDeltaBadge(deltaEarned, isNewRow) : null
 
-  // Same chrome in both modes — only type scale differs.
-  const bodyFontSize = showingPlain ? (isMobile ? '15px' : '16px') : isMobile ? '12px' : '13px'
+  // Label leads; notes support. Same color in both modes — size only differs slightly.
+  const bodyFontSize = showingPlain ? '13px' : '12px'
   const bodyLineHeight = showingPlain ? 1.5 : 1.45
-  const bodyColor = showingPlain ? 'var(--text)' : 'var(--text-secondary)'
 
   return (
-    <div style={{ marginBottom: showingPlain ? '12px' : '10px' }}>
+    <div style={{ marginBottom: '10px' }}>
       <div
         style={{
           display: 'flex',
@@ -71,8 +70,9 @@ export default function RubricCriterionRow({
       >
         <span
           style={{
-            fontSize: '11px',
-            color: 'var(--text-secondary)',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: 'var(--text-primary)',
             flex: 1,
             minWidth: 0,
             lineHeight: 1.35,
@@ -152,7 +152,7 @@ export default function RubricCriterionRow({
           style={{
             margin: '4px 0 0',
             fontSize: bodyFontSize,
-            color: bodyColor,
+            color: 'var(--text-secondary)',
             lineHeight: bodyLineHeight,
           }}
         >
