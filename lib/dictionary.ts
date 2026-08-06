@@ -338,7 +338,7 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     term: 'Lockfile',
     short: 'A file that pins exact dependency versions so installs match.',
     definition:
-      'package-lock.json, yarn.lock, pnpm-lock.yaml, etc. Evidence the project is a real installable app, not just a sketch.',
+      'package-lock.json, yarn.lock, pnpm-lock.yaml, etc. Evidence the project is a real installable app, not just a sketch. Goes with [[package-json]].',
     group: 'coding',
   },
   {
@@ -412,6 +412,158 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     definition:
       'Containers (and Dockerfiles) show up in supply-chain and [[ci]] discussions — pin versions, don’t trust random base images blindly. Related idea to [[vm]] isolation.',
     group: 'coding',
+  },
+  {
+    id: 'typescript',
+    term: 'TypeScript',
+    short: 'JavaScript with types — catches many mistakes before the app runs.',
+    definition:
+      'Common for web and agent tooling. Seeing TypeScript (or tsconfig.json) usually means a typed JS codebase, often with a [[package-json]] / [[lockfile]] install path.',
+    group: 'coding',
+  },
+  {
+    id: 'javascript',
+    term: 'JavaScript',
+    short: 'The main language of the web and of many Node agents/tools.',
+    definition:
+      'Runs in browsers and on servers via [[nodejs]]. Blurbs mention it when describing what a [[repo]] is built with.',
+    group: 'coding',
+  },
+  {
+    id: 'nodejs',
+    term: 'Node.js',
+    short: 'A way to run [[javascript]] on a server or your computer — not only in a browser.',
+    definition:
+      '“Node 20+” means the runtime version. Most JS agent CLIs and web backends here assume Node is installed.',
+    group: 'coding',
+  },
+  {
+    id: 'package-json',
+    term: 'package.json',
+    short: 'The manifest listing a JS/TS project’s name, scripts, and dependencies.',
+    definition:
+      'Paired with a [[lockfile]] (package-lock.json or yarn.lock) so installs are repeatable. Strong “this is a real app” evidence in root files. See also [[dependency]].',
+    group: 'coding',
+  },
+  {
+    id: 'nextjs',
+    term: 'Next.js',
+    short: 'A popular React framework for building websites and web apps.',
+    definition:
+      'Shows up when a [[repo]] is a web UI or full-stack app. Not a burn mechanic by itself — just the web stack.',
+    group: 'coding',
+  },
+  {
+    id: 'websocket',
+    term: 'WebSocket',
+    short: 'A live two-way link between an app and a server (streams, not one-off requests).',
+    definition:
+      'Used for realtime video, chat, or feeds. Different from a normal [[api]] request that asks once and hangs up.',
+    group: 'coding',
+  },
+  {
+    id: 'sdk',
+    term: 'SDK',
+    short: 'Software Development Kit — a packaged set of tools/libraries builders use to integrate a service.',
+    definition:
+      'An Agent SDK or wallet SDK is someone else’s toolkit your [[repo]] imports. Useful leverage; also a [[dependency]] you have to trust and update.',
+    group: 'coding',
+  },
+  {
+    id: 'rust',
+    term: 'Rust',
+    short: 'A systems programming language used for fast, memory-safe tools and some crypto stacks.',
+    definition:
+      'Cargo, rust-toolchain, and GPU setup scripts are clues. Different from [[typescript]]/[[javascript]] web apps.',
+    group: 'coding',
+  },
+  {
+    id: 'cron',
+    term: 'Cron',
+    short: 'A scheduler that runs a job on a timer (every minute, hour, day…).',
+    definition:
+      'Blurbs mention cron when bots or servers do recurring work — similar idea to [[polling]], but usually “fire this script on a schedule.”',
+    group: 'ops',
+  },
+  {
+    id: 'gas',
+    term: 'Gas',
+    short: 'The fee paid to the network to run an [[on-chain]] action.',
+    definition:
+      'Paid in the chain’s native coin (often [[eth]]). “Gas sponsorship” means someone else covers that fee so users can act without holding ETH.',
+    group: 'crypto',
+  },
+  {
+    id: 'usdc',
+    term: 'USDC',
+    short: 'A common dollar-pegged stablecoin used for payments.',
+    definition:
+      'Blurbs like “buy-and-burn on USDC payments” mean users pay in USDC, then the app buys and [[burn]]s the project token.',
+    group: 'crypto',
+  },
+  {
+    id: 'calldata',
+    term: 'Calldata',
+    short: 'The data payload sent with a blockchain transaction — “what to do” on a [[smart-contract]].',
+    definition:
+      'Encoding calldata correctly is how wallets and agents call contracts. A “calldata translation layer” turns human intent into those bytes.',
+    group: 'crypto',
+  },
+  {
+    id: 'layerzero',
+    term: 'LayerZero',
+    short: 'A protocol for messages/tokens moving across different blockchains.',
+    definition:
+      '“LayerZero endpoint” in a blurb means cross-chain plumbing is involved — bridging or messaging, not a simple single-chain [[burn]].',
+    group: 'crypto',
+  },
+  {
+    id: 'eip-712',
+    term: 'EIP-712 / meta-transaction',
+    short: 'A signed message pattern so someone else can submit your [[on-chain]] action and often pay [[gas]].',
+    definition:
+      'Common in “gasless” flows: you sign off-chain; a relayer posts the transaction. Related to sponsored gas, not the same as a [[burn]].',
+    group: 'crypto',
+  },
+  {
+    id: 'inference',
+    term: 'Inference',
+    short: 'Running a trained AI model to get an answer or action — “using” the model, not training it.',
+    definition:
+      'Local inference means the [[llm]] runs on your machine (e.g. via [[ollama]] or [[llama-cpp]]). Cloud inference calls an API instead.',
+    group: 'ai',
+  },
+  {
+    id: 'llama-cpp',
+    term: 'llama.cpp',
+    short: 'Popular open-source software for running LLMs efficiently on your own hardware.',
+    definition:
+      'Often paired with Metal/GPU acceleration on Macs. Related local-stack cousin to [[ollama]] and [[whisper]].',
+    group: 'ai',
+  },
+  {
+    id: 'screencapturekit',
+    term: 'ScreenCaptureKit',
+    short: 'Apple’s framework for capturing screen/audio on macOS.',
+    definition:
+      'Shows up in local note/meeting apps next to [[whisper]] / [[ollama]] — “this records or sees the screen on your Mac,” not a cloud bot.',
+    group: 'ai',
+  },
+  {
+    id: 'devtools-protocol',
+    term: 'Chrome DevTools Protocol',
+    short: 'A remote-control API for a real Chrome browser tab (click, navigate, inspect).',
+    definition:
+      'Agents use it to drive a real browser instead of a fake one. Powerful and sensitive — closer to “hands on a computer” than a pure text [[llm]].',
+    group: 'ai',
+  },
+  {
+    id: 'contributing-md',
+    term: 'CONTRIBUTING.md',
+    short: 'A guide for how outsiders should propose changes (PRs, style, tests).',
+    definition:
+      'Transparency signal next to [[readme]] and [[pull-request]] norms. Missing isn’t fatal for solo tools; nice for open collaboration.',
+    group: 'github',
   },
 
   // —— AI ——
