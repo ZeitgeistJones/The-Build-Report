@@ -350,16 +350,14 @@ function findLexiconHits(text, counts, examples) {
     let idx = 0
     let n = 0
     while ((idx = lower.indexOf(p, idx)) !== -1) {
-      // word-ish boundary for short tokens
-      if (p.length <= 3) {
-        const before = lower[idx - 1]
-        const after = lower[idx + p.length]
-        const okBefore = idx === 0 || /[^a-z0-9]/.test(before ?? '')
-        const okAfter = !after || /[^a-z0-9]/.test(after)
-        if (!okBefore || !okAfter) {
-          idx += p.length
-          continue
-        }
+      // Always require word-ish boundaries (avoids "rust" inside "trust").
+      const before = lower[idx - 1]
+      const after = lower[idx + p.length]
+      const okBefore = idx === 0 || /[^a-z0-9]/.test(before ?? '')
+      const okAfter = !after || /[^a-z0-9./]/.test(after)
+      if (!okBefore || !okAfter) {
+        idx += p.length
+        continue
       }
       n++
       idx += p.length
@@ -380,7 +378,9 @@ function findLexiconHits(text, counts, examples) {
 function findTechTokens(text, counts, examples) {
   // file.ext, dotted libs, kebab scripts, CamelCase tools
   const patterns = [
-    /\b[a-z][\w-]*\.(?:cpp|md|sh|ts|tsx|js|json|yml|yaml|toml)\b/gi,
+    // Notable doc/config filenames only (skip long random doc paths).
+    /\b(?:README|LICENSE|CHANGELOG|SECURITY|GOVERNANCE|CONTRIBUTING|AGENTS|CLAUDE)\.md\b/gi,
+    /\b[a-z][\w-]*\.(?:cpp|sh|ts|tsx|js|json|yml|yaml|toml)\b/gi,
     /\b(?:package|yarn|pnpm)-lock(?:\.\w+)?\b/gi,
     /\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b/g, // ScreenCaptureKit, AppleSilicon-ish
     /\b[a-z]+(?:-[a-z0-9]+){1,4}\.(?:sh|md)\b/gi,

@@ -129,6 +129,94 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
       'Useful in emergencies, risky if hidden or unlimited. Blurbs care whether admin powers exist, who holds them, and whether that matches the safety story.',
     group: 'crypto',
   },
+  {
+    id: 'eth',
+    term: 'ETH (Ethereum)',
+    short: 'The main coin used to pay network fees on Ethereum-style chains (including Base).',
+    definition:
+      'Even when you’re dealing with $CLAWD on [[base]], small ETH fees often show up for [[on-chain]] actions like Rescore. Not the same token as $CLAWD.',
+    group: 'crypto',
+  },
+  {
+    id: 'defi',
+    term: 'DeFi',
+    short: 'Decentralized finance — money apps run by [[smart-contract]]s instead of a bank.',
+    definition:
+      'Lending, swaps, locks, and similar. Security writeups talk about DeFi a lot because bugs can move real funds. Related: [[tvl]], [[liquidity]], [[multisig]].',
+    group: 'crypto',
+  },
+  {
+    id: 'multisig',
+    term: 'Multisig',
+    short: 'A wallet that needs several people to approve before something happens.',
+    definition:
+      'Short for multi-signature. “3-of-5 multisig” means any 3 of 5 key-holders must agree — safer than one set of [[admin-keys]] alone for upgrades or treasury moves.',
+    group: 'crypto',
+  },
+  {
+    id: 'oracle',
+    term: 'Oracle',
+    short: 'A bridge that feeds real-world or off-chain facts into a [[smart-contract]].',
+    definition:
+      'Contracts can’t freely browse the web; an oracle supplies prices, winners, or other data. If a game needs a human/oracle to finish, that can hurt “walkaway” style scores.',
+    group: 'crypto',
+  },
+  {
+    id: 'abi',
+    term: 'ABI',
+    short: 'The “menu” of a contract — which functions exist and how to call them.',
+    definition:
+      'Application Binary Interface. Explorers and wallets use it to show human-readable contract actions. Matching [[bytecode]] to published source often goes with ABI checks.',
+    group: 'crypto',
+  },
+  {
+    id: 'bytecode',
+    term: 'Bytecode',
+    short: 'The compiled machine code of a [[smart-contract]] as deployed on-chain.',
+    definition:
+      'What the chain actually runs. Verified contracts prove this bytecode matches published source — a transparency signal.',
+    group: 'crypto',
+  },
+  {
+    id: 'immutable',
+    term: 'Immutable',
+    short: 'Can’t be changed after deploy — no upgrade backdoor.',
+    definition:
+      'For contracts: ownership burned or no upgrade path. Strong for trust (“the rules can’t quietly change”), weaker if a bug can never be patched.',
+    group: 'crypto',
+  },
+  {
+    id: 'liquidity',
+    term: 'Liquidity',
+    short: 'How easily a token can be bought/sold without huge price swings.',
+    definition:
+      'Deep liquidity = easier trading. Blurbs may mention liquidity when talking about locks, markets, or idle capital that still “works.”',
+    group: 'crypto',
+  },
+  {
+    id: 'tvl',
+    term: 'TVL',
+    short: 'Total Value Locked — dollars sitting in a protocol’s contracts.',
+    definition:
+      'A size metric for [[defi]]. Incident severity is often judged relative to TVL (“how bad was this vs what was at risk?”).',
+    group: 'crypto',
+  },
+  {
+    id: 'erc-8004',
+    term: 'ERC-8004',
+    short: 'A proposed standard for putting agents on-chain in a common way.',
+    definition:
+      'Shows up in this ecosystem’s “get agents onchain” docs. Treat it like a shared rulebook for agent identity/jobs — not a $CLAWD burn by itself.',
+    group: 'crypto',
+  },
+  {
+    id: 'testnet',
+    term: 'Testnet',
+    short: 'A practice blockchain where tokens aren’t real money.',
+    definition:
+      'Opposite of mainnet. Wrong-chain / testnet addresses in explorers are a common copy-paste gotcha when verifying [[on-chain]] claims.',
+    group: 'crypto',
+  },
 
   // —— GitHub ——
   {
@@ -185,6 +273,38 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     short: 'A running list of what changed between versions.',
     definition:
       'Helps humans see progress over time. Absence is often noted next to missing [[ci]] or tests when judging polish.',
+    group: 'github',
+  },
+  {
+    id: 'security-md',
+    term: 'SECURITY.md',
+    short: 'A repo file explaining how to report bugs and how upgrades/security are handled.',
+    definition:
+      'Transparency signal next to [[readme]] and [[license]]. Blurbs notice when upgrade policy or vulnerability reporting is written down.',
+    group: 'github',
+  },
+  {
+    id: 'governance-md',
+    term: 'GOVERNANCE.md',
+    short: 'A doc describing who can change what — and how decisions get made.',
+    definition:
+      'Useful for consumer/money apps. Absence isn’t always fatal for simple tools, but “who holds the keys?” should still be answerable somehow.',
+    group: 'github',
+  },
+  {
+    id: 'gitignore',
+    term: '.gitignore',
+    short: 'A list of files Git should not upload (secrets, build junk, local env).',
+    definition:
+      'Basic hygiene: `.env` and keys should be ignored. Related to [[secrets-env]].',
+    group: 'github',
+  },
+  {
+    id: 'pull-request',
+    term: 'Pull request (PR)',
+    short: 'A proposed code change waiting for review before it merges.',
+    definition:
+      'CI often runs on every PR. “PRs welcome” docs ([[readme]] / CONTRIBUTING) are a transparency/community signal.',
     group: 'github',
   },
   {
@@ -251,6 +371,46 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     short: 'Labeling releases (v1.2.3) so people know what changed.',
     definition:
       'Tags, releases, and [[changelog]]s. Helps verifiability — “which build are we talking about?”',
+    group: 'coding',
+  },
+  {
+    id: 'api',
+    term: 'API',
+    short: 'A defined way for one program to talk to another.',
+    definition:
+      'Application Programming Interface. Cloud AI calls, blockchain [[rpc]]s, and app backends are all APIs. An [[api-key]] is the password-like secret that unlocks one.',
+    group: 'coding',
+  },
+  {
+    id: 'api-key',
+    term: 'API key',
+    short: 'A secret token that proves an app is allowed to use an [[api]].',
+    definition:
+      'Must stay out of the public [[repo]] (use [[secrets-env]] / [[gitignore]]). “Secrets committed to repo” is a serious red flag in security blurbs.',
+    group: 'coding',
+  },
+  {
+    id: 'dependency',
+    term: 'Dependency',
+    short: 'Outside code your project relies on (libraries, packages).',
+    definition:
+      'Tracked in package.json and pinned by a [[lockfile]]. Also used loosely for “this app depends on an [[oracle]] / human to finish” — a design dependency, not an npm package.',
+    group: 'coding',
+  },
+  {
+    id: 'npm',
+    term: 'npm',
+    short: 'The usual package manager / registry for JavaScript projects.',
+    definition:
+      '“npm audit” and Dependabot hunt known holes in dependencies. Seeing npm usually means a JS/TS app with a normal install path. See also [[dependency]].',
+    group: 'coding',
+  },
+  {
+    id: 'docker',
+    term: 'Docker',
+    short: 'A way to package an app and its environment so it runs the same everywhere.',
+    definition:
+      'Containers (and Dockerfiles) show up in supply-chain and [[ci]] discussions — pin versions, don’t trust random base images blindly. Related idea to [[vm]] isolation.',
     group: 'coding',
   },
 
@@ -376,6 +536,22 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     definition:
       'Ephemeral [[vm]]s reset per job so agent state doesn’t pile up. A safety posture word: less persistence, less surprise leftover access.',
     group: 'ops',
+  },
+  {
+    id: 'apple-silicon',
+    term: 'Apple Silicon',
+    short: 'Apple’s newer Mac chips (M1/M2/M3…) — what [[tart]] VMs run on here.',
+    definition:
+      'When blurbs say Apple Silicon + tart, they mean local Mac hardware hosting isolated agent [[vm]]s — not a cloud GPU farm.',
+    group: 'ops',
+  },
+  {
+    id: 'metamask',
+    term: 'MetaMask',
+    short: 'A popular browser [[wallet]] for Ethereum-style chains.',
+    definition:
+      'One way to hold tokens and sign actions. Coinbase Wallet is another. Connecting a wallet proves control of an address — it doesn’t by itself burn $CLAWD.',
+    group: 'crypto',
   },
 ]
 
