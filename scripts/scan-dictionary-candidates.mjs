@@ -12,8 +12,11 @@
  *   npm run scan:dictionary
  *   npm run scan:dictionary -- --limit 80
  *   npm run scan:dictionary -- --redis          # fail if Redis env missing
- *   npm run scan:dictionary -- --file path.txt  # extra blurb dump
- *   npm run scan:dictionary -- --docs           # also scan docs/
+ *   npm run scan:dictionary -- --file path/to/blurbs.txt
+ *   npm run scan:dictionary -- --docs
+ *
+ * Note: fixtures/score-blurbs-sample.txt is always loaded. --file is only for
+ * an EXTRA dump you created — not a magic filename like some-dump.txt.
  *
  * Env (optional): UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
  */
@@ -401,9 +404,50 @@ function alreadyCovered(key, existing) {
   if (existing.terms.has(k)) return true
   const slug = k.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   if (existing.ids.has(slug)) return true
-  // covered if any dictionary id is a substring match for multiword
+
+  // Filename scripts covered by provisioning/bootstrap concepts
+  if (/\.(sh|md)$/.test(k)) {
+    if (
+      /provision|install|bootstrap|agent|readme|claude|security|governance|license|changelog/.test(
+        k,
+      )
+    ) {
+      return true
+    }
+  }
+
+  const variants = new Set([
+    k,
+    k.replace(/s$/, ''),
+    k.replace(/ed$/, ''),
+    k.replace(/ing$/, ''),
+    k.replace(/ies$/, 'y'),
+    k.replace(/process-isolated/, 'process-isolation'),
+    k.replace(/\bisolated\b/, 'isolation'),
+    k.replace(/\bpolls\b/, 'polling'),
+    k.replace(/\bstaked\b/, 'staking'),
+    k.replace(/\borchestrator\b/, 'orchestration'),
+    k.replace(/test suite/, 'tests'),
+  ])
+
+  for (const v of variants) {
+    if (existing.terms.has(v)) return true
+    const vs = v.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    if (existing.ids.has(vs)) return true
+  }
+
   for (const id of existing.ids) {
-    if (k.includes(id.replace(/-/g, ' ')) || id.replace(/-/g, ' ').includes(k)) return true
+    const idWords = id.replace(/-/g, ' ')
+    if (k.includes(idWords) || idWords.includes(k)) return true
+    for (const v of variants) {
+      if (v.includes(idWords) || idWords.includes(v)) return true
+    }
+  }
+  // Any dictionary term string containing this key (e.g. "staked" in "Staking / staked")
+  for (const t of existing.terms) {
+    if (t.includes(k) || k.includes(t)) {
+      if (k.length >= 4 && t.length >= 4) return true
+    }
   }
   return false
 }
@@ -535,9 +579,12 @@ async function main() {
   }
 
   console.log(`\n[scan] tip: add winners to lib/dictionary.ts with id + [[cross-refs]], then re-run.`)
+  console.log(
+    '[scan] tip: paste more score blurbs into scripts/fixtures/score-blurbs-sample.txt (always scanned).',
+  )
   if (!process.env.UPSTASH_REDIS_REST_URL) {
     console.log(
-      '[scan] tip: set UPSTASH_REDIS_REST_* to include live autoscore blurbs (best signal).',
+      '[scan] tip: set UPSTASH_REDIS_REST_* for live autoscores, or --file C:\\path\\to\\your-blurbs.txt',
     )
   }
 }

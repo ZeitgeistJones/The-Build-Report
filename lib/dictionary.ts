@@ -107,7 +107,7 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
   },
   {
     id: 'staking',
-    term: 'Staking',
+    term: 'Staking / staked',
     short: 'Locking tokens to earn rights or rewards — not the same as burning them.',
     definition:
       'You keep ownership (usually) but can’t freely sell while staked. On this site, CV (conviction) is earned by staking $CLAWD — different from a [[burn]].',
@@ -491,10 +491,10 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
   },
   {
     id: 'orchestration',
-    term: 'Orchestration',
+    term: 'Orchestration / orchestrator',
     short: 'Software that starts, stops, and schedules workers so humans don’t babysit each one.',
     definition:
-      'Scripts like agent-wrangler.sh polling for jobs, booting [[tart]] VMs, assigning [[agent]]s. Core idea behind many [[infrastructure]] shipping scores.',
+      'The orchestrator is the conductor; orchestration is the job it does — [[polling]] for work, booting [[tart]] VMs, assigning [[agent]]s. Core idea behind many [[infrastructure]] shipping scores.',
     group: 'ops',
   },
   {
@@ -579,7 +579,7 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
   },
   {
     id: 'polling',
-    term: 'Polling',
+    term: 'Polling / polls',
     short: 'Checking for new work on a timer (e.g. every 60 seconds).',
     definition:
       'A [[daemon]] that polls doesn’t wait for a push notification — it keeps asking “any jobs?” Common in [[orchestration]] scripts.',
@@ -619,10 +619,58 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
   },
   {
     id: 'process-isolation',
-    term: 'Process isolation',
+    term: 'Process isolation (isolated / process-isolated)',
     short: 'Keeping a worker in its own box so it can’t freely touch the whole machine.',
     definition:
-      '[[tart]] [[vm]]s are one form: each [[agent]] job runs separated from the host and from other jobs. Core safety idea for host-side orchestrators.',
+      '[[tart]] [[vm]]s are one form: each [[agent]] job runs separated from the host and from other jobs. “Isolated” in blurbs usually means this — not “lonely.”',
+    group: 'ops',
+  },
+  {
+    id: 'job-pickup',
+    term: 'Job pickup',
+    short: 'An [[agent]] claiming the next piece of work from a queue or service.',
+    definition:
+      'Part of the pickup → do work → completion loop. Faster reliable pickup (via [[orchestration]]) can mean more jobs finished and more downstream [[burn]]s when payments route that way.',
+    group: 'ops',
+  },
+  {
+    id: 'execution-engine',
+    term: 'Execution engine',
+    short: 'The layer that actually runs the jobs — not the app users click, the machinery underneath.',
+    definition:
+      'Blurbs use it for host-side runners ([[agent-fleet]] + [[vm]]s) that execute work at scale. Often on the [[critical-path]] for shipping.',
+    group: 'ops',
+  },
+  {
+    id: 'privilege-escalation',
+    term: 'Privilege escalation',
+    short: 'Finding a way to gain more power than you’re supposed to have.',
+    definition:
+      'Security jargon: a bug or misconfig that turns a limited [[agent]]/user into an admin. Blurbs note when root files show no obvious escalation path or loose [[admin-keys]].',
+    group: 'coding',
+  },
+  {
+    id: 'auditable',
+    term: 'Auditable',
+    short: 'A curious outsider can check the claims by reading the code/docs.',
+    definition:
+      'Versioned [[prompt]]s, clear shell scripts, and a thorough [[readme]] make a system auditable even without a formal [[security-audit]].',
+    group: 'coding',
+  },
+  {
+    id: 'runtime',
+    term: 'Runtime',
+    short: 'While the program is actually running — as opposed to “written in a file ahead of time.”',
+    definition:
+      '“Not mutable at runtime” means the [[agent]] can’t quietly rewrite its own [[prompt]]/rules while working — the instructions stay the fixed files in the [[repo]].',
+    group: 'coding',
+  },
+  {
+    id: 'mac-mini',
+    term: 'Mac mini / macOS',
+    short: 'Apple’s small desktop Mac — a common always-on host for local [[agent]] fleets.',
+    definition:
+      'Blurbs describing wipe → [[bootstrap]] → running fleet on a Mac mini mean the [[host-side]] box is a Mac, usually running [[tart]] [[vm]]s on [[apple-silicon]].',
     group: 'ops',
   },
   {
