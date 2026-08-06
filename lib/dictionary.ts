@@ -542,6 +542,223 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     group: 'crypto',
   },
   {
+    id: 'zero-knowledge',
+    term: 'Zero-knowledge (ZK)',
+    short: 'Cryptography that proves something is true without revealing the secret details.',
+    definition:
+      'Used in privacy and scaling systems. A “ZK circuit” is the math program being proved. Related craft: [[r1cs]], [[lean-4]], formal proofs — not the same as a token [[burn]].',
+    group: 'crypto',
+  },
+  {
+    id: 'r1cs',
+    term: 'R1CS',
+    short: 'A common format for writing the constraints inside a [[zero-knowledge]] circuit.',
+    definition:
+      'Rank-1 Constraint System. When blurbs mention isR1CS / circuit shapes, they mean the proof system’s puzzle pieces — deep crypto engineering jargon.',
+    group: 'crypto',
+  },
+  {
+    id: 'lean-4',
+    term: 'Lean 4',
+    short: 'A language/tool for writing machine-checked mathematical proofs.',
+    definition:
+      '“Formal verification”: the computer rejects invalid proofs. Used in competitive ZK / circuit work. Related: lake build, axioms, soundness/completeness.',
+    group: 'crypto',
+  },
+  {
+    id: 'formal-verification',
+    term: 'Formal verification',
+    short: 'Proving software or math claims with machine-checked logic — stronger than normal [[tests]].',
+    definition:
+      'Common in high-assurance crypto ([[lean-4]], circuit proofs). The typechecker/verifier is the test harness.',
+    group: 'crypto',
+  },
+  {
+    id: 'solidity',
+    term: 'Solidity',
+    short: 'The main language for writing Ethereum-style [[smart-contract]]s.',
+    definition:
+      '`.sol` files, [[foundry]], and NatSpec comments are Solidity clues. Deployed Solidity becomes [[bytecode]] on chain.',
+    group: 'crypto',
+  },
+  {
+    id: 'uniswap',
+    term: 'Uniswap / DEX',
+    short: 'A decentralized exchange — smart contracts that swap tokens without a company order book.',
+    definition:
+      'Uniswap V3 is a common DEX on [[base]]. Blurbs about USDC → [[weth]] → token routes usually mean automated market buys (often into a [[burn]] path).',
+    group: 'crypto',
+  },
+  {
+    id: 'weth',
+    term: 'WETH',
+    short: 'Wrapped ETH — ETH in [[erc-20]] token form so it can go through token routers.',
+    definition:
+      'Many DEX routes hop through WETH (e.g. USDC → WETH → CLAWD). It’s still ETH economically; the wrap is plumbing.',
+    group: 'crypto',
+  },
+  {
+    id: 'erc-20',
+    term: 'ERC-20',
+    short: 'The standard interface for fungible tokens on Ethereum-style chains.',
+    definition:
+      'Almost every “token” balance/transfer you see follows ERC-20. Swaps, burns, and locks usually move ERC-20 balances.',
+    group: 'crypto',
+  },
+  {
+    id: 'x402',
+    term: 'x402',
+    short: 'A payment protocol pattern for paying for API/agent work over HTTP-ish flows.',
+    definition:
+      'Shows up when job marketplaces auto-collect USDC/CLAWD for work. Think “pay-to-call” plumbing, often paired with a DEX swap into the project token.',
+    group: 'crypto',
+  },
+  {
+    id: 'natspec',
+    term: 'NatSpec',
+    short: 'Structured documentation comments inside [[solidity]] contracts.',
+    definition:
+      'Helps humans and tools understand what a function is supposed to do. A transparency signal on contract repos.',
+    group: 'crypto',
+  },
+  {
+    id: 'playwright',
+    term: 'Playwright',
+    short: 'A toolkit for driving a real browser automatically (clicks, navigation, checks).',
+    definition:
+      'Often paired with [[devtools-protocol]] / headless Chrome for agent workflows. Powerful automation — treat credentials and profiles carefully.',
+    group: 'coding',
+  },
+  {
+    id: 'headless',
+    term: 'Headless (browser)',
+    short: 'Running Chrome/Firefox without a visible window — automation-only.',
+    definition:
+      'Common with [[playwright]]. Same browser engine, no GUI. Good for servers; still a full browser attack surface.',
+    group: 'coding',
+  },
+  {
+    id: 'openapi',
+    term: 'OpenAPI',
+    short: 'A standard way to describe an HTTP [[api]] so tools can document and call it.',
+    definition:
+      'Schemas/specs that list endpoints and payloads. Helps discoverability (and scanners) without reading all the code.',
+    group: 'coding',
+  },
+  {
+    id: 'webhook',
+    term: 'Webhook',
+    short: 'Your server gets a ping when something happens elsewhere (job done, payment cleared).',
+    definition:
+      'Push notifications between services. Opposite of pure [[polling]] — the other system calls you.',
+    group: 'coding',
+  },
+  {
+    id: 'pty',
+    term: 'PTY',
+    short: 'Pseudo-terminal — the byte stream a terminal app uses (like a fake keyboard/screen pipe).',
+    definition:
+      'Harnesses that mirror PTY bytes into [[xterm]] UIs are showing a live shell session in the browser. Low-level terminal plumbing.',
+    group: 'ops',
+  },
+  {
+    id: 'xterm',
+    term: 'xterm.js',
+    short: 'A terminal emulator that runs in a web page.',
+    definition:
+      'Renders the green-text shell UI in-browser. Often fed by [[pty]] mirroring from a local server.',
+    group: 'ops',
+  },
+  {
+    id: 'sse',
+    term: 'SSE (Server-Sent Events)',
+    short: 'A one-way live stream from server → browser (prices, logs, progress).',
+    definition:
+      'Lighter than a full [[websocket]] when you only need server push. Streams should be closed cleanly when done.',
+    group: 'coding',
+  },
+  {
+    id: 'tts',
+    term: 'TTS (text-to-speech)',
+    short: 'Software that turns written text into spoken audio.',
+    definition:
+      'Used in voice/avatar agents. Often a third-party API cost — not automatically a token [[burn]] unless the product wires payment that way.',
+    group: 'ai',
+  },
+  {
+    id: 'wake-word',
+    term: 'Wake word',
+    short: 'The phrase that “wakes” a listening mic (like “Hey Siri”).',
+    definition:
+      'Local voice UIs use wake-word detection before heavier speech-to-text ([[whisper]]) / [[llm]] work. Privacy-sensitive: mic access.',
+    group: 'ai',
+  },
+  {
+    id: 'obs',
+    term: 'OBS / browser source',
+    short: 'OBS Studio streaming software; a browser source is a live webpage fed into the stream.',
+    definition:
+      'Agents that “appear on Zoom” often render a UI OBS captures as a virtual camera. Media plumbing, not on-chain economics.',
+    group: 'ops',
+  },
+  {
+    id: 'launchd',
+    term: 'launchd',
+    short: 'macOS’s built-in service manager — keeps background jobs running / restarting.',
+    definition:
+      'Similar job to systemd on Linux. Blurbs about OAuth keepalive under launchd mean the Mac is supervising the [[daemon]].',
+    group: 'ops',
+  },
+  {
+    id: 'gitleaks',
+    term: 'gitleaks',
+    short: 'A scanner that hunts accidentally committed secrets in git history.',
+    definition:
+      'Often wired into [[ci]] or [[husky]] hooks. Complements [[gitignore]] / [[secrets-env]] hygiene.',
+    group: 'coding',
+  },
+  {
+    id: 'husky',
+    term: 'Husky / lint-staged',
+    short: 'Git hooks that run checks (lint, secret scan) before you commit or push.',
+    definition:
+      'Automation that keeps bad commits out. A polish signal on JS/TS repos next to [[ci]].',
+    group: 'coding',
+  },
+  {
+    id: 'ocr',
+    term: 'OCR',
+    short: 'Optical Character Recognition — reading text out of images/screenshots.',
+    definition:
+      'Vision pipelines (Apple Vision, etc.) turn pixels into words. Useful in local note apps alongside [[whisper]].',
+    group: 'ai',
+  },
+  {
+    id: 'sherpa-onnx',
+    term: 'sherpa-onnx',
+    short: 'Local speech toolkit (often speaker ID / ASR) that can run without the cloud.',
+    definition:
+      'Shows up with [[whisper]] / [[ollama]] in privacy-first audio apps. On-device ML, not a chain mechanic.',
+    group: 'ai',
+  },
+  {
+    id: 'huggingface',
+    term: 'Hugging Face',
+    short: 'A big public hub for AI models and datasets.',
+    definition:
+      'Blurbs naming a model “on Hugging Face” mean weights are downloadable/linkable — reproducibility signal for [[inference]].',
+    group: 'ai',
+  },
+  {
+    id: 'localstorage',
+    term: 'localStorage',
+    short: 'Browser storage that saves small data on the user’s device.',
+    definition:
+      'Convenient and not a vault — anything in localStorage can be read by scripts on that site. Not for private keys.',
+    group: 'coding',
+  },
+
+  {
     id: 'inference',
     term: 'Inference',
     short: 'Running a trained AI model to get an answer or action — “using” the model, not training it.',
