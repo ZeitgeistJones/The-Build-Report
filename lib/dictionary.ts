@@ -335,7 +335,7 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
   },
   {
     id: 'lockfile',
-    term: 'Lockfile',
+    term: 'Lockfile (package-lock.json / yarn.lock)',
     short: 'A file that pins exact dependency versions so installs match.',
     definition:
       'package-lock.json, yarn.lock, pnpm-lock.yaml, etc. Evidence the project is a real installable app, not just a sketch. Goes with [[package-json]].',
@@ -523,6 +523,22 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     short: 'A signed message pattern so someone else can submit your [[on-chain]] action and often pay [[gas]].',
     definition:
       'Common in “gasless” flows: you sign off-chain; a relayer posts the transaction. Related to sponsored gas, not the same as a [[burn]].',
+    group: 'crypto',
+  },
+  {
+    id: 'foundry',
+    term: 'Foundry',
+    short: 'A popular toolkit for building and testing [[smart-contract]]s (Forge, Cast, Anvil).',
+    definition:
+      'foundry.toml / foundry.lock in root usually means Solidity work with serious local testing — stronger than “contracts exist but untested.”',
+    group: 'crypto',
+  },
+  {
+    id: 'webauthn',
+    term: 'WebAuthn / passkey',
+    short: 'Sign in or approve actions with a device key (fingerprint, Face ID, security key) instead of a seed phrase alone.',
+    definition:
+      'Often paired with smart accounts. Stronger phishing resistance than a raw private key in a file — still an auth/signing topic, not a [[burn]].',
     group: 'crypto',
   },
   {
