@@ -1,30 +1,5 @@
-# Paste real score-explanation blurbs below (any repo).
-# Then run:  npm run scan:dictionary
-# The scanner mines UNIVERSAL crypto / GitHub / coding / AI / ops words.
-# It will NOT suggest CLAWD-specific product names (clawd-*, leftclaw, etc.).
+# OPTIONAL offline fallback only.
+# Prefer:  vercel env pull .env.local   then   npm run scan:dictionary
+# That pulls live rubric blurbs from production — no pasting.
 #
-# Do NOT paste terminal commands here — only the blurb paragraphs.
-
---- example / Multiplies builder shipping capacity ---
-Repo is on the critical path for autonomous agent shipping. README shows five Claude Code workers (auditor, frontendqa, builder, research, feature) running in isolated tart VMs on Apple Silicon, managed by a wrangler script polling a job service every 60s. Root files include per-agent provisioning scripts, agent daemon and prompt files, and orchestration scripts. Last push shows active maintenance. This is the execution engine for job pickup — directly multiplies the builder's ability to run autonomous onchain work at scale.
-
---- example / Downstream path to holder value ---
-Agent fleet output feeds directly into job completion, which routes external payments into token purchases and burns via a named .eth payment address. README explicitly links the five worker types to service types in the job pickup and completion loop. AGENTS.md and per-worker prompt files indicate each worker has a specialized role. Faster job turnaround via reliable container orchestration → more jobs shipped → more payments → more burns. Clear causal chain.
-
---- example / Role in ecosystem workflow ---
-README describes active operational flow: a polling daemon checks for jobs every 60s, a cont CLI boots/stops tart VMs on demand to avoid idle CPU burn, five specialized agents pick jobs and complete them onchain. .env.* example files and a skills refresh script (pulling skill packs from skills/) show active integration with the broader builder ecosystem. install.sh, provision.sh, and rehearsal-provision.sh document the bootstrap and gold-image baking workflow — maintained and documented for new hosts.
-
---- example / On-chain commitments and constraints ---
-This is host-side orchestration; no onchain contracts in root. However, architectural design shows strong permission and process discipline: a single polling daemon (single point of control), tart VMs are ephemeral and reset per job (no persistent agent state), .env secrets are gitignored (no keys in repo). Agent prompts are versioned, making agent behavior auditable. Integration with an external job service enforces pickup and completion via onchain contracts (that service handles payment routing). No admin keys or privilege escalation evident in root files — sound operational model.
-
---- example / User funds, risk, and safety posture ---
-No user funds held in this repo itself — it is a job-execution orchestrator, not a wallet or payment contract. Risk surface is low: tart VMs are isolated (host-side macOS VMs per README), ephemeral resets limit persistence of any agent state drift, secrets in .env are chmod 600 by bootstrap. Agent prompts are fixed and versioned in root — not mutable at runtime. The safety model relies on an external service for job validation and payment settlement. This is appropriate delegation — containers enforce execution isolation, not financial validation.
-
---- example / Transparency and verifiability ---
-README is thorough: explains the two-part repo (cont CLI + agent fleet), the tart VM architecture, the polling and boot-on-demand model, and the bootstrap path from a wiped Mac mini to a running fleet. Root files include AGENTS.md, CLAUDE.md (API/OAuth setup), and per-agent prompts and daemons. .env.*.example files show expected environment structure. No LICENSE or SECURITY.md, but the operational model (ephemeral VMs, versioned prompts, no admin keys) is clearly described and auditable by reading shell scripts and prompts.
-
---- example / Governance, token-economics, and ecosystem alignment ---
-This is not a governance or token-mechanic repo — it is a builder shipping tool, properly scoped. Alignment is clear: the agent fleet executes jobs from an external service that is a primary burn app (payment → token purchase → burn). By improving job execution reliability and speed, this repo amplifies that economic activity. The repo is agnostic to governance — it executes whatever jobs the service receives, which is the correct posture for infra.
-
---- example / Security, testing, and cryptographic rigor ---
-No test suite, CI/CD, or CHANGELOG in root (flags show tests=no, CI=no). However, security posture is sound for its scope: tart VMs are process-isolated, ephemeral resets after job, secrets in .env are gitignored and chmod 600. Agent prompts are static versioned files, reducing runtime mutation risk. No cryptographic operations in the repo — those are delegated to the model provider (OAuth via keychain) and the external payment settlement service. For a host-side container orchestrator, absence of formal test suites is acceptable if operational scripting is sound and the execution boundary (VM isolation) is respected. The repo is low-risk by design, not high-assurance by testing.
+# Use this file only with:  npm run scan:dictionary:offline

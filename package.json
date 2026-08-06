@@ -11,6 +11,7 @@
     "debug:theme": "node scripts/debug-custom-theme.mjs",
     "debug:theme:local": "node scripts/debug-custom-theme.mjs http://localhost:3000",
     "scan:dictionary": "node scripts/scan-dictionary-candidates.mjs",
+    "scan:dictionary:offline": "node scripts/scan-dictionary-candidates.mjs --offline --fixture",
     "setup:playwright": "playwright install chromium"
   },
   "dependencies": {

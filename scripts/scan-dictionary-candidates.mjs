@@ -1,24 +1,20 @@
 /**
- * Mine jargon from SCORE EXPLANATIONS (the blurbs under rubric rows), not random docs.
+ * Mine UNIVERSAL jargon from live score explanations (no paste required).
  *
  * Default sources (in order):
- *   1. scripts/fixtures/score-blurbs-sample.txt  — paste real blurbs here anytime
- *   2. Redis autoscores (if UPSTASH_REDIS_REST_* set) — live production blurbs
- *   3. lib/scores.ts + lib/cardFraming.ts etc. (quoted source/verdict strings)
- *
- * docs/ is OFF by default (too much reference noise). Pass --docs to include.
+ *   1. Production /api/debug/score-blurbs  (needs CRON_SECRET in env)
+ *   2. Redis autoscores                   (needs UPSTASH_REDIS_REST_*)
+ *   3. lib score-adjacent quoted strings
+ *   4. Optional fixture / --file (offline only)
  *
  * Usage:
+ *   vercel env pull .env.local            # once — loads CRON_SECRET + Redis
  *   npm run scan:dictionary
  *   npm run scan:dictionary -- --limit 80
- *   npm run scan:dictionary -- --redis          # fail if Redis env missing
- *   npm run scan:dictionary -- --file path/to/blurbs.txt
- *   npm run scan:dictionary -- --docs
+ *   npm run scan:dictionary -- --site https://the-build-report.vercel.app
+ *   npm run scan:dictionary -- --offline  # skip live pull
  *
- * Note: fixtures/score-blurbs-sample.txt is always loaded. --file is only for
- * an EXTRA dump you created — not a magic filename like some-dump.txt.
- *
- * Env (optional): UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+ * Env: CRON_SECRET, optional UPSTASH_REDIS_REST_URL/TOKEN, optional DICTIONARY_SCAN_SITE
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, relative } from 'path'
@@ -28,13 +24,38 @@ import { createRequire } from 'module'
 const root = join(fileURLToPath(import.meta.url), '..', '..')
 const require = createRequire(import.meta.url)
 
+loadEnvFile(join(root, '.env.local'))
+loadEnvFile(join(root, '.env'))
+
 const args = process.argv.slice(2)
 const limit = Number(args.find((a, i) => args[i - 1] === '--limit') ?? 60)
 const requireRedis = args.includes('--redis')
 const includeDocs = args.includes('--docs')
+const offline = args.includes('--offline')
+const useFixture = args.includes('--fixture')
+const siteArg = args.find((a, i) => args[i - 1] === '--site')
 const extraFiles = []
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--file' && args[i + 1]) extraFiles.push(args[++i])
+}
+
+function loadEnvFile(path) {
+  if (!existsSync(path)) return
+  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const t = line.trim()
+    if (!t || t.startsWith('#')) continue
+    const eq = t.indexOf('=')
+    if (eq < 1) continue
+    const key = t.slice(0, eq).trim()
+    let val = t.slice(eq + 1).trim()
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = val
+  }
 }
 
 /** Phrases / tokens holders often hit in score blurbs (case-insensitive). */
@@ -371,6 +392,33 @@ function collectRepoText() {
   return chunks
 }
 
+async function collectLiveSiteBlurbs() {
+  const secret = process.env.CRON_SECRET?.trim()
+  if (!secret) return []
+
+  const base =
+    siteArg?.replace(/\/$/, '') ||
+    process.env.DICTIONARY_SCAN_SITE?.replace(/\/$/, '') ||
+    'https://the-build-report.vercel.app'
+
+  const url = `${base}/api/debug/score-blurbs?key=${encodeURIComponent(secret)}`
+  console.log(`[scan] fetching live blurbs from ${base}/api/debug/score-blurbs …`)
+  const res = await fetch(url)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`live pull HTTP ${res.status}: ${body.slice(0, 180)}`)
+  }
+  const data = await res.json()
+  const texts = Array.isArray(data.texts)
+    ? data.texts
+    : Array.isArray(data.blurbs)
+      ? data.blurbs.map(b => b.text).filter(Boolean)
+      : []
+  return texts
+    .filter(t => typeof t === 'string' && t.trim().length >= 20)
+    .map(text => ({ source: `live:${base}`, text }))
+}
+
 async function collectRedisText() {
   const url = process.env.UPSTASH_REDIS_REST_URL?.trim()
   const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
@@ -547,20 +595,43 @@ async function main() {
     `[scan] dictionary already has ${existing.ids.size} ids / ${existing.terms.size} term tokens`,
   )
 
-  const fixtureChunks = collectFixtureBlurbs()
-  const repoChunks = collectRepoText()
-  const chunks = [...fixtureChunks, ...repoChunks]
-  console.log(`[scan] score-blurb fixtures: ${fixtureChunks.length}`)
-  console.log(`[scan] repo text chunks: ${repoChunks.length}${includeDocs ? ' (docs ON)' : ' (docs OFF)'}`)
+  const chunks = []
 
-  try {
-    const redisChunks = await collectRedisText()
-    console.log(`[scan] redis score chunks: ${redisChunks.length}`)
-    chunks.push(...redisChunks)
-  } catch (err) {
-    console.error('[scan] redis error:', err instanceof Error ? err.message : err)
-    if (requireRedis) process.exit(1)
+  if (!offline) {
+    try {
+      const live = await collectLiveSiteBlurbs()
+      console.log(`[scan] live site blurbs: ${live.length}`)
+      chunks.push(...live)
+    } catch (err) {
+      console.warn('[scan] live site pull failed:', err instanceof Error ? err.message : err)
+      if (!process.env.CRON_SECRET) {
+        console.warn(
+          '[scan] tip: run `vercel env pull .env.local` once so CRON_SECRET is available — no paste needed.',
+        )
+      }
+    }
+
+    try {
+      const redisChunks = await collectRedisText()
+      console.log(`[scan] redis score chunks: ${redisChunks.length}`)
+      chunks.push(...redisChunks)
+    } catch (err) {
+      console.error('[scan] redis error:', err instanceof Error ? err.message : err)
+      if (requireRedis) process.exit(1)
+    }
+  } else {
+    console.log('[scan] offline mode — skipping live site + Redis')
   }
+
+  if (useFixture || offline || extraFiles.length || chunks.length === 0) {
+    const fixtureChunks = collectFixtureBlurbs()
+    console.log(`[scan] fixture/file blurbs: ${fixtureChunks.length}`)
+    chunks.push(...fixtureChunks)
+  }
+
+  const repoChunks = collectRepoText()
+  console.log(`[scan] repo text chunks: ${repoChunks.length}${includeDocs ? ' (docs ON)' : ' (docs OFF)'}`)
+  chunks.push(...repoChunks)
 
   const counts = new Map()
   const examples = new Map()
@@ -610,13 +681,8 @@ async function main() {
   }
 
   console.log(`\n[scan] tip: add winners to lib/dictionary.ts with id + [[cross-refs]], then re-run.`)
-  console.log(
-    '[scan] tip: paste more score blurbs into scripts/fixtures/score-blurbs-sample.txt (always scanned).',
-  )
-  if (!process.env.UPSTASH_REDIS_REST_URL) {
-    console.log(
-      '[scan] tip: set UPSTASH_REDIS_REST_* for live autoscores, or --file C:\\path\\to\\your-blurbs.txt',
-    )
+  if (!process.env.CRON_SECRET) {
+    console.log('[scan] tip: `vercel env pull .env.local` then re-run — pulls live blurbs from the site.')
   }
 }
 
