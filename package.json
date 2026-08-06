@@ -10,6 +10,7 @@
     "debug:promo": "node scripts/debug-promo-eligibility.mjs",
     "debug:theme": "node scripts/debug-custom-theme.mjs",
     "debug:theme:local": "node scripts/debug-custom-theme.mjs http://localhost:3000",
+    "scan:dictionary": "node scripts/scan-dictionary-candidates.mjs",
     "setup:playwright": "playwright install chromium"
   },
   "dependencies": {
