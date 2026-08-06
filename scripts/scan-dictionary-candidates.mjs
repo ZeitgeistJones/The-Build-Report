@@ -1,15 +1,23 @@
 /**
- * Scan site copy + cached autoscores for jargon that may belong in /dictionary.
+ * Mine jargon from SCORE EXPLANATIONS (the blurbs under rubric rows), not random docs.
+ *
+ * Default sources (in order):
+ *   1. scripts/fixtures/score-blurbs-sample.txt  — paste real blurbs here anytime
+ *   2. Redis autoscores (if UPSTASH_REDIS_REST_* set) — live production blurbs
+ *   3. lib/scores.ts + lib/cardFraming.ts etc. (quoted source/verdict strings)
+ *
+ * docs/ is OFF by default (too much reference noise). Pass --docs to include.
  *
  * Usage:
  *   npm run scan:dictionary
  *   npm run scan:dictionary -- --limit 80
- *   npm run scan:dictionary -- --redis   # require Redis (fail if unset)
+ *   npm run scan:dictionary -- --redis          # fail if Redis env missing
+ *   npm run scan:dictionary -- --file path.txt  # extra blurb dump
+ *   npm run scan:dictionary -- --docs           # also scan docs/
  *
- * Env (optional, for live score blurbs):
- *   UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+ * Env (optional): UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
  */
-import { readdirSync, readFileSync, statSync } from 'fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, relative } from 'path'
 import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
@@ -20,6 +28,11 @@ const require = createRequire(import.meta.url)
 const args = process.argv.slice(2)
 const limit = Number(args.find((a, i) => args[i - 1] === '--limit') ?? 60)
 const requireRedis = args.includes('--redis')
+const includeDocs = args.includes('--docs')
+const extraFiles = []
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--file' && args[i + 1]) extraFiles.push(args[++i])
+}
 
 /** Phrases / tokens holders often hit in score blurbs (case-insensitive). */
 const LEXICON = [
@@ -168,9 +181,36 @@ const LEXICON = [
   'macOS',
   'Mac mini',
   'gold image',
+  'gold-image',
   'host-side',
   'isolation',
   'isolated',
+  'process-isolated',
+  'process isolation',
+  'critical path',
+  'provisioning',
+  'provision',
+  'polling',
+  'polls',
+  'boot-on-demand',
+  'chmod',
+  'chmod 600',
+  'keychain',
+  'OAuth',
+  'payment settlement',
+  'job pickup',
+  'agent fleet',
+  'execution engine',
+  'ENS',
+  '.eth',
+  'skills',
+  'ethskills',
+  'CLI',
+  'container orchestration',
+  'privilege escalation',
+  'auditable',
+  'runtime',
+  'mutable',
 ]
 
 const STOP = new Set([
@@ -256,22 +296,47 @@ function extractQuotedBlobs(fileText) {
   return blobs
 }
 
+function collectFixtureBlurbs() {
+  const paths = [
+    join(root, 'scripts', 'fixtures', 'score-blurbs-sample.txt'),
+    ...extraFiles.map(p => (p.startsWith('/') || /^[A-Za-z]:/.test(p) ? p : join(root, p))),
+  ]
+  const chunks = []
+  for (const path of paths) {
+    if (!existsSync(path)) continue
+    const text = readFileSync(path, 'utf8')
+    // Split on --- headers or blank-line paragraphs
+    const blocks = text
+      .split(/\n(?=--- )/)
+      .map(b => b.replace(/^#.*$/gm, '').trim())
+      .filter(b => b.length >= 40)
+    for (const block of blocks) {
+      chunks.push({ source: relative(root, path), text: block })
+    }
+  }
+  return chunks
+}
+
 function collectRepoText() {
+  // Score-adjacent code only by default — docs/ is reference noise.
   const files = [
     ...walkFiles(join(root, 'lib')),
     ...walkFiles(join(root, 'components')),
-    ...walkFiles(join(root, 'docs')),
+    ...(includeDocs ? walkFiles(join(root, 'docs')) : []),
   ]
+  const prefer = /(?:scores|cardFraming|badgeTooltips|rubric|autoscore|scoring)/i
   const chunks = []
   for (const file of files) {
-    const rel = relative(root, file)
-    if (rel.replace(/\\/g, '/') === 'lib/dictionary.ts') continue
+    const rel = relative(root, file).replace(/\\/g, '/')
+    if (rel === 'lib/dictionary.ts') continue
     const text = readFileSync(file, 'utf8')
-    for (const blob of extractQuotedBlobs(text)) {
+    const blobs = extractQuotedBlobs(text)
+    // Prefer files that actually hold score blurbs; elsewhere keep only long source-like blobs
+    for (const blob of blobs) {
+      if (!prefer.test(rel) && blob.length < 120) continue
       chunks.push({ source: rel, text: blob })
     }
-    // Also harvest long prose comments / markdown paragraphs lightly
-    if (file.endsWith('.md')) {
+    if (includeDocs && file.endsWith('.md')) {
       chunks.push({ source: rel, text })
     }
   }
@@ -407,8 +472,11 @@ async function main() {
     `[scan] dictionary already has ${existing.ids.size} ids / ${existing.terms.size} term tokens`,
   )
 
-  const chunks = [...collectRepoText()]
-  console.log(`[scan] repo text chunks: ${chunks.length}`)
+  const fixtureChunks = collectFixtureBlurbs()
+  const repoChunks = collectRepoText()
+  const chunks = [...fixtureChunks, ...repoChunks]
+  console.log(`[scan] score-blurb fixtures: ${fixtureChunks.length}`)
+  console.log(`[scan] repo text chunks: ${repoChunks.length}${includeDocs ? ' (docs ON)' : ' (docs OFF)'}`)
 
   try {
     const redisChunks = await collectRedisText()

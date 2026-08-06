@@ -546,6 +546,126 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     group: 'ops',
   },
   {
+    id: 'critical-path',
+    term: 'Critical path',
+    short: 'If this slows down or breaks, the whole shipping pipeline slows with it.',
+    definition:
+      'Load-bearing plumbing. Blurbs use it when a repo (often [[orchestration]] / [[agent]] hosts) is treated as essential to getting jobs done — not a side experiment.',
+    group: 'ops',
+  },
+  {
+    id: 'host-side',
+    term: 'Host-side',
+    short: 'Runs on a real machine (e.g. a Mac mini), not inside a blockchain contract.',
+    definition:
+      'Opposite of [[on-chain]]. A host-side orchestrator can still matter for burns if it feeds jobs into on-chain payment apps — it just isn’t the contract itself.',
+    group: 'ops',
+  },
+  {
+    id: 'gold-image',
+    term: 'Gold image',
+    short: 'A pre-baked clean machine template you clone instead of setting up from scratch.',
+    definition:
+      '“Baking” a gold image means installing tools once, snapshotting, then spinning new [[vm]]s from that template. Speeds [[bootstrap]] for new hosts.',
+    group: 'ops',
+  },
+  {
+    id: 'provisioning',
+    term: 'Provisioning',
+    short: 'Scripts that set up a machine or [[agent]] so it’s ready to work.',
+    definition:
+      'Files like provisionBuilderAgent.sh create accounts, env, and daemons. Related to [[bootstrap]] and [[gold-image]] baking for a whole fleet.',
+    group: 'ops',
+  },
+  {
+    id: 'polling',
+    term: 'Polling',
+    short: 'Checking for new work on a timer (e.g. every 60 seconds).',
+    definition:
+      'A [[daemon]] that polls doesn’t wait for a push notification — it keeps asking “any jobs?” Common in [[orchestration]] scripts.',
+    group: 'ops',
+  },
+  {
+    id: 'boot-on-demand',
+    term: 'Boot-on-demand',
+    short: 'Start a [[vm]] only when there’s a job — shut it down when idle.',
+    definition:
+      'Saves CPU/power versus leaving agents running forever. Often paired with [[tart]] and a CLI that boots/stops VMs.',
+    group: 'ops',
+  },
+  {
+    id: 'chmod',
+    term: 'chmod / chmod 600',
+    short: 'A Unix permission setting — who can read or write a file.',
+    definition:
+      'chmod 600 means “only this user can read/write” — typical hardening for [[secrets-env]] files so other accounts on the machine can’t peek.',
+    group: 'ops',
+  },
+  {
+    id: 'keychain',
+    term: 'Keychain',
+    short: 'The Mac’s built-in vault for passwords and tokens.',
+    definition:
+      'Blurbs may say OAuth via keychain — credentials live in the OS vault instead of a plain text file. Related to [[oauth]] and [[secrets-env]].',
+    group: 'ops',
+  },
+  {
+    id: 'oauth',
+    term: 'OAuth',
+    short: 'A common “log in with X / grant access” standard — no raw password sharing.',
+    definition:
+      'Used so Claude or other APIs can authorize without stuffing long-lived secrets into the [[repo]]. Often stored in [[keychain]] on Macs.',
+    group: 'ops',
+  },
+  {
+    id: 'process-isolation',
+    term: 'Process isolation',
+    short: 'Keeping a worker in its own box so it can’t freely touch the whole machine.',
+    definition:
+      '[[tart]] [[vm]]s are one form: each [[agent]] job runs separated from the host and from other jobs. Core safety idea for host-side orchestrators.',
+    group: 'ops',
+  },
+  {
+    id: 'payment-settlement',
+    term: 'Payment settlement',
+    short: 'The step where money is actually collected, routed, and finalized.',
+    definition:
+      'For CLAWD burn apps: payment in → buy/burn path completes. An orchestrator may run jobs but leave settlement to a separate [[on-chain]] service.',
+    group: 'crypto',
+  },
+  {
+    id: 'ens',
+    term: 'ENS / .eth name',
+    short: 'A human-readable name for a blockchain address (like pay.something.eth).',
+    definition:
+      'Ethereum Name Service. Easier than raw 0x… hex. Seeing pay.…eth in a blurb usually means “payments go to this named address.”',
+    group: 'crypto',
+  },
+  {
+    id: 'cli',
+    term: 'CLI',
+    short: 'Command-line interface — a tool you run by typing commands, not clicking a website.',
+    definition:
+      'Example: a cont CLI that boots/stops [[tart]] VMs. Common in [[infrastructure]] repos.',
+    group: 'coding',
+  },
+  {
+    id: 'skills',
+    term: 'Skills (agent skills)',
+    short: 'Reusable instruction/tool packs an [[agent]] can load for a job.',
+    definition:
+      'Folders like skills/ or ethskills are shared know-how agents pull in (via scripts like refresh-skills.sh). Not token burns — builder tooling.',
+    group: 'ai',
+  },
+  {
+    id: 'agent-fleet',
+    term: 'Agent fleet',
+    short: 'Several specialized [[agent]]s working together as a team.',
+    definition:
+      'E.g. auditor, builder, research, frontend-qa, feature workers — each with its own [[prompt]] and often its own [[vm]]. Managed by [[orchestration]].',
+    group: 'ai',
+  },
+  {
     id: 'metamask',
     term: 'MetaMask',
     short: 'A popular browser [[wallet]] for Ethereum-style chains.',
