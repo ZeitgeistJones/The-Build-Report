@@ -251,6 +251,19 @@ const STOP = new Set([
   'old',
 ])
 
+/** Product / ecosystem proper nouns — never suggest these for the universal dictionary. */
+const ECOSYSTEM_BLOCK = [
+  /^clawd/i,
+  /leftclaw/i,
+  /clawdbot/i,
+  /\$clawd/i,
+  /pay\.clawd/i,
+  /ethskills/i,
+  /agent-wrangler/i,
+  /bake-agent-gold/i,
+  /provision\w*agent/i,
+]
+
 function walkFiles(dir, out = []) {
   let entries
   try {
@@ -308,10 +321,22 @@ function collectFixtureBlurbs() {
   for (const path of paths) {
     if (!existsSync(path)) continue
     const text = readFileSync(path, 'utf8')
-    // Split on --- headers or blank-line paragraphs
+    // Split on --- headers; drop comments and accidental shell commands
     const blocks = text
       .split(/\n(?=--- )/)
-      .map(b => b.replace(/^#.*$/gm, '').trim())
+      .map(b =>
+        b
+          .split('\n')
+          .filter(line => {
+            const t = line.trim()
+            if (!t || t.startsWith('#')) return false
+            if (/^npm\s+run\b/i.test(t)) return false
+            if (/^node\s+/i.test(t)) return false
+            return true
+          })
+          .join('\n')
+          .trim(),
+      )
       .filter(b => b.length >= 40)
     for (const block of blocks) {
       chunks.push({ source: relative(root, path), text: block })
@@ -399,8 +424,14 @@ function normalizeKey(s) {
   return s.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
+function isEcosystemSpecific(key) {
+  const k = normalizeKey(key)
+  return ECOSYSTEM_BLOCK.some(re => re.test(k))
+}
+
 function alreadyCovered(key, existing) {
   const k = normalizeKey(key)
+  if (isEcosystemSpecific(k)) return true
   if (existing.terms.has(k)) return true
   const slug = k.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   if (existing.ids.has(slug)) return true

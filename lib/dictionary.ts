@@ -312,7 +312,7 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     term: 'Org (organization)',
     short: 'A shared GitHub account that owns many repos.',
     definition:
-      'Here, the tracked org is typically clawdbotatg — many repos under one umbrella.',
+      'A team/company account on GitHub — many [[repo]]s under one umbrella, shared permissions and billing.',
     group: 'github',
   },
 
@@ -702,7 +702,7 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     term: 'Skills (agent skills)',
     short: 'Reusable instruction/tool packs an [[agent]] can load for a job.',
     definition:
-      'Folders like skills/ or ethskills are shared know-how agents pull in (via scripts like refresh-skills.sh). Not token burns — builder tooling.',
+      'Folders like skills/ hold reusable instruction or tool packs an [[agent]] can load for a job. Builder tooling — not a token mechanic.',
     group: 'ai',
   },
   {
@@ -710,7 +710,7 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     term: 'Agent fleet',
     short: 'Several specialized [[agent]]s working together as a team.',
     definition:
-      'E.g. auditor, builder, research, frontend-qa, feature workers — each with its own [[prompt]] and often its own [[vm]]. Managed by [[orchestration]].',
+      'E.g. auditor, builder, research, QA workers — each with its own [[prompt]] and often its own [[vm]]. Managed by [[orchestration]].',
     group: 'ai',
   },
   {
