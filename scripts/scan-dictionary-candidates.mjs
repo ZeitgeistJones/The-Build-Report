@@ -487,15 +487,12 @@ function alreadyCovered(key, existing) {
   const slug = k.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   if (existing.ids.has(slug)) return true
 
-  // Filename scripts covered by provisioning/bootstrap concepts
-  if (/\.(sh|md)$/.test(k)) {
-    if (
-      /provision|install|bootstrap|agent|readme|claude|security|governance|license|changelog/.test(
-        k,
-      )
-    ) {
-      return true
-    }
+  // Filename scripts / one-off repo files — not universal dictionary material
+  if (/\.(sh|js|mjs|py|json)$/.test(k) && !/^(package\.json|package-lock\.json|tsconfig\.json|yarn\.lock)$/.test(k)) {
+    return true
+  }
+  if (/\.(md)$/.test(k) && !/^(readme|license|changelog|security|governance|contributing|agents|claude)\.md$/.test(k)) {
+    return true
   }
 
   const variants = new Set([
