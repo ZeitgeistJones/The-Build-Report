@@ -8,13 +8,12 @@
  *   4. Optional fixture / --file (offline only)
  *
  * Usage:
- *   vercel env pull .env.local            # once — loads CRON_SECRET + Redis
+ *   Put CRON_SECRET in .env.cron.local once (Vercel dashboard → copy).
+ *   Sensitive vars are NOT available via `vercel env pull` / `vercel env run`.
  *   npm run scan:dictionary
- *   npm run scan:dictionary -- --limit 80
  *   npm run scan:dictionary -- --site https://the-build-report.vercel.app
- *   npm run scan:dictionary -- --offline  # skip live pull
  *
- * Env: CRON_SECRET, optional UPSTASH_REDIS_REST_URL/TOKEN, optional DICTIONARY_SCAN_SITE
+ * Env: CRON_SECRET (required for live pull), optional DICTIONARY_SCAN_SITE
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
 import { join, relative } from 'path'
@@ -24,8 +23,10 @@ import { createRequire } from 'module'
 const root = join(fileURLToPath(import.meta.url), '..', '..')
 const require = createRequire(import.meta.url)
 
-loadEnvFile(join(root, '.env.local'))
-loadEnvFile(join(root, '.env'))
+// Prefer cron-local (real secret). Ignore .env.local if it only has Vercel [SENSITIVE] stubs.
+loadEnvFile(join(root, '.env.cron.local'))
+loadEnvFile(join(root, '.env.local'), { skipPlaceholders: true })
+loadEnvFile(join(root, '.env'), { skipPlaceholders: true })
 
 const args = process.argv.slice(2)
 const limit = Number(args.find((a, i) => args[i - 1] === '--limit') ?? 60)
@@ -39,7 +40,7 @@ for (let i = 0; i < args.length; i++) {
   if (args[i] === '--file' && args[i + 1]) extraFiles.push(args[++i])
 }
 
-function loadEnvFile(path) {
+function loadEnvFile(path, opts = {}) {
   if (!existsSync(path)) return
   for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
     const t = line.trim()
@@ -54,6 +55,8 @@ function loadEnvFile(path) {
     ) {
       val = val.slice(1, -1)
     }
+    if (opts.skipPlaceholders && /^\[?SENSITIVE\]?$/i.test(val)) continue
+    if (!val) continue
     if (!process.env[key]) process.env[key] = val
   }
 }
@@ -682,7 +685,9 @@ async function main() {
 
   console.log(`\n[scan] tip: add winners to lib/dictionary.ts with id + [[cross-refs]], then re-run.`)
   if (!process.env.CRON_SECRET) {
-    console.log('[scan] tip: `vercel env pull .env.local` then re-run — pulls live blurbs from the site.')
+    console.log(
+      '[scan] tip: create .env.cron.local with CRON_SECRET=<from Vercel dashboard> then re-run — pulls all live score blurbs, no paste.',
+    )
   }
 }
 

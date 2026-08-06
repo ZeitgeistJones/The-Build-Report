@@ -68,6 +68,6 @@ After `npm install`, run `npm run setup:playwright` once (downloads Chromium for
 | `npm run debug:promo` | Compare promo eligibility vs live commits (`node scripts/debug-promo-eligibility.mjs <url> <CRON_SECRET> [slug]`) |
 | `npm run debug:theme` | Playwright repro against production |
 | `npm run debug:theme:local` | Same, against `localhost:3000` (start `npm run dev` first) |
-| `npm run scan:dictionary` | Mine universal jargon from live score blurbs (`vercel env pull .env.local` once for `CRON_SECRET`) |
+| `npm run scan:dictionary` | Mine universal jargon from live score blurbs (needs `CRON_SECRET` in `.env.cron.local` — Sensitive vars can’t be pulled via CLI) |
 
 Gated production debug APIs (use `CRON_SECRET` as `?key=`): `/api/debug/burn-totals`, `/api/debug/home-perf`, `/api/debug/commit-counts`, `/api/debug/promo-status`, `/api/debug/promo-eligibility`, `/api/debug/score-blurbs`.
