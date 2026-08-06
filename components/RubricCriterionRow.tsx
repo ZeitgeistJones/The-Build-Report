@@ -44,10 +44,14 @@ export default function RubricCriterionRow({
   const fillPct = max > 0 ? (earned / max) * 100 : 0
   const barColor = LEVEL_BAR_COLORS[level]
   const technical = source.trim()
-  // Prefer stored AI rewrite; otherwise clip technical so Plain English never shows empty.
-  const plain =
+  // Prefer stored AI rewrite; clip long/jargony caches so PE stays short even before rescore.
+  const rawPlain =
     sourceNormie?.trim() ||
     (preferNormieSource && technical ? shortenSourceForNormieDisplay(technical) : '')
+  const plain =
+    preferNormieSource && rawPlain.length > 300
+      ? shortenSourceForNormieDisplay(rawPlain)
+      : rawPlain
   const showingPlain = Boolean(preferNormieSource && plain)
   const displaySource = showingPlain ? plain : technical
   const showSource = displaySource.length > 0

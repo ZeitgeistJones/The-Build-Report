@@ -1294,9 +1294,9 @@ export default function RepoList({
                       <RubricSectionTitle>
                         {economicSectionTitle(repo)}
                       </RubricSectionTitle>
-                      {economicSectionFraming(repo) && (
+                      {economicSectionFraming(repo, normie) && (
                         <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.35 }}>
-                          {economicSectionFraming(repo)}
+                          {economicSectionFraming(repo, normie)}
                         </p>
                       )}
                       {economicScore.rubric.map((row, i) => {
@@ -1331,9 +1331,9 @@ export default function RepoList({
 
                   <div style={rubricSectionGridStyle('bi', hasSL, hasTM, isMobile)}>
                     <RubricSectionTitle hint={BI_WEIGHTS_TOOLTIP_SHORT}>Builder standards</RubricSectionTitle>
-                    {integritySectionFraming(repo) && (
+                    {integritySectionFraming(repo, normie) && (
                       <p className="rubric-source-clamp" style={{ fontSize: '10px', color: 'var(--text-muted)', margin: '0 0 6px', lineHeight: 1.35 }}>
-                        {integritySectionFraming(repo)}
+                        {integritySectionFraming(repo, normie)}
                       </p>
                     )}
                     {repo.builderIntegrity.rubric.map((row, i) => {

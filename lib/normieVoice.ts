@@ -64,6 +64,8 @@ export const NORMIE_SURFACE_SHAPES = {
     '1-4 sentences matching the standard Overheard length. Same facts and repo names; explain why the podcast mention matters to token holders in plain words, no insider terms.',
   rescoreSummary:
     '1-2 sentences. Same facts and repo name as a technical rescore note, but zero jargon — warm friend voice for token holders. Keep the repo slug; gloss in plain words if helpful.',
+  rubricSource:
+    '1–2 short sentences only (~35–50 words). About 25–30% shorter than a typical technical "why this score" note. Cover the gist (what it is + why the score), not every file name. Ban jargon — say "math proofs a computer checks" not Lean 4 / R1CS; say "outside contest" not zk.golf API; say "no money at risk" not "no custody surface".',
 } as const
 
 /**

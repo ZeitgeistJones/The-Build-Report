@@ -1,5 +1,6 @@
 import { generateText, generateTextGeminiOnly, hasGeminiApiKey, hasLlmApiKey } from '@/lib/llm'
 import { shortenSourceForNormieDisplay } from '@/lib/normieSourceDisplay'
+import { NORMIE_TEMPERATURE, normieVoiceGuidance } from '@/lib/normieVoice'
 import type { Repo, RubricRow, Score } from '@/lib/scores'
 
 type SourceItem = { key: string; label: string; source: string }
@@ -117,8 +118,8 @@ async function rewriteSourcesWithLlm(
     try {
       return await generateTextGeminiOnly({
         prompt,
-        maxTokens: 1200,
-        temperature: 0.4,
+        maxTokens: 900,
+        temperature: NORMIE_TEMPERATURE,
         label: 'rubric-source-normie',
       })
     } catch (err) {
@@ -129,8 +130,8 @@ async function rewriteSourcesWithLlm(
   try {
     return await generateText({
       prompt,
-      maxTokens: 1200,
-      temperature: 0.4,
+      maxTokens: 900,
+      temperature: NORMIE_TEMPERATURE,
       label: 'rubric-source-normie',
     })
   } catch (err) {
@@ -160,18 +161,20 @@ export async function attachRubricSourceNormies(repo: Repo): Promise<Repo> {
 
     const prompt = `You rewrite scorecard "why this score" notes for $CLAWD token holders who are not developers.
 
-For EACH input row, write a plain-English rewrite that is SHORTER than the technical note but still covers its main points:
-- Use 2–3 short sentences. Never one thin sentence that drops most of the evidence.
-- Aim ~55–80 words — compress, don't omit. Hit: what the repo is, the key evidence, and what's missing or why the score landed there.
-- Soften jargon into everyday words (say "runs on your Mac with local AI" instead of listing whisper.cpp / Ollama / ScreenCaptureKit). Keep meaning.
-- Same facts only — do not invent evidence or change the score meaning.
+${normieVoiceGuidance('rubricSource')}
+
+For EACH input row, write a Plain English rewrite:
+- 1–2 short sentences only. Target ~35–50 words (about 25–30% shorter than a typical technical note).
+- Cover the gist only: what this repo is, and why this row scored how it did. Do NOT list file names, APIs, toolchains, or every proof detail.
+- Everyday words only. Forbidden unless you gloss in plain words: Lean, R1CS, ZK circuit jargon, CI, RPC, stdlib, DSL, axiom, calldata, PTY, orchestration, rubric.
+- Same facts — do not invent evidence or change the score meaning.
 - Keep the repo name if the technical note names it.
 
 INPUT:
 ${listBlock}
 
 Return ONLY JSON mapping each key to its rewrite. Keys must be exactly: ${items.map(i => i.key).join(', ')}
-Example: {"sl0":"clawd-scribe is a local meeting-notes app for your own machine, not a builder toolkit. Docs show consumer features like speaker ID and calendar awareness, with no hooks for other CLAWD agents. The project layout looks like a standalone Mac app, not shipping infrastructure other builders depend on."}`
+Example: {"sl0":"clawd-zk-golf is a one-day contest entry for fancy math proofs — not a tool other CLAWD builders plug into. It doesn't help ship apps that burn or lock tokens, so shipping-leverage stays low."}`
 
     const result = await rewriteSourcesWithLlm(prompt)
     if (result) {
