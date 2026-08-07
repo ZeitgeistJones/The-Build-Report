@@ -7,6 +7,11 @@ import {
   getBulkRegenStatus,
   runBulkRegenerateBatch,
 } from '@/lib/bulkRegen'
+import {
+  SOURCE_NORMIE_BACKFILL_DEFAULT_BATCH,
+  SOURCE_NORMIE_BACKFILL_MAX_BATCH,
+  runSourceNormieBackfillBatch,
+} from '@/lib/sourceNormieBackfill'
 
 export const maxDuration = 300
 
@@ -28,6 +33,22 @@ export async function POST(req: NextRequest) {
     const cachedSlugs = await listCachedAutoScores()
     const backup = exportBaselineBackup(cachedSlugs)
     return NextResponse.json({ ok: true, backup })
+  }
+
+  if (action === 'rewriteSourceNormies') {
+    const offset = typeof body?.offset === 'number' ? body.offset : 0
+    const forceAll = body?.forceAll === true
+    const limit =
+      typeof body?.limit === 'number'
+        ? Math.min(Math.max(1, body.limit), SOURCE_NORMIE_BACKFILL_MAX_BATCH)
+        : SOURCE_NORMIE_BACKFILL_DEFAULT_BATCH
+    try {
+      const result = await runSourceNormieBackfillBatch({ offset, limit, forceAll })
+      return NextResponse.json({ ok: true, ...result })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'SourceNormie backfill failed'
+      return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    }
   }
 
   if (action === 'regenerateBatch') {

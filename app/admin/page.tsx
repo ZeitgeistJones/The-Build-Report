@@ -72,6 +72,7 @@ export default function AdminPage() {
   const [bulkResult, setBulkResult] = useState<string | null>(null)
   const [bulkFlushAck, setBulkFlushAck] = useState(false)
   const [backupDownloaded, setBackupDownloaded] = useState(false)
+  const [normieBackfillRunning, setNormieBackfillRunning] = useState(false)
   const [collections, setCollections] = useState<Record<RepoCollectionId, string[]>>({
     'cv-related': [],
     'clawd-gated': [],
@@ -826,6 +827,59 @@ export default function AdminPage() {
       setBulkResult('Bulk regen request failed')
     }
     setBulkRunning(false)
+  }
+
+  async function runSourceNormieBackfill() {
+    setNormieBackfillRunning(true)
+    setBulkResult(null)
+    let offset = 0
+    let totalRewritten = 0
+    let totalFailed = 0
+    const failedNames: string[] = []
+
+    try {
+      while (true) {
+        const res = await fetch('/api/admin/bulk-regen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'rewriteSourceNormies',
+            password,
+            offset,
+            forceAll: false,
+          }),
+        })
+        if (!res.ok) {
+          setBulkResult(
+            `PE rewrite HTTP ${res.status} after ${totalRewritten} repo(s) — retry to continue.`,
+          )
+          break
+        }
+        const data = await res.json()
+        if (!data.ok) {
+          setBulkResult(data.error ?? 'PE note rewrite failed')
+          break
+        }
+        totalRewritten += (data.rewritten as string[] | undefined)?.length ?? 0
+        totalFailed += (data.failed as string[] | undefined)?.length ?? 0
+        failedNames.push(...((data.failed as string[] | undefined) ?? []))
+        if (data.nextOffset == null) {
+          setBulkResult(
+            `PE notes rewritten for ${totalRewritten} cached repo(s)${
+              totalFailed ? `, ${totalFailed} failed (${failedNames.slice(0, 5).join(', ')})` : ''
+            }. Grades unchanged.`,
+          )
+          break
+        }
+        offset = data.nextOffset as number
+        setBulkResult(
+          `Rewriting PE notes… ${totalRewritten} done (${offset}/${data.totalCached}).`,
+        )
+      }
+    } catch {
+      setBulkResult('PE note rewrite request failed')
+    }
+    setNormieBackfillRunning(false)
   }
 
   async function loadContextList() {
@@ -2028,6 +2082,7 @@ export default function AdminPage() {
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
             Download a baseline backup before flushing. Scores {BULK_REGEN_DEFAULT_BATCH} repos per request to avoid server timeouts — the button runs until all are done.
             Bulk flush replaces cached Live AI scores with the current v3 prompt and rubrics.
+            “Rewrite stale PE notes” only refreshes Plain English score blurbs (no grade changes).
           </p>
           {bulkStatus && (
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
@@ -2051,7 +2106,7 @@ export default function AdminPage() {
           </button>
           <button
             onClick={() => void runBulkRegenBatch(false)}
-            disabled={bulkRunning}
+            disabled={bulkRunning || normieBackfillRunning}
             style={{
               fontSize: '12px',
               padding: '8px 16px',
@@ -2062,6 +2117,21 @@ export default function AdminPage() {
             }}
           >
             {bulkRunning ? 'Running…' : 'Score uncached only (no flush)'}
+          </button>
+          <button
+            onClick={() => void runSourceNormieBackfill()}
+            disabled={bulkRunning || normieBackfillRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border)',
+            }}
+            title="Rewrites long/jargony Plain English score notes only — does not change grades"
+          >
+            {normieBackfillRunning ? 'Rewriting PE…' : 'Rewrite stale PE notes (no rescore)'}
           </button>
         </div>
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', maxWidth: '520px' }}>
@@ -2075,7 +2145,7 @@ export default function AdminPage() {
         </label>
         <button
           onClick={() => void runBulkRegenBatch(true)}
-          disabled={bulkRunning || !bulkFlushAck || !backupDownloaded}
+          disabled={bulkRunning || normieBackfillRunning || !bulkFlushAck || !backupDownloaded}
           style={{
             fontSize: '12px',
             padding: '8px 16px',

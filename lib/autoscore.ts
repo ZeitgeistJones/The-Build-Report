@@ -409,6 +409,14 @@ async function cacheScoredRepo(
   }
 }
 
+/** Write a scored repo back to Redis (PE backfill etc.) — keeps paid scores persistent. */
+export async function writeCachedScore(repo: Repo): Promise<void> {
+  await cacheScoredRepo(repo, {
+    persistent: repo.scoreOrigin === 'paid',
+    scoreOrigin: repo.scoreOrigin,
+  })
+}
+
 /** Infer (optional cache bypass) and write to Redis. Used by bulk regen and singles. */
 export async function inferAndCacheRepo(
   raw: RawRepo,

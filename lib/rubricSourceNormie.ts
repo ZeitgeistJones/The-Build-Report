@@ -5,13 +5,31 @@ import type { Repo, RubricRow, Score } from '@/lib/scores'
 
 type SourceItem = { key: string; label: string; source: string }
 
-function collectSourceItems(repo: Repo): SourceItem[] {
+/** Long, copy-pasted, or jargon-heavy PE notes — regenerate or clip. */
+export function isStaleSourceNormie(source: string, sourceNormie?: string | null): boolean {
+  const n = sourceNormie?.trim()
+  if (!n) return true
+  if (n.length > 300) return true
+  const s = source.trim()
+  if (s && n.slice(0, 72) === s.slice(0, 72)) return true
+  // Technical leftovers that slipped through older prompts
+  if (
+    /\b(lean\s*4|r1cs|calldata|stdlib|axiom|circom|halo2|zk\.golf|orchestration|pty)\b/i.test(n) &&
+    !/\b(math proofs|computer checks|outside contest|no money at risk)\b/i.test(n)
+  ) {
+    return true
+  }
+  return false
+}
+
+function collectSourceItems(repo: Repo, onlyStale = false): SourceItem[] {
   const items: SourceItem[] = []
   const pushScore = (prefix: string, score: Score | null | undefined) => {
     if (!score?.rubric?.length) return
     for (let i = 0; i < score.rubric.length; i++) {
       const row = score.rubric[i]
       if (!row.source?.trim()) continue
+      if (onlyStale && !isStaleSourceNormie(row.source, row.sourceNormie)) continue
       items.push({
         // Short stable keys — models rewrite long label-based keys and break matching.
         key: `${prefix}${i}`,
@@ -48,7 +66,8 @@ function fillMissingSourceNormies(score: Score | null | undefined): Score | null
   return {
     ...score,
     rubric: score.rubric.map(row => {
-      if (row.sourceNormie?.trim() || !row.source?.trim()) return row
+      if (!row.source?.trim()) return row
+      if (!isStaleSourceNormie(row.source, row.sourceNormie)) return row
       return { ...row, sourceNormie: shortenSourceForNormieDisplay(row.source) }
     }),
   }
@@ -144,9 +163,13 @@ async function rewriteSourcesWithLlm(
  * Attach plain-English rewrites of rubric `source` notes.
  * Tries Gemini, then Anthropic; always fills gaps with a short clip so Plain English
  * mode never shows empty after a new score.
+ * @param onlyStale — rewrite only long/jargony/missing notes (cheaper backfill).
  */
-export async function attachRubricSourceNormies(repo: Repo): Promise<Repo> {
-  const items = collectSourceItems(repo)
+export async function attachRubricSourceNormies(
+  repo: Repo,
+  opts?: { onlyStale?: boolean },
+): Promise<Repo> {
+  const items = collectSourceItems(repo, opts?.onlyStale === true)
   if (!items.length) return ensureSourceNormieClips(repo)
 
   let working: Repo = repo
