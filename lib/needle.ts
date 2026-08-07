@@ -127,6 +127,8 @@ ${normieVoiceGuidance('needle')}
 export type GenerateNeedleOptions = {
   /** Defaults to today Mountain — use yesterdayMountainDateKey() from daily-digest cron for brief sync. */
   dateKey?: string
+  /** Regenerate even if a cached Needle already exists for the date. */
+  force?: boolean
 }
 
 export async function generateAndCacheNeedle(
@@ -134,6 +136,10 @@ export async function generateAndCacheNeedle(
 ): Promise<NeedleData | null> {
   const redis = getRedis()
   const dateKey = options.dateKey ?? dateKeyMountain()
+  if (!options.force) {
+    const existing = await readCachedNeedle(dateKey)
+    if (existing) return existing
+  }
   const { startMs, endMs } = mountainDateKeyBoundsMs(dateKey)
   const slugs = await getSlugsRescoredBetween(startMs, endMs)
   if (!slugs.length) return null
@@ -180,7 +186,7 @@ export async function generateAndCacheNeedle(
 
 /** Fire-and-forget refresh after a rescore so The Needle stays current intraday. */
 export function refreshNeedleAfterRescore(): void {
-  void generateAndCacheNeedle().catch(err => {
+  void generateAndCacheNeedle({ force: true }).catch(err => {
     console.error('[needle] post-rescore refresh failed', err)
   })
 }
@@ -204,29 +210,10 @@ export async function getNeedle(): Promise<NeedleData | null> {
     const keys = editionReadKeys()
     for (const key of keys) {
       const cached = await readCachedNeedle(key)
-      if (cached) {
-        // #region agent log
-        fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',location:'lib/needle.ts:getNeedle',message:'needle cache hit',data:{cacheKey:key,dateKey:cached.dateKey,repoCount:cached.repoCount,readKeys:keys},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-        console.log('[needle-cache]', JSON.stringify({
-          event: 'hit',
-          cacheKey: key,
-          dateKey: cached.dateKey,
-          repoCount: cached.repoCount,
-        }))
-        // #endregion
-        return cached
-      }
+      if (cached) return cached
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',location:'lib/needle.ts:getNeedle',message:'needle missing',data:{readKeys:keys},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
-    console.log('[needle-cache]', JSON.stringify({ event: 'miss', readKeys: keys }))
-    // #endregion
     return null
-  } catch (err) {
-    // #region agent log
-    fetch('http://127.0.0.1:7856/ingest/8feef998-a3c0-4f10-b60f-49dbcf37bc07',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ba045f'},body:JSON.stringify({sessionId:'ba045f',location:'lib/needle.ts:getNeedle',message:'needle read error',data:{error:err instanceof Error?err.message:String(err)},timestamp:Date.now(),hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
+  } catch {
     return null
   }
 }

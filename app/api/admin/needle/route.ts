@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (denied) return denied
 
   try {
-    const needle = await generateAndCacheNeedle({ dateKey: yesterdayMountainDateKey() })
+    const needle = await generateAndCacheNeedle({ dateKey: yesterdayMountainDateKey(), force: true })
     return NextResponse.json({
       ok: true,
       generated: Boolean(needle),

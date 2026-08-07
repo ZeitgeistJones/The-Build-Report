@@ -538,7 +538,13 @@ export async function generateAndCacheDailyDigest(
   stats: GitHubStats,
   repos: Repo[],
   mountainDateKey = yesterdayMountainDateKey(),
+  options?: { force?: boolean },
 ): Promise<DailyDigestCache> {
+  if (!options?.force) {
+    const existing = await readCachedDigest(mountainDateKey)
+    if (existing?.general?.trim()) return existing
+  }
+
   const activity = collectBuildActivityForMountainDay(stats, repos, mountainDateKey)
   const commitCount = activity.reduce((n, a) => n + a.commits.length, 0)
   const gradeContext = formatGradeContext(stats, repos)
@@ -572,7 +578,7 @@ export async function generateAndCacheBuildBrief(
   repos: Repo[],
   mountainDateKey = yesterdayMountainDateKey(),
 ): Promise<{ text: string; repoCount: number; commitCount: number; generatedAt: string }> {
-  const digest = await generateAndCacheDailyDigest(stats, repos, mountainDateKey)
+  const digest = await generateAndCacheDailyDigest(stats, repos, mountainDateKey, { force: true })
   return {
     text: digest.general,
     repoCount: digest.repoCount,

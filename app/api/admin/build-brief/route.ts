@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const repos = await loadReposForBrief(stats)
     const editionKey = yesterdayMountainDateKey()
     const brief = await generateAndCacheBuildBrief(stats, repos, editionKey)
-    const needle = await generateAndCacheNeedle({ dateKey: editionKey }).catch(err => {
+    const needle = await generateAndCacheNeedle({ dateKey: editionKey, force: true }).catch(err => {
       console.error('[admin/build-brief] needle generation failed', err)
       return null
     })
