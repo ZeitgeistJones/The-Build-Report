@@ -31,7 +31,7 @@ import { periodKeyLabel, repoCommitsForPeriodKey, type Period } from '@/lib/grad
 import RubricCriterionRow from '@/components/RubricCriterionRow'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import { MIN_TAP } from '@/lib/responsive'
-import { type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
+import { type RescoreSummaryRecord, rescoreSummaryForDisplay } from '@/lib/rescoreSummaries'
 import InfoTooltip from '@/components/InfoTooltip'
 import ScoreTypeBadge from '@/components/ScoreTypeBadge'
 import {
@@ -388,13 +388,14 @@ function formatRescoreOldGrade(label: string | null | undefined): string {
   return label
 }
 
-function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
+function RescoreSummaryBlock({ meta, plain }: { meta: RescoreSummaryRecord; plain: boolean }) {
   const rescoreDate = formatScoredDateLabel(meta.rescoreAt)
   const oldDate = formatRescoreOldDateLabel(meta.oldScoredAt)
   const fromBaseline = looksLikeBaselineDate(meta.oldScoredAt)
   const oldEconomic = meta.oldTokenMechanic ?? RESCORE_NOT_SCORED_LABEL
   const newEconomic = meta.newTokenMechanic ?? 'N/A'
-  const showWhatChanged = meta.deltaHeader || meta.summary
+  const summaryText = rescoreSummaryForDisplay(meta, plain)
+  const showWhatChanged = Boolean(meta.deltaHeader || summaryText)
 
   return (
     <div style={{
@@ -448,9 +449,9 @@ function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
               {meta.deltaHeader}
             </span>
           )}
-          {meta.summary && (
+          {summaryText && (
             <span style={{ display: 'block', marginTop: meta.deltaHeader ? '6px' : '4px' }}>
-              {meta.summary}
+              {summaryText}
             </span>
           )}
         </div>
@@ -1375,7 +1376,7 @@ export default function RepoList({
               )
             })()}
 
-            {rescoreMeta && <RescoreSummaryBlock meta={rescoreMeta} />}
+            {rescoreMeta && <RescoreSummaryBlock meta={rescoreMeta} plain={normie} />}
 
             {showSeparateVerdict && (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', marginBottom: '10px' }}>

@@ -93,7 +93,7 @@ async function runRescorePipeline(repoSlug: string) {
     )
   }
 
-  const { summary: changeSummary, deltaHeader } = await generateRescoreChangeSummary({
+  const { summary: changeSummary, summaryNormie, deltaHeader } = await generateRescoreChangeSummary({
     oldRepo,
     newRepo: repo,
     commitMessages,
@@ -106,6 +106,7 @@ async function runRescorePipeline(repoSlug: string) {
     oldRepo,
     newRepo: repo,
     summary: changeSummary,
+    summaryNormie,
     deltaHeader,
     commits30dAtRescore,
   })

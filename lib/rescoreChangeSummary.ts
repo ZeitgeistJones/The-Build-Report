@@ -257,14 +257,15 @@ export async function generateRescoreChangeSummary(params: {
   newRepo: Repo
   commitMessages: string[]
   evidence?: RescoreEvidenceForSummary | null
-}): Promise<{ summary: string | null; deltaHeader: string }> {
+}): Promise<{ summary: string | null; summaryNormie: string | null; deltaHeader: string }> {
   const { oldRepo, newRepo, commitMessages, evidence } = params
   const deltas = computeRescoreDeltas(oldRepo, newRepo)
   const deltaHeader = formatRescoreDeltaHeader(deltas)
   const rowChanges = formatChangedRowsForPrompt(deltas)
+  const flatFallback = fallbackFlatSummary(deltas, commitMessages)
 
   if (!hasLlmApiKey()) {
-    return { summary: null, deltaHeader }
+    return { summary: null, summaryNormie: null, deltaHeader }
   }
 
   const commitsBlock = commitMessages.length
@@ -290,13 +291,16 @@ ${oldRepo ? formatRepoScores(oldRepo) : 'No prior score on record.'}
 NEW SCORES (live rescore of current repo; each row has a source note):
 ${formatRepoScores(newRepo)}
 
-${evidenceBlock}Write 1-2 sentences about what changed for a token holder who is not a developer. This blurb is ALWAYS plain English (normie-first site) — no dual technical version.
+${evidenceBlock}Write TWO "what changed" blurbs with the SAME facts:
+
+1) "summary" — 1–2 sentences for builders/technical readers. Precise is fine (README, CI, commits, rubric evidence). Still no markdown.
+2) "summaryNormie" — 1–2 sentences Plain English for token holders who are not developers.
 
 ${normieVoiceGuidance('rescoreSummary')}
 
-Rules:
+Shared rules (both fields):
 - Lead with evidence, not the percentage: name concrete themes from RECENT COMMITS and/or cite NEW score row \`source\` notes that justify the new rubric *level*. The reader already sees ±N pts and letter moves in the header — do not open by restating them.
-- Keep the repo slug (${newRepo.githubSlug || newRepo.name}); you may add a short plain gloss after it.
+- Keep the repo slug (${newRepo.githubSlug || newRepo.name}); you may add a short plain gloss after it in summaryNormie.
 - Treat “row X moved low→mid” as mechanism already shown above — never use that alone as the reason a grade rose or fell. Say what evidence justified the new level.
 - Ban openings that only restate “+N pts”, “rose to F (40%)”, or “Builder standards rose” without an evidence clause in the same sentence.
 - Do not open with README/docs “framing/clarity/purpose” unless the commits themselves are docs-only and that is what moved a row.
@@ -306,33 +310,68 @@ Rules:
 - If a score is flat, say the commits did not yet change the live scorecard reading (ambition in titles vs what is actually in the repo is fine).
 - If a score fell, explain the harsher reading; do not say it improved.
 - If a score rose, do not say it declined.
-- Mention specific scorecard rows only when they changed in RUBRIC ROW CHANGES above — and explain them without insider jargon (no “RPC proxy”, “build chain”, “toolchain” unless you gloss them in one short clause).
+- Mention specific scorecard rows only when they changed in RUBRIC ROW CHANGES above.
 - Do not promise a future rescore will fix the grade.
-Plain English only, no markdown.`
+
+Return ONLY JSON: {"summary":"...","summaryNormie":"..."}`
 
   try {
     const { text: raw } = await generateText({
       prompt,
-      maxTokens: 512,
+      maxTokens: 700,
       label: 'rescore-summary',
     })
-    let text = raw ? stripMarkdown(raw) : ''
 
-    if (
-      text &&
+    const parsed = parseDualSummary(raw)
+    let summary = parsed.summary ? stripMarkdown(parsed.summary) : ''
+    let summaryNormie = parsed.summaryNormie ? stripMarkdown(parsed.summaryNormie) : ''
+
+    const bad = (text: string) =>
+      Boolean(text) &&
       (summaryContradictsDeltas(text, deltas) ||
         summaryClaimsStaleSnapshot(text) ||
         summaryClaimsMissingDocs(text) ||
         summaryDeniesListedRootFiles(text, evidence) ||
         summaryIsCircularRestatement(text) ||
         summaryIgnoresCommitsForDocsOnly(text, commitMessages))
-    ) {
-      text = fallbackFlatSummary(deltas, commitMessages)
-    }
 
-    return { summary: text || null, deltaHeader }
+    if (bad(summary)) summary = flatFallback
+    if (bad(summaryNormie) || !summaryNormie) summaryNormie = flatFallback
+    if (!summary) summary = flatFallback
+
+    return {
+      summary: summary || null,
+      summaryNormie: summaryNormie || null,
+      deltaHeader,
+    }
   } catch (err) {
     console.warn('[rescoreChangeSummary] generation failed:', err)
-    return { summary: fallbackFlatSummary(deltas, commitMessages), deltaHeader }
+    return { summary: flatFallback, summaryNormie: flatFallback, deltaHeader }
   }
+}
+
+function parseDualSummary(raw: string | null | undefined): {
+  summary: string
+  summaryNormie: string
+} {
+  if (!raw?.trim()) return { summary: '', summaryNormie: '' }
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    try {
+      const obj = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>
+      const summary = typeof obj.summary === 'string' ? obj.summary.trim() : ''
+      const summaryNormie =
+        typeof obj.summaryNormie === 'string'
+          ? obj.summaryNormie.trim()
+          : typeof obj.normie === 'string'
+            ? obj.normie.trim()
+            : ''
+      if (summary || summaryNormie) return { summary, summaryNormie }
+    } catch {
+      // fall through — older single-paragraph replies
+    }
+  }
+  const plain = stripMarkdown(raw).trim()
+  return { summary: plain, summaryNormie: plain }
 }

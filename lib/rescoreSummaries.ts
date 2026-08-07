@@ -18,6 +18,8 @@ const KEY_PREFIX = 'build-report:rescore-summary:'
 
 export type RescoreSummaryRecord = {
   summary: string
+  /** Plain English “what changed”; when set, `summary` is the technical version. */
+  summaryNormie?: string | null
   deltaHeader?: string | null
   oldTokenMechanic: string | null
   newTokenMechanic: string | null
@@ -43,12 +45,14 @@ export function buildRescoreSummaryRecord(params: {
   oldRepo: Repo | null
   newRepo: Repo
   summary: string | null
+  summaryNormie?: string | null
   deltaHeader: string | null
   commits30dAtRescore: number
 }): RescoreSummaryRecord {
-  const { oldRepo, newRepo, summary, deltaHeader, commits30dAtRescore } = params
+  const { oldRepo, newRepo, summary, summaryNormie, deltaHeader, commits30dAtRescore } = params
   return {
     summary: summary?.trim() ?? '',
+    summaryNormie: summaryNormie?.trim() || null,
     deltaHeader: deltaHeader?.trim() || null,
     oldTokenMechanic: formatEconomicLabel(oldRepo),
     newTokenMechanic: formatEconomicLabel(newRepo),
@@ -60,6 +64,22 @@ export function buildRescoreSummaryRecord(params: {
     rescoreAt: new Date().toISOString(),
     oldRubrics: snapshotRubricsFromRepo(oldRepo),
   }
+}
+
+/** Pick technical vs Plain English “what changed” text for the toggle. */
+export function rescoreSummaryForDisplay(
+  meta: RescoreSummaryRecord,
+  plain: boolean,
+): string {
+  const technical = meta.summary?.trim() ?? ''
+  const normie = meta.summaryNormie?.trim() ?? ''
+  if (plain) {
+    // Dual records prefer normie; legacy PE-only records stored PE in `summary`.
+    return normie || technical
+  }
+  if (normie) return technical
+  // Legacy: only PE blurb on file — hide it in technical mode (delta header still shows).
+  return ''
 }
 
 export async function saveRescoreSummary(
