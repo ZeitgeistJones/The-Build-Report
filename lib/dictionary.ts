@@ -1107,6 +1107,14 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
     group: 'crypto',
   },
   {
+    id: 'ad-hoc',
+    term: 'Ad-hoc',
+    short: 'One-off / as-needed — not a standing product or shipping system.',
+    definition:
+      'In score blurbs (e.g. clawd-research), “ad-hoc” means scratch-pad or lab-notebook work: useful exploration, but not production code other builders depend on every day. That framing usually keeps shipping-leverage scores low.',
+    group: 'coding',
+  },
+  {
     id: 'mainnet',
     term: 'Mainnet',
     short: 'The real blockchain with real money — not a practice network.',
