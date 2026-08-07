@@ -1106,6 +1106,118 @@ export const DICTIONARY_ENTRIES: DictionaryEntry[] = [
       'One way to hold tokens and sign actions. Coinbase Wallet is another. Connecting a wallet proves control of an address — it doesn’t by itself burn $CLAWD.',
     group: 'crypto',
   },
+  {
+    id: 'mainnet',
+    term: 'Mainnet',
+    short: 'The real blockchain with real money — not a practice network.',
+    definition:
+      'Opposite of a [[testnet]]. When blurbs say a page “reads from mainnet,” they mean live chain data, not a sandbox.',
+    group: 'crypto',
+  },
+  {
+    id: 'ipfs',
+    term: 'IPFS',
+    short: 'A way to store files by content, not by a single company’s server.',
+    definition:
+      'Used a lot for podcast video, clip galleries, and “pin this file.” A [[cid]] is the fingerprint of the file. Different from a normal website host like Vercel.',
+    group: 'crypto',
+  },
+  {
+    id: 'cid',
+    term: 'CID',
+    short: 'Content ID — the fingerprint of a file on [[ipfs]].',
+    definition:
+      'If the bytes change, the CID changes. Blurbs mention updating a manifest CID when new clips get pinned.',
+    group: 'crypto',
+  },
+  {
+    id: 'contenthash',
+    term: 'Contenthash',
+    short: 'An [[ens]] record that points a name at website content (often via [[ipfs]]).',
+    definition:
+      'Lets something.eth resolve to a site without only depending on one company’s servers. Common with Scaffold-ETH / three-surface deploys.',
+    group: 'crypto',
+  },
+  {
+    id: 'vesting',
+    term: 'Vesting',
+    short: 'Unlocking tokens over time instead of all at once.',
+    definition:
+      'A linear vest streams the same amount each day/second until the schedule finishes. Related to [[supply-lock]]: tokens may be parked until they unlock.',
+    group: 'crypto',
+  },
+  {
+    id: 'slash',
+    term: 'Slash',
+    short: 'A penalty that takes away staked or locked tokens for bad behavior.',
+    definition:
+      'Governance or contracts can “slash” someone (often with a public reason). Different from a voluntary [[burn]].',
+    group: 'crypto',
+  },
+  {
+    id: 'scaffold-eth',
+    term: 'Scaffold-ETH',
+    short: 'A popular starter kit for Ethereum apps (often called SE2).',
+    definition:
+      'Gives builders a ready [[wallet]] UI, [[smart-contract]] hooks, and deploy patterns. Score blurbs mention it when a front end is built on that stack.',
+    group: 'coding',
+  },
+  {
+    id: 'tui',
+    term: 'TUI',
+    short: 'Text UI — an interactive terminal interface, not a web page.',
+    definition:
+      'Blurbs contrast interactive TUI sessions with [[headless]] / scripted runs (different billing and behavior). Related to [[pty]] when a harness mirrors a terminal.',
+    group: 'coding',
+  },
+  {
+    id: 'ffmpeg',
+    term: 'FFmpeg',
+    short: 'The common open-source tool for cutting and converting video/audio.',
+    definition:
+      'Shows up in clip pipelines: take a long episode, cut short shareable moments, write .mp4 files.',
+    group: 'coding',
+  },
+  {
+    id: 'smoke-test',
+    term: 'Smoke test',
+    short: 'A quick “does it basically run?” check — not a full test suite.',
+    definition:
+      'Better than nothing, weaker than automated [[tests]] / [[ci]]. Blurbs mention smoke scripts when formal coverage is missing.',
+    group: 'coding',
+  },
+  {
+    id: 'noir',
+    term: 'Noir',
+    short: 'A language for writing zero-knowledge proofs.',
+    definition:
+      'Research and contest repos may explore Noir the way others explore [[lean-4]] or [[r1cs]] — math proofs a computer can check, not a consumer burn app by itself.',
+    group: 'crypto',
+  },
+  {
+    id: 'prompt-injection',
+    term: 'Prompt injection',
+    short: 'Tricking an AI by hiding instructions inside the text it reads.',
+    definition:
+      'Like SQL injection, but for [[llm]]s / [[agent]]s. Security blurbs care when tools handle untrusted input or secrets.',
+    group: 'ai',
+  },
+  {
+    id: 'persona',
+    term: 'Persona',
+    short: 'The character / role file that steers how an [[agent]] behaves.',
+    definition:
+      'Often a markdown “brain” (goals, tone, tools). Sandboxes spin up many personas to test agents before real jobs.',
+    group: 'ai',
+  },
+  {
+    id: 'encryption-at-rest',
+    term: 'Encryption at rest',
+    short: 'Scrambling files on disk so stolen drives aren’t readable.',
+    definition:
+      'Different from encrypting data in transit (HTTPS). Blurbs ding repos that keep [[secrets-env]] plaintext on disk with no encryption-at-rest story.',
+    group: 'ops',
+  },
 ]
 
 const byId = new Map(DICTIONARY_ENTRIES.map(e => [e.id, e]))
