@@ -66,19 +66,71 @@ export function buildRescoreSummaryRecord(params: {
   }
 }
 
+/** Pull the % out of a stored score label like "A (93%) SL" or "F+ (58%)". */
+function pctFromLabel(label?: string | null): number | null {
+  if (!label) return null
+  const m = label.match(/\((\d+)%\)/)
+  return m ? Number(m[1]) : null
+}
+
+/** Plain direction word from two score percentages. */
+function moveWord(oldPct: number | null, newPct: number | null): 'went up' | 'dipped' | null {
+  if (oldPct == null || newPct == null || oldPct === newPct) return null
+  return newPct > oldPct ? 'went up' : 'dipped'
+}
+
+/**
+ * Old records stored a single jargon-heavy fallback in `summary` (raw rubric row
+ * names, "expand those rows / the move itself is not the reason", raw commit titles,
+ * 0x addresses). Detect that shape so Plain English mode can swap in a clean version
+ * without needing a rescore.
+ */
+function looksLikeJargonFallback(text: string): boolean {
+  return (
+    /the move itself is not the reason/i.test(text) ||
+    /expand those rows/i.test(text) ||
+    /recent commits in this rescore window/i.test(text) ||
+    /0x[a-f0-9]{6,}/i.test(text) ||
+    /\b(low|mid|high|n\/?a)\s*→\s*(low|mid|high|n\/?a)\b/i.test(text) ||
+    /Security, testing, and cryptographic rigor|On-chain commitments and constraints|Downstream path to holder value|Multiplies builder shipping capacity|Role in ecosystem workflow|User funds, risk, and safety posture|Transparency and verifiability|Governance, token-economics/i.test(
+      text,
+    )
+  )
+}
+
+/** Build a clean Plain English blurb from the record alone (no LLM, no rescore). */
+export function legacyNormieFallback(meta: RescoreSummaryRecord, repoName?: string): string {
+  const name = repoName?.trim() || 'This project'
+  const econMove = moveWord(pctFromLabel(meta.oldTokenMechanic), pctFromLabel(meta.newTokenMechanic))
+  const biMove = moveWord(pctFromLabel(meta.oldBuilderIntegrity), pctFromLabel(meta.newBuilderIntegrity))
+
+  const parts: string[] = []
+  if (econMove) parts.push(`its money-side score ${econMove}`)
+  if (biMove) parts.push(`its builder-standards score ${biMove}`)
+
+  if (!parts.length) {
+    return `${name}'s score didn't really change on this recheck. Open the rows below to see how each part scored.`
+  }
+  return `On this recheck, ${name}'s ${parts.join(' and ')}. Open the rows below to see the plain reason behind each score.`
+}
+
 /** Pick technical vs Plain English “what changed” text for the toggle. */
 export function rescoreSummaryForDisplay(
   meta: RescoreSummaryRecord,
   plain: boolean,
+  repoName?: string,
 ): string {
   const technical = meta.summary?.trim() ?? ''
   const normie = meta.summaryNormie?.trim() ?? ''
   if (plain) {
-    // Dual records prefer normie; legacy PE-only records stored PE in `summary`.
-    return normie || technical
+    if (normie) return normie
+    // Legacy PE-only records stored PE in `summary` — reuse it unless it's the old
+    // jargon fallback, in which case build a clean version from the record.
+    if (technical && !looksLikeJargonFallback(technical)) return technical
+    return legacyNormieFallback(meta, repoName)
   }
   if (normie) return technical
-  // Legacy: only PE blurb on file — hide it in technical mode (delta header still shows).
+  // Legacy: only one blurb on file — hide it in technical mode (delta header still shows).
   return ''
 }
 

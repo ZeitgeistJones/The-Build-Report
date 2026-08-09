@@ -388,13 +388,13 @@ function formatRescoreOldGrade(label: string | null | undefined): string {
   return label
 }
 
-function RescoreSummaryBlock({ meta, plain }: { meta: RescoreSummaryRecord; plain: boolean }) {
+function RescoreSummaryBlock({ meta, plain, repoName }: { meta: RescoreSummaryRecord; plain: boolean; repoName?: string }) {
   const rescoreDate = formatScoredDateLabel(meta.rescoreAt)
   const oldDate = formatRescoreOldDateLabel(meta.oldScoredAt)
   const fromBaseline = looksLikeBaselineDate(meta.oldScoredAt)
   const oldEconomic = meta.oldTokenMechanic ?? RESCORE_NOT_SCORED_LABEL
   const newEconomic = meta.newTokenMechanic ?? 'N/A'
-  const summaryText = rescoreSummaryForDisplay(meta, plain)
+  const summaryText = rescoreSummaryForDisplay(meta, plain, repoName)
   const showWhatChanged = Boolean(meta.deltaHeader || summaryText)
 
   return (
@@ -1376,7 +1376,7 @@ export default function RepoList({
               )
             })()}
 
-            {rescoreMeta && <RescoreSummaryBlock meta={rescoreMeta} plain={normie} />}
+            {rescoreMeta && <RescoreSummaryBlock meta={rescoreMeta} plain={normie} repoName={repo.githubSlug || repo.name} />}
 
             {showSeparateVerdict && (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', marginBottom: '10px' }}>
