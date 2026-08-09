@@ -3,6 +3,7 @@ import { Repo, Score } from './scores'
 import { getShippingLeverage, getTokenMechanicForDisplay } from './economicGrade'
 import { stripMarkdown } from './textCleanup'
 import { normieVoiceGuidance } from './normieVoice'
+import { buildNormieWhatChangedBlurb } from './rescoreSummaries'
 import {
   computeRescoreDeltas,
   formatChangedRowsForPrompt,
@@ -233,46 +234,22 @@ function fallbackFlatSummary(deltas: RescoreAggregateDelta, commitMessages: stri
   return `The score moved as shown above. Recent commits do not always move every scorecard row yet.${commitHint}`
 }
 
-/** Plain-word direction for a score move, from its +N/-N pts delta. */
-function describeMove(deltaPct: number | null): string {
-  if (deltaPct == null) return 'got its first score'
-  if (deltaPct === 0) return 'held steady'
-  return deltaPct > 0 ? 'went up' : 'dipped'
-}
-
 /**
  * Plain-English fallback for the "What changed" blurb — used when the LLM output
- * is missing or rejected. No insider row names, no "expand those rows" instruction,
- * no raw commit-title dump. Distinct from the technical fallback so the PE toggle
- * still reads differently.
+ * is missing or rejected. Leads with what landed (commits), then a soft score note.
  */
 function fallbackNormieSummary(
   repoName: string,
   deltas: RescoreAggregateDelta,
+  commitMessages: string[] = [],
 ): string {
-  const name = repoName?.trim() || 'This repo'
-  const econ = deltas.economic.deltaPct
-  const bi = deltas.builderIntegrity.deltaPct
-  const bothFlat = deltas.economic.label === 'flat' && deltas.builderIntegrity.label === 'flat'
-
-  if (bothFlat) {
-    return `${name}'s score didn't change on this recheck — the latest work didn't move how it reads on the scorecard yet.`
-  }
-
-  const parts: string[] = []
-  if (econ != null && econ !== 0) parts.push(`money-side score ${describeMove(econ)}`)
-  if (bi != null && bi !== 0) parts.push(`builder-standards score ${describeMove(bi)}`)
-
-  const moveClause = parts.length
-    ? `${name}'s ${parts.join(' and its ')}`
-    : `${name} had a couple of scorecard areas shift`
-
-  const changedCount = changedRows(deltas).length
-  const detailClause = changedCount
-    ? ` A few areas changed level — open the rows below to see the plain reason for each.`
-    : ` Open the rows below to see the reason behind each score.`
-
-  return `On this recheck, ${moveClause}.${detailClause}`
+  return buildNormieWhatChangedBlurb({
+    repoName,
+    economicDeltaPct: deltas.economic.deltaPct,
+    builderDeltaPct: deltas.builderIntegrity.deltaPct,
+    bothFlat: deltas.economic.label === 'flat' && deltas.builderIntegrity.label === 'flat',
+    commitMessages,
+  })
 }
 
 /** Reject blurbs that ignore listed commits and only praise README/docs framing. */
@@ -305,7 +282,11 @@ export async function generateRescoreChangeSummary(params: {
   const deltaHeader = formatRescoreDeltaHeader(deltas)
   const rowChanges = formatChangedRowsForPrompt(deltas)
   const flatFallback = fallbackFlatSummary(deltas, commitMessages)
-  const normieFallback = fallbackNormieSummary(newRepo.githubSlug || newRepo.name, deltas)
+  const normieFallback = fallbackNormieSummary(
+    newRepo.githubSlug || newRepo.name,
+    deltas,
+    commitMessages,
+  )
 
   if (!hasLlmApiKey()) {
     return { summary: null, summaryNormie: null, deltaHeader }
@@ -337,7 +318,7 @@ ${formatRepoScores(newRepo)}
 ${evidenceBlock}Write TWO "what changed" blurbs with the SAME facts:
 
 1) "summary" — 1–2 sentences for builders/technical readers. Precise is fine (README, CI, commits, rubric evidence). Still no markdown.
-2) "summaryNormie" — 1–2 sentences Plain English for token holders who are not developers.
+2) "summaryNormie" — 1–2 sentences Plain English for token holders who are not developers. MUST lead with what landed (from RECENT COMMITS) in everyday words, then a soft note on how the score moved. Never open with “money-side went up” / “builder-standards dipped” alone — that just restates the header.
 
 ${normieVoiceGuidance('rescoreSummary')}
 
