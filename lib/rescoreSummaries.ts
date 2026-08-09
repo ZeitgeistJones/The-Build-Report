@@ -105,13 +105,13 @@ export function legacyNormieFallback(meta: RescoreSummaryRecord, repoName?: stri
   const biMove = moveWord(pctFromLabel(meta.oldBuilderIntegrity), pctFromLabel(meta.newBuilderIntegrity))
 
   const parts: string[] = []
-  if (econMove) parts.push(`its money-side score ${econMove}`)
-  if (biMove) parts.push(`its builder-standards score ${biMove}`)
+  if (econMove) parts.push(`money-side score ${econMove}`)
+  if (biMove) parts.push(`builder-standards score ${biMove}`)
 
   if (!parts.length) {
     return `${name}'s score didn't really change on this recheck. Open the rows below to see how each part scored.`
   }
-  return `On this recheck, ${name}'s ${parts.join(' and ')}. Open the rows below to see the plain reason behind each score.`
+  return `On this recheck, ${name}'s ${parts.join(' and its ')}. Open the rows below to see the plain reason behind each score.`
 }
 
 /** Pick technical vs Plain English “what changed” text for the toggle. */
@@ -123,14 +123,15 @@ export function rescoreSummaryForDisplay(
   const technical = meta.summary?.trim() ?? ''
   const normie = meta.summaryNormie?.trim() ?? ''
   if (plain) {
-    if (normie) return normie
-    // Legacy PE-only records stored PE in `summary` — reuse it unless it's the old
-    // jargon fallback, in which case build a clean version from the record.
+    // Prefer stored PE — but older dual-writes stuffed the jargon fallback into
+    // both fields, so treat jargon-shaped "normie" as missing.
+    if (normie && !looksLikeJargonFallback(normie)) return normie
     if (technical && !looksLikeJargonFallback(technical)) return technical
     return legacyNormieFallback(meta, repoName)
   }
-  if (normie) return technical
-  // Legacy: only one blurb on file — hide it in technical mode (delta header still shows).
+  if (normie && !looksLikeJargonFallback(normie)) return technical
+  // Legacy / dual-jargon: hide prose in technical mode (delta header still shows).
+  if (technical && !looksLikeJargonFallback(technical)) return technical
   return ''
 }
 

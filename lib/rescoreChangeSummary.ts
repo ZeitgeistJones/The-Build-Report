@@ -260,19 +260,19 @@ function fallbackNormieSummary(
   }
 
   const parts: string[] = []
-  if (econ != null && econ !== 0) parts.push(`its money-side score ${describeMove(econ)}`)
-  if (bi != null && bi !== 0) parts.push(`its builder-standards score ${describeMove(bi)}`)
+  if (econ != null && econ !== 0) parts.push(`money-side score ${describeMove(econ)}`)
+  if (bi != null && bi !== 0) parts.push(`builder-standards score ${describeMove(bi)}`)
 
   const moveClause = parts.length
-    ? parts.join(' and ')
-    : 'a couple of scorecard areas shifted'
+    ? `${name}'s ${parts.join(' and its ')}`
+    : `${name} had a couple of scorecard areas shift`
 
   const changedCount = changedRows(deltas).length
   const detailClause = changedCount
     ? ` A few areas changed level — open the rows below to see the plain reason for each.`
     : ` Open the rows below to see the reason behind each score.`
 
-  return `On this recheck, ${name}'s ${moveClause}.${detailClause}`
+  return `On this recheck, ${moveClause}.${detailClause}`
 }
 
 /** Reject blurbs that ignore listed commits and only praise README/docs framing. */
