@@ -233,6 +233,48 @@ function fallbackFlatSummary(deltas: RescoreAggregateDelta, commitMessages: stri
   return `The score moved as shown above. Recent commits do not always move every scorecard row yet.${commitHint}`
 }
 
+/** Plain-word direction for a score move, from its +N/-N pts delta. */
+function describeMove(deltaPct: number | null): string {
+  if (deltaPct == null) return 'got its first score'
+  if (deltaPct === 0) return 'held steady'
+  return deltaPct > 0 ? 'went up' : 'dipped'
+}
+
+/**
+ * Plain-English fallback for the "What changed" blurb — used when the LLM output
+ * is missing or rejected. No insider row names, no "expand those rows" instruction,
+ * no raw commit-title dump. Distinct from the technical fallback so the PE toggle
+ * still reads differently.
+ */
+function fallbackNormieSummary(
+  repoName: string,
+  deltas: RescoreAggregateDelta,
+): string {
+  const name = repoName?.trim() || 'This repo'
+  const econ = deltas.economic.deltaPct
+  const bi = deltas.builderIntegrity.deltaPct
+  const bothFlat = deltas.economic.label === 'flat' && deltas.builderIntegrity.label === 'flat'
+
+  if (bothFlat) {
+    return `${name}'s score didn't change on this recheck — the latest work didn't move how it reads on the scorecard yet.`
+  }
+
+  const parts: string[] = []
+  if (econ != null && econ !== 0) parts.push(`its money-side score ${describeMove(econ)}`)
+  if (bi != null && bi !== 0) parts.push(`its builder-standards score ${describeMove(bi)}`)
+
+  const moveClause = parts.length
+    ? parts.join(' and ')
+    : 'a couple of scorecard areas shifted'
+
+  const changedCount = changedRows(deltas).length
+  const detailClause = changedCount
+    ? ` A few areas changed level — open the rows below to see the plain reason for each.`
+    : ` Open the rows below to see the reason behind each score.`
+
+  return `On this recheck, ${name}'s ${moveClause}.${detailClause}`
+}
+
 /** Reject blurbs that ignore listed commits and only praise README/docs framing. */
 export function summaryIgnoresCommitsForDocsOnly(
   text: string,
@@ -263,6 +305,7 @@ export async function generateRescoreChangeSummary(params: {
   const deltaHeader = formatRescoreDeltaHeader(deltas)
   const rowChanges = formatChangedRowsForPrompt(deltas)
   const flatFallback = fallbackFlatSummary(deltas, commitMessages)
+  const normieFallback = fallbackNormieSummary(newRepo.githubSlug || newRepo.name, deltas)
 
   if (!hasLlmApiKey()) {
     return { summary: null, summaryNormie: null, deltaHeader }
@@ -336,7 +379,7 @@ Return ONLY JSON: {"summary":"...","summaryNormie":"..."}`
         summaryIgnoresCommitsForDocsOnly(text, commitMessages))
 
     if (bad(summary)) summary = flatFallback
-    if (bad(summaryNormie) || !summaryNormie) summaryNormie = flatFallback
+    if (bad(summaryNormie) || !summaryNormie) summaryNormie = normieFallback
     if (!summary) summary = flatFallback
 
     return {
@@ -346,7 +389,7 @@ Return ONLY JSON: {"summary":"...","summaryNormie":"..."}`
     }
   } catch (err) {
     console.warn('[rescoreChangeSummary] generation failed:', err)
-    return { summary: flatFallback, summaryNormie: flatFallback, deltaHeader }
+    return { summary: flatFallback, summaryNormie: normieFallback, deltaHeader }
   }
 }
 
