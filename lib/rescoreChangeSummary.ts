@@ -55,23 +55,30 @@ function formatEvidenceBlock(evidence?: RescoreEvidenceForSummary | null): strin
 
 function summaryContradictsDeltas(text: string, deltas: RescoreAggregateDelta): boolean {
   const lower = text.toLowerCase()
+  const econ = deltas.economic.deltaPct
+  const bi = deltas.builderIntegrity.deltaPct
+
+  // Mixed axes (one up, one down) — a good blurb often says "stronger" AND "dipped".
+  // The old global rising/falling detector false-rejected those and forced the fallback.
+  if (
+    econ != null &&
+    bi != null &&
+    econ !== 0 &&
+    bi !== 0 &&
+    Math.sign(econ) !== Math.sign(bi)
+  ) {
+    return false
+  }
+
   const rising =
     /\b(should rise|will rise|bump(ed)? up|increase(d)?|improv(ed|e)|stronger|higher)\b/.test(lower)
   const falling =
     /\b(should fall|drop(ped)?|decrease(d)?|lower|weaker|declin(ed|e))\b/.test(lower)
 
-  if (deltas.builderIntegrity.deltaPct != null && deltas.builderIntegrity.deltaPct < 0 && rising && !falling) {
-    return true
-  }
-  if (deltas.builderIntegrity.deltaPct != null && deltas.builderIntegrity.deltaPct > 0 && falling && !rising) {
-    return true
-  }
-  if (deltas.economic.deltaPct != null && deltas.economic.deltaPct < 0 && rising && !falling) {
-    return true
-  }
-  if (deltas.economic.deltaPct != null && deltas.economic.deltaPct > 0 && falling && !rising) {
-    return true
-  }
+  if (bi != null && bi < 0 && rising && !falling) return true
+  if (bi != null && bi > 0 && falling && !rising) return true
+  if (econ != null && econ < 0 && rising && !falling) return true
+  if (econ != null && econ > 0 && falling && !rising) return true
   return false
 }
 
@@ -350,17 +357,35 @@ Return ONLY JSON: {"summary":"...","summaryNormie":"..."}`
     let summary = parsed.summary ? stripMarkdown(parsed.summary) : ''
     let summaryNormie = parsed.summaryNormie ? stripMarkdown(parsed.summaryNormie) : ''
 
-    const bad = (text: string) =>
-      Boolean(text) &&
-      (summaryContradictsDeltas(text, deltas) ||
-        summaryClaimsStaleSnapshot(text) ||
-        summaryClaimsMissingDocs(text) ||
-        summaryDeniesListedRootFiles(text, evidence) ||
-        summaryIsCircularRestatement(text) ||
-        summaryIgnoresCommitsForDocsOnly(text, commitMessages))
+    const rejectReason = (text: string): string | null => {
+      if (!text) return 'empty'
+      if (summaryContradictsDeltas(text, deltas)) return 'contradicts-deltas'
+      if (summaryClaimsStaleSnapshot(text)) return 'stale-snapshot'
+      if (summaryClaimsMissingDocs(text)) return 'missing-docs'
+      if (summaryDeniesListedRootFiles(text, evidence)) return 'denies-root-files'
+      if (summaryIsCircularRestatement(text)) return 'circular-restatement'
+      if (summaryIgnoresCommitsForDocsOnly(text, commitMessages)) return 'docs-only-ignores-commits'
+      return null
+    }
 
-    if (bad(summary)) summary = flatFallback
-    if (bad(summaryNormie) || !summaryNormie) summaryNormie = normieFallback
+    const summaryReject = rejectReason(summary)
+    const normieReject = summaryNormie ? rejectReason(summaryNormie) : 'empty'
+    if (summaryReject) {
+      console.warn('[rescoreChangeSummary] rejecting technical summary', {
+        slug: newRepo.githubSlug || newRepo.name,
+        reason: summaryReject,
+        preview: summary.slice(0, 160),
+      })
+      summary = flatFallback
+    }
+    if (normieReject) {
+      console.warn('[rescoreChangeSummary] rejecting normie summary', {
+        slug: newRepo.githubSlug || newRepo.name,
+        reason: normieReject,
+        preview: (summaryNormie || '').slice(0, 160),
+      })
+      summaryNormie = normieFallback
+    }
     if (!summary) summary = flatFallback
 
     return {
@@ -382,20 +407,25 @@ function parseDualSummary(raw: string | null | undefined): {
   const start = raw.indexOf('{')
   const end = raw.lastIndexOf('}')
   if (start >= 0 && end > start) {
-    try {
-      const obj = JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>
-      const summary = typeof obj.summary === 'string' ? obj.summary.trim() : ''
-      const summaryNormie =
-        typeof obj.summaryNormie === 'string'
-          ? obj.summaryNormie.trim()
-          : typeof obj.normie === 'string'
-            ? obj.normie.trim()
-            : ''
-      if (summary || summaryNormie) return { summary, summaryNormie }
-    } catch {
-      // fall through — older single-paragraph replies
+    const slice = raw.slice(start, end + 1)
+    for (const candidate of [slice, slice.replace(/,\s*([}\]])/g, '$1')]) {
+      try {
+        const obj = JSON.parse(candidate) as Record<string, unknown>
+        const summary = typeof obj.summary === 'string' ? obj.summary.trim() : ''
+        const summaryNormie =
+          typeof obj.summaryNormie === 'string'
+            ? obj.summaryNormie.trim()
+            : typeof obj.normie === 'string'
+              ? obj.normie.trim()
+              : ''
+        if (summary || summaryNormie) return { summary, summaryNormie }
+      } catch {
+        // try next candidate
+      }
     }
   }
+  // Non-JSON reply: keep as technical only — don't dual-write the same prose into PE
+  // (that used to make both fields fail checks and land on the jargon fallback).
   const plain = stripMarkdown(raw).trim()
-  return { summary: plain, summaryNormie: plain }
+  return { summary: plain, summaryNormie: '' }
 }
