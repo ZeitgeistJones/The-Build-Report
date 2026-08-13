@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { REPOS } from '@/lib/scores'
 import { BULK_REGEN_DEFAULT_BATCH } from '@/lib/bulkRegenConfig'
 import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
 import type { CommunityContextSubmission } from '@/lib/communityContextTypes'
 import type { OverheardEntry } from '@/lib/podcastMentions'
+import type { UtilityIndexRow } from '@/lib/utilityIndex'
 import OverheardAdminEntryCard, { mentionToEditDraft, sanitizeDraftForSave, type MentionEditDraft } from '@/components/OverheardAdminEntryCard'
 import AdminStarterKitShare from '@/components/AdminStarterKitShare'
+import UtilityLedger from '@/components/UtilityLedger'
 
 type AdminContextSubmission = CommunityContextSubmission
 
@@ -78,6 +80,12 @@ export default function AdminPage() {
     'clawd-gated': [],
   })
   const [forceInclude, setForceInclude] = useState<string[]>([])
+  const [utilityRows, setUtilityRows] = useState<UtilityIndexRow[]>([])
+  const [utilityEnriched, setUtilityEnriched] = useState(0)
+  const [utilityTotal, setUtilityTotal] = useState(0)
+  const [utilityUpdatedAt, setUtilityUpdatedAt] = useState<string | null>(null)
+  const [utilityLoading, setUtilityLoading] = useState(false)
+  const [utilityError, setUtilityError] = useState<string | null>(null)
   const [collectionInputs, setCollectionInputs] = useState<Record<RepoCollectionId, string>>({
     'cv-related': '',
     'clawd-gated': '',
@@ -613,10 +621,43 @@ export default function AdminPage() {
       setCollections(data.collections ?? { 'cv-related': [], 'clawd-gated': [] })
       setForceInclude(data.forceInclude ?? [])
       void loadBulkStatus()
+      void loadUtilityIndex(password)
     } else {
       setAuthError('Wrong password.')
     }
   }
+
+  async function loadUtilityIndex(pw: string) {
+    setUtilityLoading(true)
+    setUtilityError(null)
+    try {
+      const res = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'utilityIndex', password: pw }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setUtilityRows(Array.isArray(data.rows) ? data.rows : [])
+        setUtilityEnriched(typeof data.enrichedCount === 'number' ? data.enrichedCount : 0)
+        setUtilityTotal(typeof data.totalCount === 'number' ? data.totalCount : 0)
+        setUtilityUpdatedAt(typeof data.updatedAt === 'string' ? data.updatedAt : null)
+      } else {
+        setUtilityError(data.error ?? 'Failed to load utility index')
+      }
+    } catch {
+      setUtilityError('Failed to load utility index')
+    }
+    setUtilityLoading(false)
+  }
+
+  useEffect(() => {
+    if (!authed) return
+    if (typeof window === 'undefined') return
+    if (window.location.hash !== '#utility') return
+    const el = document.getElementById('utility')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [authed, utilityLoading])
 
   async function toggleExclude(slug: string, currentlyExcluded: boolean) {
     setTogglingExclude(slug)
@@ -999,6 +1040,57 @@ export default function AdminPage() {
 
   return (
     <div>
+      {/* CLAWD / CV utility ledger (moved from public /utility) */}
+      <div id="utility" style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>CLAWD Utility</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Plain-English CLAWD / CV use and last upgrade from public GitHub. Interpretive — not an official CLAWD product list.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadUtilityIndex(password)}
+            disabled={utilityLoading}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {utilityLoading ? 'Loading…' : 'Refresh ledger'}
+          </button>
+        </div>
+        {utilityError && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {utilityError}
+          </div>
+        )}
+        {utilityLoading && utilityRows.length === 0 ? (
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading utility index…</p>
+        ) : (
+          <UtilityLedger
+            rows={utilityRows}
+            enrichedCount={utilityEnriched}
+            totalCount={utilityTotal}
+            updatedAt={utilityUpdatedAt}
+          />
+        )}
+      </div>
+
       {/* GitHub data refresh */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>

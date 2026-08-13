@@ -22,9 +22,6 @@ function DesktopNavLinks() {
       <a href="/dictionary" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Dictionary
       </a>
-      <a href="/utility" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-        Utility
-      </a>
       <a href="/how-we-score" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         How we score
       </a>
@@ -77,9 +74,6 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         </a>
         <a href="/dictionary" className="mobile-nav-link" onClick={onClose}>
           Dictionary
-        </a>
-        <a href="/utility" className="mobile-nav-link" onClick={onClose}>
-          Utility
         </a>
         <a href="/how-we-score" className="mobile-nav-link" onClick={onClose}>
           How we score

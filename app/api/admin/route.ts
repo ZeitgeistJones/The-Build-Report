@@ -14,6 +14,7 @@ import {
   removeTrackableForceInclude,
 } from '@/lib/repoCollections'
 import { adminAcceptSubmission, adminRemoveSubmission, listAllSubmissions } from '@/lib/communityContext'
+import { loadUtilityIndex, utilityIndexStats } from '@/lib/utilityIndex'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -38,6 +39,19 @@ export async function POST(req: NextRequest) {
       ecosystemContext: ecosystemContext ?? '',
       collections,
       forceInclude,
+    })
+  }
+
+  if (action === 'utilityIndex') {
+    const { snapshot, updatedAt } = await loadUtilityIndex()
+    const stats = utilityIndexStats(snapshot)
+    const rows = Object.values(snapshot.rows).sort((a, b) => a.slug.localeCompare(b.slug))
+    return NextResponse.json({
+      ok: true,
+      rows,
+      enrichedCount: stats.enriched,
+      totalCount: stats.total,
+      updatedAt,
     })
   }
 

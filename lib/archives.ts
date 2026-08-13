@@ -2,11 +2,11 @@ import {
   BRIEF_DATES_INDEX_KEY,
   NEEDLE_DATES_INDEX_KEY,
   mountainDateKeyDaysAgo,
+  mountainDateKeysInclusive,
   indexArchiveDate,
   listIndexedDateKeys,
 } from '@/lib/archiveIndex'
 import {
-  buildBriefEditionKeys,
   getCachedDigestForDate,
   type BuildBriefData,
   type DailyDigestCache,
@@ -53,13 +53,22 @@ function sinceDateKeyForPeriod(period: ArchivePeriod): string {
   return mountainDateKeyDaysAgo(periodToDays(period))
 }
 
+function digestHasRealCards(digest: DailyDigestCache): boolean {
+  const c = digest.cards
+  if (!c) return false
+  const windows = [c['24h'], c['7d'], c['30d'], c['60d']] as const
+  return windows.some(
+    w => Boolean(w?.builder?.trim() || w?.economic?.trim() || w?.integrity?.trim() || w?.leverage?.trim()),
+  )
+}
+
 function digestToBrief(digest: DailyDigestCache): BuildBriefData {
   // toBuildBriefData is not exported — mirror it locally
   return {
     text: digest.general,
     general: digest.general,
     ...(digest.generalNormie ? { generalNormie: digest.generalNormie } : {}),
-    cards: digest.cards,
+    cards: digestHasRealCards(digest) ? digest.cards : null,
     dateKey: digest.dateKey,
     isToday: false,
     repoCount: digest.repoCount,
@@ -69,43 +78,52 @@ function digestToBrief(digest: DailyDigestCache): BuildBriefData {
 }
 
 async function loadBriefItems(sinceDateKey: string): Promise<ArchiveFeedItem[]> {
+  // Probe every calendar day in range — the ZSET index was added later and is often sparse,
+  // while digest payloads still live under build-report:daily-digest:{date} (90d TTL).
   const indexed = await listIndexedDateKeys(BRIEF_DATES_INDEX_KEY, sinceDateKey)
-  const bootstrap = buildBriefEditionKeys().filter(k => k >= sinceDateKey)
-  const dateKeys = [...new Set([...indexed, ...bootstrap])].sort((a, b) => b.localeCompare(a))
+  const rangeKeys = mountainDateKeysInclusive(sinceDateKey)
+  const dateKeys = [...new Set([...indexed, ...rangeKeys])].sort((a, b) => b.localeCompare(a))
+  const indexedSet = new Set(indexed)
 
+  const digests = await Promise.all(dateKeys.map(dateKey => getCachedDigestForDate(dateKey)))
   const items: ArchiveFeedItem[] = []
-  for (const dateKey of dateKeys) {
-    const digest = await getCachedDigestForDate(dateKey)
+  const backfill: Promise<void>[] = []
+
+  for (let i = 0; i < dateKeys.length; i++) {
+    const dateKey = dateKeys[i]!
+    const digest = digests[i]
     if (!digest) continue
-    if (!indexed.includes(dateKey)) {
-      await indexArchiveDate(BRIEF_DATES_INDEX_KEY, dateKey)
+    if (!indexedSet.has(dateKey)) {
+      backfill.push(indexArchiveDate(BRIEF_DATES_INDEX_KEY, dateKey))
     }
-    const brief = digestToBrief(digest)
     items.push({
       kind: 'brief',
       sortAt: digest.generatedAt || `${dateKey}T12:00:00.000Z`,
       dateKey,
-      brief,
+      brief: digestToBrief(digest),
     })
   }
+
+  if (backfill.length) await Promise.all(backfill)
   return items
 }
 
 async function loadNeedleItems(sinceDateKey: string): Promise<ArchiveFeedItem[]> {
   const indexed = await listIndexedDateKeys(NEEDLE_DATES_INDEX_KEY, sinceDateKey)
-  // Bootstrap: today + brief edition keys often hold needle editions too
-  const bootstrap = [
-    mountainDateKeyDaysAgo(0),
-    ...buildBriefEditionKeys(),
-  ].filter(k => k >= sinceDateKey)
-  const dateKeys = [...new Set([...indexed, ...bootstrap])].sort((a, b) => b.localeCompare(a))
+  const rangeKeys = mountainDateKeysInclusive(sinceDateKey)
+  const dateKeys = [...new Set([...indexed, ...rangeKeys])].sort((a, b) => b.localeCompare(a))
+  const indexedSet = new Set(indexed)
 
+  const needles = await Promise.all(dateKeys.map(dateKey => getCachedNeedleForDate(dateKey)))
   const items: ArchiveFeedItem[] = []
-  for (const dateKey of dateKeys) {
-    const needle = await getCachedNeedleForDate(dateKey)
+  const backfill: Promise<void>[] = []
+
+  for (let i = 0; i < dateKeys.length; i++) {
+    const dateKey = dateKeys[i]!
+    const needle = needles[i]
     if (!needle) continue
-    if (!indexed.includes(dateKey)) {
-      await indexArchiveDate(NEEDLE_DATES_INDEX_KEY, dateKey)
+    if (!indexedSet.has(dateKey)) {
+      backfill.push(indexArchiveDate(NEEDLE_DATES_INDEX_KEY, dateKey))
     }
     items.push({
       kind: 'needle',
@@ -114,6 +132,8 @@ async function loadNeedleItems(sinceDateKey: string): Promise<ArchiveFeedItem[]>
       needle,
     })
   }
+
+  if (backfill.length) await Promise.all(backfill)
   return items
 }
 

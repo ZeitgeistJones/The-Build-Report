@@ -34,6 +34,25 @@ export function mountainDateKeyDaysAgo(days: number, now = new Date()): string {
   return prior.toISOString().slice(0, 10)
 }
 
+/**
+ * Every Mountain YYYY-MM-DD from `sinceDateKey` through today (inclusive).
+ * Used by Archives to probe Redis for cached editions even when the ZSET index is sparse.
+ */
+export function mountainDateKeysInclusive(sinceDateKey: string, now = new Date()): string[] {
+  const through = dateKeyMountain(now)
+  const [ys, ms, ds] = sinceDateKey.split('-').map(Number)
+  const [ye, me, de] = through.split('-').map(Number)
+  if (!ys || !ms || !ds || !ye || !me || !de) return [through]
+  const start = Date.UTC(ys, ms - 1, ds)
+  const end = Date.UTC(ye, me - 1, de)
+  if (end < start) return [through]
+  const out: string[] = []
+  for (let t = start; t <= end; t += 24 * 3600 * 1000) {
+    out.push(new Date(t).toISOString().slice(0, 10))
+  }
+  return out
+}
+
 /** Record an edition date in the archive index and prune members older than 90d. */
 export async function indexArchiveDate(
   indexKey: string,

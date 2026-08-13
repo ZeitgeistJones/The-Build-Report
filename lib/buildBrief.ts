@@ -599,9 +599,23 @@ async function readCachedDigest(dateKey: string): Promise<DailyDigestCache | nul
   }
 }
 
-/** Public read for Archives — one Mountain calendar edition. */
+/** Public read for Archives — one Mountain calendar edition (digest, or legacy brief). */
 export async function getCachedDigestForDate(dateKey: string): Promise<DailyDigestCache | null> {
-  return readCachedDigest(dateKey)
+  const digest = await readCachedDigest(dateKey)
+  if (digest) return digest
+
+  // Older editions were stored as build-brief:{date} without card blurbs.
+  const legacy = await readLegacyBrief(dateKey)
+  if (!legacy) return null
+  const empty: CardBlurbs = { builder: '', economic: '', integrity: '' }
+  return {
+    general: legacy.text,
+    cards: { '24h': empty, '7d': empty, '30d': empty, '60d': empty },
+    dateKey,
+    repoCount: legacy.repoCount,
+    commitCount: legacy.commitCount,
+    generatedAt: legacy.generatedAt,
+  }
 }
 
 async function readLegacyBrief(
