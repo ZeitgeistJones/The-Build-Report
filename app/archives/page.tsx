@@ -10,8 +10,7 @@ import {
 
 export const metadata = {
   title: 'Archives — The Build Report',
-  description:
-    'Browse past Build Briefs, The Needle, Spotted, and Overheard columns — filter by type and period.',
+  description: 'Browse past Build Briefs and The Needle — filter by type and period.',
 }
 
 export const dynamic = 'force-dynamic'
@@ -37,8 +36,7 @@ export default async function ArchivesPage({
         Archives
       </h1>
       <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        Past Briefs, Needles, Spotted, and Overheard. Briefs and Needles keep ~90 days going forward;
-        Spotted and Overheard keep published history longer.
+        Past Briefs and Needles. Editions stay available for about 90 days.
       </p>
 
       <Suspense fallback={null}>

@@ -12,18 +12,14 @@ import {
   type DailyDigestCache,
 } from '@/lib/buildBrief'
 import { getCachedNeedleForDate, type NeedleData } from '@/lib/needle'
-import { listPublishedSpotted, type SpottedEntry } from '@/lib/spotted'
-import { listPublishedMentionsSince, type OverheardEntry } from '@/lib/podcastMentions'
 
-export type ArchiveType = 'all' | 'brief' | 'needle' | 'spotted' | 'overheard'
+export type ArchiveType = 'all' | 'brief' | 'needle'
 export type ArchivePeriod = '7d' | '30d' | '90d'
 
 export const ARCHIVE_TYPE_OPTIONS: { key: ArchiveType; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'brief', label: 'Brief' },
   { key: 'needle', label: 'Needle' },
-  { key: 'spotted', label: 'Spotted' },
-  { key: 'overheard', label: 'Overheard' },
 ]
 
 export const ARCHIVE_PERIOD_OPTIONS: { key: ArchivePeriod; label: string }[] = [
@@ -35,18 +31,11 @@ export const ARCHIVE_PERIOD_OPTIONS: { key: ArchivePeriod; label: string }[] = [
 export type ArchiveFeedItem =
   | { kind: 'brief'; sortAt: string; dateKey: string; brief: BuildBriefData }
   | { kind: 'needle'; sortAt: string; dateKey: string; needle: NeedleData }
-  | { kind: 'spotted'; sortAt: string; spotted: SpottedEntry }
-  | { kind: 'overheard'; sortAt: string; entry: OverheardEntry }
 
 function periodToDays(period: ArchivePeriod): number {
   if (period === '7d') return 7
   if (period === '30d') return 30
   return 90
-}
-
-function sinceIsoForPeriod(period: ArchivePeriod): string {
-  const days = periodToDays(period)
-  return new Date(Date.now() - days * 24 * 3600 * 1000).toISOString()
 }
 
 function sinceDateKeyForPeriod(period: ArchivePeriod): string {
@@ -137,27 +126,10 @@ async function loadNeedleItems(sinceDateKey: string): Promise<ArchiveFeedItem[]>
   return items
 }
 
-async function loadSpottedItems(sinceIso: string): Promise<ArchiveFeedItem[]> {
-  const list = await listPublishedSpotted(sinceIso)
-  return list.map(spotted => ({
-    kind: 'spotted' as const,
-    sortAt: spotted.publishedAt ?? spotted.createdAt,
-    spotted,
-  }))
-}
-
-async function loadOverheardItems(sinceIso: string): Promise<ArchiveFeedItem[]> {
-  const list = await listPublishedMentionsSince(sinceIso)
-  return list.map(entry => ({
-    kind: 'overheard' as const,
-    sortAt: entry.publishedAt ?? entry.confirmedAt ?? entry.scannedAt ?? '',
-    entry,
-  }))
-}
-
 export function parseArchiveType(raw: string | string[] | undefined): ArchiveType {
   const v = Array.isArray(raw) ? raw[0] : raw
-  if (v === 'brief' || v === 'needle' || v === 'spotted' || v === 'overheard' || v === 'all') return v
+  if (v === 'brief' || v === 'needle' || v === 'all') return v
+  // Legacy ?type=spotted|overheard URLs fall back to All (Brief + Needle only).
   return 'all'
 }
 
@@ -174,13 +146,10 @@ export async function getArchiveFeed(opts: {
   const type = opts.type ?? 'all'
   const period = opts.period ?? '30d'
   const sinceDateKey = sinceDateKeyForPeriod(period)
-  const sinceIso = sinceIsoForPeriod(period)
 
   const loaders: Promise<ArchiveFeedItem[]>[] = []
   if (type === 'all' || type === 'brief') loaders.push(loadBriefItems(sinceDateKey))
   if (type === 'all' || type === 'needle') loaders.push(loadNeedleItems(sinceDateKey))
-  if (type === 'all' || type === 'spotted') loaders.push(loadSpottedItems(sinceIso))
-  if (type === 'all' || type === 'overheard') loaders.push(loadOverheardItems(sinceIso))
 
   const chunks = await Promise.all(loaders)
   return chunks

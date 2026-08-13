@@ -3,39 +3,21 @@
 import type { ArchiveFeedItem } from '@/lib/archives'
 import BuildBriefCard from '@/components/BuildBriefCard'
 import NeedleCard from '@/components/NeedleCard'
-import SpottedCard from '@/components/SpottedCard'
-import OverheardCard from '@/components/OverheardCard'
 
 function kindLabel(kind: ArchiveFeedItem['kind']): string {
-  if (kind === 'brief') return 'Yesterday\'s build'
-  if (kind === 'needle') return 'The Needle'
-  if (kind === 'spotted') return 'Spotted'
-  return 'Overheard'
+  if (kind === 'brief') return "Yesterday's build"
+  return 'The Needle'
 }
 
 function dateLabel(item: ArchiveFeedItem): string {
-  if (item.kind === 'brief' || item.kind === 'needle') return item.dateKey
-  const iso =
-    item.kind === 'spotted'
-      ? item.spotted.publishedAt
-      : item.entry.publishedAt
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('en-US', {
-    timeZone: 'America/New_York',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  return item.dateKey
 }
 
 export default function ArchivesFeed({ items }: { items: ArchiveFeedItem[] }) {
   if (!items.length) {
     return (
       <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.55 }}>
-        Nothing in this window yet. Briefs and Needles start archiving from deploy — Spotted and
-        Overheard go back farther when published.
+        Nothing in this window yet. Briefs and Needles keep about 90 days of editions.
       </p>
     )
   }
@@ -43,14 +25,7 @@ export default function ArchivesFeed({ items }: { items: ArchiveFeedItem[] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
       {items.map(item => {
-        const key =
-          item.kind === 'brief'
-            ? `brief-${item.dateKey}`
-            : item.kind === 'needle'
-              ? `needle-${item.dateKey}`
-              : item.kind === 'spotted'
-                ? `spotted-${item.spotted.id}`
-                : `overheard-${item.entry.id}`
+        const key = item.kind === 'brief' ? `brief-${item.dateKey}` : `needle-${item.dateKey}`
 
         return (
           <div key={key}>
@@ -79,8 +54,6 @@ export default function ArchivesFeed({ items }: { items: ArchiveFeedItem[] }) {
 
             {item.kind === 'brief' && <BuildBriefCard brief={item.brief} />}
             {item.kind === 'needle' && <NeedleCard needle={item.needle} />}
-            {item.kind === 'spotted' && <SpottedCard spotted={item.spotted} />}
-            {item.kind === 'overheard' && <OverheardCard entry={item.entry} digest={null} />}
           </div>
         )
       })}
