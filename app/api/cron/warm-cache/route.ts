@@ -5,6 +5,7 @@ import { syncBurnSnapshot } from '@/lib/burnSnapshot'
 import { syncEthUsdRate } from '@/lib/ethUsdRate'
 import { generateAndCacheDailyDigest, loadReposForBrief, yesterdayMountainDateKey } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
+import { generateAndCacheGitlawbDigest } from '@/lib/gitlawbBrief'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -37,6 +38,10 @@ export async function GET(req: NextRequest) {
       console.error('[warm-cache] needle generation failed', err)
       return null
     })
+    const gitlawb = await generateAndCacheGitlawbDigest({ dateKey: editionKey }).catch(err => {
+      console.error('[warm-cache] gitlawb brief generation failed', err)
+      return null
+    })
 
     return NextResponse.json({
       ok: true,
@@ -53,6 +58,9 @@ export async function GET(req: NextRequest) {
       briefGeneratedAt: digest.generatedAt,
       needleDateKey: needle?.dateKey ?? null,
       needleRepoCount: needle?.repoCount ?? 0,
+      gitlawbDateKey: gitlawb?.dateKey ?? null,
+      gitlawbRepoCount: gitlawb?.repoCount ?? 0,
+      gitlawbCommitCount: gitlawb?.commitCount ?? 0,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Warm cache cron failed'

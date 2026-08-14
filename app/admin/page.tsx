@@ -7,9 +7,11 @@ import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
 import type { CommunityContextSubmission } from '@/lib/communityContextTypes'
 import type { OverheardEntry } from '@/lib/podcastMentions'
 import type { UtilityIndexRow } from '@/lib/utilityIndex'
+import type { BuildBriefData } from '@/lib/buildBrief'
 import OverheardAdminEntryCard, { mentionToEditDraft, sanitizeDraftForSave, type MentionEditDraft } from '@/components/OverheardAdminEntryCard'
 import AdminStarterKitShare from '@/components/AdminStarterKitShare'
 import UtilityLedger from '@/components/UtilityLedger'
+import BuildBriefCard from '@/components/BuildBriefCard'
 
 type AdminContextSubmission = CommunityContextSubmission
 
@@ -86,6 +88,10 @@ export default function AdminPage() {
   const [utilityUpdatedAt, setUtilityUpdatedAt] = useState<string | null>(null)
   const [utilityLoading, setUtilityLoading] = useState(false)
   const [utilityError, setUtilityError] = useState<string | null>(null)
+  const [gitlawbBrief, setGitlawbBrief] = useState<BuildBriefData | null>(null)
+  const [gitlawbLoading, setGitlawbLoading] = useState(false)
+  const [gitlawbRunning, setGitlawbRunning] = useState(false)
+  const [gitlawbResult, setGitlawbResult] = useState<string | null>(null)
   const [collectionInputs, setCollectionInputs] = useState<Record<RepoCollectionId, string>>({
     'cv-related': '',
     'clawd-gated': '',
@@ -622,6 +628,7 @@ export default function AdminPage() {
       setForceInclude(data.forceInclude ?? [])
       void loadBulkStatus()
       void loadUtilityIndex(password)
+      void loadGitlawbBrief(password)
     } else {
       setAuthError('Wrong password.')
     }
@@ -649,6 +656,52 @@ export default function AdminPage() {
       setUtilityError('Failed to load utility index')
     }
     setUtilityLoading(false)
+  }
+
+  async function loadGitlawbBrief(pw: string) {
+    setGitlawbLoading(true)
+    setGitlawbResult(null)
+    try {
+      const res = await fetch('/api/admin/gitlawb-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get', password: pw }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setGitlawbBrief(data.brief ?? null)
+      } else {
+        setGitlawbResult(data.error ?? 'Failed to load gitlawb brief')
+      }
+    } catch {
+      setGitlawbResult('Failed to load gitlawb brief')
+    }
+    setGitlawbLoading(false)
+  }
+
+  async function regenerateGitlawbBrief() {
+    setGitlawbRunning(true)
+    setGitlawbResult(null)
+    try {
+      const res = await fetch('/api/admin/gitlawb-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'regenerate', password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setGitlawbBrief(data.brief ?? null)
+        setGitlawbResult(
+          `Saved — ${data.repoCount ?? 0} repos, ${data.commitCount ?? 0} commits` +
+            (data.brief?.general ? `. ${String(data.brief.general).slice(0, 120)}…` : ''),
+        )
+      } else {
+        setGitlawbResult(data.error ?? 'Gitlawb brief generation failed')
+      }
+    } catch {
+      setGitlawbResult('Gitlawb brief request failed')
+    }
+    setGitlawbRunning(false)
   }
 
   useEffect(() => {
@@ -1168,6 +1221,56 @@ export default function AdminPage() {
           }}>
             {briefResult}
           </div>
+        )}
+      </div>
+
+      {/* Gitlawb / $GITLAWB Yesterday's Build (admin-only preview) */}
+      <div id="gitlawb" style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Gitlawb Yesterday&apos;s Build</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              Admin-only shipping summary for github.com/gitlawb. Mentions $GITLAWB only when commits support it — no grades, no public tab yet. Regenerates with the overnight digest cron.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void regenerateGitlawbBrief()}
+            disabled={gitlawbRunning || gitlawbLoading}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {gitlawbRunning ? 'Generating…' : 'Regenerate gitlawb brief'}
+          </button>
+        </div>
+        {gitlawbResult && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {gitlawbResult}
+          </div>
+        )}
+        {gitlawbLoading && !gitlawbBrief ? (
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading gitlawb brief…</p>
+        ) : gitlawbBrief ? (
+          <BuildBriefCard brief={gitlawbBrief} />
+        ) : (
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            No cached edition yet — hit Regenerate or wait for the daily digest cron.
+          </p>
         )}
       </div>
 
