@@ -10,7 +10,7 @@ import {
 } from '@/lib/externalOwnerBrief'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 /** Admin: load or regenerate a secondary-account Yesterday's Build (gitlawb, 1clawAI, …). */
 export async function POST(req: NextRequest) {

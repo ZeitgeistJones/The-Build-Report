@@ -10,13 +10,12 @@ import type { UtilityIndexRow } from '@/lib/utilityIndex'
 import type { BuildBriefData } from '@/lib/buildBrief'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
-  EXTERNAL_BRIEFS_SUPER_DISCLAIMER,
   type ExternalBriefAccountId,
 } from '@/lib/externalOwnerBrief'
 import OverheardAdminEntryCard, { mentionToEditDraft, sanitizeDraftForSave, type MentionEditDraft } from '@/components/OverheardAdminEntryCard'
 import AdminStarterKitShare from '@/components/AdminStarterKitShare'
 import UtilityLedger from '@/components/UtilityLedger'
-import BuildBriefCard from '@/components/BuildBriefCard'
+import ExternalBriefsNewspaper from '@/components/ExternalBriefsNewspaper'
 
 type AdminContextSubmission = CommunityContextSubmission
 
@@ -1241,109 +1240,14 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* Secondary-account Yesterday's Builds (admin-only) */}
-      <div style={{ marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>
-          Secondary accounts — Yesterday&apos;s Build
-        </h2>
-        <p
-          style={{
-            margin: 0,
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--text-primary)',
-            maxWidth: '720px',
-            lineHeight: 1.55,
-            padding: '12px 14px',
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: 'var(--radius)',
-          }}
-        >
-          {EXTERNAL_BRIEFS_SUPER_DISCLAIMER}
-        </p>
-      </div>
-      {EXTERNAL_BRIEF_ACCOUNTS.map(account => {
-        const brief = externalBriefs[account.id] ?? null
-        const loading = Boolean(externalLoading[account.id])
-        const running = Boolean(externalRunning[account.id])
-        const result = externalResults[account.id] ?? null
-        return (
-          <div key={account.id} id={account.id} style={{ marginBottom: '32px' }}>
-            <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-              <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>
-                  {account.label} Yesterday&apos;s Build
-                </h2>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '560px' }}>
-                  Admin-only shipping summary for github.com/{account.owner}.
-                  {account.ticker
-                    ? ` Mentions ${account.ticker} only when commits support it —`
-                    : ' No token ticker set —'}
-                  {' '}no grades, no public tab yet. Regenerates with the overnight digest cron.
-                </p>
-                {account.sampleNote && (
-                  <p
-                    style={{
-                      margin: '10px 0 0',
-                      fontSize: '12px',
-                      color: 'var(--text-secondary)',
-                      maxWidth: '640px',
-                      lineHeight: 1.5,
-                      padding: '10px 12px',
-                      background: 'var(--surface-1)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius)',
-                    }}
-                  >
-                    {account.sampleNote}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => void regenerateExternalBrief(account.id)}
-                disabled={running || loading}
-                style={{
-                  fontSize: '12px',
-                  padding: '8px 16px',
-                  borderRadius: 'var(--radius)',
-                  background: 'var(--surface-3)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-strong)',
-                  flexShrink: 0,
-                }}
-              >
-                {running ? 'Generating…' : `Regenerate ${account.label} brief`}
-              </button>
-            </div>
-            {result && (
-              <div style={{
-                marginBottom: '12px',
-                padding: '10px 14px',
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                fontSize: '13px',
-                color: 'var(--text-secondary)',
-              }}>
-                {result}
-              </div>
-            )}
-            {loading && !brief ? (
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                Loading {account.label} brief…
-              </p>
-            ) : brief ? (
-              <BuildBriefCard brief={brief} />
-            ) : (
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                No cached edition yet — hit Regenerate or wait for the daily digest cron.
-              </p>
-            )}
-          </div>
-        )
-      })}
+      {/* Secondary-account Yesterday's Builds — newspaper desk */}
+      <ExternalBriefsNewspaper
+        briefs={externalBriefs}
+        loading={externalLoading}
+        running={externalRunning}
+        results={externalResults}
+        onRegenerate={id => void regenerateExternalBrief(id)}
+      />
 
       {/* Needle */}
       <div style={{ marginBottom: '32px' }}>

@@ -5,7 +5,7 @@ import { generateAndCacheNeedle } from '@/lib/needle'
 import { generateAllExternalDigests } from '@/lib/externalOwnerBrief'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET

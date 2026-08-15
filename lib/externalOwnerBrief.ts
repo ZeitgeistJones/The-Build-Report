@@ -21,7 +21,7 @@ const DIGEST_TTL_SEC = 90 * 24 * 3600
 
 /** Shown once above all secondary-account Yesterday's Builds in Admin. */
 export const EXTERNAL_BRIEFS_SUPER_DISCLAIMER =
-  'SUPER DISCLAIMER — UNOFFICIAL / ALL SECONDARY ACCOUNTS. The Build Report is an independent community project. These Yesterday’s Builds (Gitlawb, 1clawAI, Agoreums, Gblinproject, Base, and any others added here) are NOT affiliated with, endorsed by, sponsored by, or connected to those GitHub accounts, their tokens, teams, employers, or related companies (including Base and Coinbase where applicable). Each brief is an automated, interpretive skim of public GitHub activity only. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
+  'SUPER DISCLAIMER — UNOFFICIAL / ALL PROJECTS BELOW. The Build Report is an independent community project. These Yesterday’s Builds are NOT affiliated with, endorsed by, sponsored by, or connected to the listed GitHub accounts, orgs, tokens, teams, employers, or related companies (including Base, Coinbase, OpenAI, Google, and others where applicable). Each brief is an automated, interpretive skim of public GitHub activity only — sometimes a single tracked repo, sometimes a capped sample of an org. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
 
 export type ExternalBriefAccountId =
   | 'gitlawb'
@@ -29,19 +29,39 @@ export type ExternalBriefAccountId =
   | 'agoreums'
   | 'gblinproject'
   | 'base'
+  | 'openclaw'
+  | 'eliza'
+  | 'openai-agents-python'
+  | 'mastra'
+  | 'crewai'
+  | 'openhands'
+  | 'google-adk'
+  | 'goose'
+  | 'composio'
 
 export type ExternalBriefAccount = {
   id: ExternalBriefAccountId
-  /** GitHub login */
+  /** GitHub login / org */
   owner: string
   /** Exact ticker for prompts + UI (include $). Null = shipping summary only, no token framing. */
   ticker: string | null
-  /** Admin section title */
+  /** Admin / newspaper headline */
   label: string
   /** Redis key segment — keep gitlawb as-is so existing cache stays valid */
   redisSlug: string
+  /**
+   * If set, only these repo names under `owner` are scanned (required for huge orgs
+   * like openai/google). If omitted, scans up to 40 recently pushed public repos.
+   */
+  focusRepos?: string[]
   /** Optional per-account coverage note (e.g. Base sampling limits) */
   sampleNote?: string
+}
+
+function repoPath(account: ExternalBriefAccount): string {
+  if (account.focusRepos?.length === 1) return `${account.owner}/${account.focusRepos[0]}`
+  if (account.focusRepos?.length) return `${account.owner}/{${account.focusRepos.join(',')}}`
+  return account.owner
 }
 
 export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
@@ -82,10 +102,95 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     sampleNote:
       'Coverage limit (Base only): this is NOT the full Base org. We only sample up to 40 recently pushed public repos (newest pushes first). Quiet or important repos that did not push recently are often missing. Treat this as a partial skim of public GitHub, never an official Base changelog.',
   },
+  {
+    id: 'openclaw',
+    owner: 'openclaw',
+    ticker: null,
+    label: 'OpenClaw',
+    redisSlug: 'openclaw',
+    focusRepos: ['openclaw'],
+  },
+  {
+    id: 'eliza',
+    owner: 'elizaOS',
+    ticker: null,
+    label: 'ElizaOS',
+    redisSlug: 'eliza',
+    focusRepos: ['eliza'],
+  },
+  {
+    id: 'openai-agents-python',
+    owner: 'openai',
+    ticker: null,
+    label: 'OpenAI Agents SDK',
+    redisSlug: 'openai-agents-python',
+    focusRepos: ['openai-agents-python'],
+    sampleNote: 'Single-repo feed only (openai/openai-agents-python) — not the full OpenAI org.',
+  },
+  {
+    id: 'mastra',
+    owner: 'mastra-ai',
+    ticker: null,
+    label: 'Mastra',
+    redisSlug: 'mastra',
+    focusRepos: ['mastra'],
+  },
+  {
+    id: 'crewai',
+    owner: 'crewAIInc',
+    ticker: null,
+    label: 'CrewAI',
+    redisSlug: 'crewai',
+    focusRepos: ['crewAI'],
+  },
+  {
+    id: 'openhands',
+    owner: 'All-Hands-AI',
+    ticker: null,
+    label: 'OpenHands',
+    redisSlug: 'openhands',
+    focusRepos: ['OpenHands'],
+  },
+  {
+    id: 'google-adk',
+    owner: 'google',
+    ticker: null,
+    label: 'Google ADK',
+    redisSlug: 'google-adk',
+    focusRepos: ['adk-python'],
+    sampleNote: 'Single-repo feed only (google/adk-python) — not the full Google org.',
+  },
+  {
+    id: 'goose',
+    owner: 'aaif-goose',
+    ticker: null,
+    label: 'Goose',
+    redisSlug: 'goose',
+    focusRepos: ['goose'],
+  },
+  {
+    id: 'composio',
+    owner: 'ComposioHQ',
+    ticker: null,
+    label: 'Composio',
+    redisSlug: 'composio',
+    focusRepos: ['composio'],
+  },
 ]
 
 export function getExternalBriefAccount(id: string): ExternalBriefAccount | null {
   return EXTERNAL_BRIEF_ACCOUNTS.find(a => a.id === id) ?? null
+}
+
+export function externalBriefGithubUrl(account: ExternalBriefAccount): string {
+  if (account.focusRepos?.length === 1) {
+    return `https://github.com/${account.owner}/${account.focusRepos[0]}`
+  }
+  return `https://github.com/${account.owner}`
+}
+
+export function externalBriefGithubLabel(account: ExternalBriefAccount): string {
+  return repoPath(account)
 }
 
 export type ExternalDigestCache = {
@@ -125,10 +230,13 @@ function buildFallbackGeneral(
   snapshot: ExternalDaySnapshot,
 ): string {
   if (!snapshot.activity.length) {
+    const target = account.focusRepos?.length
+      ? `github.com/${repoPath(account)}`
+      : `github.com/${account.owner}`
     const tail = account.ticker
       ? ` Check back tomorrow for a fresher read on what shipped for ${account.ticker}.`
       : ' Check back tomorrow for a fresher read on what shipped.'
-    return `Quiet day on github.com/${account.owner} — no commits landed on the scanned public repos for ${snapshot.dateKey}.${tail}`
+    return `Quiet day on ${target} — no commits landed on the scanned public repos for ${snapshot.dateKey}.${tail}`
   }
   const names = snapshot.activity
     .slice(0, 5)
@@ -169,9 +277,15 @@ BASE / COINBASE RULES (mandatory):
 - Do not soften the sampling limit.`
       : ''
 
-  const prompt = `You write Yesterday's Build for The Build Report — a short shipping summary for a SECONDARY GitHub account (not clawdbotatg / CLAWD).
+  const scopeLine = account.focusRepos?.length
+    ? `Tracked repo(s) only: ${account.focusRepos.map(r => `${account.owner}/${r}`).join(', ')} — do not invent activity from other repos in this org.`
+    : `Owner scan: up to ~40 recently pushed public repos under github.com/${account.owner}.`
 
+  const prompt = `You write Yesterday's Build for The Build Report — a short shipping summary for a SECONDARY GitHub project (not clawdbotatg / CLAWD).
+
+Project label: ${account.label}
 Account: github.com/${account.owner}
+${scopeLine}
 ${tickerBlock}
 Edition date (Mountain / America/Denver calendar): ${snapshot.dateKey}
 Repos with commits that day: ${snapshot.repoCount}
@@ -279,7 +393,9 @@ export async function generateAndCacheExternalDigest(
     if (existing?.general?.trim()) return existing
   }
 
-  const snapshot = await fetchExternalOwnerDayActivity(account.owner, dateKey)
+  const snapshot = await fetchExternalOwnerDayActivity(account.owner, dateKey, {
+    focusRepos: account.focusRepos,
+  })
   if (snapshot.rateLimited && snapshot.activity.length === 0) {
     console.warn(`[${account.id}-brief] rate limited with no activity; writing quiet fallback`, {
       dateKey,
