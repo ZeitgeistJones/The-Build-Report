@@ -1242,6 +1242,7 @@ export default function AdminPage() {
 
       {/* Secondary-account Yesterday's Builds — newspaper desk */}
       <ExternalBriefsNewspaper
+        admin
         briefs={externalBriefs}
         loading={externalLoading}
         running={externalRunning}

@@ -2,15 +2,11 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import ArchivesFilters from '@/components/ArchivesFilters'
 import ArchivesFeed from '@/components/ArchivesFeed'
-import {
-  getArchiveFeed,
-  parseArchivePeriod,
-  parseArchiveType,
-} from '@/lib/archives'
+import { getArchiveFeed, parseArchivePeriod } from '@/lib/archives'
 
 export const metadata = {
   title: 'Archives — The Build Report',
-  description: 'Browse past Build Briefs and The Needle — filter by type and period.',
+  description: 'Browse past Build Briefs — filter by period.',
 }
 
 export const dynamic = 'force-dynamic'
@@ -20,9 +16,8 @@ export default async function ArchivesPage({
 }: {
   searchParams?: Record<string, string | string[] | undefined>
 }) {
-  const type = parseArchiveType(searchParams?.type)
   const period = parseArchivePeriod(searchParams?.period)
-  const items = await getArchiveFeed({ type, period })
+  const items = await getArchiveFeed({ period })
 
   return (
     <>
@@ -36,11 +31,11 @@ export default async function ArchivesPage({
         Archives
       </h1>
       <p style={{ margin: '0 0 20px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        Past Briefs and Needles. Editions stay available for about 90 days.
+        Past clawdbotatg Build Briefs. Editions stay available for about 90 days.
       </p>
 
       <Suspense fallback={null}>
-        <ArchivesFilters type={type} period={period} />
+        <ArchivesFilters period={period} />
       </Suspense>
 
       <ArchivesFeed items={items} />

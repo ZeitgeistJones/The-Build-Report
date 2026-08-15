@@ -437,6 +437,19 @@ export async function getExternalBrief(
   return toBriefData(digest)
 }
 
+/** Cached briefs for every secondary account (public page + Admin). */
+export async function getAllExternalBriefs(
+  dateKey = yesterdayMountainDateKey(),
+): Promise<Partial<Record<ExternalBriefAccountId, BuildBriefData | null>>> {
+  const entries = await Promise.all(
+    EXTERNAL_BRIEF_ACCOUNTS.map(async account => {
+      const brief = await getExternalBrief(account.id, dateKey)
+      return [account.id, brief] as const
+    }),
+  )
+  return Object.fromEntries(entries)
+}
+
 /** Cron/warm: generate each secondary account; failures stay isolated. */
 export async function generateAllExternalDigests(options?: {
   force?: boolean

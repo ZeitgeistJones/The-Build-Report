@@ -1,6 +1,5 @@
 import {
   BRIEF_DATES_INDEX_KEY,
-  NEEDLE_DATES_INDEX_KEY,
   mountainDateKeyDaysAgo,
   mountainDateKeysInclusive,
   indexArchiveDate,
@@ -11,15 +10,13 @@ import {
   type BuildBriefData,
   type DailyDigestCache,
 } from '@/lib/buildBrief'
-import { getCachedNeedleForDate, type NeedleData } from '@/lib/needle'
 
-export type ArchiveType = 'all' | 'brief' | 'needle'
+export type ArchiveType = 'brief'
 export type ArchivePeriod = '7d' | '30d' | '90d'
 
+/** Type filter retired — Archives is Brief-only now. Kept for URL compat. */
 export const ARCHIVE_TYPE_OPTIONS: { key: ArchiveType; label: string }[] = [
-  { key: 'all', label: 'All' },
   { key: 'brief', label: 'Brief' },
-  { key: 'needle', label: 'Needle' },
 ]
 
 export const ARCHIVE_PERIOD_OPTIONS: { key: ArchivePeriod; label: string }[] = [
@@ -28,9 +25,12 @@ export const ARCHIVE_PERIOD_OPTIONS: { key: ArchivePeriod; label: string }[] = [
   { key: '90d', label: '90d' },
 ]
 
-export type ArchiveFeedItem =
-  | { kind: 'brief'; sortAt: string; dateKey: string; brief: BuildBriefData }
-  | { kind: 'needle'; sortAt: string; dateKey: string; needle: NeedleData }
+export type ArchiveFeedItem = {
+  kind: 'brief'
+  sortAt: string
+  dateKey: string
+  brief: BuildBriefData
+}
 
 function periodToDays(period: ArchivePeriod): number {
   if (period === '7d') return 7
@@ -52,7 +52,6 @@ function digestHasRealCards(digest: DailyDigestCache): boolean {
 }
 
 function digestToBrief(digest: DailyDigestCache): BuildBriefData {
-  // toBuildBriefData is not exported — mirror it locally
   return {
     text: digest.general,
     general: digest.general,
@@ -67,8 +66,6 @@ function digestToBrief(digest: DailyDigestCache): BuildBriefData {
 }
 
 async function loadBriefItems(sinceDateKey: string): Promise<ArchiveFeedItem[]> {
-  // Probe every calendar day in range — the ZSET index was added later and is often sparse,
-  // while digest payloads still live under build-report:daily-digest:{date} (90d TTL).
   const indexed = await listIndexedDateKeys(BRIEF_DATES_INDEX_KEY, sinceDateKey)
   const rangeKeys = mountainDateKeysInclusive(sinceDateKey)
   const dateKeys = [...new Set([...indexed, ...rangeKeys])].sort((a, b) => b.localeCompare(a))
@@ -97,40 +94,8 @@ async function loadBriefItems(sinceDateKey: string): Promise<ArchiveFeedItem[]> 
   return items
 }
 
-async function loadNeedleItems(sinceDateKey: string): Promise<ArchiveFeedItem[]> {
-  const indexed = await listIndexedDateKeys(NEEDLE_DATES_INDEX_KEY, sinceDateKey)
-  const rangeKeys = mountainDateKeysInclusive(sinceDateKey)
-  const dateKeys = [...new Set([...indexed, ...rangeKeys])].sort((a, b) => b.localeCompare(a))
-  const indexedSet = new Set(indexed)
-
-  const needles = await Promise.all(dateKeys.map(dateKey => getCachedNeedleForDate(dateKey)))
-  const items: ArchiveFeedItem[] = []
-  const backfill: Promise<void>[] = []
-
-  for (let i = 0; i < dateKeys.length; i++) {
-    const dateKey = dateKeys[i]!
-    const needle = needles[i]
-    if (!needle) continue
-    if (!indexedSet.has(dateKey)) {
-      backfill.push(indexArchiveDate(NEEDLE_DATES_INDEX_KEY, dateKey))
-    }
-    items.push({
-      kind: 'needle',
-      sortAt: needle.generatedAt || `${dateKey}T12:00:00.000Z`,
-      dateKey,
-      needle,
-    })
-  }
-
-  if (backfill.length) await Promise.all(backfill)
-  return items
-}
-
-export function parseArchiveType(raw: string | string[] | undefined): ArchiveType {
-  const v = Array.isArray(raw) ? raw[0] : raw
-  if (v === 'brief' || v === 'needle' || v === 'all') return v
-  // Legacy ?type=spotted|overheard URLs fall back to All (Brief + Needle only).
-  return 'all'
+export function parseArchiveType(_raw: string | string[] | undefined): ArchiveType {
+  return 'brief'
 }
 
 export function parseArchivePeriod(raw: string | string[] | undefined): ArchivePeriod {
@@ -143,16 +108,8 @@ export async function getArchiveFeed(opts: {
   type?: ArchiveType
   period?: ArchivePeriod
 }): Promise<ArchiveFeedItem[]> {
-  const type = opts.type ?? 'all'
   const period = opts.period ?? '30d'
   const sinceDateKey = sinceDateKeyForPeriod(period)
-
-  const loaders: Promise<ArchiveFeedItem[]>[] = []
-  if (type === 'all' || type === 'brief') loaders.push(loadBriefItems(sinceDateKey))
-  if (type === 'all' || type === 'needle') loaders.push(loadNeedleItems(sinceDateKey))
-
-  const chunks = await Promise.all(loaders)
-  return chunks
-    .flat()
-    .sort((a, b) => b.sortAt.localeCompare(a.sortAt))
+  const items = await loadBriefItems(sinceDateKey)
+  return items.sort((a, b) => b.sortAt.localeCompare(a.sortAt))
 }

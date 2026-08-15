@@ -1,12 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import {
-  ARCHIVE_PERIOD_OPTIONS,
-  ARCHIVE_TYPE_OPTIONS,
-  type ArchivePeriod,
-  type ArchiveType,
-} from '@/lib/archives'
+import { ARCHIVE_PERIOD_OPTIONS, type ArchivePeriod } from '@/lib/archives'
 
 function Pill({
   active,
@@ -38,36 +33,20 @@ function Pill({
   )
 }
 
-export default function ArchivesFilters({
-  type,
-  period,
-}: {
-  type: ArchiveType
-  period: ArchivePeriod
-}) {
+export default function ArchivesFilters({ period }: { period: ArchivePeriod }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  function setParam(key: string, value: string) {
+  function setPeriod(value: string) {
     const next = new URLSearchParams(searchParams.toString())
-    next.set(key, value)
+    next.delete('type')
+    next.set('period', value)
     router.replace(`${pathname}?${next.toString()}`, { scroll: false })
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-        <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginRight: '4px' }}>Type</span>
-        {ARCHIVE_TYPE_OPTIONS.map(opt => (
-          <Pill
-            key={opt.key}
-            active={type === opt.key}
-            label={opt.label}
-            onClick={() => setParam('type', opt.key)}
-          />
-        ))}
-      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
         <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginRight: '4px' }}>Period</span>
         {ARCHIVE_PERIOD_OPTIONS.map(opt => (
@@ -75,7 +54,7 @@ export default function ArchivesFilters({
             key={opt.key}
             active={period === opt.key}
             label={opt.label}
-            onClick={() => setParam('period', opt.key)}
+            onClick={() => setPeriod(opt.key)}
           />
         ))}
       </div>

@@ -13,10 +13,12 @@ import type { BuildBriefData } from '@/lib/buildBrief'
 
 type Props = {
   briefs: Partial<Record<ExternalBriefAccountId, BuildBriefData | null>>
-  loading: Partial<Record<ExternalBriefAccountId, boolean>>
-  running: Partial<Record<ExternalBriefAccountId, boolean>>
-  results: Partial<Record<ExternalBriefAccountId, string | null>>
-  onRegenerate: (id: ExternalBriefAccountId) => void
+  /** Admin regenerate controls */
+  admin?: boolean
+  loading?: Partial<Record<ExternalBriefAccountId, boolean>>
+  running?: Partial<Record<ExternalBriefAccountId, boolean>>
+  results?: Partial<Record<ExternalBriefAccountId, string | null>>
+  onRegenerate?: (id: ExternalBriefAccountId) => void
 }
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -34,6 +36,7 @@ function briefBody(brief: BuildBriefData, normie: boolean): string {
 function Article({
   account,
   brief,
+  admin,
   loading,
   running,
   result,
@@ -42,10 +45,11 @@ function Article({
 }: {
   account: ExternalBriefAccount
   brief: BuildBriefData | null
+  admin: boolean
   loading: boolean
   running: boolean
   result: string | null
-  onRegenerate: () => void
+  onRegenerate?: () => void
   normie: boolean
 }) {
   const text = brief ? briefBody(brief, normie) : ''
@@ -72,18 +76,20 @@ function Article({
             {account.ticker ? ` · ${account.ticker}` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          className="ext-paper-regen"
-          onClick={onRegenerate}
-          disabled={running || loading}
-        >
-          {running ? 'Generating…' : 'Regenerate'}
-        </button>
+        {admin && onRegenerate && (
+          <button
+            type="button"
+            className="ext-paper-regen"
+            onClick={onRegenerate}
+            disabled={running || loading}
+          >
+            {running ? 'Generating…' : 'Regenerate'}
+          </button>
+        )}
       </header>
 
       {account.sampleNote && <p className="ext-paper-sample">{account.sampleNote}</p>}
-      {result && <p className="ext-paper-result">{result}</p>}
+      {admin && result && <p className="ext-paper-result">{result}</p>}
 
       {loading && !brief ? (
         <p className="ext-paper-empty">Loading edition…</p>
@@ -95,7 +101,9 @@ function Article({
         </div>
       ) : (
         <p className="ext-paper-empty">
-          No cached edition yet — hit Regenerate or wait for the daily digest cron.
+          {admin
+            ? 'No cached edition yet — hit Regenerate or wait for the daily digest cron.'
+            : 'No edition yet for this window — check back after the overnight refresh.'}
         </p>
       )}
     </article>
@@ -104,9 +112,10 @@ function Article({
 
 export default function ExternalBriefsNewspaper({
   briefs,
-  loading,
-  running,
-  results,
+  admin = false,
+  loading = {},
+  running = {},
+  results = {},
   onRegenerate,
 }: Props) {
   const { normie } = useNormieMode()
@@ -114,13 +123,15 @@ export default function ExternalBriefsNewspaper({
     EXTERNAL_BRIEF_ACCOUNTS.map(a => briefs[a.id]?.dateKey).find(Boolean) ?? null
 
   return (
-    <section className="ext-paper" aria-label="Secondary accounts newspaper">
+    <section className="ext-paper" aria-label="Yesterday's Builds">
       <header className="ext-paper-masthead">
-        <p className="ext-paper-masthead__eyebrow">The Build Report · Admin desk</p>
-        <h2 className="ext-paper-masthead__title">The Other Builds</h2>
+        <p className="ext-paper-masthead__eyebrow">
+          {admin ? 'The Build Report · Admin desk' : 'The Build Report'}
+        </p>
+        <h2 className="ext-paper-masthead__title">Yesterday&apos;s Builds</h2>
         <div className="ext-paper-masthead__rule" />
         <p className="ext-paper-masthead__deck">
-          Independent shipping digests for tracked GitHub projects outside the main clawdbotatg
+          Overnight shipping digests for builders and projects we track outside the main clawdbotatg
           report.
           {anyDate ? ` Edition window: ${formatDigestDate(anyDate)} (Mountain).` : ''}
         </p>
@@ -133,10 +144,11 @@ export default function ExternalBriefsNewspaper({
             key={account.id}
             account={account}
             brief={briefs[account.id] ?? null}
+            admin={admin}
             loading={Boolean(loading[account.id])}
             running={Boolean(running[account.id])}
             result={results[account.id] ?? null}
-            onRegenerate={() => onRegenerate(account.id)}
+            onRegenerate={onRegenerate ? () => onRegenerate(account.id) : undefined}
             normie={normie}
           />
         ))}
