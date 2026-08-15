@@ -23,13 +23,6 @@ const DIGEST_TTL_SEC = 90 * 24 * 3600
 export const EXTERNAL_BRIEFS_SUPER_DISCLAIMER =
   'SUPER DISCLAIMER — UNOFFICIAL / ALL PROJECTS BELOW. The Build Report is an independent community project. These Yesterday’s Builds are NOT affiliated with, endorsed by, sponsored by, or connected to the listed GitHub accounts, orgs, tokens, teams, employers, or related companies (including Base, Coinbase, OpenAI, Google, and others where applicable). Each brief is an automated, interpretive skim of public GitHub activity only — sometimes a single tracked repo, sometimes a capped sample of an org. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
 
-/** Page-level sampling note — applies to every column, not inside any one story. */
-export const EXTERNAL_BRIEFS_COVERAGE_NOTE =
-  'Coverage limit (all columns): each digest is a partial skim of public GitHub — at most 40 commits used per project for the writeup (newest first). Org-wide feeds also only scan up to 40 recently pushed public repos. Quiet or important activity can be missing. Never treat these as official changelogs.'
-
-/** Max commits fed into each Yesterday's Builds writeup. */
-export const EXTERNAL_BRIEF_MAX_COMMITS = 40
-
 export type ExternalBriefAccountId =
   | 'gitlawb'
   | '1clawAI'
@@ -61,7 +54,7 @@ export type ExternalBriefAccount = {
    * like openai/google). If omitted, scans up to 40 recently pushed public repos.
    */
   focusRepos?: string[]
-  /** Optional per-column note (usually unused — coverage lives in page chrome). */
+  /** Optional per-account coverage note (e.g. Base sampling limits) */
   sampleNote?: string
 }
 
@@ -106,6 +99,8 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     ticker: null,
     label: 'Base',
     redisSlug: 'base',
+    sampleNote:
+      'Coverage limit (Base only): this is NOT the full Base org. We only sample up to 40 recently pushed public repos (newest pushes first). Quiet or important repos that did not push recently are often missing. Treat this as a partial skim of public GitHub, never an official Base changelog.',
   },
   {
     id: 'openclaw',
@@ -130,6 +125,7 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     label: 'OpenAI Agents SDK',
     redisSlug: 'openai-agents-python',
     focusRepos: ['openai-agents-python'],
+    sampleNote: 'Single-repo feed only (openai/openai-agents-python) — not the full OpenAI org.',
   },
   {
     id: 'mastra',
@@ -162,6 +158,7 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     label: 'Google ADK',
     redisSlug: 'google-adk',
     focusRepos: ['adk-python'],
+    sampleNote: 'Single-repo feed only (google/adk-python) — not the full Google org.',
   },
   {
     id: 'goose',
@@ -199,12 +196,39 @@ export function externalBriefGithubLabel(account: ExternalBriefAccount): string 
 export type ExternalDigestCache = {
   general: string
   generalNormie?: string
+  /** Newspaper headline for this edition — 3–7 words, written by the model. */
+  headline?: string
+  /** Plain-English headline for normie mode. */
+  headlineNormie?: string
+  /** One-sentence deck under the headline. */
+  deck?: string
+  /** Plain-English deck for normie mode. */
+  deckNormie?: string
+  /**
+   * Model's read of how big a day this was for THIS account, 1–5.
+   * 1 = routine/quiet, 3 = normal shipping day, 5 = a real landing
+   * (launch, migration, major feature). Feeds front-page placement.
+   */
+  significance?: number
   dateKey: string
   repoCount: number
   commitCount: number
   generatedAt: string
   owner: string
   ticker: string | null
+}
+
+/**
+ * BuildBriefData plus the newspaper fields that only secondary-account
+ * editions carry. All optional, so anything already typed BuildBriefData
+ * still assigns cleanly.
+ */
+export type ExternalBriefData = BuildBriefData & {
+  headline?: string
+  headlineNormie?: string
+  deck?: string
+  deckNormie?: string
+  significance?: number
 }
 
 function digestRedisKey(account: ExternalBriefAccount, dateKey: string): string {
@@ -220,38 +244,12 @@ function formatActivityForPrompt(
 
   return activity
     .map(row => {
-      const msgs = row.commits.map(c => `  - ${c.message}`).join('\n')
       const desc = row.description ? ` — ${row.description.slice(0, 120)}` : ''
-      return `${row.slug}${desc}:\n${msgs}`
+      const msgs = row.commits.slice(0, 10).map(c => `  - ${c.message}`).join('\n')
+      const extra = row.commits.length > 10 ? `\n  - …and ${row.commits.length - 10} more` : ''
+      return `${row.slug}${desc}:\n${msgs}${extra}`
     })
     .join('\n\n')
-}
-
-/** Keep at most N commits for the writeup (newest repos first, commits in listed order). */
-function capActivityCommits(
-  activity: ExternalDayActivity[],
-  maxCommits = EXTERNAL_BRIEF_MAX_COMMITS,
-): ExternalDayActivity[] {
-  let remaining = maxCommits
-  const out: ExternalDayActivity[] = []
-  for (const row of activity) {
-    if (remaining <= 0) break
-    const commits = row.commits.slice(0, remaining)
-    if (!commits.length) continue
-    remaining -= commits.length
-    out.push({ ...row, commits })
-  }
-  return out
-}
-
-function withCappedActivity(snapshot: ExternalDaySnapshot): ExternalDaySnapshot {
-  const activity = capActivityCommits(snapshot.activity)
-  return {
-    ...snapshot,
-    activity,
-    repoCount: activity.length,
-    commitCount: activity.reduce((n, a) => n + a.commits.length, 0),
-  }
 }
 
 function buildFallbackGeneral(
@@ -276,13 +274,71 @@ function buildFallbackGeneral(
   const who = account.ticker
     ? `the ${account.ticker} builder account`
     : `github.com/${account.owner}`
-  return `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
+  let text = `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
+  if (account.id === 'base') {
+    text +=
+      ' Partial sample only: up to 40 recently pushed public repos — not the full Base org, and not an official Base update.'
+  }
+  return text
+}
+
+/** Used when the LLM is unavailable — never invents news. */
+function buildFallbackHeadline(
+  account: ExternalBriefAccount,
+  snapshot: ExternalDaySnapshot,
+): string {
+  if (!snapshot.activity.length) return 'Presses Idle Overnight'
+  if (snapshot.repoCount === 1) {
+    const slug = snapshot.activity[0].slug.split('/').pop() || account.label
+    return `Work Lands On ${slug}`
+  }
+  return `Commits Across ${snapshot.repoCount} Repos`
+}
+
+type AiOverview = {
+  general: string
+  generalNormie?: string
+  headline?: string
+  headlineNormie?: string
+  deck?: string
+  deckNormie?: string
+  significance?: number
+}
+
+/** Headlines must stay short and punchy — anything long or list-y is dropped. */
+function cleanHeadline(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const text = stripMarkdown(value.trim())
+    .replace(/\s+/g, ' ')
+    .replace(/[.。]+$/, '')
+    .trim()
+  if (!text) return undefined
+  if (text.length > 60) return undefined
+  if (text.split(' ').length > 9) return undefined
+  return text
+}
+
+function cleanDeck(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const text = stripMarkdown(value.trim()).replace(/\s+/g, ' ').trim()
+  if (!text) return undefined
+  if (text.length > 170) return text.slice(0, 167).trimEnd() + '…'
+  return text
+}
+
+function cleanSignificance(value: unknown): number | undefined {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return undefined
+  const rounded = Math.round(n)
+  if (rounded < 1) return 1
+  if (rounded > 5) return 5
+  return rounded
 }
 
 async function generateOverviewWithAi(
   account: ExternalBriefAccount,
   snapshot: ExternalDaySnapshot,
-): Promise<{ general: string; generalNormie?: string } | null> {
+): Promise<AiOverview | null> {
   if (!hasLlmApiKey()) return null
 
   const activityBlock = formatActivityForPrompt(account.owner, snapshot.activity, snapshot.dateKey)
@@ -291,9 +347,19 @@ async function generateOverviewWithAi(
 - Mention ${account.ticker} only when commits/descriptions clearly touch the token, holders, or related product; otherwise focus on what shipped.`
     : `No known token ticker for this account — do not invent one. Focus on what shipped.`
 
+  const baseRules =
+    account.id === 'base'
+      ? `
+BASE / COINBASE RULES (mandatory):
+- This feed is UNOFFICIAL and NOT affiliated with Base or Coinbase.
+- The commit list is a PARTIAL SAMPLE (at most ~40 recently pushed public repos). Say that clearly near the start (one short sentence). Do not imply full-org coverage or an official changelog.
+- Never speak as Base/Coinbase. Never invent roadmap, token, partnership, or product claims beyond the commit list.
+- Do not soften the sampling limit.`
+      : ''
+
   const scopeLine = account.focusRepos?.length
     ? `Tracked repo(s) only: ${account.focusRepos.map(r => `${account.owner}/${r}`).join(', ')} — do not invent activity from other repos in this org.`
-    : `Owner scan under github.com/${account.owner} (recently pushed public repos only).`
+    : `Owner scan: up to ~40 recently pushed public repos under github.com/${account.owner}.`
 
   const prompt = `You write Yesterday's Build for The Build Report — a short shipping summary for a SECONDARY GitHub project (not clawdbotatg / CLAWD).
 
@@ -302,21 +368,25 @@ Account: github.com/${account.owner}
 ${scopeLine}
 ${tickerBlock}
 Edition date (Mountain / America/Denver calendar): ${snapshot.dateKey}
-Repos with commits in this sample: ${snapshot.repoCount}
-Commits in this sample (capped): ${snapshot.commitCount}
+Repos with commits that day: ${snapshot.repoCount}
+Commits that day: ${snapshot.commitCount}
+${baseRules}
 
 COMMITS:
 ${activityBlock}
 
 Write JSON only:
-{"general":"…","generalNormie":"…"}
+{"headline":"…","headlineNormie":"…","deck":"…","deckNormie":"…","significance":3,"general":"…","generalNormie":"…"}
 
 Rules:
+- headline: a real newspaper headline for this edition — 3 to 7 words, active present tense, no ending period, no quotes, no colons, sentence-shaped not label-shaped. Say what actually happened, from the commit list only. Good: "Deposit Panel Picks Your Tokens". Bad: "Daily Update", "${account.label} Ships Code", "Various Improvements". If the day was quiet, write a quiet headline ("Presses Idle Overnight") rather than inventing news.
+- headlineNormie: same headline in plain English for non-builders. Same length limit.
+- deck: ONE sentence under the headline, max 140 characters, adding a second concrete detail the headline left out. No period-stacking, no lists.
+- deckNormie: same deck in plain English.
+- significance: integer 1-5 for how big this day was FOR THIS ACCOUNT specifically. 1 = nothing or pure chores (dependency bumps, lint, typo fixes, CI noise). 2 = light maintenance. 3 = a normal shipping day. 4 = a notable feature, refactor, or release landed. 5 = a genuine landing — launch, migration, major subsystem. Judge the substance of the commits, NOT how many there are. Forty dependency bumps is a 1. One real feature merge is a 4. Be strict: most days are 2 or 3, and 5 should be rare.
 - general: 2–4 short paragraphs (or fewer if quiet). Technical but readable. Name real repos that shipped. Ground claims in the commit list — do not invent features, burns, locks, or tokenomics.
 - generalNormie: same facts in plain English for non-builders. ${normieVoiceGuidance('digestGeneral')}
 - Never invent CLAWD framing, burn grades, or holder-economics scorecards — this account has no scores on The Build Report.
-- Do NOT open with coverage/sampling disclaimers, “partial sample,” or “not the full org” — that lives on the page chrome, not in the story.
-- Never speak as the project’s official voice (including Base/Coinbase/OpenAI/Google).
 - If quiet (no commits), say so plainly and stop.
 - No markdown, no bullet lists, no JSON inside the strings.`
 
@@ -338,6 +408,11 @@ Rules:
     const parsed = JSON.parse(trimmed.slice(start, end + 1)) as {
       general?: unknown
       generalNormie?: unknown
+      headline?: unknown
+      headlineNormie?: unknown
+      deck?: unknown
+      deckNormie?: unknown
+      significance?: unknown
     }
     const general = typeof parsed.general === 'string' ? stripMarkdown(parsed.general.trim()) : ''
     if (!general) return null
@@ -345,7 +420,20 @@ Rules:
       typeof parsed.generalNormie === 'string' && parsed.generalNormie.trim()
         ? stripMarkdown(parsed.generalNormie.trim())
         : undefined
-    return { general, ...(generalNormie ? { generalNormie } : {}) }
+    const headline = cleanHeadline(parsed.headline)
+    const headlineNormie = cleanHeadline(parsed.headlineNormie)
+    const deck = cleanDeck(parsed.deck)
+    const deckNormie = cleanDeck(parsed.deckNormie)
+    const significance = cleanSignificance(parsed.significance)
+    return {
+      general,
+      ...(generalNormie ? { generalNormie } : {}),
+      ...(headline ? { headline } : {}),
+      ...(headlineNormie ? { headlineNormie } : {}),
+      ...(deck ? { deck } : {}),
+      ...(deckNormie ? { deckNormie } : {}),
+      ...(significance ? { significance } : {}),
+    }
   } catch (err) {
     console.error(`[${account.id}-brief] AI generation failed:`, err)
     return null
@@ -381,11 +469,16 @@ async function cacheDigest(
   }
 }
 
-function toBriefData(digest: ExternalDigestCache): BuildBriefData {
+function toBriefData(digest: ExternalDigestCache): ExternalBriefData {
   return {
     text: digest.general,
     general: digest.general,
     ...(digest.generalNormie ? { generalNormie: digest.generalNormie } : {}),
+    ...(digest.headline ? { headline: digest.headline } : {}),
+    ...(digest.headlineNormie ? { headlineNormie: digest.headlineNormie } : {}),
+    ...(digest.deck ? { deck: digest.deck } : {}),
+    ...(digest.deckNormie ? { deckNormie: digest.deckNormie } : {}),
+    ...(digest.significance ? { significance: digest.significance } : {}),
     cards: null,
     dateKey: digest.dateKey,
     isToday: false,
@@ -408,11 +501,9 @@ export async function generateAndCacheExternalDigest(
     if (existing?.general?.trim()) return existing
   }
 
-  const snapshot = withCappedActivity(
-    await fetchExternalOwnerDayActivity(account.owner, dateKey, {
-      focusRepos: account.focusRepos,
-    }),
-  )
+  const snapshot = await fetchExternalOwnerDayActivity(account.owner, dateKey, {
+    focusRepos: account.focusRepos,
+  })
   if (snapshot.rateLimited && snapshot.activity.length === 0) {
     console.warn(`[${account.id}-brief] rate limited with no activity; writing quiet fallback`, {
       dateKey,
@@ -431,6 +522,11 @@ export async function generateAndCacheExternalDigest(
   const payload: ExternalDigestCache = {
     general: ai?.general ?? buildFallbackGeneral(account, snapshot),
     ...(ai?.generalNormie ? { generalNormie: ai.generalNormie } : {}),
+    headline: ai?.headline ?? buildFallbackHeadline(account, snapshot),
+    ...(ai?.headlineNormie ? { headlineNormie: ai.headlineNormie } : {}),
+    ...(ai?.deck ? { deck: ai.deck } : {}),
+    ...(ai?.deckNormie ? { deckNormie: ai.deckNormie } : {}),
+    significance: ai?.significance ?? (snapshot.commitCount > 0 ? 2 : 1),
     dateKey,
     repoCount: snapshot.repoCount,
     commitCount: snapshot.commitCount,
@@ -446,7 +542,7 @@ export async function generateAndCacheExternalDigest(
 export async function getExternalBrief(
   accountId: ExternalBriefAccountId,
   dateKey = yesterdayMountainDateKey(),
-): Promise<BuildBriefData | null> {
+): Promise<ExternalBriefData | null> {
   const account = getExternalBriefAccount(accountId)
   if (!account) return null
   const digest = await readCachedDigest(account, dateKey)
@@ -457,7 +553,7 @@ export async function getExternalBrief(
 /** Cached briefs for every secondary account (public page + Admin). */
 export async function getAllExternalBriefs(
   dateKey = yesterdayMountainDateKey(),
-): Promise<Partial<Record<ExternalBriefAccountId, BuildBriefData | null>>> {
+): Promise<Partial<Record<ExternalBriefAccountId, ExternalBriefData | null>>> {
   const entries = await Promise.all(
     EXTERNAL_BRIEF_ACCOUNTS.map(async account => {
       const brief = await getExternalBrief(account.id, dateKey)

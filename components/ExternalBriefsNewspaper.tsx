@@ -8,11 +8,11 @@ import {
   externalBriefGithubUrl,
   type ExternalBriefAccount,
   type ExternalBriefAccountId,
+  type ExternalBriefData,
 } from '@/lib/externalOwnerBrief'
-import type { BuildBriefData } from '@/lib/buildBrief'
 
 type Props = {
-  briefs: Partial<Record<ExternalBriefAccountId, BuildBriefData | null>>
+  briefs: Partial<Record<ExternalBriefAccountId, ExternalBriefData | null>>
   /** Admin regenerate controls */
   admin?: boolean
   loading?: Partial<Record<ExternalBriefAccountId, boolean>>
@@ -30,6 +30,31 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 
 /** Issue numbering epoch — day 1 of the paper. Bump only if you want to re-baseline. */
 const ISSUE_EPOCH = Date.UTC(2025, 11, 31)
+
+/* ------------------------------------------------------------------
+   FRONT-PAGE RANKING — how a story gets pegged as the lead.
+
+   score = significance × 100
+         + min(commits, COMMIT_CAP)
+         + repos × 2
+         + (has a token ticker ? TICKER_EDGE : 0)
+
+   significance (1-5) is the model's read of how much the day actually
+   mattered for that account, judged on what the commits DID, not how
+   many there were. It dominates on purpose: 40 dependency bumps is a 1,
+   one real feature merge is a 4.
+
+   Commits are capped so a bot-spam day can't buy the front page — they
+   only break ties between stories of equal significance.
+
+   TICKER_EDGE is a thumb on the scale for accounts with a token, since
+   holders are who this page is for. Set it to 0 for a neutral desk.
+
+   Editions cached before significance existed default to NEUTRAL.
+   ------------------------------------------------------------------ */
+const COMMIT_CAP = 40
+const TICKER_EDGE = 15
+const NEUTRAL_SIGNIFICANCE = 3
 
 function parseDateKey(dateKey: string): { y: number; m: number; d: number } | null {
   const [y, m, d] = dateKey.split('-').map(Number)
@@ -66,8 +91,20 @@ function outlookFlag(commits: number, projects: number): string {
   return 'Outlook: Heavy Traffic'
 }
 
-function briefBody(brief: BuildBriefData, normie: boolean): string {
+function briefBody(brief: ExternalBriefData, normie: boolean): string {
   return (normie && brief.generalNormie) || brief.general || brief.text || ''
+}
+
+function briefHeadline(brief: ExternalBriefData | null, normie: boolean): string | null {
+  if (!brief) return null
+  const value = (normie && brief.headlineNormie) || brief.headline
+  return value && value.trim() ? value.trim() : null
+}
+
+function briefDeck(brief: ExternalBriefData | null, normie: boolean): string | null {
+  if (!brief) return null
+  const value = (normie && brief.deckNormie) || brief.deck
+  return value && value.trim() ? value.trim() : null
 }
 
 function toParagraphs(text: string): string[] {
@@ -78,14 +115,13 @@ function toParagraphs(text: string): string[] {
 }
 
 /**
- * Newspapers put a one-line deck under the headline. We don't have an LLM-written
- * deck, so we lift the first sentence — but only if it reads like a deck (short
- * enough) and there's real body left behind it.
+ * Fallback deck for editions cached before the model wrote one: lift the
+ * first sentence, but only if it reads like a deck and leaves real body behind.
  */
 function splitDeck(paragraphs: string[]): { deck: string | null; body: string[] } {
   if (!paragraphs.length) return { deck: null, body: [] }
   const first = paragraphs[0]
-  const match = first.match(/^(.+?[.!?])(\s+)([\s\S]+)$/)
+  const match = first.match(/^(.+?[.!?])(\s+)(.+)$/)
   if (match && match[1].length <= 150 && match[1].length >= 30) {
     const rest = match[3].trim()
     const body = rest ? [rest, ...paragraphs.slice(1)] : paragraphs.slice(1)
@@ -97,7 +133,7 @@ function splitDeck(paragraphs: string[]): { deck: string | null; body: string[] 
   return { deck: null, body: paragraphs }
 }
 
-function commitLine(brief: BuildBriefData | null): string | null {
+function commitLine(brief: ExternalBriefData | null): string | null {
   if (!brief || brief.commitCount <= 0) return null
   const c = `${brief.commitCount} commit${brief.commitCount === 1 ? '' : 's'}`
   if (brief.repoCount > 0) {
@@ -108,8 +144,17 @@ function commitLine(brief: BuildBriefData | null): string | null {
 
 type Story = {
   account: ExternalBriefAccount
-  brief: BuildBriefData | null
+  brief: ExternalBriefData | null
   text: string
+}
+
+function frontPageScore(story: Story): number {
+  const brief = story.brief
+  if (!brief) return 0
+  const significance = brief.significance ?? NEUTRAL_SIGNIFICANCE
+  const commits = Math.min(brief.commitCount ?? 0, COMMIT_CAP)
+  const repos = brief.repoCount ?? 0
+  return significance * 100 + commits + repos * 2 + (story.account.ticker ? TICKER_EDGE : 0)
 }
 
 function RegenButton({
@@ -136,7 +181,15 @@ function RegenButton({
   )
 }
 
-function Byline({ account, brief }: { account: ExternalBriefAccount; brief: BuildBriefData | null }) {
+function Byline({
+  account,
+  brief,
+  admin,
+}: {
+  account: ExternalBriefAccount
+  brief: ExternalBriefData | null
+  admin: boolean
+}) {
   const commits = commitLine(brief)
   return (
     <p className="ext-paper-byline">
@@ -146,14 +199,16 @@ function Byline({ account, brief }: { account: ExternalBriefAccount; brief: Buil
       {brief?.dateKey ? ` · ${formatDigestDate(brief.dateKey)}` : ''}
       {commits ? ` · ${commits}` : ''}
       {account.ticker ? ` · ${account.ticker}` : ''}
+      {admin && brief?.significance ? ` · sig ${brief.significance}/5` : ''}
     </p>
   )
 }
 
-function Story({
+function StoryBlock({
   story,
   variant,
   admin,
+  normie,
   loading,
   running,
   result,
@@ -162,6 +217,7 @@ function Story({
   story: Story
   variant: 'lead' | 'second' | 'brief'
   admin: boolean
+  normie: boolean
   loading: boolean
   running: boolean
   result: string | null
@@ -169,22 +225,38 @@ function Story({
 }) {
   const { account, brief, text } = story
   const paragraphs = toParagraphs(text)
-  const { deck, body } = variant === 'brief' ? { deck: null, body: paragraphs } : splitDeck(paragraphs)
+
+  const modelHeadline = briefHeadline(brief, normie)
+  const modelDeck = briefDeck(brief, normie)
+
+  // Only fall back to sentence-slicing on old editions that have no model deck.
+  const useFallbackDeck = !modelDeck && variant !== 'brief'
+  const sliced = useFallbackDeck ? splitDeck(paragraphs) : { deck: null, body: paragraphs }
+  const deck = modelDeck ?? sliced.deck
+  const body = sliced.body
+
+  const label = variant === 'lead' ? 'Lead story' : variant === 'second' ? 'Report' : 'In brief'
 
   return (
     <article id={account.id} className={`ext-paper-story ext-paper-story--${variant}`}>
       <div className="ext-paper-story__head">
         <div className="ext-paper-story__headwrap">
           <p className="ext-paper-kicker">
-            {variant === 'lead' ? 'Lead story' : variant === 'second' ? 'Report' : 'In brief'}
-            {account.ticker ? ` · ${account.ticker}` : ''}
+            {account.label}
+            <span className="ext-paper-kicker__sep"> · </span>
+            {label}
           </p>
-          <h3 className="ext-paper-headline">{account.label}</h3>
+          <h3 className="ext-paper-headline">{modelHeadline ?? account.label}</h3>
           {deck && <p className="ext-paper-deck">{deck}</p>}
-          <Byline account={account} brief={brief} />
+          <Byline account={account} brief={brief} admin={admin} />
         </div>
         {admin && (
-          <RegenButton running={running} loading={loading} onRegenerate={onRegenerate} small={variant === 'brief'} />
+          <RegenButton
+            running={running}
+            loading={loading}
+            onRegenerate={onRegenerate}
+            small={variant === 'brief'}
+          />
         )}
       </div>
 
@@ -220,12 +292,9 @@ export default function ExternalBriefsNewspaper({
   const filed = rows
     .filter(r => r.text.length > 0)
     .sort((a, b) => {
-      const ac = a.brief?.commitCount ?? 0
-      const bc = b.brief?.commitCount ?? 0
-      if (bc !== ac) return bc - ac
-      const ar = a.brief?.repoCount ?? 0
-      const br = b.brief?.repoCount ?? 0
-      return br - ar
+      const diff = frontPageScore(b) - frontPageScore(a)
+      if (diff !== 0) return diff
+      return (b.brief?.commitCount ?? 0) - (a.brief?.commitCount ?? 0)
     })
 
   const wire = rows.filter(r => !r.text.length)
@@ -271,18 +340,25 @@ export default function ExternalBriefsNewspaper({
 
       {lead ? (
         <>
-          <Story story={lead} variant="lead" admin={admin} {...stateFor(lead.account.id)} />
+          <StoryBlock
+            story={lead}
+            variant="lead"
+            admin={admin}
+            normie={normie}
+            {...stateFor(lead.account.id)}
+          />
 
           {seconds.length > 0 && (
             <>
               <div className="ext-paper-rule" />
               <div className="ext-paper-secondrow">
                 {seconds.map(story => (
-                  <Story
+                  <StoryBlock
                     key={story.account.id}
                     story={story}
                     variant="second"
                     admin={admin}
+                    normie={normie}
                     {...stateFor(story.account.id)}
                   />
                 ))}
@@ -296,11 +372,12 @@ export default function ExternalBriefsNewspaper({
               <p className="ext-paper-sectionhead">Also filed</p>
               <div className="ext-paper-shorts">
                 {shorts.map(story => (
-                  <Story
+                  <StoryBlock
                     key={story.account.id}
                     story={story}
                     variant="brief"
                     admin={admin}
+                    normie={normie}
                     {...stateFor(story.account.id)}
                   />
                 ))}

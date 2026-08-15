@@ -1094,18 +1094,6 @@ button {
   }
 }
 
-@media (min-width: 1400px) {
-  .ext-paper-shorts {
-    column-count: 4;
-  }
-}
-
-@media (min-width: 1800px) {
-  .ext-paper-shorts {
-    column-count: 5;
-  }
-}
-
 .ext-paper-shorts > .ext-paper-story {
   margin: 0 0 20px;
   padding: 0 0 16px;
@@ -1244,4 +1232,9 @@ button {
     font-size: 12px;
     letter-spacing: 0.04em;
   }
+}
+
+/* Kicker separator (account label · placement) */
+.ext-paper-kicker__sep {
+  opacity: 0.5;
 }
