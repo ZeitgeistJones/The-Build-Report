@@ -9,7 +9,7 @@ import RescorePromoBannerShell from '@/components/RescorePromoBannerShell'
 const FULLSCREEN_ROUTES = ['/sky']
 
 /** Keep nav/footer, but drop the centered content max-width. */
-const FULL_BLEED_CONTENT_ROUTES = ["/yesterdays-builds"]
+const FULL_BLEED_CONTENT_ROUTES: string[] = []
 
 function isFullscreenRoute(pathname: string | null) {
   if (!pathname) return false
