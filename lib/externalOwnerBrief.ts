@@ -19,7 +19,12 @@ import {
 
 const DIGEST_TTL_SEC = 90 * 24 * 3600
 
-export type ExternalBriefAccountId = 'gitlawb' | '1clawAI' | 'agoreums' | 'gblinproject'
+export type ExternalBriefAccountId =
+  | 'gitlawb'
+  | '1clawAI'
+  | 'agoreums'
+  | 'gblinproject'
+  | 'base'
 
 export type ExternalBriefAccount = {
   id: ExternalBriefAccountId
@@ -61,6 +66,13 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     ticker: null,
     label: 'Gblinproject',
     redisSlug: 'gblinproject',
+  },
+  {
+    id: 'base',
+    owner: 'base',
+    ticker: null,
+    label: 'Base',
+    redisSlug: 'base',
   },
 ]
 

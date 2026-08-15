@@ -1255,6 +1255,9 @@ export default function AdminPage() {
                 </h2>
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
                   Admin-only shipping summary for github.com/{account.owner}.
+                  {account.id === 'base'
+                    ? ' Large org — samples up to 40 recently pushed public repos.'
+                    : ''}
                   {account.ticker
                     ? ` Mentions ${account.ticker} only when commits support it —`
                     : ' No token ticker set —'}
