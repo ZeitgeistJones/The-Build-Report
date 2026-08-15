@@ -8,9 +8,19 @@ import RescorePromoBannerShell from '@/components/RescorePromoBannerShell'
 // Matches the route itself and any sub-paths (e.g. "/sky/foo").
 const FULLSCREEN_ROUTES = ['/sky']
 
+/** Keep nav/footer, but drop the centered content max-width. */
+const FULL_BLEED_CONTENT_ROUTES = ["/yesterdays-builds"]
+
 function isFullscreenRoute(pathname: string | null) {
   if (!pathname) return false
   return FULLSCREEN_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  )
+}
+
+function isFullBleedContentRoute(pathname: string | null) {
+  if (!pathname) return false
+  return FULL_BLEED_CONTENT_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   )
 }
@@ -24,17 +34,29 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
+  const fullBleedContent = isFullBleedContentRoute(pathname)
+
   return (
     <>
       <NavBar />
       <RescorePromoBannerShell />
       <main
-        className="site-main"
-        style={{
-          maxWidth: 'var(--content-max-width)',
-          margin: '0 auto',
-          padding: '32px var(--content-padding-x) 80px',
-        }}
+        className={fullBleedContent ? 'site-main site-main--fullbleed' : 'site-main'}
+        style={
+          fullBleedContent
+            ? {
+                width: '100%',
+                maxWidth: 'none',
+                margin: 0,
+                boxSizing: 'border-box',
+                padding: '32px var(--content-padding-x) 80px',
+              }
+            : {
+                maxWidth: 'var(--content-max-width)',
+                margin: '0 auto',
+                padding: '32px var(--content-padding-x) 80px',
+              }
+        }
       >
         {children}
       </main>
