@@ -11,6 +11,9 @@ import {
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 
+/** Safety cap — busy repos can exceed one GitHub page; stop runaway pagination. */
+const MAX_COMMIT_PAGES = 20
+
 export type ExternalRepoCommit = {
   message: string
   date: string
@@ -132,6 +135,47 @@ async function resolveFocusCandidates(
 }
 
 /**
+ * All commits on a Mountain calendar day for one repo.
+ *
+ * Uses since+until so today's flood cannot bury yesterday on page 1, and
+ * paginates so days with >100 commits still count.
+ */
+async function fetchRepoCommitsOnDay(
+  ownerEnc: string,
+  repoName: string,
+  mountainDateKey: string,
+  startMs: number,
+  endMs: number,
+): Promise<ExternalRepoCommit[]> {
+  const sinceIso = encodeURIComponent(new Date(startMs).toISOString())
+  const untilIso = encodeURIComponent(new Date(endMs).toISOString())
+  const out: ExternalRepoCommit[] = []
+
+  for (let page = 1; page <= MAX_COMMIT_PAGES; page++) {
+    const batch = await ghFetch(
+      `/repos/${ownerEnc}/${encodeURIComponent(repoName)}/commits?since=${sinceIso}&until=${untilIso}&per_page=100&page=${page}`,
+    )
+    if (!Array.isArray(batch) || batch.length === 0) break
+
+    for (const c of batch) {
+      const date = String(c?.commit?.author?.date ?? '')
+      if (!date) continue
+      if (dateKeyMountain(new Date(date)) !== mountainDateKey) continue
+      const t = Date.parse(date)
+      if (!Number.isFinite(t) || t < startMs || t >= endMs) continue
+      out.push({
+        message: firstLine(String(c?.commit?.message ?? '')),
+        date,
+      })
+    }
+
+    if (batch.length < 100) break
+  }
+
+  return out
+}
+
+/**
  * Commits on a Mountain calendar day for an owner — either a focus-repo allowlist
  * or up to `maxRepos` recently pushed public non-fork repos.
  */
@@ -142,7 +186,6 @@ export async function fetchExternalOwnerDayActivity(
 ): Promise<ExternalDaySnapshot> {
   const ownerEnc = encodeURIComponent(owner)
   const { startMs, endMs } = mountainDateKeyBoundsMs(mountainDateKey)
-  const sinceIso = new Date(startMs - 12 * 3600000).toISOString()
   const focusRepos = (options?.focusRepos ?? []).map(s => s.trim()).filter(Boolean)
   const maxRepos = options?.maxRepos ?? 40
 
@@ -172,22 +215,13 @@ export async function fetchExternalOwnerDayActivity(
 
   for (const repo of candidates) {
     try {
-      const commits = await ghFetch(
-        `/repos/${ownerEnc}/${encodeURIComponent(repo.name)}/commits?since=${sinceIso}&per_page=100`,
+      const onDay = await fetchRepoCommitsOnDay(
+        ownerEnc,
+        repo.name,
+        mountainDateKey,
+        startMs,
+        endMs,
       )
-      if (!Array.isArray(commits)) continue
-
-      const onDay = commits
-        .map((c: any) => ({
-          message: firstLine(String(c?.commit?.message ?? '')),
-          date: String(c?.commit?.author?.date ?? ''),
-        }))
-        .filter(c => c.date && dateKeyMountain(new Date(c.date)) === mountainDateKey)
-        .filter(c => {
-          const t = Date.parse(c.date)
-          return Number.isFinite(t) && t >= startMs && t < endMs
-        })
-
       if (!onDay.length) continue
       activity.push({
         slug: repo.name,
