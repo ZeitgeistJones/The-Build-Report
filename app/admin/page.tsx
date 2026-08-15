@@ -1254,7 +1254,11 @@ export default function AdminPage() {
                   {account.label} Yesterday&apos;s Build
                 </h2>
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-                  Admin-only shipping summary for github.com/{account.owner}. Mentions {account.ticker} only when commits support it — no grades, no public tab yet. Regenerates with the overnight digest cron.
+                  Admin-only shipping summary for github.com/{account.owner}.
+                  {account.ticker
+                    ? ` Mentions ${account.ticker} only when commits support it —`
+                    : ' No token ticker set —'}
+                  {' '}no grades, no public tab yet. Regenerates with the overnight digest cron.
                 </p>
               </div>
               <button

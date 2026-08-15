@@ -19,14 +19,14 @@ import {
 
 const DIGEST_TTL_SEC = 90 * 24 * 3600
 
-export type ExternalBriefAccountId = 'gitlawb' | '1clawAI'
+export type ExternalBriefAccountId = 'gitlawb' | '1clawAI' | 'agoreums' | 'gblinproject'
 
 export type ExternalBriefAccount = {
   id: ExternalBriefAccountId
   /** GitHub login */
   owner: string
-  /** Exact ticker string for prompts + UI (include $) */
-  ticker: string
+  /** Exact ticker for prompts + UI (include $). Null = shipping summary only, no token framing. */
+  ticker: string | null
   /** Admin section title */
   label: string
   /** Redis key segment — keep gitlawb as-is so existing cache stays valid */
@@ -48,6 +48,20 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     label: '1clawAI',
     redisSlug: '1clawAI',
   },
+  {
+    id: 'agoreums',
+    owner: 'agoreums',
+    ticker: null,
+    label: 'Agoreums',
+    redisSlug: 'agoreums',
+  },
+  {
+    id: 'gblinproject',
+    owner: 'gblinproject',
+    ticker: null,
+    label: 'Gblinproject',
+    redisSlug: 'gblinproject',
+  },
 ]
 
 export function getExternalBriefAccount(id: string): ExternalBriefAccount | null {
@@ -62,7 +76,7 @@ export type ExternalDigestCache = {
   commitCount: number
   generatedAt: string
   owner: string
-  ticker: string
+  ticker: string | null
 }
 
 function digestRedisKey(account: ExternalBriefAccount, dateKey: string): string {
@@ -91,7 +105,10 @@ function buildFallbackGeneral(
   snapshot: ExternalDaySnapshot,
 ): string {
   if (!snapshot.activity.length) {
-    return `Quiet day on github.com/${account.owner} — no commits landed on the scanned public repos for ${snapshot.dateKey}. Check back tomorrow for a fresher read on what shipped for ${account.ticker}.`
+    const tail = account.ticker
+      ? ` Check back tomorrow for a fresher read on what shipped for ${account.ticker}.`
+      : ' Check back tomorrow for a fresher read on what shipped.'
+    return `Quiet day on github.com/${account.owner} — no commits landed on the scanned public repos for ${snapshot.dateKey}.${tail}`
   }
   const names = snapshot.activity
     .slice(0, 5)
@@ -99,7 +116,10 @@ function buildFallbackGeneral(
     .join(', ')
   const extra =
     snapshot.activity.length > 5 ? ` and ${snapshot.activity.length - 5} more repos` : ''
-  return `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for the ${account.ticker} builder account — not a scored Build Report grade card.`
+  const who = account.ticker
+    ? `the ${account.ticker} builder account`
+    : `github.com/${account.owner}`
+  return `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
 }
 
 async function generateOverviewWithAi(
@@ -109,10 +129,15 @@ async function generateOverviewWithAi(
   if (!hasLlmApiKey()) return null
 
   const activityBlock = formatActivityForPrompt(account.owner, snapshot.activity, snapshot.dateKey)
+  const tickerBlock = account.ticker
+    ? `Token ticker (when relevant): ${account.ticker} — always write it exactly as ${account.ticker}.
+- Mention ${account.ticker} only when commits/descriptions clearly touch the token, holders, or related product; otherwise focus on what shipped.`
+    : `No known token ticker for this account — do not invent one. Focus on what shipped.`
+
   const prompt = `You write Yesterday's Build for The Build Report — a short shipping summary for a SECONDARY GitHub account (not clawdbotatg / CLAWD).
 
 Account: github.com/${account.owner}
-Token ticker (when relevant): ${account.ticker} — always write it exactly as ${account.ticker}.
+${tickerBlock}
 Edition date (Mountain / America/Denver calendar): ${snapshot.dateKey}
 Repos with commits that day: ${snapshot.repoCount}
 Commits that day: ${snapshot.commitCount}
@@ -126,7 +151,6 @@ Write JSON only:
 Rules:
 - general: 2–4 short paragraphs (or fewer if quiet). Technical but readable. Name real repos that shipped. Ground claims in the commit list — do not invent features, burns, locks, or tokenomics.
 - generalNormie: same facts in plain English for non-builders. ${normieVoiceGuidance('digestGeneral')}
-- Mention ${account.ticker} only when commits/descriptions clearly touch the token, holders, or related product; otherwise focus on what shipped.
 - Never invent CLAWD framing, burn grades, or holder-economics scorecards — this account has no scores on The Build Report.
 - If quiet (no commits), say so plainly and stop.
 - No markdown, no bullet lists, no JSON inside the strings.`
