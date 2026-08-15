@@ -23,6 +23,10 @@ const DIGEST_TTL_SEC = 90 * 24 * 3600
 export const EXTERNAL_BRIEFS_SUPER_DISCLAIMER =
   'SUPER DISCLAIMER — UNOFFICIAL / ALL PROJECTS BELOW. The Build Report is an independent community project. These Yesterday’s Builds are NOT affiliated with, endorsed by, sponsored by, or connected to the listed GitHub accounts, orgs, tokens, teams, employers, or related companies (including Base, Coinbase, OpenAI, Google, and others where applicable). Each brief is an automated, interpretive skim of public GitHub activity only — sometimes a single tracked repo, sometimes a capped sample of an org. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
 
+/** Matches vercel.json cron for /api/cron/daily-digest (`0 7 * * *`). */
+export const EXTERNAL_BRIEFS_REFRESH_NOTE =
+  'Refreshes daily at 7:00 UTC · overnight Mountain'
+
 /** Max commits fed into each Yesterday's Builds writeup (newest first). */
 export const EXTERNAL_BRIEF_MAX_COMMITS = 40
 

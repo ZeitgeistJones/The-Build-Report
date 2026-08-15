@@ -4,6 +4,7 @@ import { useNormieMode } from '@/components/NormieModeProvider'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
   EXTERNAL_BRIEF_MAX_COMMITS,
+  EXTERNAL_BRIEFS_REFRESH_NOTE,
   EXTERNAL_BRIEFS_SUPER_DISCLAIMER,
   externalBriefGithubLabel,
   externalBriefGithubUrl,
@@ -335,6 +336,7 @@ export default function ExternalBriefsNewspaper({
         <p className="ext-paper-masthead__deck">
           {admin ? 'Admin desk · ' : ''}Free · Independent community project
         </p>
+        <p className="ext-paper-masthead__refresh">{EXTERNAL_BRIEFS_REFRESH_NOTE}</p>
       </header>
 
       <div className="ext-paper-rule ext-paper-rule--double" />
