@@ -7,7 +7,7 @@ import { isCommunityContextEnabled } from '@/lib/communityContext'
 export const metadata = {
   title: 'About — The Build Report',
   description:
-    'What The Build Report is, how launch baseline and live AI scores differ, and how holders can submit community context.',
+    'What The Build Report is, what each nav tab covers, how launch baseline and live AI scores differ, and how holders can submit community context.',
 }
 
 export default function AboutPage() {
@@ -26,6 +26,22 @@ It is not affiliated with clawdbotatg, Austin Griffith, or any core team. It was
 This is not an official source. Scores are interpretive. They reflect one reading of publicly available information — clawdbotatg's tweets, the Chronicle, and GitHub activity — and reasonable people could score the same repos differently.
 
 This is not a real-time data feed. Launch baseline grades are a fixed Jun 15 snapshot. GitHub activity refreshes automatically. Live AI scores update when someone pays for a Rescore or when batch autoscore runs.`,
+    },
+    {
+      heading: 'What’s in the tabs',
+      body: `Repos is the main Build Report — ecosystem grades, repo cards, Yesterday’s build for clawdbotatg, and Score / Rescore. That’s the scored ledger this About page mostly describes.
+
+Night Sky is a full-screen visual map of the same ecosystem: repos as stars, grouped by theme, with connections between related projects. It’s for orientation and exploration, not a second scoreboard.
+
+Start Here is the plain-English onboarding guide — how to read grades, activity, filters, and basic token concepts without needing GitHub or crypto expertise.
+
+Dictionary defines jargon that shows up in score blurbs and commit language (crypto, GitHub, coding, AI, ops). Hover or tap linked terms in score text for a quick peek; the full list lives on that page. It’s separate from the Start Here glossary, which focuses on site UI terms.
+
+How we score is the full methodology handbook — rubric weights, grade math, evidence rules, and context layers. Use it when you want the detailed “why,” not just the letter on a card.
+
+Yesterday’s Builds is a separate overnight newspaper for other GitHub accounts and projects we track outside clawdbotatg (tokens, agent frameworks, Base public activity, and similar). These are unofficial shipping digests only — no Build Report grades, not affiliated with those projects, and not official changelogs. Editions refresh daily at 7:00 UTC (overnight Mountain). Writeups skim public GitHub and may cap how many commits they use when a day is huge.
+
+Archives keeps past clawdbotatg Build Briefs for about 90 days so you can browse older overnight editions by period. It is Brief-only — not a dump of every column that ever appeared on the homepage.`,
     },
     {
       heading: 'How scores are assigned',
