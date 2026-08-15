@@ -4,7 +4,7 @@
  */
 
 import { getRedis } from '@/lib/redis'
-import { generateText, hasLlmApiKey } from '@/lib/llm'
+import { generateTextGeminiFirst, hasLlmApiKey } from '@/lib/llm'
 import { stripMarkdown } from '@/lib/textCleanup'
 import { NORMIE_TEMPERATURE, normieVoiceGuidance } from '@/lib/normieVoice'
 import {
@@ -306,7 +306,7 @@ Rules:
 - No markdown, no bullet lists, no JSON inside the strings.`
 
   try {
-    const { text, provider } = await generateText({
+    const { text, provider } = await generateTextGeminiFirst({
       prompt,
       maxTokens: 2048,
       temperature: NORMIE_TEMPERATURE,

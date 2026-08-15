@@ -119,6 +119,33 @@ export async function generateTextGeminiOnly(opts: GenerateTextOptions): Promise
 }
 
 /**
+ * Gemini first, Anthropic Haiku fallback — for high-volume cheap surfaces
+ * (Yesterday's Builds / secondary digests).
+ */
+export async function generateTextGeminiFirst(opts: GenerateTextOptions): Promise<GenerateTextResult> {
+  const label = opts.label ?? 'llm'
+  const anthropicKey = anthropicApiKey()
+  const geminiKey = geminiApiKey()
+
+  if (!anthropicKey && !geminiKey) {
+    throw new Error('No LLM API key configured (ANTHROPIC_API_KEY or GEMINI_API_KEY)')
+  }
+
+  if (geminiKey) {
+    try {
+      const text = await generateWithGemini(opts)
+      return { text, provider: 'gemini' }
+    } catch (err) {
+      if (!anthropicKey) throw err
+      console.warn(`[${label}] Gemini failed; falling back to Anthropic:`, err)
+    }
+  }
+
+  const text = await generateWithAnthropic(opts)
+  return { text, provider: 'anthropic' }
+}
+
+/**
  * Generate text with Anthropic Haiku as primary and Gemini as fallback.
  * Falls back when Anthropic is unset or the Anthropic call fails.
  */
