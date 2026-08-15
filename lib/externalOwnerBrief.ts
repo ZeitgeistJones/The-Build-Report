@@ -23,6 +23,9 @@ const DIGEST_TTL_SEC = 90 * 24 * 3600
 export const EXTERNAL_BRIEFS_SUPER_DISCLAIMER =
   'SUPER DISCLAIMER — UNOFFICIAL / ALL PROJECTS BELOW. The Build Report is an independent community project. These Yesterday’s Builds are NOT affiliated with, endorsed by, sponsored by, or connected to the listed GitHub accounts, orgs, tokens, teams, employers, or related companies (including Base, Coinbase, OpenAI, Google, and others where applicable). Each brief is an automated, interpretive skim of public GitHub activity only — sometimes a single tracked repo, sometimes a capped sample of an org. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
 
+/** Max commits fed into each Yesterday's Builds writeup (newest first). */
+export const EXTERNAL_BRIEF_MAX_COMMITS = 40
+
 export type ExternalBriefAccountId =
   | 'gitlawb'
   | '1clawAI'
@@ -54,7 +57,7 @@ export type ExternalBriefAccount = {
    * like openai/google). If omitted, scans up to 40 recently pushed public repos.
    */
   focusRepos?: string[]
-  /** Optional per-account coverage note (e.g. Base sampling limits) */
+  /** Optional static note (e.g. single-repo feeds under a huge org) */
   sampleNote?: string
 }
 
@@ -99,8 +102,6 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     ticker: null,
     label: 'Base',
     redisSlug: 'base',
-    sampleNote:
-      'Coverage limit (Base only): this is NOT the full Base org. We only sample up to 40 recently pushed public repos (newest pushes first). Quiet or important repos that did not push recently are often missing. Treat this as a partial skim of public GitHub, never an official Base changelog.',
   },
   {
     id: 'openclaw',
@@ -245,11 +246,27 @@ function formatActivityForPrompt(
   return activity
     .map(row => {
       const desc = row.description ? ` — ${row.description.slice(0, 120)}` : ''
-      const msgs = row.commits.slice(0, 10).map(c => `  - ${c.message}`).join('\n')
-      const extra = row.commits.length > 10 ? `\n  - …and ${row.commits.length - 10} more` : ''
-      return `${row.slug}${desc}:\n${msgs}${extra}`
+      const msgs = row.commits.map(c => `  - ${c.message}`).join('\n')
+      return `${row.slug}${desc}:\n${msgs}`
     })
     .join('\n\n')
+}
+
+/** Keep at most N commits for the writeup (repos already sorted by volume). */
+function capActivityCommits(
+  activity: ExternalDayActivity[],
+  maxCommits = EXTERNAL_BRIEF_MAX_COMMITS,
+): ExternalDayActivity[] {
+  let remaining = maxCommits
+  const out: ExternalDayActivity[] = []
+  for (const row of activity) {
+    if (remaining <= 0) break
+    const commits = row.commits.slice(0, remaining)
+    if (!commits.length) continue
+    remaining -= commits.length
+    out.push({ ...row, commits })
+  }
+  return out
 }
 
 function buildFallbackGeneral(
@@ -274,12 +291,7 @@ function buildFallbackGeneral(
   const who = account.ticker
     ? `the ${account.ticker} builder account`
     : `github.com/${account.owner}`
-  let text = `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
-  if (account.id === 'base') {
-    text +=
-      ' Partial sample only: up to 40 recently pushed public repos — not the full Base org, and not an official Base update.'
-  }
-  return text
+  return `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
 }
 
 /** Used when the LLM is unavailable — never invents news. */
@@ -341,7 +353,9 @@ async function generateOverviewWithAi(
 ): Promise<AiOverview | null> {
   if (!hasLlmApiKey()) return null
 
-  const activityBlock = formatActivityForPrompt(account.owner, snapshot.activity, snapshot.dateKey)
+  const cappedActivity = capActivityCommits(snapshot.activity)
+  const promptCommitCount = cappedActivity.reduce((n, a) => n + a.commits.length, 0)
+  const activityBlock = formatActivityForPrompt(account.owner, cappedActivity, snapshot.dateKey)
   const tickerBlock = account.ticker
     ? `Token ticker (when relevant): ${account.ticker} — always write it exactly as ${account.ticker}.
 - Mention ${account.ticker} only when commits/descriptions clearly touch the token, holders, or related product; otherwise focus on what shipped.`
@@ -352,9 +366,7 @@ async function generateOverviewWithAi(
       ? `
 BASE / COINBASE RULES (mandatory):
 - This feed is UNOFFICIAL and NOT affiliated with Base or Coinbase.
-- The commit list is a PARTIAL SAMPLE (at most ~40 recently pushed public repos). Say that clearly near the start (one short sentence). Do not imply full-org coverage or an official changelog.
-- Never speak as Base/Coinbase. Never invent roadmap, token, partnership, or product claims beyond the commit list.
-- Do not soften the sampling limit.`
+- Never speak as Base/Coinbase. Never invent roadmap, token, partnership, or product claims beyond the commit list.`
       : ''
 
   const scopeLine = account.focusRepos?.length
@@ -369,7 +381,8 @@ ${scopeLine}
 ${tickerBlock}
 Edition date (Mountain / America/Denver calendar): ${snapshot.dateKey}
 Repos with commits that day: ${snapshot.repoCount}
-Commits that day: ${snapshot.commitCount}
+Commits that day (full count): ${snapshot.commitCount}
+Commits in this sample (capped at ${EXTERNAL_BRIEF_MAX_COMMITS}): ${promptCommitCount}
 ${baseRules}
 
 COMMITS:
@@ -387,6 +400,8 @@ Rules:
 - general: 2–4 short paragraphs (or fewer if quiet). Technical but readable. Name real repos that shipped. Ground claims in the commit list — do not invent features, burns, locks, or tokenomics.
 - generalNormie: same facts in plain English for non-builders. ${normieVoiceGuidance('digestGeneral')}
 - Never invent CLAWD framing, burn grades, or holder-economics scorecards — this account has no scores on The Build Report.
+- Do NOT open with coverage/sampling disclaimers, “partial sample,” or “not the full org” — the page shows a short note under a story only when that day had more than ${EXTERNAL_BRIEF_MAX_COMMITS} commits.
+- Never speak as the project’s official voice (including Base/Coinbase/OpenAI/Google).
 - If quiet (no commits), say so plainly and stop.
 - No markdown, no bullet lists, no JSON inside the strings.`
 

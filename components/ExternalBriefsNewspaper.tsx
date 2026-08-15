@@ -3,6 +3,7 @@
 import { useNormieMode } from '@/components/NormieModeProvider'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
+  EXTERNAL_BRIEF_MAX_COMMITS,
   EXTERNAL_BRIEFS_SUPER_DISCLAIMER,
   externalBriefGithubLabel,
   externalBriefGithubUrl,
@@ -262,6 +263,12 @@ function StoryBlock({
 
       <div className="ext-paper-hairline" />
 
+      {brief && brief.commitCount > EXTERNAL_BRIEF_MAX_COMMITS && (
+        <p className="ext-paper-sample">
+          Partial skim: {brief.commitCount} commits yesterday — writeup used the newest{' '}
+          {EXTERNAL_BRIEF_MAX_COMMITS}.
+        </p>
+      )}
       {account.sampleNote && <p className="ext-paper-sample">{account.sampleNote}</p>}
       {admin && result && <p className="ext-paper-result">{result}</p>}
 
