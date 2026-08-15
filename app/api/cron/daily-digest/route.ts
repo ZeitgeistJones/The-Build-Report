@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadGitHubStatsForCron } from '@/lib/githubStatsSnapshot'
 import { generateAndCacheDailyDigest, loadReposForBrief, yesterdayMountainDateKey } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
-import { generateAndCacheGitlawbDigest } from '@/lib/gitlawbBrief'
+import { generateAllExternalDigests } from '@/lib/externalOwnerBrief'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -31,10 +31,7 @@ export async function GET(req: NextRequest) {
       console.error('[daily-digest] needle generation failed', err)
       return null
     })
-    const gitlawb = await generateAndCacheGitlawbDigest({ dateKey: editionKey }).catch(err => {
-      console.error('[daily-digest] gitlawb brief generation failed', err)
-      return null
-    })
+    const external = await generateAllExternalDigests({ dateKey: editionKey })
     return NextResponse.json({
       ok: true,
       dateKey: digest.dateKey,
@@ -43,9 +40,7 @@ export async function GET(req: NextRequest) {
       generatedAt: digest.generatedAt,
       needleDateKey: needle?.dateKey ?? null,
       needleRepoCount: needle?.repoCount ?? 0,
-      gitlawbDateKey: gitlawb?.dateKey ?? null,
-      gitlawbRepoCount: gitlawb?.repoCount ?? 0,
-      gitlawbCommitCount: gitlawb?.commitCount ?? 0,
+      externalBriefs: external,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Daily digest cron failed'
