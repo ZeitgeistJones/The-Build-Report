@@ -49,28 +49,29 @@ export async function verifyAdminPassword(password: unknown): Promise<boolean> {
   return timingSafeEqual(a, b)
 }
 
-// Per-IP limiter for password-gated admin endpoints. Generous enough for real
-// admin use, tight enough to blunt brute-force attempts. Consumed on every
-// attempt (success or fail).
-const adminAttemptLimit = new Ratelimit({
+// Per-IP limiter for *failed* admin password attempts only. Successful admin
+// calls (auth, regenerate, list) must not burn this — the Admin page fires many
+// POSTs after login and was locking the real operator out at 20/10m.
+const adminFailLimit = new Ratelimit({
   redis: getRedis(),
   limiter: Ratelimit.slidingWindow(20, '10 m'),
-  prefix: 'build-report:rl:admin-attempt',
+  prefix: 'build-report:rl:admin-fail',
 })
 
 /**
- * Rate-limits and authenticates an admin request. Returns a NextResponse to
- * short-circuit on rate-limit (429) or bad password (401), or null when the
- * request is authorized and may proceed.
+ * Authenticates an admin request. Rate-limits only bad passwords (brute-force).
+ * Returns a NextResponse to short-circuit on rate-limit (429) or bad password (401),
+ * or null when the request is authorized and may proceed.
  */
 export async function guardAdmin(req: NextRequest, password: unknown): Promise<NextResponse | null> {
+  if (await verifyAdminPassword(password)) {
+    return null
+  }
+
   const ip = extractClientIp(req)
-  const { success } = await adminAttemptLimit.limit(ip)
+  const { success } = await adminFailLimit.limit(ip)
   if (!success) {
     return NextResponse.json({ ok: false, error: 'Rate limit exceeded — try again later' }, { status: 429 })
   }
-  if (!(await verifyAdminPassword(password))) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-  }
-  return null
+  return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 }
