@@ -45,6 +45,9 @@ export type ExternalBriefAccountId =
   | 'google-adk'
   | 'goose'
   | 'composio'
+  | 'aeon'
+  | 'clawbank'
+  | 'miroshark'
 
 export type ExternalBriefAccount = {
   id: ExternalBriefAccountId
@@ -180,6 +183,30 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     label: 'Composio',
     redisSlug: 'composio',
     focusRepos: ['composio'],
+  },
+  {
+    id: 'aeon',
+    owner: 'aeonfun',
+    ticker: null,
+    label: 'Aeon',
+    redisSlug: 'aeon',
+    focusRepos: ['aeon'],
+  },
+  {
+    id: 'clawbank',
+    owner: 'ClawBank-co',
+    ticker: null,
+    label: 'ClawBank',
+    redisSlug: 'clawbank',
+    focusRepos: ['clawbank'],
+  },
+  {
+    id: 'miroshark',
+    owner: 'MiroShark',
+    ticker: null,
+    label: 'MiroShark',
+    redisSlug: 'miroshark',
+    focusRepos: ['MiroShark'],
   },
 ]
 

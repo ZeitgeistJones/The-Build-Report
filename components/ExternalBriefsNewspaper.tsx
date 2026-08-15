@@ -297,15 +297,18 @@ export default function ExternalBriefsNewspaper({
     return { account, brief, text: brief ? briefBody(brief, normie).trim() : '' } as Story
   })
 
+  // Public paper: only projects that actually shipped yesterday. Quiet/blank
+  // desks stay visible in Admin so you can regenerate and inspect them.
   const filed = rows
     .filter(r => r.text.length > 0)
+    .filter(r => admin || (r.brief?.commitCount ?? 0) > 0)
     .sort((a, b) => {
       const diff = frontPageScore(b) - frontPageScore(a)
       if (diff !== 0) return diff
       return (b.brief?.commitCount ?? 0) - (a.brief?.commitCount ?? 0)
     })
 
-  const wire = rows.filter(r => !r.text.length)
+  const wire = admin ? rows.filter(r => !r.text.length) : []
 
   const lead = filed[0] ?? null
   const seconds = filed.slice(1, 3)
