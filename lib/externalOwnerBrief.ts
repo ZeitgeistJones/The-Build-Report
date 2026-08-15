@@ -61,6 +61,8 @@ export type ExternalBriefAccount = {
    * like openai/google). If omitted, scans up to 40 recently pushed public repos.
    */
   focusRepos?: string[]
+  /** Optional per-column note (usually unused — coverage lives in page chrome). */
+  sampleNote?: string
 }
 
 function repoPath(account: ExternalBriefAccount): string {
