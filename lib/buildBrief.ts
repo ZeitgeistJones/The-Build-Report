@@ -73,6 +73,8 @@ export interface DailyDigestCache {
   repoCount: number
   commitCount: number
   generatedAt: string
+  /** 'ai' = model writeup. 'fallback' = template. Cron retries fallbacks so a failed night cannot stick. */
+  source?: 'ai' | 'fallback'
 }
 
 export interface BuildBriefData {
@@ -322,22 +324,68 @@ interface DigestAiPayload {
   cards: DailyDigestCards
 }
 
+function cardsAreComplete(cards: DailyDigestCards | undefined): cards is DailyDigestCards {
+  if (!cards) return false
+  return (['24h', '7d', '30d', '60d'] as const).every(period => {
+    const row = cards[period]
+    return Boolean(row?.builder?.trim() && row.economic?.trim() && row.integrity?.trim())
+  })
+}
+
+/** Last-ditch pull of "general" when the model truncates mid-JSON. */
+function extractGeneralFromPartial(raw: string): string | null {
+  const match = raw.match(/"general"\s*:\s*"((?:\\.|[^"\\])*)"/)
+  if (!match) return null
+  try {
+    const text = JSON.parse(`"${match[1]}"`)
+    return typeof text === 'string' && text.trim() ? text.trim() : null
+  } catch {
+    return match[1]?.trim() || null
+  }
+}
+
 function parseDigestJson(raw: string): DigestAiPayload | null {
   const trimmed = raw.trim()
   const start = trimmed.indexOf('{')
   const end = trimmed.lastIndexOf('}')
-  if (start < 0 || end <= start) return null
+  if (start < 0 || end <= start) {
+    const general = extractGeneralFromPartial(trimmed)
+    return general ? { general, cards: {} as DailyDigestCards } : null
+  }
   try {
     const parsed = JSON.parse(trimmed.slice(start, end + 1)) as DigestAiPayload
-    if (!parsed.general || !parsed.cards) return null
-    for (const period of ['24h', '7d', '30d', '60d'] as const) {
-      const row = parsed.cards[period]
-      if (!row?.builder || !row.economic || !row.integrity) return null
+    if (!parsed.general?.trim()) {
+      const general = extractGeneralFromPartial(trimmed)
+      return general ? { general, cards: {} as DailyDigestCards } : null
+    }
+    if (!cardsAreComplete(parsed.cards)) {
+      // Keep the overview even when card JSON was truncated — grade cards use live fallback copy.
+      return {
+        general: parsed.general,
+        ...(parsed.generalNormie?.trim() ? { generalNormie: parsed.generalNormie } : {}),
+        cards: {} as DailyDigestCards,
+      }
     }
     return parsed
   } catch {
-    return null
+    const general = extractGeneralFromPartial(trimmed)
+    return general ? { general, cards: {} as DailyDigestCards } : null
   }
+}
+
+function isTemplateFallbackGeneral(general: string): boolean {
+  const g = general.trim()
+  if (!g) return true
+  if (g === QUIET_GENERAL) return true
+  if (g.includes('The grade cards below put that activity in context')) return true
+  return /^On \d{4}-\d{2}-\d{2}, work landed on /.test(g)
+}
+
+/** True when cron should try the model again instead of serving a stuck template. */
+function isRetryableDigest(digest: DailyDigestCache): boolean {
+  if (digest.source === 'fallback') return true
+  if (digest.source === 'ai') return false
+  return isTemplateFallbackGeneral(digest.general)
 }
 
 async function generateDigestWithAi(
@@ -426,22 +474,6 @@ Rules:
       })
       return null
     }
-    const mapRow = (row: CardBlurbs): CardBlurbs => ({
-      builder: stripMarkdown(row.builder),
-      economic: stripMarkdown(row.economic),
-      integrity: stripMarkdown(row.integrity),
-      ...(row.leverage ? { leverage: stripMarkdown(row.leverage) } : {}),
-      ...(row.normie
-        ? {
-            normie: {
-              builder: stripMarkdown(row.normie.builder),
-              economic: stripMarkdown(row.normie.economic),
-              integrity: stripMarkdown(row.normie.integrity),
-              ...(row.normie.leverage ? { leverage: stripMarkdown(row.normie.leverage) } : {}),
-            },
-          }
-        : {}),
-    })
     const general = stripMarkdown(parsed.general)
     let generalNormie = parsed.generalNormie ? stripMarkdown(parsed.generalNormie) : undefined
     const activitySlugs = activity.map(a => a.slug)
@@ -465,6 +497,32 @@ Rules:
         }
       }
     }
+
+    if (!cardsAreComplete(parsed.cards)) {
+      console.warn('[build-brief] keeping AI overview; card JSON incomplete — using live card copy')
+      return {
+        general,
+        ...(generalNormie ? { generalNormie } : {}),
+        cards: {} as DailyDigestCards,
+      }
+    }
+
+    const mapRow = (row: CardBlurbs): CardBlurbs => ({
+      builder: stripMarkdown(row.builder),
+      economic: stripMarkdown(row.economic),
+      integrity: stripMarkdown(row.integrity),
+      ...(row.leverage ? { leverage: stripMarkdown(row.leverage) } : {}),
+      ...(row.normie
+        ? {
+            normie: {
+              builder: stripMarkdown(row.normie.builder),
+              economic: stripMarkdown(row.normie.economic),
+              integrity: stripMarkdown(row.normie.integrity),
+              ...(row.normie.leverage ? { leverage: stripMarkdown(row.normie.leverage) } : {}),
+            },
+          }
+        : {}),
+    })
     return {
       general,
       ...(generalNormie ? { generalNormie } : {}),
@@ -542,7 +600,8 @@ export async function generateAndCacheDailyDigest(
 ): Promise<DailyDigestCache> {
   if (!options?.force) {
     const existing = await readCachedDigest(mountainDateKey)
-    if (existing?.general?.trim()) return existing
+    // A template fallback is not "done" — retry so CLAWD cannot get stuck on backup copy.
+    if (existing?.general?.trim() && !isRetryableDigest(existing)) return existing
   }
 
   const activity = collectBuildActivityForMountainDay(stats, repos, mountainDateKey)
@@ -551,22 +610,29 @@ export async function generateAndCacheDailyDigest(
 
   const ai = await generateDigestWithAi(activity, gradeContext, mountainDateKey)
   const fallback = buildFallbackDigest(stats, repos, activity, mountainDateKey)
-  if (!ai) {
+  const aiOverview = Boolean(ai?.general?.trim())
+  const aiCards = cardsAreComplete(ai?.cards) ? ai.cards : null
+  if (!aiOverview) {
     console.warn('[build-brief] using template fallback digest', {
       mountainDateKey,
       repoCount: activity.length,
       commitCount,
     })
+  } else if (!aiCards) {
+    console.warn('[build-brief] AI overview saved; card fields fell back to live copy', {
+      mountainDateKey,
+    })
   }
 
   const payload: DailyDigestCache = {
-    general: ai?.general ?? fallback.general,
+    general: aiOverview ? ai!.general : fallback.general,
     ...(ai?.generalNormie ? { generalNormie: ai.generalNormie } : {}),
-    cards: ai?.cards ?? fallback.cards,
+    cards: aiCards ?? fallback.cards,
     dateKey: mountainDateKey,
     repoCount: activity.length,
     commitCount,
     generatedAt: new Date().toISOString(),
+    source: aiOverview ? 'ai' : 'fallback',
   }
 
   await cacheDailyDigest(mountainDateKey, payload)

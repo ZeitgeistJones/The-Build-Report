@@ -5,7 +5,6 @@ import { syncBurnSnapshot } from '@/lib/burnSnapshot'
 import { syncEthUsdRate } from '@/lib/ethUsdRate'
 import { generateAndCacheDailyDigest, loadReposForBrief, yesterdayMountainDateKey } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
-import { generateAllExternalDigests } from '@/lib/externalOwnerBrief'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -38,7 +37,6 @@ export async function GET(req: NextRequest) {
       console.error('[warm-cache] needle generation failed', err)
       return null
     })
-    const external = await generateAllExternalDigests({ dateKey: editionKey })
 
     return NextResponse.json({
       ok: true,
@@ -55,7 +53,6 @@ export async function GET(req: NextRequest) {
       briefGeneratedAt: digest.generatedAt,
       needleDateKey: needle?.dateKey ?? null,
       needleRepoCount: needle?.repoCount ?? 0,
-      externalBriefs: external,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Warm cache cron failed'
