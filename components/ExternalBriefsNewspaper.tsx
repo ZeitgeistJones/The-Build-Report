@@ -4,6 +4,7 @@ import { useNormieMode } from '@/components/NormieModeProvider'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
   EXTERNAL_BRIEFS_SUPER_DISCLAIMER,
+  EXTERNAL_BRIEFS_COVERAGE_NOTE,
   externalBriefGithubLabel,
   externalBriefGithubUrl,
   type ExternalBriefAccount,
@@ -88,7 +89,6 @@ function Article({
         )}
       </header>
 
-      {account.sampleNote && <p className="ext-paper-sample">{account.sampleNote}</p>}
       {admin && result && <p className="ext-paper-result">{result}</p>}
 
       {loading && !brief ? (
@@ -136,6 +136,7 @@ export default function ExternalBriefsNewspaper({
           {anyDate ? ` Edition window: ${formatDigestDate(anyDate)} (Mountain).` : ''}
         </p>
         <p className="ext-paper-disclaimer">{EXTERNAL_BRIEFS_SUPER_DISCLAIMER}</p>
+        <p className="ext-paper-coverage">{EXTERNAL_BRIEFS_COVERAGE_NOTE}</p>
       </header>
 
       <div className="ext-paper-grid">

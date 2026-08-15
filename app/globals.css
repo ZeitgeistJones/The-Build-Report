@@ -876,6 +876,16 @@ button {
   border-bottom: 1px solid var(--border-strong);
 }
 
+.ext-paper-coverage {
+  margin: 10px auto 0;
+  max-width: 820px;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  color: var(--text-secondary);
+}
+
 .ext-paper-grid {
   column-count: 1;
   column-gap: 28px;

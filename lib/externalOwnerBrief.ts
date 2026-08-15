@@ -23,6 +23,13 @@ const DIGEST_TTL_SEC = 90 * 24 * 3600
 export const EXTERNAL_BRIEFS_SUPER_DISCLAIMER =
   'SUPER DISCLAIMER — UNOFFICIAL / ALL PROJECTS BELOW. The Build Report is an independent community project. These Yesterday’s Builds are NOT affiliated with, endorsed by, sponsored by, or connected to the listed GitHub accounts, orgs, tokens, teams, employers, or related companies (including Base, Coinbase, OpenAI, Google, and others where applicable). Each brief is an automated, interpretive skim of public GitHub activity only — sometimes a single tracked repo, sometimes a capped sample of an org. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
 
+/** Page-level sampling note — applies to every column, not inside any one story. */
+export const EXTERNAL_BRIEFS_COVERAGE_NOTE =
+  'Coverage limit (all columns): each digest is a partial skim of public GitHub — at most 40 commits used per project for the writeup (newest first). Org-wide feeds also only scan up to 40 recently pushed public repos. Quiet or important activity can be missing. Never treat these as official changelogs.'
+
+/** Max commits fed into each Yesterday's Builds writeup. */
+export const EXTERNAL_BRIEF_MAX_COMMITS = 40
+
 export type ExternalBriefAccountId =
   | 'gitlawb'
   | '1clawAI'
@@ -54,8 +61,6 @@ export type ExternalBriefAccount = {
    * like openai/google). If omitted, scans up to 40 recently pushed public repos.
    */
   focusRepos?: string[]
-  /** Optional per-account coverage note (e.g. Base sampling limits) */
-  sampleNote?: string
 }
 
 function repoPath(account: ExternalBriefAccount): string {
@@ -99,8 +104,6 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     ticker: null,
     label: 'Base',
     redisSlug: 'base',
-    sampleNote:
-      'Coverage limit (Base only): this is NOT the full Base org. We only sample up to 40 recently pushed public repos (newest pushes first). Quiet or important repos that did not push recently are often missing. Treat this as a partial skim of public GitHub, never an official Base changelog.',
   },
   {
     id: 'openclaw',
@@ -125,7 +128,6 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     label: 'OpenAI Agents SDK',
     redisSlug: 'openai-agents-python',
     focusRepos: ['openai-agents-python'],
-    sampleNote: 'Single-repo feed only (openai/openai-agents-python) — not the full OpenAI org.',
   },
   {
     id: 'mastra',
@@ -158,7 +160,6 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     label: 'Google ADK',
     redisSlug: 'google-adk',
     focusRepos: ['adk-python'],
-    sampleNote: 'Single-repo feed only (google/adk-python) — not the full Google org.',
   },
   {
     id: 'goose',
@@ -217,12 +218,38 @@ function formatActivityForPrompt(
 
   return activity
     .map(row => {
+      const msgs = row.commits.map(c => `  - ${c.message}`).join('\n')
       const desc = row.description ? ` — ${row.description.slice(0, 120)}` : ''
-      const msgs = row.commits.slice(0, 10).map(c => `  - ${c.message}`).join('\n')
-      const extra = row.commits.length > 10 ? `\n  - …and ${row.commits.length - 10} more` : ''
-      return `${row.slug}${desc}:\n${msgs}${extra}`
+      return `${row.slug}${desc}:\n${msgs}`
     })
     .join('\n\n')
+}
+
+/** Keep at most N commits for the writeup (newest repos first, commits in listed order). */
+function capActivityCommits(
+  activity: ExternalDayActivity[],
+  maxCommits = EXTERNAL_BRIEF_MAX_COMMITS,
+): ExternalDayActivity[] {
+  let remaining = maxCommits
+  const out: ExternalDayActivity[] = []
+  for (const row of activity) {
+    if (remaining <= 0) break
+    const commits = row.commits.slice(0, remaining)
+    if (!commits.length) continue
+    remaining -= commits.length
+    out.push({ ...row, commits })
+  }
+  return out
+}
+
+function withCappedActivity(snapshot: ExternalDaySnapshot): ExternalDaySnapshot {
+  const activity = capActivityCommits(snapshot.activity)
+  return {
+    ...snapshot,
+    activity,
+    repoCount: activity.length,
+    commitCount: activity.reduce((n, a) => n + a.commits.length, 0),
+  }
 }
 
 function buildFallbackGeneral(
@@ -247,12 +274,7 @@ function buildFallbackGeneral(
   const who = account.ticker
     ? `the ${account.ticker} builder account`
     : `github.com/${account.owner}`
-  let text = `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
-  if (account.id === 'base') {
-    text +=
-      ' Partial sample only: up to 40 recently pushed public repos — not the full Base org, and not an official Base update.'
-  }
-  return text
+  return `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
 }
 
 async function generateOverviewWithAi(
@@ -267,19 +289,9 @@ async function generateOverviewWithAi(
 - Mention ${account.ticker} only when commits/descriptions clearly touch the token, holders, or related product; otherwise focus on what shipped.`
     : `No known token ticker for this account — do not invent one. Focus on what shipped.`
 
-  const baseRules =
-    account.id === 'base'
-      ? `
-BASE / COINBASE RULES (mandatory):
-- This feed is UNOFFICIAL and NOT affiliated with Base or Coinbase.
-- The commit list is a PARTIAL SAMPLE (at most ~40 recently pushed public repos). Say that clearly near the start (one short sentence). Do not imply full-org coverage or an official changelog.
-- Never speak as Base/Coinbase. Never invent roadmap, token, partnership, or product claims beyond the commit list.
-- Do not soften the sampling limit.`
-      : ''
-
   const scopeLine = account.focusRepos?.length
     ? `Tracked repo(s) only: ${account.focusRepos.map(r => `${account.owner}/${r}`).join(', ')} — do not invent activity from other repos in this org.`
-    : `Owner scan: up to ~40 recently pushed public repos under github.com/${account.owner}.`
+    : `Owner scan under github.com/${account.owner} (recently pushed public repos only).`
 
   const prompt = `You write Yesterday's Build for The Build Report — a short shipping summary for a SECONDARY GitHub project (not clawdbotatg / CLAWD).
 
@@ -288,9 +300,8 @@ Account: github.com/${account.owner}
 ${scopeLine}
 ${tickerBlock}
 Edition date (Mountain / America/Denver calendar): ${snapshot.dateKey}
-Repos with commits that day: ${snapshot.repoCount}
-Commits that day: ${snapshot.commitCount}
-${baseRules}
+Repos with commits in this sample: ${snapshot.repoCount}
+Commits in this sample (capped): ${snapshot.commitCount}
 
 COMMITS:
 ${activityBlock}
@@ -302,6 +313,8 @@ Rules:
 - general: 2–4 short paragraphs (or fewer if quiet). Technical but readable. Name real repos that shipped. Ground claims in the commit list — do not invent features, burns, locks, or tokenomics.
 - generalNormie: same facts in plain English for non-builders. ${normieVoiceGuidance('digestGeneral')}
 - Never invent CLAWD framing, burn grades, or holder-economics scorecards — this account has no scores on The Build Report.
+- Do NOT open with coverage/sampling disclaimers, “partial sample,” or “not the full org” — that lives on the page chrome, not in the story.
+- Never speak as the project’s official voice (including Base/Coinbase/OpenAI/Google).
 - If quiet (no commits), say so plainly and stop.
 - No markdown, no bullet lists, no JSON inside the strings.`
 
@@ -393,9 +406,11 @@ export async function generateAndCacheExternalDigest(
     if (existing?.general?.trim()) return existing
   }
 
-  const snapshot = await fetchExternalOwnerDayActivity(account.owner, dateKey, {
-    focusRepos: account.focusRepos,
-  })
+  const snapshot = withCappedActivity(
+    await fetchExternalOwnerDayActivity(account.owner, dateKey, {
+      focusRepos: account.focusRepos,
+    }),
+  )
   if (snapshot.rateLimited && snapshot.activity.length === 0) {
     console.warn(`[${account.id}-brief] rate limited with no activity; writing quiet fallback`, {
       dateKey,
