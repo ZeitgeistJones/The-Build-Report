@@ -36,6 +36,10 @@ export type ExternalBriefAccount = {
   label: string
   /** Redis key segment — keep gitlawb as-is so existing cache stays valid */
   redisSlug: string
+  /** Shown in Admin under the title — sampling / coverage limits */
+  sampleNote?: string
+  /** Strong legal/affiliation disclaimer shown above the brief */
+  disclaimer?: string
 }
 
 export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
@@ -73,6 +77,10 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     ticker: null,
     label: 'Base',
     redisSlug: 'base',
+    sampleNote:
+      'Coverage limit: this is NOT the full Base org. We only sample up to 40 recently pushed public repos (newest pushes first). Quiet or important repos that did not push recently are often missing. Treat this as a partial skim of public GitHub, never an official Base changelog.',
+    disclaimer:
+      'SUPER DISCLAIMER — UNOFFICIAL. The Build Report is an independent community project. This Base Yesterday’s Build is NOT affiliated with, endorsed by, sponsored by, or connected to Base, Coinbase, or any Base/Coinbase team, employee, or contractor. It is an automated, interpretive summary of a limited sample of public GitHub activity only. It can be incomplete, outdated, or wrong. It is not an official Base update, not financial advice, and not a substitute for Base docs, blog, status page, or GitHub itself. Do not treat anything here as Base’s position or roadmap.',
   },
 ]
 
@@ -131,7 +139,12 @@ function buildFallbackGeneral(
   const who = account.ticker
     ? `the ${account.ticker} builder account`
     : `github.com/${account.owner}`
-  return `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
+  let text = `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
+  if (account.id === 'base') {
+    text +=
+      ' Partial sample only: up to 40 recently pushed public repos — not the full Base org, and not an official Base update.'
+  }
+  return text
 }
 
 async function generateOverviewWithAi(
@@ -146,6 +159,16 @@ async function generateOverviewWithAi(
 - Mention ${account.ticker} only when commits/descriptions clearly touch the token, holders, or related product; otherwise focus on what shipped.`
     : `No known token ticker for this account — do not invent one. Focus on what shipped.`
 
+  const baseRules =
+    account.id === 'base'
+      ? `
+BASE / COINBASE RULES (mandatory):
+- This feed is UNOFFICIAL and NOT affiliated with Base or Coinbase.
+- The commit list is a PARTIAL SAMPLE (at most ~40 recently pushed public repos). Say that clearly near the start (one short sentence). Do not imply full-org coverage or an official changelog.
+- Never speak as Base/Coinbase. Never invent roadmap, token, partnership, or product claims beyond the commit list.
+- Do not soften the sampling limit.`
+      : ''
+
   const prompt = `You write Yesterday's Build for The Build Report — a short shipping summary for a SECONDARY GitHub account (not clawdbotatg / CLAWD).
 
 Account: github.com/${account.owner}
@@ -153,6 +176,7 @@ ${tickerBlock}
 Edition date (Mountain / America/Denver calendar): ${snapshot.dateKey}
 Repos with commits that day: ${snapshot.repoCount}
 Commits that day: ${snapshot.commitCount}
+${baseRules}
 
 COMMITS:
 ${activityBlock}

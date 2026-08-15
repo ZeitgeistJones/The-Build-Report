@@ -1253,16 +1253,48 @@ export default function AdminPage() {
                 <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>
                   {account.label} Yesterday&apos;s Build
                 </h2>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '560px' }}>
                   Admin-only shipping summary for github.com/{account.owner}.
-                  {account.id === 'base'
-                    ? ' Large org — samples up to 40 recently pushed public repos.'
-                    : ''}
                   {account.ticker
                     ? ` Mentions ${account.ticker} only when commits support it —`
                     : ' No token ticker set —'}
                   {' '}no grades, no public tab yet. Regenerates with the overnight digest cron.
                 </p>
+                {account.sampleNote && (
+                  <p
+                    style={{
+                      margin: '10px 0 0',
+                      fontSize: '12px',
+                      color: 'var(--text-secondary)',
+                      maxWidth: '640px',
+                      lineHeight: 1.5,
+                      padding: '10px 12px',
+                      background: 'var(--surface-1)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                    }}
+                  >
+                    {account.sampleNote}
+                  </p>
+                )}
+                {account.disclaimer && (
+                  <p
+                    style={{
+                      margin: '10px 0 0',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      maxWidth: '640px',
+                      lineHeight: 1.55,
+                      padding: '12px 14px',
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border-strong)',
+                      borderRadius: 'var(--radius)',
+                    }}
+                  >
+                    {account.disclaimer}
+                  </p>
+                )}
               </div>
               <button
                 type="button"
