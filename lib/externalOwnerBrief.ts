@@ -19,6 +19,10 @@ import {
 
 const DIGEST_TTL_SEC = 90 * 24 * 3600
 
+/** Shown once above all secondary-account Yesterday's Builds in Admin. */
+export const EXTERNAL_BRIEFS_SUPER_DISCLAIMER =
+  'SUPER DISCLAIMER — UNOFFICIAL / ALL SECONDARY ACCOUNTS. The Build Report is an independent community project. These Yesterday’s Builds (Gitlawb, 1clawAI, Agoreums, Gblinproject, Base, and any others added here) are NOT affiliated with, endorsed by, sponsored by, or connected to those GitHub accounts, their tokens, teams, employers, or related companies (including Base and Coinbase where applicable). Each brief is an automated, interpretive skim of public GitHub activity only. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
+
 export type ExternalBriefAccountId =
   | 'gitlawb'
   | '1clawAI'
@@ -36,10 +40,8 @@ export type ExternalBriefAccount = {
   label: string
   /** Redis key segment — keep gitlawb as-is so existing cache stays valid */
   redisSlug: string
-  /** Shown in Admin under the title — sampling / coverage limits */
+  /** Optional per-account coverage note (e.g. Base sampling limits) */
   sampleNote?: string
-  /** Strong legal/affiliation disclaimer shown above the brief */
-  disclaimer?: string
 }
 
 export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
@@ -78,9 +80,7 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     label: 'Base',
     redisSlug: 'base',
     sampleNote:
-      'Coverage limit: this is NOT the full Base org. We only sample up to 40 recently pushed public repos (newest pushes first). Quiet or important repos that did not push recently are often missing. Treat this as a partial skim of public GitHub, never an official Base changelog.',
-    disclaimer:
-      'SUPER DISCLAIMER — UNOFFICIAL. The Build Report is an independent community project. This Base Yesterday’s Build is NOT affiliated with, endorsed by, sponsored by, or connected to Base, Coinbase, or any Base/Coinbase team, employee, or contractor. It is an automated, interpretive summary of a limited sample of public GitHub activity only. It can be incomplete, outdated, or wrong. It is not an official Base update, not financial advice, and not a substitute for Base docs, blog, status page, or GitHub itself. Do not treat anything here as Base’s position or roadmap.',
+      'Coverage limit (Base only): this is NOT the full Base org. We only sample up to 40 recently pushed public repos (newest pushes first). Quiet or important repos that did not push recently are often missing. Treat this as a partial skim of public GitHub, never an official Base changelog.',
   },
 ]
 

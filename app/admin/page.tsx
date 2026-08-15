@@ -10,6 +10,7 @@ import type { UtilityIndexRow } from '@/lib/utilityIndex'
 import type { BuildBriefData } from '@/lib/buildBrief'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
+  EXTERNAL_BRIEFS_SUPER_DISCLAIMER,
   type ExternalBriefAccountId,
 } from '@/lib/externalOwnerBrief'
 import OverheardAdminEntryCard, { mentionToEditDraft, sanitizeDraftForSave, type MentionEditDraft } from '@/components/OverheardAdminEntryCard'
@@ -1241,6 +1242,27 @@ export default function AdminPage() {
       </div>
 
       {/* Secondary-account Yesterday's Builds (admin-only) */}
+      <div style={{ marginBottom: '16px' }}>
+        <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px' }}>
+          Secondary accounts — Yesterday&apos;s Build
+        </h2>
+        <p
+          style={{
+            margin: 0,
+            fontSize: '12px',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            maxWidth: '720px',
+            lineHeight: 1.55,
+            padding: '12px 14px',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border-strong)',
+            borderRadius: 'var(--radius)',
+          }}
+        >
+          {EXTERNAL_BRIEFS_SUPER_DISCLAIMER}
+        </p>
+      </div>
       {EXTERNAL_BRIEF_ACCOUNTS.map(account => {
         const brief = externalBriefs[account.id] ?? null
         const loading = Boolean(externalLoading[account.id])
@@ -1275,24 +1297,6 @@ export default function AdminPage() {
                     }}
                   >
                     {account.sampleNote}
-                  </p>
-                )}
-                {account.disclaimer && (
-                  <p
-                    style={{
-                      margin: '10px 0 0',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--text-primary)',
-                      maxWidth: '640px',
-                      lineHeight: 1.55,
-                      padding: '12px 14px',
-                      background: 'var(--surface-2)',
-                      border: '1px solid var(--border-strong)',
-                      borderRadius: 'var(--radius)',
-                    }}
-                  >
-                    {account.disclaimer}
                   </p>
                 )}
               </div>
