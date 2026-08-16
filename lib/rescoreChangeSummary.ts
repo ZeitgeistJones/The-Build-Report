@@ -144,10 +144,23 @@ export function summaryIsCircularRestatement(text: string): boolean {
   const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean)
   for (const sentence of sentences) {
     const lower = sentence.toLowerCase()
+
+    // "Role in ecosystem workflow row was moved to low because…" — mechanism as reason.
+    if (
+      /\b(role in ecosystem workflow|multiplies builder shipping capacity|downstream path to holder value|on-chain commitments and constraints|user funds, risk, and safety posture|transparency and verifiability|governance, token-economics, and ecosystem alignment|security, testing, and cryptographic rigor|builder standards|shipping leverage|holder economics)\b/.test(
+        lower,
+      ) &&
+      /\b(was )?moved (from|to)\s+(low|mid|high|n\/?a)\b/.test(lower) &&
+      /\b(because|as|after|when)\b/.test(lower)
+    ) {
+      return true
+    }
+
     const restatesMove =
       /\b(rose|fell|increased|decreased|climbed|dropped)\s+\d+\s*pts?\b/.test(lower) ||
       /\b(rose|fell)\s+to\s+[a-f][+\-]?\b/.test(lower) ||
-      /\b[+\-]\d+\s*pts?\b/.test(lower)
+      /\b[+\-]\d+\s*pts?\b/.test(lower) ||
+      /\b(was )?moved (from|to)\s+(low|mid|high|n\/?a)\b/.test(lower)
 
     if (!restatesMove) continue
 
@@ -183,8 +196,9 @@ export function summaryIsCircularRestatement(text: string): boolean {
       .replace(/\b(rose|fell|increased|decreased|climbed|dropped)\s+\d+\s*pts?\b/g, ' ')
       .replace(/\b(rose|fell)\s+to\s+[a-f][+\-]?\b/g, ' ')
       .replace(/\b[+\-]\d+\s*pts?\b/g, ' ')
+      .replace(/\b(was )?moved (from|to)\s+(low|mid|high|n\/?a)\b/g, ' ')
       .replace(
-        /\b(builder standards|shipping leverage|holder economics|overall|grade|score|the|a|an|to|from|on|in|and|this|rescore)\b/g,
+        /\b(builder standards|shipping leverage|holder economics|overall|grade|score|the|a|an|to|from|on|in|and|this|rescore|row)\b/g,
         ' ',
       )
       .replace(/[^a-z0-9\s]/g, ' ')
@@ -193,6 +207,50 @@ export function summaryIsCircularRestatement(text: string): boolean {
     if (withoutMoveBoilerplate.length < 20) return true
   }
   return false
+}
+
+/** Soft length gate — prompt asks 1–2 sentences; walls get rejected. */
+export function summaryTooLong(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  const sentences = trimmed.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0)
+  if (sentences.length > 2) return true
+  if (trimmed.length > 420) return true
+  const words = trimmed.split(/\s+/).filter(Boolean).length
+  return words > 95
+}
+
+/**
+ * Normie blurb still reading like a lab writeup — reject so the PE fallback can lead with commits.
+ */
+export function summaryNotNormieEnough(text: string): boolean {
+  const lower = text.toLowerCase()
+  return (
+    /\b(rubric|infra\b|r&d|token mechanic|shipping leverage|holder economics|adoption paths?|workflow row|ci\/testing|scorecard|multipl(y|ier) on what)\b/i.test(
+      lower,
+    ) ||
+    /\b(investigations?|shipping pipeline)\b/i.test(lower) ||
+    /\b(was )?moved (from|to)\s+(low|mid|high)\b/.test(lower) ||
+    /\b(role in ecosystem workflow|multiplies builder shipping capacity|downstream path to holder value)\b/.test(
+      lower,
+    )
+  )
+}
+
+/**
+ * Shipping-leverage drop narrated as if recent pushes caused the downgrade —
+ * contradicts Role High = active use with recent pushes; busy ≠ in the shipping path.
+ */
+export function summaryBlamesPushCadenceForDrop(text: string): boolean {
+  const lower = text.toLowerCase()
+  const citesPush =
+    /\b(active push|push cadence|recent pushes|pushed (today|yesterday)|last push)\b/.test(lower)
+  if (!citesPush) return false
+  return (
+    /\b(moved to low|fell|drop(ped)?|downgrade|not (yet )?a multiplier|do not ground|don't ground|unclear adoption)\b/.test(
+      lower,
+    ) || /\bbecause\b.{0,80}\b(push|pushes|cadence)\b/.test(lower)
+  )
 }
 
 function changedRows(deltas: RescoreAggregateDelta): RubricRowDelta[] {
@@ -305,6 +363,20 @@ export async function generateRescoreChangeSummary(params: {
 
   const evidenceBlock = formatEvidenceBlock(evidence)
 
+  const shippingLeverageTag =
+    newRepo.tag === 'theoretical' ||
+    newRepo.tag === 'indirect' ||
+    newRepo.tag === 'infrastructure'
+
+  const shippingLeverageRules = shippingLeverageTag
+    ? `
+SHIPPING-LEVERAGE / RESEARCH-NOTEBOOK RULES (this repo is tagged ${newRepo.tag}):
+- Recent pushes and topic folders prove activity, not that the repo is on the builder shipping path.
+- Never cite “active push cadence” / “recent pushes” as the reason shipping leverage or Role fell — say the work did not hook into shipping tools or products people use.
+- Prefer “lab notebook / learning tool” framing over prosecuting a named rubric row.
+`
+    : ''
+
   const prompt = `These are the old and new scores from a live rescore. The reader already sees the numeric delta header — do NOT restate it.
 
 COMPUTED DELTAS (match these directions; do NOT quote “±N pts” or letter transitions as your explanation):
@@ -322,16 +394,17 @@ ${oldRepo ? formatRepoScores(oldRepo) : 'No prior score on record.'}
 NEW SCORES (live rescore of current repo; each row has a source note):
 ${formatRepoScores(newRepo)}
 
-${evidenceBlock}Write TWO "what changed" blurbs with the SAME facts:
+${evidenceBlock}${shippingLeverageRules}Write TWO "what changed" blurbs with the SAME facts:
 
-1) "summary" — 1–2 sentences for builders/technical readers. Precise is fine (README, CI, commits, rubric evidence). Still no markdown.
-2) "summaryNormie" — 1–2 sentences Plain English for token holders who are not developers. MUST lead with what landed (from RECENT COMMITS) in everyday words, then a soft note on how the score moved. Never open with “money-side went up” / “builder-standards dipped” alone — that just restates the header.
+1) "summary" — 1–2 short sentences for builders/technical readers. Precise is fine (README, CI, commits, rubric evidence). Still no markdown. Hard max ~90 words.
+2) "summaryNormie" — 1–2 short sentences Plain English for token holders who are not developers. MUST lead with what landed (from RECENT COMMITS) in everyday words, then a soft note on how the score moved. Never open with “money-side went up” / “builder-standards dipped” alone — that just restates the header. Sound like texting a smart friend — not a lab report.
 
 ${normieVoiceGuidance('rescoreSummary')}
 
 Shared rules (both fields):
 - Lead with evidence, not the percentage: name concrete themes from RECENT COMMITS and/or cite NEW score row \`source\` notes that justify the new rubric *level*. The reader already sees ±N pts and letter moves in the header — do not open by restating them.
 - Keep the repo slug (${newRepo.githubSlug || newRepo.name}); you may add a short plain gloss after it in summaryNormie.
+- Never write “<row name> was moved to low/mid/high because…” — that mechanism is already on the card. Say what the commits/evidence show instead.
 - Treat “row X moved low→mid” as mechanism already shown above — never use that alone as the reason a grade rose or fell. Say what evidence justified the new level.
 - Ban openings that only restate “+N pts”, “rose to F (40%)”, or “Builder standards rose” without an evidence clause in the same sentence.
 - Do not open with README/docs “framing/clarity/purpose” unless the commits themselves are docs-only and that is what moved a row.
@@ -341,7 +414,7 @@ Shared rules (both fields):
 - If a score is flat, say the commits did not yet change the live scorecard reading (ambition in titles vs what is actually in the repo is fine).
 - If a score fell, explain the harsher reading; do not say it improved.
 - If a score rose, do not say it declined.
-- Mention specific scorecard rows only when they changed in RUBRIC ROW CHANGES above.
+- Mention specific scorecard rows only when they changed in RUBRIC ROW CHANGES above — and even then, do not narrate the level transition as the reason.
 - Do not promise a future rescore will fix the grade.
 
 Return ONLY JSON: {"summary":"...","summaryNormie":"..."}`
@@ -357,7 +430,7 @@ Return ONLY JSON: {"summary":"...","summaryNormie":"..."}`
     let summary = parsed.summary ? stripMarkdown(parsed.summary) : ''
     let summaryNormie = parsed.summaryNormie ? stripMarkdown(parsed.summaryNormie) : ''
 
-    const rejectReason = (text: string): string | null => {
+    const rejectReason = (text: string, kind: 'tech' | 'normie'): string | null => {
       if (!text) return 'empty'
       if (summaryContradictsDeltas(text, deltas)) return 'contradicts-deltas'
       if (summaryClaimsStaleSnapshot(text)) return 'stale-snapshot'
@@ -365,11 +438,14 @@ Return ONLY JSON: {"summary":"...","summaryNormie":"..."}`
       if (summaryDeniesListedRootFiles(text, evidence)) return 'denies-root-files'
       if (summaryIsCircularRestatement(text)) return 'circular-restatement'
       if (summaryIgnoresCommitsForDocsOnly(text, commitMessages)) return 'docs-only-ignores-commits'
+      if (summaryTooLong(text)) return 'too-long'
+      if (summaryBlamesPushCadenceForDrop(text)) return 'blames-push-cadence'
+      if (kind === 'normie' && summaryNotNormieEnough(text)) return 'not-normie-enough'
       return null
     }
 
-    const summaryReject = rejectReason(summary)
-    const normieReject = summaryNormie ? rejectReason(summaryNormie) : 'empty'
+    const summaryReject = rejectReason(summary, 'tech')
+    const normieReject = summaryNormie ? rejectReason(summaryNormie, 'normie') : 'empty'
     if (summaryReject) {
       console.warn('[rescoreChangeSummary] rejecting technical summary', {
         slug: newRepo.githubSlug || newRepo.name,
