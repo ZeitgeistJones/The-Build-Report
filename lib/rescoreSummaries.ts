@@ -89,6 +89,8 @@ function looksLikeJargonFallback(text: string): boolean {
   return (
     /the move itself is not the reason/i.test(text) ||
     /expand those rows/i.test(text) ||
+    /open the rows below/i.test(text) ||
+    /for the plain why/i.test(text) ||
     /recent commits in this rescore window/i.test(text) ||
     /0x[a-f0-9]{6,}/i.test(text) ||
     /\b(low|mid|high|n\/?a)\s*→\s*(low|mid|high|n\/?a)\b/i.test(text) ||
@@ -141,6 +143,15 @@ function plainifyCommitTitle(raw: string): string {
   if (/^Port to\b|\bScaffold-ETH 2\b|\bSE-?2\b/i.test(t) && /\b(port|frontend|monorepo)\b/i.test(t)) {
     return 'a Scaffold-ETH 2 port with a live Base frontend'
   }
+  if (/\bgpt-voice\b/i.test(t) && /\b(moved to|demo|research)\b/i.test(t)) {
+    return 'voice research spun into its own gpt-voice project'
+  }
+  if (/\bgpt-voice\b|\bRealtime API\b|\bsemantic VAD\b|\bcustom-voice\b/i.test(t)) {
+    return 'OpenAI live-voice API research (speech detection, pricing, custom voices)'
+  }
+  if (/\bglm-?5\.?3\b|\bGLM-5\.3\b/i.test(t)) {
+    return 'notes on the GLM-5.3 AI model and who can use it yet'
+  }
 
   t = t.replace(/0x[a-fA-F0-9]{6,}/g, '')
   t = t.replace(/\(Basescan verified\)/gi, 'verified on Base')
@@ -148,12 +159,18 @@ function plainifyCommitTitle(raw: string): string {
   t = t.replace(/\bethskills\b/gi, '')
   t = t.replace(/\b7-domain evm-audit-skills\b/gi, 'security review')
   t = t.replace(/\bevm-audit-skills\b/gi, 'security review')
+  t = t.replace(/\bsemantic VAD\b/gi, 'speech detection')
+  t = t.replace(/\bcustom-voice gating\b/gi, 'custom voice limits')
+  t = t.replace(/\bRealtime API\b/gi, 'live voice API')
   t = t.replace(/\bcanonical flow\b/gi, '')
   t = t.replace(/\bmonorepo\b/gi, 'project setup')
   t = t.replace(/\s*[|:]\s*/g, ' — ')
   t = t.replace(/\(\s*\)/g, '')
   t = t.replace(/\s{2,}/g, ' ').replace(/\s+([,.])/g, '$1').trim()
   t = t.replace(/^[\s—,-]+|[\s—,-]+$/g, '').replace(/\s*—\s*$/g, '').trim()
+
+  // Keep fallback themes short — long commit titles scare readers.
+  if (t.length > 90) t = `${t.slice(0, 87).trimEnd()}…`
   return t
 }
 
@@ -165,11 +182,12 @@ export function plainWorkFromCommitMessages(messages: string[]): string | null {
   const themes = messages
     .map(plainifyCommitTitle)
     .filter(Boolean)
-    .slice(0, 3)
+    // Dedupe near-identical themes (e.g. two gpt-voice titles).
+    .filter((theme, i, arr) => arr.findIndex(t => t.toLowerCase() === theme.toLowerCase()) === i)
+    .slice(0, 2)
   if (!themes.length) return null
   if (themes.length === 1) return themes[0]
-  if (themes.length === 2) return `${themes[0]}, and ${themes[1]}`
-  return `${themes[0]}; ${themes[1]}; and ${themes[2]}`
+  return `${themes[0]}, and ${themes[1]}`
 }
 
 export type NormieWhatChangedInput = {
@@ -220,12 +238,12 @@ export function buildNormieWhatChangedBlurb(input: NormieWhatChangedInput): stri
   if (econMove) scoreBits.push(`money-side reading ${econMove}`)
   if (biMove) scoreBits.push(`builder-standards ${biMove}`)
   const scoreClause = scoreBits.length
-    ? `${scoreBits.join(' and ')} — open the rows below for the plain why.`
-    : `the scorecard reading held steady — open the rows below for the plain why.`
+    ? `${scoreBits.join(' and ')}.`
+    : `the scorecard reading held steady.`
 
   if (work) {
     if (bothFlat || (!econMove && !biMove)) {
-      return `${name} landed ${work}. That work didn't move the overall scorecard reading much yet — open the rows below for the plain why.`
+      return `${name} landed ${work}. That work didn't move the overall scorecard reading much yet.`
     }
     return `${name} landed ${work}. ${scoreClause.charAt(0).toUpperCase()}${scoreClause.slice(1)}`
   }
@@ -233,7 +251,7 @@ export function buildNormieWhatChangedBlurb(input: NormieWhatChangedInput): stri
   if (bothFlat || (!econMove && !biMove)) {
     return `${name}'s score didn't really change on this recheck — the latest work didn't move how it reads on the scorecard yet.`
   }
-  return `On this recheck, ${name}'s ${scoreBits.map(s => s.replace(' reading', ' score').replace('builder-standards', 'builder-standards score')).join(' and its ')}. Open the rows below to see the plain reason behind each score.`
+  return `On this recheck, ${name}'s ${scoreBits.map(s => s.replace(' reading', ' score').replace('builder-standards', 'builder-standards score')).join(' and its ')}.`
 }
 
 /** Build a clean Plain English blurb from the record alone (no LLM, no rescore). */
@@ -269,12 +287,11 @@ export function rescoreSummaryForDisplay(
     if (technical && !shouldRebuildPlainSummary(technical)) return technical
     return legacyNormieFallback(meta, repoName)
   }
-  if (normie && !looksLikeJargonFallback(normie) && !looksLikeWeakScoreRestatement(normie)) {
+  if (technical && !looksLikeJargonFallback(technical) && !looksLikeWeakScoreRestatement(technical)) {
     return technical
   }
-  // Legacy / dual-jargon: hide prose in technical mode (delta header still shows).
-  if (technical && !looksLikeJargonFallback(technical)) return technical
-  return ''
+  // Legacy jargon / look-elsewhere templates — rebuild a plain informative blurb.
+  return legacyNormieFallback(meta, repoName)
 }
 
 export async function saveRescoreSummary(

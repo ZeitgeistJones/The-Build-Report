@@ -3,13 +3,12 @@ import { Repo, Score } from './scores'
 import { getShippingLeverage, getTokenMechanicForDisplay } from './economicGrade'
 import { stripMarkdown } from './textCleanup'
 import { normieVoiceGuidance } from './normieVoice'
-import { buildNormieWhatChangedBlurb } from './rescoreSummaries'
+import { buildNormieWhatChangedBlurb, plainWorkFromCommitMessages } from './rescoreSummaries'
 import {
   computeRescoreDeltas,
   formatChangedRowsForPrompt,
   formatRescoreDeltaHeader,
   type RescoreAggregateDelta,
-  type RubricRowDelta,
 } from './rescoreDeltas'
 
 export type RescoreEvidenceForSummary = {
@@ -215,25 +214,26 @@ export function summaryTooLong(text: string): boolean {
   if (!trimmed) return false
   const sentences = trimmed.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0)
   if (sentences.length > 2) return true
-  if (trimmed.length > 420) return true
+  if (trimmed.length > 480) return true
   const words = trimmed.split(/\s+/).filter(Boolean).length
-  return words > 95
+  return words > 110
 }
 
 /**
  * Normie blurb still reading like a lab writeup — reject so the PE fallback can lead with commits.
+ * Keep this narrow: reject scorecard jargon and row-move sermons, not ordinary plain words.
  */
 export function summaryNotNormieEnough(text: string): boolean {
   const lower = text.toLowerCase()
   return (
-    /\b(rubric|infra\b|r&d|token mechanic|shipping leverage|holder economics|adoption paths?|workflow row|ci\/testing|scorecard|multipl(y|ier) on what)\b/i.test(
+    /\b(rubric|infra\b|r&d|token mechanic|shipping leverage|holder economics|workflow row|ci\/testing|scorecard)\b/i.test(
       lower,
     ) ||
-    /\b(investigations?|shipping pipeline)\b/i.test(lower) ||
     /\b(was )?moved (from|to)\s+(low|mid|high)\b/.test(lower) ||
     /\b(role in ecosystem workflow|multiplies builder shipping capacity|downstream path to holder value)\b/.test(
       lower,
-    )
+    ) ||
+    /\bsemantic vad\b|\bcustom-voice gating\b/i.test(lower)
   )
 }
 
@@ -253,50 +253,39 @@ export function summaryBlamesPushCadenceForDrop(text: string): boolean {
   )
 }
 
-function changedRows(deltas: RescoreAggregateDelta): RubricRowDelta[] {
-  return [
-    ...deltas.rowDeltas.shippingLeverage,
-    ...deltas.rowDeltas.tokenMechanic,
-    ...deltas.rowDeltas.builderIntegrity,
-  ].filter(r => r.oldLevel != null && r.oldLevel !== r.newLevel)
-}
-
-function formatCommitHint(commitMessages: string[]): string {
-  if (!commitMessages.length) return ''
-  const titles = commitMessages
-    .slice(0, 3)
-    .map(m => m.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-  if (!titles.length) return ''
-  return ` Recent commits in this rescore window: ${titles.join('; ')}.`
-}
-
 function fallbackFlatSummary(deltas: RescoreAggregateDelta, commitMessages: string[] = []): string {
-  const commitHint = formatCommitHint(commitMessages)
+  const work = plainWorkFromCommitMessages(commitMessages)
   const bothFlat = deltas.economic.label === 'flat' && deltas.builderIntegrity.label === 'flat'
+  const econ = deltas.economic.deltaPct
+  const bi = deltas.builderIntegrity.deltaPct
+  const rose =
+    (econ != null && econ > 0) || (bi != null && bi > 0)
+  const fell =
+    (econ != null && econ < 0) || (bi != null && bi < 0)
+
   if (bothFlat) {
-    return `The score stayed the same — those recent commits did not change how this project reads on the scorecard yet.${commitHint}`
+    return work
+      ? `Recent work covered ${work}, but that did not change how this project reads on the live scorecard yet.`
+      : 'The score stayed the same — recent commits did not change how this project reads on the scorecard yet.'
   }
 
-  const rows = changedRows(deltas)
-  if (rows.length) {
-    const bits = rows
-      .slice(0, 2)
-      .map(r => `${r.label} ${r.oldLevel} → ${r.newLevel}`)
-      .join('; ')
-    return (
-      `${bits} on this rescore. Expand those rows for the source notes that justify the new levels` +
-      ` — the move itself is not the reason.${commitHint}`
-    )
+  if (work) {
+    if (rose && !fell) {
+      return `Recent work covered ${work}. The live reading moved up as shown above on a fuller take of how that work fits this repo.`
+    }
+    if (fell && !rose) {
+      return `Recent work covered ${work}. The live reading moved down as shown above on a stricter take of what is actually in the repo today.`
+    }
+    return `Recent work covered ${work}. The live reading moved as shown above.`
   }
 
-  if (
-    (deltas.economic.deltaPct != null && deltas.economic.deltaPct < 0) ||
-    (deltas.builderIntegrity.deltaPct != null && deltas.builderIntegrity.deltaPct < 0)
-  ) {
-    return `The score moved as shown above on a stricter reading of what is in the repo today versus those recent commits.${commitHint}`
+  if (fell && !rose) {
+    return 'The score moved down as shown above on a stricter reading of what is in the repo today versus those recent commits.'
   }
-  return `The score moved as shown above. Recent commits do not always move every scorecard row yet.${commitHint}`
+  if (rose && !fell) {
+    return 'The score moved up as shown above on a fuller reading of what recent commits put in the repo.'
+  }
+  return 'The score moved as shown above. Recent commits do not always move every scorecard row yet.'
 }
 
 /**
