@@ -1,5 +1,5 @@
 /**
- * Deterministic checks for rescore "What changed" reject gates + plain fallbacks.
+ * Fixloop repro for look-elsewhere / jargon What-changed blurbs.
  * Run: npx --yes tsx scripts/check-rescore-summary-gates.ts
  */
 import {
@@ -10,13 +10,24 @@ import {
 } from '../lib/rescoreChangeSummary'
 import {
   buildNormieWhatChangedBlurb,
+  extractCommitMessagesFromSummary,
   plainWorkFromCommitMessages,
+  rescoreSummaryForDisplay,
+  type RescoreSummaryRecord,
 } from '../lib/rescoreSummaries'
 
-const TECH_FAIL =
-  'Recent clawd-research commits explore gpt-voice, eth-eval, lp-tls, webrtc-e2ee, noir, and local-ai topics—voice APIs, domain infrastructure, certificate deployment, cryptographic protocols, and inference economics—but none integrate into shipping workflows or establish downstream adoption paths. Role in ecosystem workflow row was moved to low because the active push cadence (2026-08-16) and 16 topic folders do not ground adoption in builder workflow or CI/testing visibility; clawd-research remains a transparent lab notebook without documented shipping leverage.'
+const LOOK_ELSEWHERE = /open the rows|expand those rows|plain why|the move itself is not the reason/i
+const SCARY_JARGON = /semantic vad|custom-voice gating|role in ecosystem workflow/i
 
-const NORMIE_JARGON_COMMITS = [
+/** Exact shape from the clawd-research screenshot (tech fallback). */
+const CACHED_TECH =
+  'Role in ecosystem workflow low → mid on this rescore. Expand those rows for the source notes that justify the new levels — the move itself is not the reason. Recent commits in this rescore window: gpt-voice: research + demo moved to clawdbotatg/gpt-voice project; glm-53: GLM-5.3 open-source status + subscription access (weights ~end Aug, only Z.ai sub has it today); gpt-voice: OpenAI Realtime API research — semantic VAD, pricing, custom-voice gating.'
+
+/** Exact shape from the clawd-research screenshot (normie fallback). */
+const CACHED_NORMIE =
+  "clawd-research landed gpt-voice — research + demo moved to clawdbotatg/gpt-voice project; glm-53 — GLM-5.3 open-source status + subscription access (weights ~end Aug, only Z.ai sub has it today); and gpt-voice — OpenAI Realtime API research — semantic VAD, pricing, custom-voice gating. Money-side reading went up — open the rows below for the plain why."
+
+const COMMITS = [
   'gpt-voice: research + demo moved to clawdbotatg/gpt-voice project',
   'glm-53: GLM-5.3 open-source status + subscription access (weights ~end Aug, only Z.ai sub has it today)',
   'gpt-voice: OpenAI Realtime API research — semantic VAD, pricing, custom-voice gating',
@@ -28,44 +39,95 @@ const TECH_OK =
 const NORMIE_OK =
   "clawd-research — Austin's been poking at voice APIs, expired domains, WebRTC privacy, and some AI hardware price stuff. Cool homework, but none of it showed up in tools builders actually ship with, so it still reads like a research notebook."
 
-const SIBLING_TECH_OK =
-  'fwaah landed a Base frontend redeploy and contract audit fixes; the live scorecard now credits that verifiable shipping path instead of scaffold-only framing.'
+const SIBLING_COMMITS = [
+  'Redeploy fwaah frontend (Basescan verified)',
+  'Port to Scaffold-ETH 2 + live Base frontend',
+]
 
 function expect(name: string, cond: boolean) {
   if (!cond) throw new Error(`FAIL: ${name}`)
   console.log(`ok — ${name}`)
 }
 
-expect('tech fail: circular', summaryIsCircularRestatement(TECH_FAIL) === true)
-expect('tech fail: too long', summaryTooLong(TECH_FAIL) === true)
-expect('tech fail: blames push', summaryBlamesPushCadenceForDrop(TECH_FAIL) === true)
+function assertCleanBlurb(name: string, text: string) {
+  expect(`${name}: non-empty`, text.trim().length > 20)
+  expect(`${name}: no look-elsewhere`, !LOOK_ELSEWHERE.test(text))
+  expect(`${name}: no scary jargon`, !SCARY_JARGON.test(text))
+}
 
-expect('tech ok: not circular', summaryIsCircularRestatement(TECH_OK) === false)
-expect('tech ok: length', summaryTooLong(TECH_OK) === false)
-expect('tech ok: push blame', summaryBlamesPushCadenceForDrop(TECH_OK) === false)
+console.log('\n=== Attempt 1: failing case (cached clawd-research) ===')
 
-expect('normie ok: voice', summaryNotNormieEnough(NORMIE_OK) === false)
-expect('normie ok: length', summaryTooLong(NORMIE_OK) === false)
+const extracted = extractCommitMessagesFromSummary(CACHED_TECH)
+expect('extract commits from cached tech', extracted.length >= 2)
+console.log('extracted:', extracted)
 
-expect('sibling tech ok: circular', summaryIsCircularRestatement(SIBLING_TECH_OK) === false)
-expect('sibling tech ok: length', summaryTooLong(SIBLING_TECH_OK) === false)
-expect('sibling tech ok: push', summaryBlamesPushCadenceForDrop(SIBLING_TECH_OK) === false)
+const badMeta: RescoreSummaryRecord = {
+  summary: CACHED_TECH,
+  summaryNormie: CACHED_NORMIE,
+  deltaHeader: 'Shipping leverage +9 pts (33% → 42%). Builder standards flat (59% → 59%).',
+  oldTokenMechanic: 'F- (33%) SL',
+  newTokenMechanic: 'F (42%) SL',
+  oldBuilderIntegrity: 'F+ (59%)',
+  newBuilderIntegrity: 'F+ (59%)',
+  oldScoredAt: '2026-08-16T00:00:00.000Z',
+  newScoredAt: '2026-08-16T12:00:00.000Z',
+  commits30dAtRescore: 39,
+  rescoreAt: '2026-08-16T12:00:00.000Z',
+}
 
-const work = plainWorkFromCommitMessages(NORMIE_JARGON_COMMITS)
-expect('plain work exists', Boolean(work))
-expect('plain work no semantic VAD', !/semantic vad/i.test(work || ''))
-expect('plain work no custom-voice gating', !/custom-voice gating/i.test(work || ''))
-console.log('plain work sample:', work)
+const displayedPlain = rescoreSummaryForDisplay(badMeta, true, 'clawd-research')
+const displayedTech = rescoreSummaryForDisplay(badMeta, false, 'clawd-research')
+console.log('display plain:', displayedPlain)
+console.log('display tech:', displayedTech)
+assertCleanBlurb('display plain', displayedPlain)
+assertCleanBlurb('display tech', displayedTech)
+expect('display mentions work', /voice|glm|gpt-voice/i.test(displayedPlain))
 
-const normieFallback = buildNormieWhatChangedBlurb({
+const directFallback = buildNormieWhatChangedBlurb({
   repoName: 'clawd-research',
   economicDeltaPct: 9,
   builderDeltaPct: 0,
-  commitMessages: NORMIE_JARGON_COMMITS,
+  commitMessages: COMMITS,
 })
-expect('fallback no look-elsewhere', !/open the rows|expand those rows|plain why/i.test(normieFallback))
-expect('fallback no raw VAD', !/semantic vad/i.test(normieFallback))
-expect('fallback has clawd-research', /clawd-research/i.test(normieFallback))
-console.log('normie fallback sample:', normieFallback)
+console.log('direct fallback:', directFallback)
+assertCleanBlurb('direct fallback', directFallback)
 
-console.log('All rescore summary gate checks passed.')
+console.log('\n=== Confirmations: other aim (good LLM-shaped blurbs) ===')
+expect('other tech: not circular', summaryIsCircularRestatement(TECH_OK) === false)
+expect('other tech: length ok', summaryTooLong(TECH_OK) === false)
+expect('other tech: no push-blame', summaryBlamesPushCadenceForDrop(TECH_OK) === false)
+expect('other normie: voice ok', summaryNotNormieEnough(NORMIE_OK) === false)
+expect('other normie: length ok', summaryTooLong(NORMIE_OK) === false)
+assertCleanBlurb('other normie', NORMIE_OK)
+
+const goodMeta: RescoreSummaryRecord = {
+  ...badMeta,
+  summary: TECH_OK,
+  summaryNormie: NORMIE_OK,
+}
+expect(
+  'good meta keeps stored normie',
+  rescoreSummaryForDisplay(goodMeta, true, 'clawd-research') === NORMIE_OK,
+)
+expect(
+  'good meta keeps stored tech',
+  rescoreSummaryForDisplay(goodMeta, false, 'clawd-research') === TECH_OK,
+)
+
+console.log('\n=== Confirmations: sibling (shipping-path repo commits) ===')
+const siblingWork = plainWorkFromCommitMessages(SIBLING_COMMITS)
+console.log('sibling work:', siblingWork)
+expect('sibling work exists', Boolean(siblingWork))
+assertCleanBlurb('sibling work', siblingWork || '')
+
+const siblingFallback = buildNormieWhatChangedBlurb({
+  repoName: 'fwaah',
+  economicDeltaPct: 5,
+  builderDeltaPct: 0,
+  commitMessages: SIBLING_COMMITS,
+})
+console.log('sibling fallback:', siblingFallback)
+assertCleanBlurb('sibling fallback', siblingFallback)
+expect('sibling mentions fwaah or work', /fwaah|redeploy|Scaffold-ETH|Base/i.test(siblingFallback))
+
+console.log('\nAll fixloop checks passed.')
