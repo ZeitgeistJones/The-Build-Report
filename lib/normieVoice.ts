@@ -63,7 +63,7 @@ export const NORMIE_SURFACE_SHAPES = {
   overheard:
     '1-4 sentences matching the standard Overheard length. Same facts and repo names; explain why the podcast mention matters to token holders in plain words, no insider terms.',
   rescoreSummary:
-    '1–2 short sentences max (~45–70 words). Warm friend texting — not an essay. Lead with what landed in everyday words, then one soft score note. Ban lab-speak: investigations, shipping pipeline, multiplier, adoption paths, workflow, CI. Never name rubric rows or say a row “moved to low/mid/high.”',
+    '1–2 short sentences. Warm friend texting. Lead with what landed in everyday words (no file paths, no ~/Desktop, no acronyms like TCC unless you explain them), then one soft score note. Never name rubric rows or say a row “moved to low/mid/high.”',
   rubricSource:
     '1–2 short sentences only (~35–50 words). About 25–30% shorter than a typical technical "why this score" note. Cover the gist (what it is + why the score), not every file name. Ban jargon — say "math proofs a computer checks" not Lean 4 / R1CS; say "outside contest" not zk.golf API; say "no money at risk" not "no custody surface".',
 } as const

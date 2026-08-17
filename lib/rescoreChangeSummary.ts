@@ -220,19 +220,19 @@ export function summaryTooLong(text: string): boolean {
 }
 
 /**
- * Normie blurb still reading like a lab writeup — reject so the PE fallback can lead with commits.
- * Keep this narrow: reject scorecard jargon and row-move sermons, not ordinary plain words.
+ * Normie blurb still reading like a scorecard sermon — reject so PE fallback can lead with work.
+ * Keep this narrow so we don't kick decent friend-voice blurbs into worse commit dumps.
  */
 export function summaryNotNormieEnough(text: string): boolean {
   const lower = text.toLowerCase()
   return (
-    /\b(rubric|infra\b|r&d|token mechanic|shipping leverage|holder economics|workflow row|ci\/testing|scorecard)\b/i.test(
-      lower,
-    ) ||
+    /\b(rubric|token mechanic|shipping leverage|holder economics|workflow row)\b/i.test(lower) ||
     /\b(was )?moved (from|to)\s+(low|mid|high)\b/.test(lower) ||
     /\b(role in ecosystem workflow|multiplies builder shipping capacity|downstream path to holder value)\b/.test(
       lower,
     ) ||
+    /~\//.test(text) ||
+    /\bTCC\b/.test(text) ||
     /\bsemantic vad\b|\bcustom-voice gating\b/i.test(lower)
   )
 }

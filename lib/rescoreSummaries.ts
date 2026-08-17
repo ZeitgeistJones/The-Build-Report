@@ -93,6 +93,9 @@ function looksLikeJargonFallback(text: string): boolean {
     /for the plain why/i.test(text) ||
     /recent commits in this rescore window/i.test(text) ||
     /0x[a-f0-9]{6,}/i.test(text) ||
+    /~\//.test(text) ||
+    /\bTCC\b/.test(text) ||
+    /\bbuilder-standards\b/i.test(text) ||
     /\b(low|mid|high|n\/?a)\s*→\s*(low|mid|high|n\/?a)\b/i.test(text) ||
     /Security, testing, and cryptographic rigor|On-chain commitments and constraints|Downstream path to holder value|Multiplies builder shipping capacity|Role in ecosystem workflow|User funds, risk, and safety posture|Transparency and verifiability|Governance, token-economics/i.test(
       text,
@@ -120,12 +123,20 @@ export function extractCommitMessagesFromSummary(text: string): string[] {
     /Recent commits in this rescore window:\s*([\s\S]+?)(?:\.\s*$|$)/i,
   )
   const blob = m?.[1]?.trim()
-  if (!blob) return []
-  return blob
-    .split(/\s*;\s*/)
-    .map(s => s.replace(/\s+/g, ' ').trim())
-    .filter(s => s.length > 3)
-    .slice(0, 4)
+  if (blob) {
+    return blob
+      .split(/\s*;\s*/)
+      .map(s => s.replace(/\s+/g, ' ').trim())
+      .filter(s => s.length > 3)
+      .slice(0, 4)
+  }
+
+  // Bad PE fallback baked the raw commit into "X landed …." — recover it so we can re-plainify.
+  const landed = text.match(
+    /\blanded\s+(.+?)\.\s*(?:Money-side|Builder|That work|The live|The score)/i,
+  )
+  if (landed?.[1]?.trim()) return [landed[1].trim()]
+  return []
 }
 
 /** Soften one commit title for holders (no raw 0x dumps / insider toolkit names). */
@@ -152,6 +163,13 @@ function plainifyCommitTitle(raw: string): string {
   if (/\bglm-?5\.?3\b|\bGLM-5\.3\b/i.test(t)) {
     return 'notes on the GLM-5.3 AI model and who can use it yet'
   }
+  // macOS Desktop → elsewhere / TCC permission traps — never show ~/ paths to holders
+  if (/recon/i.test(t) && (/Desktop/i.test(t) || /\bTCC\b/.test(t) || /~\//.test(t))) {
+    return 'a recon-folder move so overnight Mac jobs can actually open the files, plus a daily report'
+  }
+  if (/~\//.test(t) || /\bTCC\b/.test(t) || (/→/.test(t) && /\/(Desktop|Documents|Downloads)\//i.test(t))) {
+    return 'a file move so automated Mac jobs can reach what they need'
+  }
 
   t = t.replace(/0x[a-fA-F0-9]{6,}/g, '')
   t = t.replace(/\(Basescan verified\)/gi, 'verified on Base')
@@ -168,6 +186,11 @@ function plainifyCommitTitle(raw: string): string {
   t = t.replace(/\(\s*\)/g, '')
   t = t.replace(/\s{2,}/g, ' ').replace(/\s+([,.])/g, '$1').trim()
   t = t.replace(/^[\s—,-]+|[\s—,-]+$/g, '').replace(/\s*—\s*$/g, '').trim()
+
+  // Still looks like a shell/path commit — don't dump it on holders.
+  if (/~\//.test(t) || /\bTCC\b/.test(t) || /\/Users\//i.test(t) || /\$[A-Z_]{2,}/.test(t)) {
+    return 'some behind-the-scenes file and setup work'
+  }
 
   // Keep fallback themes short — long commit titles scare readers.
   if (t.length > 90) t = `${t.slice(0, 87).trimEnd()}…`
@@ -235,30 +258,33 @@ export function buildNormieWhatChangedBlurb(input: NormieWhatChangedInput): stri
       pctFromLabel(input.newEconomicLabel) != null)
 
   const scoreBits: string[] = []
-  if (econMove) scoreBits.push(`money-side reading ${econMove}`)
-  if (biMove) scoreBits.push(`builder-standards ${biMove}`)
+  if (econMove) scoreBits.push(`the money-side reading ${econMove}`)
+  if (biMove) scoreBits.push(`builder standards ${biMove}`)
   const scoreClause = scoreBits.length
     ? `${scoreBits.join(' and ')}.`
-    : `the scorecard reading held steady.`
+    : `the overall reading held steady.`
 
   if (work) {
     if (bothFlat || (!econMove && !biMove)) {
-      return `${name} landed ${work}. That work didn't move the overall scorecard reading much yet.`
+      return `${name} landed ${work}. That work didn't move the overall reading much yet.`
     }
     return `${name} landed ${work}. ${scoreClause.charAt(0).toUpperCase()}${scoreClause.slice(1)}`
   }
 
   if (bothFlat || (!econMove && !biMove)) {
-    return `${name}'s score didn't really change on this recheck — the latest work didn't move how it reads on the scorecard yet.`
+    return `${name}'s score didn't really change on this recheck — the latest work didn't move how it reads yet.`
   }
-  return `On this recheck, ${name}'s ${scoreBits.map(s => s.replace(' reading', ' score').replace('builder-standards', 'builder-standards score')).join(' and its ')}.`
+  return `On this recheck, ${name}'s ${scoreBits
+    .map(s => s.replace(' reading', ' score').replace(/^the /, ''))
+    .join(' and its ')}.`
 }
 
 /** Build a clean Plain English blurb from the record alone (no LLM, no rescore). */
 export function legacyNormieFallback(meta: RescoreSummaryRecord, repoName?: string): string {
   const fromSummary = extractCommitMessagesFromSummary(meta.summary || '')
   const fromNormie = extractCommitMessagesFromSummary(meta.summaryNormie || '')
-  const commitMessages = fromSummary.length ? fromSummary : fromNormie
+  // Prefer the PE text's embedded commit when that's what went wrong (path dumps, etc.).
+  const commitMessages = fromNormie.length ? fromNormie : fromSummary
   return buildNormieWhatChangedBlurb({
     repoName,
     oldEconomicLabel: meta.oldTokenMechanic,
@@ -284,6 +310,10 @@ export function rescoreSummaryForDisplay(
   if (plain) {
     // Prefer stored PE — but rebuild jargon / weak score-only restatements when we can.
     if (normie && !shouldRebuildPlainSummary(normie)) return normie
+    // Bad PE (paths, TCC, look-elsewhere): rebuild — don't fall through to a technical note.
+    if (normie && shouldRebuildPlainSummary(normie)) {
+      return legacyNormieFallback(meta, repoName)
+    }
     if (technical && !shouldRebuildPlainSummary(technical)) return technical
     return legacyNormieFallback(meta, repoName)
   }
