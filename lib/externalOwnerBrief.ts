@@ -242,6 +242,12 @@ export type ExternalDigestCache = {
    * (launch, migration, major feature). Feeds front-page placement.
    */
   significance?: number
+  /** Verbatim commit message picked as Commit of the Day. Admin surface only. */
+  quote?: string
+  /** owner/repo the quote came from — derived, never taken from the model. */
+  quoteRepo?: string
+  /** Model's 1–5 read of how worth printing the quote is. */
+  quoteScore?: number
   dateKey: string
   repoCount: number
   commitCount: number
@@ -261,6 +267,9 @@ export type ExternalBriefData = BuildBriefData & {
   deck?: string
   deckNormie?: string
   significance?: number
+  quote?: string
+  quoteRepo?: string
+  quoteScore?: number
 }
 
 function digestRedisKey(account: ExternalBriefAccount, dateKey: string): string {
@@ -346,6 +355,9 @@ type AiOverview = {
   deck?: string
   deckNormie?: string
   significance?: number
+  quote?: string
+  quoteRepo?: string
+  quoteScore?: number
 }
 
 /** Headlines must stay short and punchy — anything long or list-y is dropped. */
@@ -376,6 +388,41 @@ function cleanSignificance(value: unknown): number | undefined {
   if (rounded < 1) return 1
   if (rounded > 5) return 5
   return rounded
+}
+
+/**
+ * Commit messages that must never be reprinted under the masthead. These are
+ * strangers' words on a public page — the cost of a false positive is one
+ * boring morning, the cost of a false negative is a leaked key or a slur.
+ */
+const QUOTE_BLOCK_PATTERNS: RegExp[] = [
+  /\b(api[_-]?key|secret|passwd|password|private[_-]?key|bearer|credential)\b/i,
+  /\b0x[a-fA-F0-9]{20,}\b/,
+  /\b[A-Za-z0-9_-]{40,}\b/,
+  /https?:\/\//i,
+  /@[A-Za-z0-9][A-Za-z0-9-]{2,}/,
+  /\b(fuck|shit|bitch|bastard|cunt|retard)\w*\b/i,
+]
+
+/**
+ * Verbatim or nothing. `candidates` maps a normalized commit message to the
+ * repo slug it came from; a quote that is not an exact match for something in
+ * that map is a paraphrase or a fabrication and does not print.
+ */
+function cleanQuote(
+  value: unknown,
+  candidates: Map<string, string>,
+): { quote: string; repo: string } | undefined {
+  if (typeof value !== 'string') return undefined
+  const text = value.trim().replace(/\s+/g, ' ')
+  if (!text) return undefined
+  if (text.length < 8 || text.length > 100) return undefined
+  const repo = candidates.get(text)
+  if (!repo) return undefined
+  if (!/[a-z]/i.test(text)) return undefined
+  if (/^[A-Za-z]+-\d+$/.test(text)) return undefined
+  if (QUOTE_BLOCK_PATTERNS.some(re => re.test(text))) return undefined
+  return { quote: text, repo }
 }
 
 async function generateOverviewWithAi(
@@ -420,7 +467,7 @@ COMMITS:
 ${activityBlock}
 
 Write JSON only:
-{"headline":"…","headlineNormie":"…","deck":"…","deckNormie":"…","significance":3,"general":"…","generalNormie":"…"}
+{"headline":"…","headlineNormie":"…","deck":"…","deckNormie":"…","significance":3,"general":"…","generalNormie":"…","quote":"…","quoteScore":1}
 
 Rules:
 - headline: a real newspaper headline for this edition — 3 to 7 words, active present tense, no ending period, no quotes, no colons, sentence-shaped not label-shaped. Say what actually happened, from the commit list only. Good: "Deposit Panel Picks Your Tokens". Bad: "Daily Update", "${account.label} Ships Code", "Various Improvements". If the day was quiet, write a quiet headline ("Presses Idle Overnight") rather than inventing news.
@@ -434,7 +481,19 @@ Rules:
 - Do NOT open with coverage/sampling disclaimers, “partial sample,” or “not the full org” — the page shows a short note under a story only when that day had more than ${EXTERNAL_BRIEF_MAX_COMMITS} commits.
 - Never speak as the project’s official voice (including Base/Coinbase/OpenAI/Google).
 - If quiet (no commits), say so plainly and stop.
+- quote: COMMIT OF THE DAY. Copy ONE commit message from the COMMITS list above EXACTLY — character for character, including any typos, casing, and punctuation. Do NOT rewrite it, trim it, translate it, summarize it, or fix it. Pick the one a newsroom would actually print: funny, weary, unusually human, or absurdly mundane. If nothing that day is worth printing, return an empty string. An empty slot is better than a forced one.
+- Never pick a quote containing credentials, keys, tokens, URLs, @handles, a person's name, or abusive language. Return an empty string instead.
+- quoteScore: integer 1-5 for how worth printing the quote is. 1 = ordinary, 3 = mildly amusing, 5 = genuinely funny. Be strict — most days are 1 or 2.
 - No markdown, no bullet lists, no JSON inside the strings.`
+
+  // Only commits the model actually saw are eligible to be quoted.
+  const quoteCandidates = new Map<string, string>()
+  for (const row of cappedActivity) {
+    for (const c of row.commits) {
+      const norm = c.message.trim().replace(/\s+/g, ' ')
+      if (norm && !quoteCandidates.has(norm)) quoteCandidates.set(norm, row.slug)
+    }
+  }
 
   try {
     const { text, provider } = await generateTextGeminiFirst({
@@ -459,6 +518,8 @@ Rules:
       deck?: unknown
       deckNormie?: unknown
       significance?: unknown
+      quote?: unknown
+      quoteScore?: unknown
     }
     const general = typeof parsed.general === 'string' ? stripMarkdown(parsed.general.trim()) : ''
     if (!general) return null
@@ -471,6 +532,11 @@ Rules:
     const deck = cleanDeck(parsed.deck)
     const deckNormie = cleanDeck(parsed.deckNormie)
     const significance = cleanSignificance(parsed.significance)
+    const picked = cleanQuote(parsed.quote, quoteCandidates)
+    if (parsed.quote && !picked) {
+      console.warn(`[${account.id}-brief] quote rejected (not verbatim or blocked)`)
+    }
+    const quoteScore = picked ? cleanSignificance(parsed.quoteScore) : undefined
     return {
       general,
       ...(generalNormie ? { generalNormie } : {}),
@@ -479,6 +545,8 @@ Rules:
       ...(deck ? { deck } : {}),
       ...(deckNormie ? { deckNormie } : {}),
       ...(significance ? { significance } : {}),
+      ...(picked ? { quote: picked.quote, quoteRepo: picked.repo } : {}),
+      ...(quoteScore ? { quoteScore } : {}),
     }
   } catch (err) {
     console.error(`[${account.id}-brief] AI generation failed:`, err)
@@ -525,6 +593,9 @@ function toBriefData(digest: ExternalDigestCache): ExternalBriefData {
     ...(digest.deck ? { deck: digest.deck } : {}),
     ...(digest.deckNormie ? { deckNormie: digest.deckNormie } : {}),
     ...(digest.significance ? { significance: digest.significance } : {}),
+    ...(digest.quote ? { quote: digest.quote } : {}),
+    ...(digest.quoteRepo ? { quoteRepo: digest.quoteRepo } : {}),
+    ...(digest.quoteScore ? { quoteScore: digest.quoteScore } : {}),
     cards: null,
     dateKey: digest.dateKey,
     isToday: false,
@@ -573,6 +644,9 @@ export async function generateAndCacheExternalDigest(
     ...(ai?.deck ? { deck: ai.deck } : {}),
     ...(ai?.deckNormie ? { deckNormie: ai.deckNormie } : {}),
     significance: ai?.significance ?? (snapshot.commitCount > 0 ? 2 : 1),
+    ...(ai?.quote ? { quote: ai.quote } : {}),
+    ...(ai?.quoteRepo ? { quoteRepo: ai.quoteRepo } : {}),
+    ...(ai?.quoteScore ? { quoteScore: ai.quoteScore } : {}),
     dateKey,
     repoCount: snapshot.repoCount,
     commitCount: snapshot.commitCount,

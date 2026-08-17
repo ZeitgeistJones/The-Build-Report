@@ -159,6 +159,48 @@ function frontPageScore(story: Story): number {
   return significance * 100 + commits + repos * 2 + (story.account.ticker ? TICKER_EDGE : 0)
 }
 
+type CommitPick = { quote: string; repo: string; label: string }
+
+/**
+ * One quote per edition, picked across every filed desk. Highest quoteScore
+ * wins; front-page score breaks ties so the lead desk gets the nod.
+ */
+function pickCommitOfTheDay(stories: Story[]): CommitPick | null {
+  let best: (CommitPick & { score: number; tie: number }) | null = null
+  for (const story of stories) {
+    const brief = story.brief
+    if (!brief?.quote || !brief.quoteRepo) continue
+    const score = brief.quoteScore ?? 1
+    const tie = frontPageScore(story)
+    if (!best || score > best.score || (score === best.score && tie > best.tie)) {
+      best = {
+        quote: brief.quote,
+        repo: brief.quoteRepo,
+        label: story.account.label,
+        score,
+        tie,
+      }
+    }
+  }
+  if (!best) return null
+  return { quote: best.quote, repo: best.repo, label: best.label }
+}
+
+function CommitOfTheDay({ pick }: { pick: CommitPick }) {
+  return (
+    <aside className="ext-paper-cotd" aria-label="Commit of the day">
+      <p className="ext-paper-sectionhead">Commit of the day</p>
+      <blockquote className="ext-paper-cotd__quote">{pick.quote}</blockquote>
+      <p className="ext-paper-cotd__attr">
+        {pick.repo} · {pick.label}
+      </p>
+      <p className="ext-paper-cotd__note">
+        Verbatim from a public commit message. Admin preview — not on the public page.
+      </p>
+    </aside>
+  )
+}
+
 function RegenButton({
   running,
   loading,
@@ -309,6 +351,7 @@ export default function ExternalBriefsNewspaper({
     })
 
   const wire = admin ? rows.filter(r => !r.text.length) : []
+  const commitOfTheDay = admin ? pickCommitOfTheDay(filed) : null
 
   const lead = filed[0] ?? null
   const seconds = filed.slice(1, 3)
@@ -403,6 +446,13 @@ export default function ExternalBriefsNewspaper({
             ? 'No cached editions yet — hit Regenerate on a desk below or wait for the daily digest cron.'
             : 'No editions filed for this window yet — check back after the overnight refresh.'}
         </p>
+      )}
+
+      {commitOfTheDay && (
+        <>
+          <div className="ext-paper-rule" />
+          <CommitOfTheDay pick={commitOfTheDay} />
+        </>
       )}
 
       {wire.length > 0 && (
