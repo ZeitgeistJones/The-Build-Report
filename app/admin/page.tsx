@@ -37,6 +37,8 @@ export default function AdminPage() {
   const [briefResult, setBriefResult] = useState<string | null>(null)
   const [needleRunning, setNeedleRunning] = useState(false)
   const [needleResult, setNeedleResult] = useState<string | null>(null)
+  const [wireRunning, setWireRunning] = useState(false)
+  const [wireResult, setWireResult] = useState<string | null>(null)
   const [podcastScanRunning, setPodcastScanRunning] = useState(false)
   const [podcastScanResult, setPodcastScanResult] = useState<string | null>(null)
   const [overheardMode, setOverheardModeState] = useState<'automatic' | 'manual'>('automatic')
@@ -566,6 +568,39 @@ export default function AdminPage() {
       setPodcastScanResult('Podcast scan request failed')
     }
     setPodcastScanRunning(false)
+  }
+
+  async function refreshMcpWire() {
+    setWireRunning(true)
+    setWireResult(null)
+    try {
+      const res = await fetch('/api/admin/mcp-wire', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'refresh' }),
+      })
+      const data = await res.json()
+      if (data.ok && data.wire) {
+        const w = data.wire
+        if (w.status === 'failed') {
+          setWireResult(`Desk closed — ${w.error ?? 'source unavailable'}`)
+        } else if (w.totalChanges === 0) {
+          setWireResult('Registry had no changes in this window.')
+        } else {
+          const names = w.items
+            .map((i: { title?: string; name: string }) => i.title || i.name)
+            .join(', ')
+          setWireResult(
+            `${w.totalChanges} changes filed, ${w.items.length} printed. ${names || 'All filtered out — loosen LOW_INTEREST.'}`,
+          )
+        }
+      } else {
+        setWireResult(data.error ?? 'Wire refresh failed')
+      }
+    } catch {
+      setWireResult('Wire request failed')
+    }
+    setWireRunning(false)
   }
 
   async function regenerateNeedle() {
@@ -1249,6 +1284,46 @@ export default function AdminPage() {
         results={externalResults}
         onRegenerate={id => void regenerateExternalBrief(id)}
       />
+
+      {/* The Wire — MCP registry */}
+      <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>The Wire</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+              New tools published to the public MCP registry since the last successful collection. Runs automatically with the nightly digest; use this to pull immediately. Running it twice in a row should return almost nothing — that means the watermark is working.
+            </p>
+          </div>
+          <button
+            onClick={refreshMcpWire}
+            disabled={wireRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+              flexShrink: 0,
+            }}
+          >
+            {wireRunning ? 'Pulling…' : 'Refresh wire'}
+          </button>
+        </div>
+        {wireResult && (
+          <div style={{
+            marginBottom: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {wireResult}
+          </div>
+        )}
+      </div>
 
       {/* Needle */}
       <div style={{ marginBottom: '32px' }}>
