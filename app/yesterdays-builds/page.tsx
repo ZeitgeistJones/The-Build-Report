@@ -1,6 +1,9 @@
 import Link from 'next/link'
 import ExternalBriefsNewspaper from '@/components/ExternalBriefsNewspaper'
+import McpWire from '@/components/McpWire'
+import { yesterdayMountainDateKey } from '@/lib/buildBrief'
 import { getAllExternalBriefs } from '@/lib/externalOwnerBrief'
+import { getMcpWire } from '@/lib/mcpWire'
 
 export const metadata = {
   title: "Yesterday's Builds — The Build Report",
@@ -11,7 +14,9 @@ export const metadata = {
 export const dynamic = 'force-dynamic'
 
 export default async function YesterdaysBuildsPage() {
+  const dateKey = yesterdayMountainDateKey()
   const briefs = await getAllExternalBriefs()
+  const wire = await getMcpWire(dateKey).catch(() => null)
 
   return (
     <>
@@ -22,6 +27,7 @@ export default async function YesterdaysBuildsPage() {
       </p>
 
       <ExternalBriefsNewspaper briefs={briefs} />
+      <McpWire wire={wire} />
     </>
   )
 }

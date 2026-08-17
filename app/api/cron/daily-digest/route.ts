@@ -3,6 +3,7 @@ import { loadGitHubStatsForCron } from '@/lib/githubStatsSnapshot'
 import { generateAndCacheDailyDigest, loadReposForBrief, yesterdayMountainDateKey } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
 import { generateAllExternalDigests } from '@/lib/externalOwnerBrief'
+import { collectMcpWire } from '@/lib/mcpWire'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -32,6 +33,10 @@ export async function GET(req: NextRequest) {
       return null
     })
     const external = await generateAllExternalDigests({ dateKey: editionKey })
+    const wire = await collectMcpWire(editionKey).catch(err => {
+      console.error('[daily-digest] mcp wire failed', err)
+      return null
+    })
     return NextResponse.json({
       ok: true,
       dateKey: digest.dateKey,
@@ -41,6 +46,7 @@ export async function GET(req: NextRequest) {
       needleDateKey: needle?.dateKey ?? null,
       needleRepoCount: needle?.repoCount ?? 0,
       externalBriefs: external,
+      mcpWire: wire ? { status: wire.status, printed: wire.items.length, total: wire.totalChanges } : null,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Daily digest cron failed'

@@ -1311,3 +1311,87 @@ button {
 @media (max-width: 600px) {
   .ext-paper-cotd__quote { font-size: 17px; }
 }
+
+/* The Wire — MCP registry desk */
+.ext-wire {
+  margin: 20px 0 8px;
+  padding: 14px 16px;
+  border-top: 2px solid var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.ext-wire__intro {
+  margin: 2px 0 4px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ext-wire__source {
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ext-wire__list { margin: 0; padding: 0; list-style: none; }
+
+.ext-wire__item {
+  padding: 9px 0;
+  border-bottom: 1px dotted var(--border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ext-wire__item:last-child { border-bottom: 0; }
+
+.ext-wire__kind {
+  display: inline-block;
+  margin-right: 7px;
+  padding: 1px 5px;
+  border: 1px solid var(--text-primary);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  vertical-align: 1px;
+}
+
+.ext-wire__kind--withdrawn {
+  background: var(--text-primary);
+  color: var(--surface-2);
+}
+
+.ext-wire__name { font-weight: 600; overflow-wrap: anywhere; }
+.ext-wire__time { float: right; font-size: 10px; color: var(--text-muted); }
+
+.ext-wire__slug {
+  display: block;
+  margin-top: 1px;
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.ext-wire__desc {
+  margin: 3px 0 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ext-wire__note {
+  margin: 3px 0 0;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.ext-wire__closed,
+.ext-wire__more {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
