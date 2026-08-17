@@ -117,8 +117,12 @@ export default function HowWeScoreContent({
         <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>live AI</strong>{' '}
         (auto-inferred or paid Rescore). Live AI reads{' '}
         <a href="#context" style={{ color: 'var(--accent)' }}>scoring context</a> — rules, repo cheat sheet, and Chronicle
-        timeline — plus each repo&apos;s GitHub files. See{' '}
-        <Link href="/about#score-types" style={{ color: 'var(--accent)' }}>About → Score types</Link>.
+        timeline — plus each repo&apos;s GitHub files. Plain-English grade tour:{' '}
+        <Link href="/start#sh-scores" style={{ color: 'var(--accent)' }}>Start Here → The grades</Link>.
+        Score / Rescore wallet notes:{' '}
+        <Link href="/start#sh-wallet" style={{ color: 'var(--accent)' }}>Start Here → Wallets &amp; Rescore</Link>.
+        Affiliation and disclaimers:{' '}
+        <Link href="/about" style={{ color: 'var(--accent)' }}>About</Link>.
       </p>
 
       <TocNav chronicle={chronicle} communityContextEnabled={communityContextEnabled} />

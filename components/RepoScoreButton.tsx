@@ -91,8 +91,8 @@ function RescoreTooltipContent({
         </div>
       )}
       {promoActive ? RESCORE_PROMO_TOOLTIP : RESCORE_BUTTON_TOOLTIP}{' '}
-      <a href="/about#score-types" style={{ color: 'var(--accent)' }} onClick={e => e.stopPropagation()}>
-        About score types ↗
+      <a href="/start#sh-wallet" style={{ color: 'var(--accent)' }} onClick={e => e.stopPropagation()}>
+        Wallets &amp; Rescore ↗
       </a>
     </>
   )

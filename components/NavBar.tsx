@@ -13,6 +13,12 @@ function DesktopNavLinks() {
       <a href="/" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Repos
       </a>
+      <a href="/yesterdays-builds" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        Yesterday&apos;s Builds
+      </a>
+      <a href="/archives" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        Archives
+      </a>
       <a href="/sky" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Night Sky
       </a>
@@ -24,12 +30,6 @@ function DesktopNavLinks() {
       </a>
       <a href="/how-we-score" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         How we score
-      </a>
-      <a href="/yesterdays-builds" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-        Yesterday&apos;s Builds
-      </a>
-      <a href="/archives" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-        Archives
       </a>
       <a href="/about" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         About
@@ -69,6 +69,12 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         <a href="/" className="mobile-nav-link" onClick={onClose}>
           Repos
         </a>
+        <a href="/yesterdays-builds" className="mobile-nav-link" onClick={onClose}>
+          Yesterday&apos;s Builds
+        </a>
+        <a href="/archives" className="mobile-nav-link" onClick={onClose}>
+          Archives
+        </a>
         <a href="/sky" className="mobile-nav-link" onClick={onClose}>
           Night Sky
         </a>
@@ -80,12 +86,6 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         </a>
         <a href="/how-we-score" className="mobile-nav-link" onClick={onClose}>
           How we score
-        </a>
-        <a href="/yesterdays-builds" className="mobile-nav-link" onClick={onClose}>
-          Yesterday&apos;s Builds
-        </a>
-        <a href="/archives" className="mobile-nav-link" onClick={onClose}>
-          Archives
         </a>
         <a href="/about" className="mobile-nav-link" onClick={onClose}>
           About

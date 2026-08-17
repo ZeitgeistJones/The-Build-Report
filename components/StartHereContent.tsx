@@ -252,6 +252,33 @@ export default function StartHereContent() {
                 <Link href="/how-we-score" style={{ color: 'var(--accent)' }}>
                   How we score ↗
                 </Link>
+                {' · '}
+                <Link href="/dictionary" style={{ color: 'var(--accent)' }}>
+                  Dictionary ↗
+                </Link>
+              </p>
+            )}
+            {section.id === 'sh-elsewhere' && (
+              <p style={{ ...PROSE_STYLE, marginTop: '12px', fontSize: '12px' }}>
+                <Link href="/yesterdays-builds" style={{ color: 'var(--accent)' }}>
+                  Yesterday&apos;s Builds ↗
+                </Link>
+                {' · '}
+                <Link href="/archives" style={{ color: 'var(--accent)' }}>
+                  Archives ↗
+                </Link>
+                {' · '}
+                <Link href="/sky" style={{ color: 'var(--accent)' }}>
+                  Night Sky ↗
+                </Link>
+              </p>
+            )}
+            {section.id === 'sh-glossary' && (
+              <p style={{ ...PROSE_STYLE, marginTop: '12px', fontSize: '12px' }}>
+                Looking up a word from a score blurb?{' '}
+                <Link href="/dictionary" style={{ color: 'var(--accent)' }}>
+                  Open Dictionary ↗
+                </Link>
               </p>
             )}
           </>

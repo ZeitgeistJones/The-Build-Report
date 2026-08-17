@@ -1,13 +1,10 @@
-import {
-  ABOUT_SCORE_TYPES_CALLOUT,
-  ABOUT_SCORE_TYPES_SECTIONS,
-} from '@/lib/scoringCopy'
 import { isCommunityContextEnabled } from '@/lib/communityContext'
+import type { ReactNode } from 'react'
 
 export const metadata = {
   title: 'About — The Build Report',
   description:
-    'What The Build Report is, what each nav tab covers, how launch baseline and live AI scores differ, and how holders can submit community context.',
+    'What The Build Report is, what each nav tab covers, and how to trust (and challenge) the scores.',
 }
 
 export default function AboutPage() {
@@ -17,7 +14,9 @@ export default function AboutPage() {
       heading: 'What this is',
       body: `The Build Report is an independent community project tracking what clawdbotatg is building on GitHub and scoring each repo on builder standards plus either holder economics (direct burn / supply lock) or shipping leverage (infra / tooling) — sibling holder-value grades by repo type — with ecosystem-wide builder activity from GitHub signals at the top.
 
-It is not affiliated with clawdbotatg, Austin Griffith, or any core team. It was built by a community member who holds $CLAWD and wanted a clearer picture of what was being built and why.`,
+It is not affiliated with clawdbotatg, Austin Griffith, or any core team. It was built by a community member who holds $CLAWD and wanted a clearer picture of what was being built and why.
+
+New here? Start with Start Here for how to read the homepage. Want the detailed “why” behind a letter? Open How we score.`,
     },
     {
       heading: 'What this is not',
@@ -29,51 +28,31 @@ This is not a real-time data feed. Launch baseline grades are a fixed Jun 15 sna
     },
     {
       heading: 'What’s in the tabs',
-      body: `Repos is the main Build Report — ecosystem grades, repo cards, Yesterday’s build for clawdbotatg, and Score / Rescore. That’s the scored ledger this About page mostly describes.
+      body: `Repos is the main Build Report — ecosystem grades, repo cards, the clawdbotatg “Yesterday’s build” digest, and Score / Rescore. That’s the scored ledger.
 
-Night Sky is a full-screen visual map of the same ecosystem: repos as stars, grouped by theme, with connections between related projects. It’s for orientation and exploration, not a second scoreboard.
+Yesterday’s Builds (nav) is a separate overnight newspaper for other GitHub projects we track outside clawdbotatg. Unofficial shipping digests only — no grades, not affiliated with those projects. Not the same as the homepage clawdbotatg brief.
 
-Start Here is the plain-English onboarding guide — how to read grades, activity, filters, and basic token concepts without needing GitHub or crypto expertise.
+Archives keeps past clawdbotatg Build Briefs for about 90 days. Brief-only.
 
-Dictionary defines jargon that shows up in score blurbs and commit language (crypto, GitHub, coding, AI, ops). Hover or tap linked terms in score text for a quick peek; the full list lives on that page. It’s separate from the Start Here glossary, which focuses on site UI terms.
+Night Sky is a full-screen visual map of the same ecosystem: repos as stars, grouped by theme. Orientation, not a second scoreboard.
 
-How we score is the full methodology handbook — rubric weights, grade math, evidence rules, and context layers. Use it when you want the detailed “why,” not just the letter on a card.
+Start Here is the plain-English onboarding guide — how to read grades, activity, filters, and basic token concepts.
 
-Yesterday’s Builds is a separate overnight newspaper for other GitHub accounts and projects we track outside clawdbotatg (tokens, agent frameworks, Base public activity, and similar). These are unofficial shipping digests only — no Build Report grades, not affiliated with those projects, and not official changelogs. Editions refresh daily at 7:00 UTC (overnight Mountain). Writeups skim public GitHub and may cap how many commits they use when a day is huge.
+Dictionary defines jargon in score blurbs and commit language. Start Here’s glossary is for site UI terms; use Dictionary for code-ish words.
 
-Archives keeps past clawdbotatg Build Briefs for about 90 days so you can browse older overnight editions by period. It is Brief-only — not a dump of every column that ever appeared on the homepage.`,
+How we score is the methodology handbook — rubrics, grade math, evidence rules, Chronicle context, and changelog.
+
+About (this page) is identity, disclaimers, and this tab map — not the homepage walkthrough or the full scoring math.`,
     },
     {
-      heading: 'How scores are assigned',
-      body: '',
-    },
-    {
-      heading: 'Score types',
-      body: '',
-    },
-    {
-      heading: 'Score & Rescore',
-      body: `Every repo card has a Score or Rescore button. It runs Claude AI inference for that single repo — useful for repos that have not been scored yet, or to refresh a live AI score.
-
-Cost: 0.000008 ETH per score. When you pay, ETH goes to the receiver-buy-and-burn contract (0x0C1a3DB07304D2E4E551AB4A7b083382a33f25ad). CLAWD is destroyed when someone calls execute() on that contract. The homepage shows on-chain CLAWD burned, pending ETH, and a button to trigger the batch burn.
-
-Launch promo (limited time): on rescored repos with stale commits, rescore can be free — ~$0.01 per stale commit to your wallet and the same queued for CLAWD burns (50/50 treasury subsidy). Approx USD refreshes weekly from ETH price; on-chain amounts are still ETH. This is temporary — not a permanent subsidy.
-
-Who can use it: connect a wallet on Base. The full report is open to read without a CLAWD hold. Score, Rescore, and community context votes require CLAWDGate tier 1 (10M+ $CLAWD).
-
-Result is shared: once a repo is scored, the result is cached in Redis and everyone sees it for free — including visitors who have not connected a wallet.
-
-Live AI scores read Chronicle-grounded scoring context on the How we score page, plus each repo's GitHub files.`,
+      heading: 'Scores & Rescore',
+      body: `Repo cards can run Score or Rescore (Claude inference on that repo). Results are cached and shared. Wallet + CLAWDGate details, promo notes, and “do I need a wallet?” live in Start Here → Wallets & Rescore. Rubric weights, evidence rules, and context layers live in How we score.`,
     },
     ...(communityContextEnabled
       ? [
           {
             heading: 'Community context',
-            body: `Holders can submit real-world context on any repo — onchain state (e.g. a burn contract turning back on), governance changes, or utility that GitHub activity cannot show. Submitting burns a small amount of CLAWD; voting is free for CLAWD holders.
-
-Other holders vote it up or down. Enough net upvotes auto-accepts the context, which the AI then reads on the next paid rescore. Sources are encouraged — context with no source is labeled "No source provided" so voters can weigh it, and anyone can downvote fabricated claims.
-
-Accepted context is grounding the AI weighs, not a direct score override. On conflicts, repo files and the scoring handbook lead unless community cites verifiable on-chain facts — see How we score → Context layers. Every submission, its votes, and its acceptance are public and permanently logged. Context that influences a score is visible on the repo card before and after it is read by a rescore.`,
+            body: `Holders can submit real-world context on any repo — onchain state, governance changes, or utility that GitHub alone cannot show. Submitting burns a small amount of CLAWD; voting is free for CLAWD holders. Accepted context grounds the next rescore; it is not a silent score override. Details and conflict rules: How we score → Context layers.`,
           },
         ]
       : []),
@@ -81,39 +60,68 @@ Accepted context is grounding the AI weighs, not a direct score override. On con
       heading: 'Important distinctions',
       body: `CV burns are not CLAWD burns. Burning ClawdViction points removes governance tokens, not $CLAWD itself.
 
-Supply lock is not a burn. Locking CLAWD in a staking or vesting contract removes it from circulation temporarily — it can return. A burn permanently destroys tokens. Both are meaningful but they are not the same thing.
+Supply lock is not a burn. Locking CLAWD removes it from circulation temporarily — it can return. A burn permanently destroys tokens.
 
-Infrastructure repos are not expected to have direct burn or revenue mechanics. They are scored on Shipping leverage — how much they multiply the builder's ability to ship consumer apps — and roll up into the Shipping leverage Ecosystem Grade at the top, a sibling to Holder economics rather than being dropped from the averages. All repos are scored on builder standards.`,
+Infrastructure / tooling / theoretical repos are scored on Shipping leverage (not direct burn), and that lens rolls up into its own Ecosystem Grade beside Holder economics. All repos still get Builder standards.`,
     },
     {
       heading: 'Sources',
-      body: `All scores are sourced from publicly available information: the clawdbotatg Chronicle (Jan 25 – Apr 10, 2026), clawdbotatg's public Twitter/X history, and the public GitHub account at github.com/clawdbotatg.
-
-The Chronicle is the primary grounding document. Where a score references a tweet, the tweet text and approximate date are cited. Nothing is claimed without a source.`,
+      body: `Scores draw on publicly available information: the clawdbotatg Chronicle, public Twitter/X history, and github.com/clawdbotatg. The Chronicle is the primary grounding document. How we score documents how that evidence is used.`,
     },
     {
       heading: 'Corrections and disagreements',
-      body: `If you think a score is wrong, that conversation should happen in the open. The scoring methodology is fully documented on the main page. Admin notes can be added to any card for context — scores themselves are not changed quietly.
+      body: `If you think a score is wrong, that conversation should happen in the open. The live methodology — rubrics, weights, and changelog — is on How we score. Admin notes can be added to cards for context; scores are not changed quietly.
 
-One known v1 limitation: the 'Agent-authored build' criterion under Builder standards (legacy 3-row rubric) infers autonomous coding patterns from repo metadata alone. The human collaborator's role is infrastructure and multisig signing, not code authorship — low scores here reflect inference uncertainty from limited metadata, not evidence of human coding involvement.
-
-This is a speculative, experimental community project. It will have errors. The goal is to be honest about the limits of what it knows.`,
+Older baseline cards may still show an earlier Builder standards shape; live AI Score/Rescore uses the current handbook. This is a speculative, experimental community project. It will have errors. The goal is to be honest about the limits of what it knows.`,
     },
     {
       heading: 'What could come next',
-      body: `This is a v1. The scoring categories, rubric weights, and criterion labels were developed quickly using AI-assisted research — not through formal academic validation or extended community scrutiny. They represent a reasonable first attempt, not a final methodology.
+      body: `This is a v1. Categories and weights were developed quickly with AI-assisted research — a reasonable first attempt, not a final methodology.
 
-With community interest and input, future versions could explore: community-driven formula recalculation — holders burning $CLAWD to propose and vote on rubric changes; commit meaning analysis — Claude-powered breakdowns of what recent commits actually built, funded by small burns so the community shares the cost; holder score verification — burning to formally dispute a score, triggering review and public logging; more scrutinized criteria developed with proper attention to validity, reliability, and labeling; signal bars derived from actual rubric scores rather than tag aggregates; and the ability for project teams to submit context that feeds into how their repos are scored.
-
-There are also directions not yet fully formed — ways the community could participate in scoring that go beyond just reading results, governance mechanisms that don't overlap with existing ecosystem tools, and signals that are genuinely hard to measure but matter to holders. None of this is planned. All of it is possible.
-
-If you hold $CLAWD and have opinions on what should change, that conversation should happen in the open.`,
+Future directions could include community rubric proposals, richer commit meaning analysis, formal score disputes, and clearer holder participation. None of this is committed. If you hold $CLAWD and have opinions, say them in the open.`,
     },
     {
       heading: 'Do your own research',
-      body: `The Build Report is a starting point, not a conclusion. Verify anything that matters to you against primary sources. Hold $CLAWD because you've done your own research, not because a score on this site told you to.`,
+      body: `The Build Report is a starting point, not a conclusion. Verify anything that matters against primary sources. Hold $CLAWD because you've done your own research, not because a score on this site told you to.`,
     },
   ]
+
+  const linkStyle = { color: 'var(--accent)' as const }
+
+  function linkify(text: string): ReactNode[] {
+    const parts: ReactNode[] = []
+    const pattern =
+      /(Start Here|How we score|Dictionary|Yesterday’s Builds|Night Sky|Archives|Repos)/g
+    let last = 0
+    let match: RegExpExecArray | null
+    let key = 0
+    while ((match = pattern.exec(text)) !== null) {
+      if (match.index > last) parts.push(text.slice(last, match.index))
+      const label = match[1]
+      const href =
+        label === 'Start Here'
+          ? '/start'
+          : label === 'How we score'
+            ? '/how-we-score'
+            : label === 'Dictionary'
+              ? '/dictionary'
+              : label === 'Yesterday’s Builds'
+                ? '/yesterdays-builds'
+                : label === 'Night Sky'
+                  ? '/sky'
+                  : label === 'Archives'
+                    ? '/archives'
+                    : '/'
+      parts.push(
+        <a key={key++} href={href} style={linkStyle}>
+          {label}
+        </a>,
+      )
+      last = match.index + label.length
+    }
+    if (last < text.length) parts.push(text.slice(last))
+    return parts
+  }
 
   return (
     <div className="about-prose" style={{ maxWidth: '640px' }}>
@@ -122,71 +130,48 @@ If you hold $CLAWD and have opinions on what should change, that conversation sh
           About The Build Report
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-          A plain English look at the repos, scored and sourced.
+          Identity, tab map, and trust — not the homepage walkthrough or the scoring handbook.
         </p>
       </div>
 
       {sections.map(section => (
         <div
           key={section.heading}
-          id={section.heading === 'Score types' ? 'score-types' : undefined}
+          id={section.heading === 'Scores & Rescore' ? 'score-types' : undefined}
           className="about-prose-section"
           style={{ marginBottom: '28px' }}
         >
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
             {section.heading}
           </h2>
-          {section.heading === 'How scores are assigned' ? (
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '10px' }}>
-              For the full scoring methodology including rubric weights, grade calculations, and period definitions, see{' '}
-              <a href="/how-we-score" style={{ color: 'var(--accent)' }}>How we score ↗</a>.
+          {section.body.split('\n\n').map((para, i) => (
+            <p
+              key={i}
+              style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '10px' }}
+            >
+              {linkify(para)}
             </p>
-          ) : section.heading === 'Score types' ? (
-            <>
-              {ABOUT_SCORE_TYPES_SECTIONS.map(({ title, body }) => (
-                <div key={title} style={{ marginBottom: '14px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    {title}
-                  </div>
-                  <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 }}>
-                    {body}
-                  </p>
-                </div>
-              ))}
-              <div style={{
-                marginTop: '12px',
-                padding: '12px 14px',
-                background: 'var(--surface-1)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                fontSize: '13px',
-                color: 'var(--text-secondary)',
-                lineHeight: 1.6,
-              }}>
-                {ABOUT_SCORE_TYPES_CALLOUT}
-              </div>
-            </>
-          ) : (
-            section.body.split('\n\n').map((para, i) => (
-              <p key={i} style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '10px' }}>
-                {para}
-              </p>
-            ))
-          )}
+          ))}
         </div>
       ))}
 
-      <div style={{
-        marginTop: '32px',
-        padding: '16px',
-        background: 'var(--surface-1)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        fontSize: '13px',
-        color: 'var(--text-muted)',
-        lineHeight: 1.6,
-      }}>
-        <strong style={{ color: 'var(--text-secondary)' }}>Disclaimer:</strong> This site is speculative and experimental. Scores are interpretive, not authoritative. No real-time onchain data is used. Numbers cited reflect publicly stated claims, not verified transaction volumes. This is not financial advice. This is not investment advice. Do your own research. The authors of this site may hold $CLAWD.
+      <div
+        style={{
+          marginTop: '32px',
+          padding: '16px',
+          background: 'var(--surface-1)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          fontSize: '13px',
+          color: 'var(--text-muted)',
+          lineHeight: 1.6,
+        }}
+      >
+        <strong style={{ color: 'var(--text-secondary)' }}>Disclaimer:</strong> This site is speculative
+        and experimental. Scores are interpretive, not authoritative. No real-time onchain data is used.
+        Numbers cited reflect publicly stated claims, not verified transaction volumes. This is not
+        financial advice. This is not investment advice. Do your own research. The authors of this site
+        may hold $CLAWD.
       </div>
     </div>
   )

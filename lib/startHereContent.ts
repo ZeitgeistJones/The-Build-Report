@@ -163,6 +163,7 @@ export const START_HERE_TOC = [
   { href: '#sh-github', label: 'GitHub for you' },
   { href: '#sh-scores', label: 'The grades' },
   { href: '#sh-walkthrough', label: '3-minute walkthrough' },
+  { href: '#sh-elsewhere', label: 'Where else to go' },
   { href: '#sh-token', label: 'CLAWD & CV' },
   { href: '#sh-glossary', label: 'Glossary' },
   { href: '#sh-wallet', label: 'Wallets & Rescore' },
@@ -212,7 +213,7 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
       },
       {
         title: 'Builder standards',
-        body: 'This asks: is this repo being built carefully? It looks at safety practices, whether the code has tests, and how clear the documentation is. A lower score usually just means the repo is early-stage or under-documented, which is common for fast-moving projects. It\'s a snapshot of current polish, not a judgment on the team or the idea behind the repo.',
+        body: 'This asks: is this repo being built carefully? It looks at safety practices, whether the code has tests, and how clear the documentation is. A lower score usually just means the repo is early-stage or under-documented, which is common for fast-moving projects. It\'s a snapshot of current polish, not a judgment on the team or the idea behind the repo. For rubric weights and evidence rules, open How we score.',
         analogy: START_HERE_ANALOGIES[4],
       },
       {
@@ -237,7 +238,38 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
       },
       {
         title: 'Step 3 — The repo list',
-        body: 'Each row is one project. Each card shows Builder standards plus either Holder economics or Shipping leverage (by tag) — plus that repo\'s commit count for the window, its last-activity timestamp, and a status badge (Shipping, Stable, or Done). Use the filters above the list to narrow things down: Holder economics for direct-burn and supply-lock repos, Shipping leverage for infra/tooling, New arrivals for repos created in the selected window, Recently rescored for live Score/Rescore activity (what can feed The Needle), Clawd/CV perks for holder-gated apps, Community context for repos with holder-submitted context. Sort by Recent, Most active, or Grades. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Most active, set the window to 7d, and start there.',
+        body: 'Each row is one project. Each card shows Builder standards plus either Holder economics or Shipping leverage (by tag) — plus that repo\'s commit count for the window, its last-activity timestamp, and a status badge (Shipping, Stable, or Done). Use the filters above the list to narrow things down: Holder economics for direct-burn and supply-lock repos, Shipping leverage for infra/tooling, New arrivals for repos created in the selected window, Recently rescored for live Score/Rescore activity, Clawd/CV perks for holder-gated apps, Community context for repos with holder-submitted context. Sort by Recent, Most active, or Grades. Click any row to expand its full scorecard. If your only question is "are they still building?" — sort by Most active, set the window to 7d, and start there.',
+      },
+    ],
+  },
+  {
+    id: 'sh-elsewhere',
+    title: 'Where else to go',
+    subtitle: 'Other tabs after you can read the homepage',
+    subsections: [
+      {
+        title: 'Yesterday’s Builds (nav) vs Yesterday’s build (homepage)',
+        body: 'On the Repos homepage, “Yesterday’s build” is the overnight digest for clawdbotatg — the scored org this site tracks. The nav tab Yesterday’s Builds is different: an unofficial newspaper of shipping digests for other GitHub projects we follow (agent tools, token builders, Base samples, and similar). No Build Report grades there, and quiet days often don’t show.',
+      },
+      {
+        title: 'Archives',
+        body: 'Past clawdbotatg Build Briefs for about 90 days. Brief-only history — not a dump of every old homepage column.',
+      },
+      {
+        title: 'Night Sky',
+        body: 'A full-screen map of the same ecosystem as stars and connections. For orientation and exploration, not a second scoreboard.',
+      },
+      {
+        title: 'Dictionary',
+        body: 'Plain definitions for crypto, GitHub, coding, and ops words that show up in score blurbs and commit language. This Start Here glossary is for site UI terms; open Dictionary when a blurb word looks like code jargon.',
+      },
+      {
+        title: 'How we score',
+        body: 'The methodology handbook — rubric weights, grade math, evidence rules, Chronicle context, and changelog. Use it when you want the detailed “why” behind a letter, not just how to read the homepage.',
+      },
+      {
+        title: 'About',
+        body: 'Who built this, affiliation disclaimers, and a short map of every tab. Trust and identity — not the place to learn the homepage walkthrough (that’s here) or the full scoring math (that’s How we score).',
       },
     ],
   },
@@ -251,14 +283,14 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
   {
     id: 'sh-glossary',
     title: 'Glossary',
-    subtitle: 'Terms in the order you\'re likely to hit them on the site',
+    subtitle: 'Site UI terms you’re likely to hit on the homepage — for commit/score jargon, use Dictionary',
   },
   {
     id: 'sh-wallet',
     title: 'A note on wallets, ETH & Rescore',
     subtitle: 'Only matters if you want Rescore or holder-gated features',
     walletSidebar: true,
-    body: 'A crypto wallet, like MetaMask or Coinbase Wallet, is a software account that holds tokens — think of it as a digital ID and pocket combined. ETH (Ethereum) is a separate token used to pay for actions on many blockchains; even though $CLAWD lives on Base, small ETH fees still show up for on-chain transactions like Rescore.\n\nRescore costs 0.000008 ETH (or is subsidized during the launch promo). That fee buys $CLAWD on the open market and burns it, so paying to rescore also benefits every other holder. Score and Rescore need a connected Base wallet holding at least 10M $CLAWD (CLAWDGate). Community context votes also require holding at least 10M $CLAWD.\n\nIf you don\'t have a wallet or ETH, you can still read every score, use every filter, and browse the Chronicle — Rescore is optional, never required to access the site.\n\nFor help setting up a wallet or buying ETH, search "how to set up a crypto wallet" — that\'s outside the scope of this guide.',
+    body: 'A crypto wallet, like MetaMask or Coinbase Wallet, is a software account that holds tokens — think of it as a digital ID and pocket combined. ETH (Ethereum) is a separate token used to pay for actions on many blockchains; even though $CLAWD lives on Base, small ETH fees still show up for on-chain transactions like Rescore.\n\nRescore costs 0.000008 ETH (or is subsidized during the launch promo). That fee buys $CLAWD on the open market and burns it, so paying to rescore also benefits every other holder. Score and Rescore need a connected Base wallet holding at least 10M $CLAWD (CLAWDGate). Community context votes also require holding at least 10M $CLAWD.\n\nIf you don’t have a wallet or ETH, you can still read every score, use every filter, and browse the Chronicle — Rescore is optional, never required to access the site.\n\nFor the full scoring methodology behind a Rescore result, see How we score. For help setting up a wallet or buying ETH, search "how to set up a crypto wallet" — that’s outside the scope of this guide.',
   },
   {
     id: 'sh-disclaimer',

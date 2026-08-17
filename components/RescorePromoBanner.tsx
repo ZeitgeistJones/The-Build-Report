@@ -115,7 +115,7 @@ export default function RescorePromoBanner({
       <p className="rescore-promo-banner__disclaimer">{RESCORE_PROMO_SITE_BANNER.disclaimer}</p>
 
       <p className="rescore-promo-banner__link">
-        <Link href="/about#score-types">About score types &amp; promo ↗</Link>
+        <Link href="/start#sh-wallet">Wallets &amp; Rescore (promo notes) ↗</Link>
       </p>
     </div>
   )
