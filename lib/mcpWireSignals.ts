@@ -20,10 +20,10 @@ export type WireWhyCode =
 
 export const WHY_SHOWN_LABEL: Record<WireWhyCode, string> = {
   tracked: 'TRACKED PROJECT MATCH',
-  newTool: 'NEW TOOL',
+  newTool: 'NEW MCP REGISTRATION',
   crypto: 'NEW CRYPTO / ONCHAIN TOOL',
-  realCode: 'REAL CODE AVAILABLE',
-  withdrawn: 'WITHDRAWN / REMOVED',
+  realCode: 'PUBLIC SOURCE REPOSITORY',
+  withdrawn: 'REMOVED FROM REGISTRY',
   majorChange: 'MAJOR CAPABILITY CHANGE',
   consequential: 'CONSEQUENTIAL ACCESS',
   firstRelease: 'FIRST / MAJOR RELEASE',
@@ -48,6 +48,43 @@ const CONSEQUENTIAL_RE =
   /\b(browser\s*control|puppeteer|playwright|headless\s*browser|shell\s*access|command\s*execution|terminal\s*access|ssh\b|cloud\s*infrastructure|deployments?|kubernetes|wallets?|money\s*movement|payments?|smart\s*contracts?|hardware\s*control|account\s*management|send(?:s|ing)?\s+messages?)\b/i
 
 const FIRST_RELEASE_RE = /^v?(0\.1\.0|1\.0(\.0)?)$/i
+
+export type RegistryLifecycle = 'active' | 'deprecated' | 'deleted'
+
+export function parseRegistryStatus(raw?: string): RegistryLifecycle | undefined {
+  const s = raw?.trim().toLowerCase()
+  if (s === 'active' || s === 'deprecated' || s === 'deleted') return s
+  return undefined
+}
+
+export function registryStatusDisplay(status?: RegistryLifecycle): string {
+  if (status === 'active') return 'ACTIVE IN REGISTRY'
+  if (status === 'deprecated') return 'DEPRECATED IN REGISTRY'
+  if (status === 'deleted') return 'REMOVED FROM REGISTRY'
+  return ''
+}
+
+/** Preserve GitHub owner/repo casing from the URL for display. */
+export function githubRepoDisplay(url?: string): string | null {
+  if (!url) return null
+  const m = url.trim().match(/github\.com[/:]([^/\s]+)\/([^/\s?#]+)/i)
+  if (!m) return null
+  const owner = m[1]
+  const repo = m[2].replace(/\.git$/i, '')
+  if (!owner || !repo) return null
+  return `${owner}/${repo}`
+}
+
+export function registryReasonLine(message?: string): string {
+  const t = message?.trim()
+  return t ? t : 'No reason supplied.'
+}
+
+export function githubPublisherDisplay(url?: string): string | undefined {
+  const slug = githubRepoDisplay(url)
+  if (!slug) return undefined
+  return slug.split('/')[0]
+}
 
 export function parseGithubOwnerRepo(url?: string): { owner: string; repo: string } | null {
   if (!url) return null
@@ -156,10 +193,25 @@ export function firstSentence(description: string): string {
   return sentence
 }
 
-export function happenedLine(kind: 'new' | 'revised' | 'withdrawn' | 'unknown'): string {
-  if (kind === 'new') return 'New MCP registration.'
-  if (kind === 'withdrawn') return 'This listing was withdrawn or removed.'
-  if (kind === 'revised') return 'Existing listing was updated.'
+export function happenedLine(
+  kind: 'new' | 'revised' | 'withdrawn' | 'unknown',
+  status?: RegistryLifecycle,
+): string {
+  if (status === 'deleted') {
+    return 'The official MCP Registry now marks this listing as deleted, so it is hidden from normal Registry listings.'
+  }
+  if (status === 'deprecated') {
+    return 'The official MCP Registry now marks this listing as deprecated.'
+  }
+  if (kind === 'new') {
+    return 'This listing first appeared in the official MCP Registry during this collection window.'
+  }
+  if (kind === 'withdrawn') {
+    return 'The official MCP Registry marked this listing deleted or deprecated.'
+  }
+  if (kind === 'revised') {
+    return 'Existing listing was updated in the official MCP Registry during this collection window.'
+  }
   return 'Registry row with incomplete metadata.'
 }
 
@@ -167,30 +219,31 @@ export function composeWhyShownText(args: {
   why: WireWhyCode[]
   tracked?: TrackedProjectHit | null
   kind: 'new' | 'revised' | 'withdrawn' | 'unknown'
+  registryStatus?: RegistryLifecycle
 }): string {
+  if (args.kind === 'withdrawn' || args.why.includes('withdrawn')) {
+    if (args.registryStatus === 'deprecated') {
+      return 'Registry deprecations are surfaced automatically because a listing changed lifecycle status.'
+    }
+    return 'Registry removals are surfaced automatically because a previously listed MCP changed lifecycle status.'
+  }
+
   const bits: string[] = []
   if (args.why.includes('tracked') && args.tracked) {
     bits.push(`${args.tracked.label} is already tracked by Yesterday’s Builds`)
   }
-  if (args.why.includes('newTool') || args.kind === 'new') {
-    bits.push('this is a newly registered MCP')
-  }
-  if (args.why.includes('crypto')) bits.push('it deals with wallets, chains, or onchain data')
-  if (args.why.includes('consequential')) {
-    bits.push('it lets an assistant take consequential external actions')
-  }
-  if (args.why.includes('withdrawn')) bits.push('the listing was withdrawn or removed')
+  if (args.why.includes('newTool') || args.kind === 'new') bits.push('New registration')
+  if (args.why.includes('crypto')) bits.push('crypto/onchain capability')
+  if (args.why.includes('consequential')) bits.push('consequential access')
   if (args.why.includes('majorChange')) {
-    bits.push('what it says it can do changed in this window, not just a version number')
+    bits.push('capability text changed this window')
   }
-  if (args.why.includes('firstRelease')) bits.push('the version looks like a first or 1.0 release')
-  if (args.why.includes('realCode')) bits.push('a public source repository is attached')
+  if (args.why.includes('firstRelease')) bits.push('first or 1.0 version')
+  if (args.why.includes('realCode')) bits.push('public source repository')
   if (bits.length === 0) return 'No low-interest filter matched.'
   const unique = [...new Set(bits)]
-  const head = unique[0]
-  const rest = unique.slice(1)
-  if (rest.length === 0) return `${head.charAt(0).toUpperCase()}${head.slice(1)}.`
-  return `${head.charAt(0).toUpperCase()}${head.slice(1)}, and ${rest.join('; ')}.`
+  const text = unique.join(' · ')
+  return text.endsWith('.') ? text : `${text}.`
 }
 
 /**

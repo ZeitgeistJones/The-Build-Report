@@ -10,13 +10,18 @@ import {
   fetchChangesSince,
   lowInterestMatch,
   nextWatermark,
+  officialRegistryRecordUrl,
   resolveSince,
   wireRefreshSummary,
   type McpWireAdminRecord,
   type McpWireSnapshot,
   type RegistryRow,
 } from '../lib/mcpWire'
-import { matchTrackedProject } from '../lib/mcpWireSignals'
+import {
+  githubRepoDisplay,
+  matchTrackedProject,
+  registryReasonLine,
+} from '../lib/mcpWireSignals'
 import { resolveAdminSectionId } from '../lib/adminNav'
 
 function expect(name: string, cond: boolean) {
@@ -34,6 +39,7 @@ function listing(opts: {
   publishedAt?: string
   updatedAt?: string
   status?: string
+  statusMessage?: string
   repoUrl?: string
   skipMeta?: boolean
 }): RegistryRow {
@@ -52,6 +58,7 @@ function listing(opts: {
             publishedAt: opts.publishedAt ?? '2026-08-17T10:00:00.000Z',
             updatedAt: opts.updatedAt ?? '2026-08-17T10:00:00.000Z',
             status: opts.status,
+            statusMessage: opts.statusMessage,
           },
         },
   }
@@ -274,7 +281,7 @@ expect(
   })
   expect(
     'complete summary names surfaced count',
-    wireRefreshSummary(record) === 'Complete — 2 registry changes checked, 0 surfaced.',
+    wireRefreshSummary(record) === 'Complete — 2 listings checked after grouping, 0 surfaced.',
   )
   expect(
     'admin inbox has routine vs filtered',
@@ -348,6 +355,163 @@ expect(
   const mastraRow = built.inbox.find(r => r.name.includes('mastra'))
   expect('mastra has tracked why', !!mastraRow?.whyShown?.includes('tracked'))
   expect('mastra why text names Yesterday’s Builds', (mastraRow?.whyShownText ?? '').includes('Yesterday'))
+}
+
+{
+  const activeRepo = buildWireCollection([
+    listing({
+      name: 'uk.co.cybercentry/verification',
+      title: 'Cybercentry Verification',
+      description: 'Pay-per-call security verification for wallets, contracts, agents and apps.',
+      version: '1.0.3',
+      status: 'active',
+      repoUrl: 'https://github.com/Cybercentry/verification-mcp',
+    }),
+  ]).inbox[0]
+  expect('active listing with repo is SHOW ME crypto', activeRepo.pile === 'show')
+  expect(
+    'happened line is first appearance, not a repeat of why',
+    activeRepo.whatHappened?.includes('first appeared') === true,
+  )
+  expect(
+    'why shown does not repeat what happened',
+    !(activeRepo.whyShownText ?? '').includes('first appeared'),
+  )
+  expect('github display keeps casing', githubRepoDisplay(activeRepo.repoUrl) === 'Cybercentry/verification-mcp')
+  expect('publisher is GitHub owner', activeRepo.publisher === 'Cybercentry')
+  expect('registry status retained', activeRepo.registryStatus === 'active')
+}
+
+{
+  const noRepo = buildWireCollection([
+    listing({
+      name: 'com.example/wallet-bridge',
+      description: 'Lets an assistant send payments on ethereum.',
+      status: 'active',
+    }),
+  ]).inbox[0]
+  expect('active listing without repo still surfaces on crypto/consequential', noRepo.pile === 'show')
+  expect('no repo url', !noRepo.repoUrl)
+}
+
+{
+  const deprecated = buildWireCollection([
+    listing({
+      name: 'io.example/old-tool',
+      description: 'A filesystem helper.',
+      status: 'deprecated',
+      statusMessage: 'Use v2 instead.',
+    }),
+  ]).inbox[0]
+  expect('deprecated is SHOW ME', deprecated.pile === 'show')
+  expect('deprecated happened copy names Registry', (deprecated.whatHappened ?? '').includes('deprecated'))
+  expect('deprecated why is lifecycle, not a repeat of happened', deprecated.whyShownText?.includes('deprecations') === true)
+  expect('deprecated statusMessage retained', deprecated.statusMessage === 'Use v2 instead.')
+  expect('deprecated is not described as shutdown', !/shut down|no longer works|project is dead/i.test(`${deprecated.whatHappened} ${deprecated.whyShownText}`))
+}
+
+{
+  const deletedNoted = buildWireCollection([
+    listing({
+      name: 'systems.entia/entity-verification',
+      title: 'ENTIA Entity Verification',
+      description: '5.5M verified entities across 10 countries and 13 tools.',
+      version: '1.1.1',
+      status: 'deleted',
+      statusMessage: 'Publisher unpublished this version.',
+      repoUrl: 'https://github.com/ENTIA-IA/entia-mcp-server',
+    }),
+  ]).inbox[0]
+  expect('deleted is SHOW ME', deletedNoted.pile === 'show')
+  expect('deleted happened copy is Registry lifecycle', deletedNoted.whatHappened?.includes('marks this listing as deleted') === true)
+  expect('deleted why is automatic surfacing', deletedNoted.whyShownText?.includes('Registry removals are surfaced automatically') === true)
+  expect('statusMessage kept', deletedNoted.statusMessage === 'Publisher unpublished this version.')
+  expect('reason line uses supplied message', registryReasonLine(deletedNoted.statusMessage) === 'Publisher unpublished this version.')
+  expect(
+    'deleted is not project shutdown',
+    !/shut down|software is dead|repository was deleted|service stopped/i.test(
+      `${deletedNoted.whatHappened} ${deletedNoted.whyShownText}`,
+    ),
+  )
+}
+
+{
+  const deletedSilent = buildWireCollection([
+    listing({
+      name: 'systems.entia/entity-verification',
+      description: 'Entity records.',
+      version: '1.1.1',
+      status: 'deleted',
+    }),
+  ]).inbox[0]
+  expect('missing statusMessage is not invented', deletedSilent.statusMessage === undefined)
+  expect('empty reason is explicit', registryReasonLine(deletedSilent.statusMessage) === 'No reason supplied.')
+}
+
+{
+  const url = officialRegistryRecordUrl('uk.co.cybercentry/verification', '1.0.3')
+  expect(
+    'receipt encodes registry name',
+    url.includes('uk.co.cybercentry%2Fverification') && url.includes('/versions/1.0.3'),
+  )
+  expect('deleted receipts include include_deleted', url.includes('include_deleted=true'))
+  const deletedUrl = officialRegistryRecordUrl('systems.entia/entity-verification', '1.1.1')
+  expect('deleted receipt still include_deleted', deletedUrl.includes('include_deleted=true'))
+}
+
+{
+  const grouped = buildWireCollection([
+    listing({
+      name: 'io.example/same',
+      description: 'A filesystem helper.',
+      version: '1.0.0',
+      publishedAt: '2026-08-17T10:00:00.000Z',
+      updatedAt: '2026-08-17T10:00:00.000Z',
+    }),
+    listing({
+      name: 'io.example/same',
+      description: 'A filesystem helper.',
+      version: '1.0.1',
+      publishedAt: '2026-08-17T10:00:00.000Z',
+      updatedAt: '2026-08-17T11:00:00.000Z',
+    }),
+  ])
+  expect('two version rows group to one listing', grouped.rawCount === 2 && grouped.showMeCount + grouped.routineCount + grouped.filteredCount === 1)
+  expect('extra version rows accounted for', grouped.extraVersionRows === 1)
+}
+
+{
+  const related = buildWireCollection([
+    listing({
+      name: 'systems.entia/entity-verification',
+      description: 'Entity records.',
+      status: 'deleted',
+      repoUrl: 'https://github.com/ENTIA-IA/entia-mcp-server',
+    }),
+    listing({
+      name: 'systems.entia/entity-verification-v2',
+      description: 'Entity records v2.',
+      status: 'active',
+      repoUrl: 'https://github.com/ENTIA-IA/entia-mcp-server',
+    }),
+  ])
+  const a = related.inbox.find(r => r.name.endsWith('entity-verification'))
+  const b = related.inbox.find(r => r.name.endsWith('entity-verification-v2'))
+  expect(
+    'same repo is strong related evidence',
+    !!a && !!b && githubRepoDisplay(a.repoUrl) === githubRepoDisplay(b.repoUrl),
+  )
+}
+
+{
+  const yb = readFileSync(join(process.cwd(), 'app/yesterdays-builds/page.tsx'), 'utf8')
+  const inbox = readFileSync(join(process.cwd(), 'components/McpWireInbox.tsx'), 'utf8')
+  expect('public YB still omits admin on McpWire', /<McpWire wire=\{wire\} \/>/.test(yb))
+  expect('inbox does not claim listings are verified safe', !/verified safe|officially approved|widely used/i.test(inbox))
+  expect(
+    'inbox treats deletion as a Registry event, not a shutdown',
+    inbox.includes('does not necessarily mean the underlying project shut down'),
+  )
 }
 
 {

@@ -1971,3 +1971,80 @@ button {
 .wire-card__tech summary {
   cursor: pointer;
 }
+
+.wire-inbox__what {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wire-inbox__term {
+  border-bottom: 1px dotted var(--text-muted);
+  cursor: help;
+}
+
+.wire-inbox__source-line {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 720px;
+  line-height: 1.45;
+}
+
+.wire-inbox__disclose {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  max-width: 720px;
+}
+
+.wire-inbox__disclose summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.wire-inbox__disclose p,
+.wire-inbox__limits p {
+  margin: 6px 0 0;
+  line-height: 1.55;
+}
+
+.wire-card__related,
+.wire-card__caveat,
+.wire-card__evidence-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+}
+
+.wire-card__evidence {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.wire-card__evidence summary {
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.wire-card__evidence-body {
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.wire-card__evidence-body p {
+  margin: 0 0 4px;
+}
+
+.wire-card__evidence-kicker {
+  margin: 8px 0 2px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.wire-card__evidence a {
+  color: var(--accent);
+}

@@ -2,9 +2,11 @@ import { getRedis } from '@/lib/redis'
 import {
   composeWhyShownText,
   firstSentence,
+  githubPublisherDisplay,
   happenedLine,
-  parseGithubOwnerRepo,
+  parseRegistryStatus,
   surfaceWhy,
+  type RegistryLifecycle,
   type TrackedProjectHit,
   type WireWhyCode,
 } from '@/lib/mcpWireSignals'
@@ -70,6 +72,10 @@ export type WireInboxRow = {
   whyShownText?: string
   tracked?: TrackedProjectHit | null
   publisher?: string
+  registryStatus?: RegistryLifecycle
+  statusMessage?: string
+  publishedAt?: string
+  updatedAt?: string
 }
 
 export type McpWireAdminRecord = {
@@ -96,6 +102,8 @@ export type McpWireAdminRecord = {
   showStored: number
   routineStored: number
   filteredStored: number
+  /** Raw rows minus grouped listings — extra versions folded into one name. */
+  extraVersionRows: number
 }
 
 type RegistryMeta = {
@@ -118,6 +126,13 @@ export type RegistryRow = {
 }
 
 const OFFICIAL_META = 'io.modelcontextprotocol.registry/official'
+
+/** Exact official Registry JSON for this name + version. Always asks include_deleted so removals still open. */
+export function officialRegistryRecordUrl(name: string, version?: string): string {
+  const encodedName = encodeURIComponent(name.trim())
+  const ver = version?.trim() ? encodeURIComponent(version.trim()) : 'latest'
+  return `${REGISTRY}/${encodedName}/versions/${ver}?include_deleted=true`
+}
 
 /**
  * Same editorial buckets as the original LOW_INTEREST list.
@@ -274,6 +289,8 @@ function kindFor(entry: ServerEntry): WireItem['kind'] {
 
 function inboxFromUnnamed(row: RegistryRow): WireInboxRow {
   const s = row.server
+  const m = row._meta?.[OFFICIAL_META]
+  const status = parseRegistryStatus(m?.status)
   return {
     keep: false,
     pile: 'filtered',
@@ -283,13 +300,17 @@ function inboxFromUnnamed(row: RegistryRow): WireInboxRow {
     description: (s?.description ?? '').trim(),
     version: s?.version ?? '',
     repoUrl: s?.repository?.url,
-    at: '',
+    at: m?.updatedAt ?? m?.publishedAt ?? '',
     reason: 'Skipped — no registry name or official listing metadata.',
     whatItIs: firstSentence((s?.description ?? '').trim()),
-    whatHappened: happenedLine('unknown'),
+    whatHappened: happenedLine('unknown', status),
     whyShown: [],
     whyShownText: 'Skipped — no registry name or official listing metadata.',
-    publisher: parseGithubOwnerRepo(s?.repository?.url)?.owner,
+    publisher: githubPublisherDisplay(s?.repository?.url),
+    registryStatus: status,
+    statusMessage: m?.statusMessage?.trim() || undefined,
+    publishedAt: m?.publishedAt,
+    updatedAt: m?.updatedAt,
   }
 }
 
@@ -303,7 +324,8 @@ function decideEntry(name: string, entry: ServerEntry): { item?: WireItem; row: 
   const version = s?.version ?? ''
   const repoUrl = s?.repository?.url
   const note = m.statusMessage?.trim() || undefined
-  const publisher = parseGithubOwnerRepo(repoUrl)?.owner
+  const publisher = githubPublisherDisplay(repoUrl)
+  const registryStatus = parseRegistryStatus(m.status)
 
   const base: Omit<WireInboxRow, 'keep' | 'pile' | 'reason'> = {
     kind,
@@ -314,8 +336,12 @@ function decideEntry(name: string, entry: ServerEntry): { item?: WireItem; row: 
     repoUrl,
     at,
     whatItIs: firstSentence(description),
-    whatHappened: happenedLine(kind),
+    whatHappened: happenedLine(kind, registryStatus),
     publisher,
+    registryStatus,
+    statusMessage: note,
+    publishedAt: m.publishedAt,
+    updatedAt: m.updatedAt,
   }
 
   if (!description) {
@@ -379,7 +405,12 @@ function decideEntry(name: string, entry: ServerEntry): { item?: WireItem; row: 
         pile: 'show',
         reason: surfaced.why.map(w => w).join(', '),
         whyShown: surfaced.why,
-        whyShownText: composeWhyShownText({ why: surfaced.why, tracked: surfaced.tracked, kind }),
+        whyShownText: composeWhyShownText({
+          why: surfaced.why,
+          tracked: surfaced.tracked,
+          kind,
+          registryStatus,
+        }),
         tracked: surfaced.tracked,
       },
     }
@@ -413,6 +444,7 @@ export function buildWireCollection(rows: RegistryRow[]): {
   showMeCount: number
   routineCount: number
   filteredCount: number
+  extraVersionRows: number
   reasonCounts: Partial<Record<WireWhyCode, number>>
 } {
   const { byServer, unnamed } = collapseByServer(rows)
@@ -478,6 +510,7 @@ export function buildWireCollection(rows: RegistryRow[]): {
     showMeCount: show.length,
     routineCount: routine.length,
     filteredCount: filtered.length,
+    extraVersionRows: Math.max(0, rows.length - allRows.length),
     reasonCounts,
   }
 }
@@ -517,6 +550,7 @@ function emptyAdminRecord(
     showStored: 0,
     routineStored: 0,
     filteredStored: 0,
+    extraVersionRows: 0,
     ...extras,
   }
 }
@@ -601,6 +635,7 @@ export async function collectMcpWireDetailed(
       showStored: Math.min(built.showMeCount, SHOW_STORE_CAP),
       routineStored: Math.min(built.routineCount, ROUTINE_STORE_CAP),
       filteredStored: Math.min(built.filteredCount, FILTERED_STORE_CAP),
+      extraVersionRows: built.extraVersionRows,
     }
 
     await savePublic(snapshot)
@@ -674,7 +709,7 @@ export function wireRefreshSummary(record: McpWireAdminRecord): string {
   const surfaced = record.showMeCount ?? 0
   if (checked === 0) return 'Complete — no new Registry changes.'
   if (checked === 1) {
-    return `Complete — 1 new registry change checked, ${surfaced} surfaced.`
+    return `Complete — 1 listing checked after grouping, ${surfaced} surfaced.`
   }
-  return `Complete — ${checked} registry changes checked, ${surfaced} surfaced.`
+  return `Complete — ${checked} listings checked after grouping, ${surfaced} surfaced.`
 }
