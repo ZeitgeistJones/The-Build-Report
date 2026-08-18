@@ -17,8 +17,9 @@ export type GenerateTextResult = {
   provider: LlmProvider
 }
 
-/** Prefer a Gemini model with spare free-tier quota; 3.6-flash is often RPD-capped first. */
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+/** Google retired 2.5-flash for new API keys; 3.6-flash is the current flash default. */
+const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash'
+const RETIRED_GEMINI_MODELS = ['gemini-2.5-flash', 'models/gemini-2.5-flash']
 const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
 
 function geminiApiKey(): string | undefined {
@@ -40,7 +41,16 @@ export function hasLlmApiKey(): boolean {
 }
 
 function geminiModel(): string {
-  return process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL
+  const requested = process.env.GEMINI_MODEL?.trim()
+  if (!requested) return DEFAULT_GEMINI_MODEL
+  const bare = requested.replace(/^models\//, '')
+  if (RETIRED_GEMINI_MODELS.includes(requested) || RETIRED_GEMINI_MODELS.includes(bare)) {
+    console.warn(
+      `[gemini] ${requested} is retired for new API keys; using ${DEFAULT_GEMINI_MODEL}`,
+    )
+    return DEFAULT_GEMINI_MODEL
+  }
+  return requested
 }
 
 function anthropicModel(): string {
@@ -128,6 +138,9 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message.includes('GEMINI_API_KEY is not set')) throw err
+    if (message.includes('"code":404') || message.includes('NOT_FOUND') || message.includes('no longer available')) {
+      throw err
+    }
     console.warn(`[${label}] Gemini first attempt failed; retrying without thinking:`, err)
     return await generateWithGeminiOnce(opts, 'off', retryMax)
   }
