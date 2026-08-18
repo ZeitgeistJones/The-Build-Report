@@ -58,6 +58,9 @@ const ISSUE_EPOCH = Date.UTC(2025, 11, 31)
    holders are who this page is for. Set it to 0 for a neutral desk.
 
    Editions cached before significance existed default to NEUTRAL.
+
+   Public ranking lives HERE, not in yesterdaysBuildsLeadPolicy.
+   Do not import YB-LEAD-v1 for story order. Shadow comparison is Admin-only.
    ------------------------------------------------------------------ */
 const COMMIT_CAP = 40
 const TICKER_EDGE = 15

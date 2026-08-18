@@ -1577,6 +1577,162 @@ button {
   color: var(--text-muted);
 }
 
+/* Yesterday's Builds Lead Story Lab — Admin shadow comparison only */
+.yb-lead-lab {
+  margin: 0 0 24px;
+  padding: 16px 18px 18px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+
+.yb-lead-lab__kicker {
+  margin: 0 0 4px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.yb-lead-lab__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.yb-lead-lab__note,
+.yb-lead-lab__muted,
+.yb-lead-lab__body {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 720px;
+}
+
+.yb-lead-lab__muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.yb-lead-lab__compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+@media (max-width: 720px) {
+  .yb-lead-lab__compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+.yb-lead-lab__card {
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.yb-lead-lab__card--proposed {
+  border-color: var(--border-strong);
+}
+
+.yb-lead-lab__card-kicker {
+  margin: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.yb-lead-lab__card-name {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.yb-lead-lab__explain {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 720px;
+}
+
+.yb-lead-lab__explain h4 {
+  margin: 16px 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.yb-lead-lab__explain ul {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+}
+
+.yb-lead-lab__axes {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto;
+  gap: 2px 16px;
+  margin: 8px 0 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.yb-lead-lab__axis {
+  display: contents;
+}
+
+.yb-lead-lab__axis dt {
+  color: var(--text-muted);
+}
+
+.yb-lead-lab__axis dd {
+  margin: 0;
+  text-align: right;
+}
+
+.yb-lead-lab__table-wrap {
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.yb-lead-lab__table-wrap summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.yb-lead-lab__table-scroll {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
+.yb-lead-lab__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.yb-lead-lab__table th,
+.yb-lead-lab__table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.yb-lead-lab__table th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 /* Wire Inbox — admin diagnostic mailroom */
 .wire-inbox {
   margin: 8px 0 16px;

@@ -7,15 +7,16 @@ import { REPO_COLLECTIONS, type RepoCollectionId } from '@/lib/repoCollections'
 import type { CommunityContextSubmission } from '@/lib/communityContextTypes'
 import type { OverheardEntry } from '@/lib/podcastMentions'
 import type { UtilityIndexRow } from '@/lib/utilityIndex'
-import type { BuildBriefData } from '@/lib/buildBrief'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
   type ExternalBriefAccountId,
+  type ExternalBriefData,
 } from '@/lib/externalOwnerBrief'
 import OverheardAdminEntryCard, { mentionToEditDraft, sanitizeDraftForSave, type MentionEditDraft } from '@/components/OverheardAdminEntryCard'
 import AdminStarterKitShare from '@/components/AdminStarterKitShare'
 import UtilityLedger from '@/components/UtilityLedger'
 import ExternalBriefsNewspaper from '@/components/ExternalBriefsNewspaper'
+import YbLeadStoryLab from '@/components/YbLeadStoryLab'
 import McpWire from '@/components/McpWire'
 import McpWireInbox from '@/components/McpWireInbox'
 import AdminSectionNav, { AdminBackToNav } from '@/components/AdminSectionNav'
@@ -100,7 +101,7 @@ export default function AdminPage() {
   const [utilityLoading, setUtilityLoading] = useState(false)
   const [utilityError, setUtilityError] = useState<string | null>(null)
   const [externalBriefs, setExternalBriefs] = useState<
-    Partial<Record<ExternalBriefAccountId, BuildBriefData | null>>
+    Partial<Record<ExternalBriefAccountId, ExternalBriefData | null>>
   >({})
   const [externalLoading, setExternalLoading] = useState<Partial<Record<ExternalBriefAccountId, boolean>>>({})
   const [externalRunning, setExternalRunning] = useState<Partial<Record<ExternalBriefAccountId, boolean>>>({})
@@ -1299,6 +1300,7 @@ export default function AdminPage() {
 
       {/* Secondary-account Yesterday's Builds — newspaper desk */}
       <div id="admin-builds" className="admin-jump-target">
+      <YbLeadStoryLab briefs={externalBriefs} />
       <ExternalBriefsNewspaper
         admin
         briefs={externalBriefs}
