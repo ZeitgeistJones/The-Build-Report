@@ -1,4 +1,4 @@
-import { generateText, hasLlmApiKey } from '@/lib/llm'
+import { generateTextGeminiOnly, hasGeminiApiKey } from '@/lib/llm'
 import { getRedis } from '@/lib/redis'
 import { getEffectiveTag } from '@/lib/economicGrade'
 import { hasShippingLeverageTag } from '@/lib/rubrics/shippingLeverage'
@@ -393,7 +393,7 @@ async function generateDigestWithAi(
   gradeContext: string,
   mountainDateKey: string,
 ): Promise<DigestAiPayload | null> {
-  if (!hasLlmApiKey()) return null
+  if (!hasGeminiApiKey()) return null
 
   const prompt = `You write copy for The Build Report — an independent dashboard that tracks clawdbotatg's GitHub repos for $CLAWD holders.
 
@@ -453,7 +453,7 @@ Rules:
 - The general overview MAY name specific repos and describe what shipped; the card fields should stay high-level and plain.`
 
   try {
-    const { text, provider } = await generateText({
+    const { text, provider } = await generateTextGeminiOnly({
       prompt,
       // Normie fields roughly doubled the JSON payload (general + generalNormie + 4 periods ×
       // 8 fields). Gemini 3.x thinking shares this budget with visible text — keep headroom high
@@ -545,9 +545,9 @@ async function repairGeneralNormie(
   generalNormie: string,
   missingSlugs: string[],
 ): Promise<string | null> {
-  if (!hasLlmApiKey()) return null
+  if (!hasGeminiApiKey()) return null
   try {
-    const { text } = await generateText({
+    const { text } = await generateTextGeminiOnly({
       prompt: `Rewrite the plain-English overview so it keeps the same repo identity as the standard overview.
 
 STANDARD OVERVIEW (source of truth for which repos and topics):

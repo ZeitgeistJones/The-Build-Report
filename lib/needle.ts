@@ -1,4 +1,4 @@
-import { generateText, hasLlmApiKey } from '@/lib/llm'
+import { generateTextGeminiOnly, hasGeminiApiKey } from '@/lib/llm'
 import { getRedis } from '@/lib/redis'
 import { getSlugsRescoredBetween } from '@/lib/scoreHistory'
 import { getRescoreSummaries, type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
@@ -75,7 +75,7 @@ function buildFallbackNeedle(qualifying: QualifyingMove[]): { text: string; text
 async function generateNeedleCopy(
   qualifying: QualifyingMove[],
 ): Promise<{ text: string; textNormie?: string } | null> {
-  if (!hasLlmApiKey()) return null
+  if (!hasGeminiApiKey()) return null
 
   const lines = formatMoveLines(qualifying)
   const prompt = `You write a very short daily column called "The Needle" for a crypto ecosystem scoring site. It reports on today's rescores — sometimes the overall grade moved, sometimes it held flat even though specific rubric rows changed underneath. Here is today's rescore data:
@@ -97,7 +97,7 @@ ${normieVoiceGuidance('needle')}
 `
 
   try {
-    const { text: raw } = await generateText({
+    const { text: raw } = await generateTextGeminiOnly({
       prompt,
       maxTokens: 2048,
       label: 'needle',

@@ -107,7 +107,7 @@ export function hasGeminiApiKey(): boolean {
 
 /**
  * Generate text with Gemini only — never Anthropic.
- * Used for rubric sourceNormie translations so Haiku quota stays on scoring.
+ * Used for Yesterday's Build, The Needle, and other Gemini-only surfaces.
  */
 export async function generateTextGeminiOnly(opts: GenerateTextOptions): Promise<GenerateTextResult> {
   const label = opts.label ?? 'llm-gemini'
