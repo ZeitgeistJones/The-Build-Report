@@ -36,6 +36,8 @@ export default function McpWire({
 
       {wire.status === 'failed' ? (
         <p className="ext-wire__closed">Desk closed — source unavailable.</p>
+      ) : wire.status === 'partial' && wire.items.length === 0 ? (
+        <p className="ext-wire__closed">Partial pull — page safety limit reached before anything printable.</p>
       ) : wire.items.length === 0 ? (
         <p className="ext-wire__closed">No qualifying listings filed by press time.</p>
       ) : (

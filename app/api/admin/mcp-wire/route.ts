@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin } from '@/lib/admin'
 import { yesterdayMountainDateKey } from '@/lib/buildBrief'
-import { collectMcpWire, getMcpWire } from '@/lib/mcpWire'
+import { collectMcpWireDetailed, getMcpWireAdmin, wireRefreshSummary } from '@/lib/mcpWire'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -18,12 +18,22 @@ export async function POST(req: NextRequest) {
 
   try {
     if (action === 'refresh') {
-      const wire = await collectMcpWire(editionKey)
-      return NextResponse.json({ ok: true, wire })
+      const record = await collectMcpWireDetailed(editionKey)
+      return NextResponse.json({
+        ok: true,
+        wire: record.snapshot,
+        admin: record,
+        summary: wireRefreshSummary(record),
+      })
     }
 
-    const wire = await getMcpWire(editionKey)
-    return NextResponse.json({ ok: true, dateKey: editionKey, wire })
+    const record = await getMcpWireAdmin(editionKey)
+    return NextResponse.json({
+      ok: true,
+      dateKey: editionKey,
+      wire: record?.snapshot ?? null,
+      admin: record,
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'MCP wire failed'
     return NextResponse.json({ ok: false, error: message }, { status: 500 })

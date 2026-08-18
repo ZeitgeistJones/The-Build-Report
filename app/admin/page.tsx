@@ -16,6 +16,10 @@ import OverheardAdminEntryCard, { mentionToEditDraft, sanitizeDraftForSave, type
 import AdminStarterKitShare from '@/components/AdminStarterKitShare'
 import UtilityLedger from '@/components/UtilityLedger'
 import ExternalBriefsNewspaper from '@/components/ExternalBriefsNewspaper'
+import McpWire from '@/components/McpWire'
+import McpWireInbox from '@/components/McpWireInbox'
+import AdminSectionNav, { AdminBackToNav } from '@/components/AdminSectionNav'
+import type { McpWireAdminRecord } from '@/lib/mcpWire'
 
 type AdminContextSubmission = CommunityContextSubmission
 
@@ -39,6 +43,7 @@ export default function AdminPage() {
   const [needleResult, setNeedleResult] = useState<string | null>(null)
   const [wireRunning, setWireRunning] = useState(false)
   const [wireResult, setWireResult] = useState<string | null>(null)
+  const [wireAdmin, setWireAdmin] = useState<McpWireAdminRecord | null>(null)
   const [podcastScanRunning, setPodcastScanRunning] = useState(false)
   const [podcastScanResult, setPodcastScanResult] = useState<string | null>(null)
   const [overheardMode, setOverheardModeState] = useState<'automatic' | 'manual'>('automatic')
@@ -570,6 +575,20 @@ export default function AdminPage() {
     setPodcastScanRunning(false)
   }
 
+  async function loadMcpWire(pw: string) {
+    try {
+      const res = await fetch('/api/admin/mcp-wire', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      })
+      const data = await res.json()
+      if (data.ok) setWireAdmin(data.admin ?? null)
+    } catch {
+      /* inbox stays empty until refresh */
+    }
+  }
+
   async function refreshMcpWire() {
     setWireRunning(true)
     setWireResult(null)
@@ -580,19 +599,17 @@ export default function AdminPage() {
         body: JSON.stringify({ password, action: 'refresh' }),
       })
       const data = await res.json()
-      if (data.ok && data.wire) {
+      if (data.ok && data.admin) {
+        setWireAdmin(data.admin)
+        setWireResult(data.summary ?? 'Wire refreshed')
+      } else if (data.ok && data.wire) {
         const w = data.wire
         if (w.status === 'failed') {
-          setWireResult(`Desk closed — ${w.error ?? 'source unavailable'}`)
-        } else if (w.totalChanges === 0) {
-          setWireResult('Registry had no changes in this window.')
+          setWireResult(`Failed — registry unavailable. Watermark NOT advanced.`)
+        } else if (w.status === 'partial') {
+          setWireResult('Partial — page safety limit reached. Watermark NOT advanced.')
         } else {
-          const names = w.items
-            .map((i: { title?: string; name: string }) => i.title || i.name)
-            .join(', ')
-          setWireResult(
-            `${w.totalChanges} changes filed, ${w.items.length} printed. ${names || 'All filtered out — loosen LOW_INTEREST.'}`,
-          )
+          setWireResult(data.summary ?? 'Wire refreshed')
         }
       } else {
         setWireResult(data.error ?? 'Wire refresh failed')
@@ -669,6 +686,7 @@ export default function AdminPage() {
       setForceInclude(data.forceInclude ?? [])
       void loadBulkStatus()
       void loadUtilityIndex(password)
+      void loadMcpWire(password)
       for (const account of EXTERNAL_BRIEF_ACCOUNTS) {
         void loadExternalBrief(account.id, password)
       }
@@ -1144,7 +1162,10 @@ export default function AdminPage() {
 
   return (
     <div>
+      <AdminSectionNav />
+
       {/* CLAWD / CV utility ledger (moved from public /utility) */}
+      <div id="admin-utility" className="admin-jump-target">
       <div id="utility" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
@@ -1194,9 +1215,10 @@ export default function AdminPage() {
           />
         )}
       </div>
+      </div>
 
       {/* GitHub data refresh */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-github" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>GitHub data</h2>
@@ -1236,7 +1258,7 @@ export default function AdminPage() {
       </div>
 
       {/* Build brief */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-brief" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Build brief</h2>
@@ -1276,6 +1298,7 @@ export default function AdminPage() {
       </div>
 
       {/* Secondary-account Yesterday's Builds — newspaper desk */}
+      <div id="admin-builds" className="admin-jump-target">
       <ExternalBriefsNewspaper
         admin
         briefs={externalBriefs}
@@ -1284,13 +1307,15 @@ export default function AdminPage() {
         results={externalResults}
         onRegenerate={id => void regenerateExternalBrief(id)}
       />
+      </div>
 
       {/* The Wire — MCP registry */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-wire" className="admin-jump-target" style={{ marginBottom: '32px' }}>
+        <div id="wire" />
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>The Wire</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.55 }}>
               New tools published to the public MCP registry since the last successful collection. Runs automatically with the nightly digest; use this to pull immediately. Running it twice in a row should return almost nothing — that means the watermark is working.
             </p>
           </div>
@@ -1323,10 +1348,15 @@ export default function AdminPage() {
             {wireResult}
           </div>
         )}
+        <McpWireInbox record={wireAdmin} />
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '16px 0 8px' }}>
+          Newspaper preview — what would print from the kept items (admin only, not on the public page):
+        </p>
+        <McpWire wire={wireAdmin?.snapshot ?? null} admin />
       </div>
 
       {/* Needle */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-needle" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>The Needle</h2>
@@ -1368,7 +1398,7 @@ export default function AdminPage() {
       <AdminStarterKitShare />
 
       {/* Overheard — podcast mentions */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-overheard" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Overheard (podcast mentions)</h2>
@@ -1441,7 +1471,7 @@ export default function AdminPage() {
       </div>
 
       {/* Podcast mentions review */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-podcast-review" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Podcast mentions review</h2>
@@ -1669,10 +1699,11 @@ export default function AdminPage() {
             </div>
           </>
         )}
+        <AdminBackToNav />
       </div>
 
       {/* Spotted — X mentions */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-spotted" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Spotted (X mentions)</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
@@ -1942,10 +1973,11 @@ export default function AdminPage() {
             ))}
           </div>
         )}
+        <AdminBackToNav />
       </div>
 
       {/* Scoring context (Chronicle-grounded) */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-scoring-context" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Scoring context</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px' }}>
@@ -1993,7 +2025,7 @@ export default function AdminPage() {
       </div>
 
       {/* Community context moderation — launch fast-track + emergency kill-switch */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-community" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Community context</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px', lineHeight: 1.6 }}>
@@ -2140,10 +2172,11 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+        <AdminBackToNav />
       </div>
 
       {/* Filter collections — homepage repo filters */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-filters" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Filter collections</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '640px', lineHeight: 1.6 }}>
@@ -2322,7 +2355,7 @@ export default function AdminPage() {
       </div>
 
       {/* Scoring v2 — bulk regenerate */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-bulk" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Bulk regenerate (Live AI)</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>
@@ -2416,10 +2449,11 @@ export default function AdminPage() {
             {bulkResult}
           </div>
         )}
+        <AdminBackToNav />
       </div>
 
       {/* Auto-scored repos */}
-      <div style={{ marginBottom: '32px' }}>
+      <div id="admin-scores" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Auto-inferred scores</h2>
