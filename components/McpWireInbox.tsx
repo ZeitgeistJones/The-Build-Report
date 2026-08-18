@@ -1,6 +1,7 @@
-import type { McpWireAdminRecord, McpWireStatus, WireInboxRow } from '@/lib/mcpWire'
+import type { McpWireAdminRecord, McpWireStatus, WireInboxRow, WirePile } from '@/lib/mcpWire'
+import { WHY_SHOWN_LABEL, type WireWhyCode } from '@/lib/mcpWireSignals'
 
-const KIND_LABEL: Record<WireInboxRow['kind'], string> = {
+const KIND_HAPPENED: Record<WireInboxRow['kind'], string> = {
   new: 'NEW',
   revised: 'UPDATED',
   withdrawn: 'WITHDRAWN',
@@ -20,11 +21,110 @@ function fmtTime(at: string): string {
   return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC')
 }
 
-function fmtCollected(at: string): string {
-  if (!at) return '—'
-  const d = new Date(at)
-  if (Number.isNaN(d.getTime())) return at
-  return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC')
+function pileOf(row: WireInboxRow): WirePile {
+  return row.pile ?? (row.keep ? 'routine' : 'filtered')
+}
+
+function reasonLine(code: WireWhyCode, count: number) {
+  const labels: Record<WireWhyCode, string> = {
+    tracked: 'tracked-project matches',
+    newTool: 'new tools',
+    crypto: 'crypto/onchain tools',
+    realCode: 'with public source repos',
+    withdrawn: 'withdrawals',
+    majorChange: 'major capability changes',
+    consequential: 'consequential-access tools',
+    firstRelease: 'first/major releases',
+  }
+  return `${count} ${labels[code]}`
+}
+
+function InboxCard({ row }: { row: WireInboxRow }) {
+  const pile = pileOf(row)
+  const why = row.whyShown ?? []
+
+  return (
+    <li className="wire-card">
+      {pile === 'show' && why.length > 0 && (
+        <div className="wire-card__labels">
+          {why.map(code => (
+            <span key={code} className="wire-card__label">
+              {WHY_SHOWN_LABEL[code]}
+            </span>
+          ))}
+        </div>
+      )}
+      {pile === 'filtered' && (
+        <span className="wire-inbox__keep is-skip">SKIP</span>
+      )}
+      <p className="wire-card__title">{row.title || row.name}</p>
+      <p className="wire-card__what">
+        <strong>What it is:</strong> {row.whatItIs || row.description || '—'}
+      </p>
+      <p className="wire-card__what">
+        <strong>What happened:</strong> {row.whatHappened || KIND_HAPPENED[row.kind]}
+      </p>
+      <p className="wire-card__why">
+        <strong>{pile === 'filtered' ? 'Why skipped:' : 'Why shown:'}</strong>{' '}
+        {row.whyShownText || row.reason}
+      </p>
+      {row.tracked && (
+        <p className="wire-card__tracked">
+          Tracked as: {row.tracked.label}{' '}
+          <a href={row.tracked.buildsHref}>Yesterday’s Builds ↗</a>
+        </p>
+      )}
+      <details className="wire-card__tech">
+        <summary>Technical details</summary>
+        <div className="wire-inbox__meta">
+          <span>{row.name}</span>
+          {row.version && <span>v{row.version}</span>}
+          <span>{fmtTime(row.at)}</span>
+          {row.publisher && <span>publisher: {row.publisher}</span>}
+          {row.repoUrl && (
+            <a href={row.repoUrl} target="_blank" rel="noreferrer">
+              {row.repoUrl}
+            </a>
+          )}
+        </div>
+      </details>
+    </li>
+  )
+}
+
+function Pile({
+  title,
+  count,
+  stored,
+  defaultOpen,
+  note,
+  rows,
+}: {
+  title: string
+  count: number
+  stored: number
+  defaultOpen?: boolean
+  note?: string
+  rows: WireInboxRow[]
+}) {
+  return (
+    <details className="wire-pile" open={defaultOpen}>
+      <summary>
+        {title} — {count}
+        {stored < count ? ` (showing ${stored})` : ''}
+      </summary>
+      {note && <p className="wire-pile__note">{note}</p>}
+      {rows.length === 0 ? (
+        <p className="wire-inbox__empty">None in this collection.</p>
+      ) : (
+        <ul className="wire-inbox__list">
+          {rows.map((row, i) => (
+            <InboxCard key={`${row.name}-${row.version}-${i}`} row={row} />
+          ))}
+        </ul>
+      )}
+    </details>
+  )
 }
 
 export default function McpWireInbox({ record }: { record: McpWireAdminRecord | null }) {
@@ -37,18 +137,24 @@ export default function McpWireInbox({ record }: { record: McpWireAdminRecord | 
   }
 
   const status = statusLabel(record.snapshot.status)
-  const skipped = record.skippedFilterCount + record.skippedOtherCount
+  const showMe = record.showMeCount ?? 0
+  const routine = record.routineCount ?? 0
+  const filtered = record.filteredCount ?? record.skippedFilterCount + record.skippedOtherCount
+  const showRows = record.inbox.filter(r => pileOf(r) === 'show')
+  const routineRows = record.inbox.filter(r => pileOf(r) === 'routine')
+  const filteredRows = record.inbox.filter(r => pileOf(r) === 'filtered')
+  const reasonEntries = Object.entries(record.reasonCounts ?? {}) as [WireWhyCode, number][]
 
   return (
     <div className="wire-inbox">
       <p className="wire-inbox__explain">
-        MCP tools are connectors that let AI assistants use outside services, APIs, data, or software.
-        The Wire watches the public MCP Registry for new or changed connectors from projects across the
-        wider ecosystem.
+        MCP tools are connectors that let AI assistants use outside services, APIs, data, software,
+        wallets, browsers, databases, and other systems. The Wire watches the public MCP Registry for
+        new or changed connectors from projects across the wider ecosystem.
       </p>
       <p className="wire-inbox__explain wire-inbox__explain--desk">
-        This inbox is the mailroom: everything the registry sent us, then what the robot editor kept or
-        threw away. The newspaper preview below is only the kept items that would print.
+        You should not need to read the whole firehose. SHOW ME is the short list. Routine updates and
+        filtered noise stay collapsed.
       </p>
 
       <dl className="wire-inbox__summary">
@@ -61,16 +167,16 @@ export default function McpWireInbox({ record }: { record: McpWireAdminRecord | 
           <dd>{record.rawRegistryRows}</dd>
         </div>
         <div>
-          <dt>Kept as potentially interesting</dt>
-          <dd>{record.keptCount}</dd>
+          <dt>Surfaced events</dt>
+          <dd>{showMe}</dd>
         </div>
         <div>
-          <dt>Skipped by our filter</dt>
-          <dd>{record.skippedFilterCount}</dd>
+          <dt>Routine updates</dt>
+          <dd>{routine}</dd>
         </div>
         <div>
-          <dt>Printed in the newspaper preview</dt>
-          <dd>{record.printedCount}</dd>
+          <dt>Filtered / noise</dt>
+          <dd>{filtered}</dd>
         </div>
         <div>
           <dt>Pages fetched</dt>
@@ -80,12 +186,12 @@ export default function McpWireInbox({ record }: { record: McpWireAdminRecord | 
           </dd>
         </div>
         <div>
-          <dt>Window start</dt>
-          <dd>Checking since {record.since || '—'}</dd>
+          <dt>Checking since</dt>
+          <dd>{record.since || '—'}</dd>
         </div>
         <div>
           <dt>Collection time</dt>
-          <dd>{fmtCollected(record.snapshot.collectedAt)}</dd>
+          <dd>{fmtTime(record.snapshot.collectedAt)}</dd>
         </div>
         <div>
           <dt>Watermark</dt>
@@ -95,54 +201,48 @@ export default function McpWireInbox({ record }: { record: McpWireAdminRecord | 
               : `NOT advanced (still ${record.snapshot.through || 'none'})`}
           </dd>
         </div>
-        {record.skippedOtherCount > 0 && (
-          <div>
-            <dt>Skipped for other reasons</dt>
-            <dd>{record.skippedOtherCount} (no description or missing listing metadata)</dd>
-          </div>
-        )}
       </dl>
 
-      {record.snapshot.error && (
-        <p className="wire-inbox__error">{record.snapshot.error}</p>
-      )}
+      {record.snapshot.error && <p className="wire-inbox__error">{record.snapshot.error}</p>}
 
       <p className="wire-inbox__counts">
-        {record.consideredCount} listings considered · {record.keptCount} kept · {skipped} skipped
-        {record.inboxCapped
-          ? ` · showing ${record.inbox.length} of ${record.inboxTotal} (inbox cap ${record.inboxCap})`
-          : ''}
+        {record.consideredCount} registry changes
+        {record.inboxCapped ? ' · some piles are capped in storage (counts above are complete)' : ''}
       </p>
 
-      {record.inbox.length === 0 ? (
-        <p className="wire-inbox__empty">No listings in this window.</p>
-      ) : (
-        <ul className="wire-inbox__list">
-          {record.inbox.map((row, i) => (
-            <li key={`${row.name}-${row.version}-${i}`} className="wire-inbox__row">
-              <div className="wire-inbox__row-top">
-                <span className={`wire-inbox__keep ${row.keep ? 'is-keep' : 'is-skip'}`}>
-                  {row.keep ? 'KEEP' : 'SKIP'}
-                </span>
-                <span className="wire-inbox__kind">{KIND_LABEL[row.kind]}</span>
-                <span className="wire-inbox__title">{row.title || row.name}</span>
-                <span className="wire-inbox__when">{fmtTime(row.at)}</span>
-              </div>
-              {row.title && <div className="wire-inbox__slug">{row.name}</div>}
-              {row.description && <p className="wire-inbox__desc">{row.description}</p>}
-              <p className="wire-inbox__reason">Reason: {row.reason}</p>
-              <div className="wire-inbox__meta">
-                {row.version && <span>v{row.version}</span>}
-                {row.repoUrl && (
-                  <a href={row.repoUrl} target="_blank" rel="noreferrer">
-                    {row.repoUrl}
-                  </a>
-                )}
-              </div>
-            </li>
-          ))}
+      {reasonEntries.length > 0 && (
+        <ul className="wire-inbox__reason-counts">
+          {reasonEntries
+            .filter(([, n]) => n > 0)
+            .map(([code, n]) => (
+              <li key={code}>{reasonLine(code, n)}</li>
+            ))}
+          <li className="wire-inbox__overlap">SHOW ME labels can overlap on one listing.</li>
         </ul>
       )}
+
+      <Pile
+        title="SHOW ME"
+        count={showMe}
+        stored={record.showStored ?? showRows.length}
+        defaultOpen
+        note="Concrete events with a factual reason to look."
+        rows={showRows}
+      />
+      <Pile
+        title="ROUTINE UPDATES"
+        count={routine}
+        stored={record.routineStored ?? routineRows.length}
+        note="Existing listings that changed in a low-value way (version bump, metadata, no obvious new capability)."
+        rows={routineRows}
+      />
+      <Pile
+        title="FILTERED / NOISE"
+        count={filtered}
+        stored={record.filteredStored ?? filteredRows.length}
+        note="Excluded by the current low-interest filter (marketing, casino/betting, crypto/trading signals) or missing listing metadata."
+        rows={filteredRows}
+      />
     </div>
   )
 }

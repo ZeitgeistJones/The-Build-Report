@@ -1,4 +1,13 @@
 import { getRedis } from '@/lib/redis'
+import {
+  composeWhyShownText,
+  firstSentence,
+  happenedLine,
+  parseGithubOwnerRepo,
+  surfaceWhy,
+  type TrackedProjectHit,
+  type WireWhyCode,
+} from '@/lib/mcpWireSignals'
 
 const REGISTRY = 'https://registry.modelcontextprotocol.io/v0.1/servers'
 const WIRE_KEY = 'build-report:mcp-wire'
@@ -8,6 +17,9 @@ const TTL_SECONDS = 60 * 60 * 24 * 90
 export const PAGE_CAP = 40
 export const PRINT_CAP = 6
 export const INBOX_CAP = 250
+export const SHOW_STORE_CAP = 80
+export const ROUTINE_STORE_CAP = 50
+export const FILTERED_STORE_CAP = 80
 
 /** One dispatch on the wire (newspaper preview / public snapshot). */
 export type WireItem = {
@@ -37,9 +49,12 @@ export type McpWireSnapshot = {
   error?: string
 }
 
-/** One piece of mail in the admin inbox — keep or skip, with a plain-English why. */
+export type WirePile = 'show' | 'routine' | 'filtered'
+
+/** One piece of mail in the admin inbox. */
 export type WireInboxRow = {
   keep: boolean
+  pile: WirePile
   kind: WireItem['kind'] | 'unknown'
   title?: string
   name: string
@@ -49,6 +64,12 @@ export type WireInboxRow = {
   at: string
   reason: string
   filterBucket?: 'marketing' | 'casino' | 'signals'
+  whatItIs?: string
+  whatHappened?: string
+  whyShown?: WireWhyCode[]
+  whyShownText?: string
+  tracked?: TrackedProjectHit | null
+  publisher?: string
 }
 
 export type McpWireAdminRecord = {
@@ -64,10 +85,17 @@ export type McpWireAdminRecord = {
   skippedFilterCount: number
   skippedOtherCount: number
   printedCount: number
+  showMeCount: number
+  routineCount: number
+  filteredCount: number
+  reasonCounts: Partial<Record<WireWhyCode, number>>
   inbox: WireInboxRow[]
   inboxCap: number
   inboxCapped: boolean
   inboxTotal: number
+  showStored: number
+  routineStored: number
+  filteredStored: number
 }
 
 type RegistryMeta = {
@@ -181,7 +209,13 @@ export async function fetchChangesSince(
   return { rows, pagesFetched: pages, complete: false }
 }
 
-type ServerEntry = { row: RegistryRow; meta: RegistryMeta; versions: number }
+type ServerEntry = {
+  row: RegistryRow
+  meta: RegistryMeta
+  versions: number
+  oldestDescription: string
+  newestDescription: string
+}
 
 function collapseByServer(rows: RegistryRow[]): {
   byServer: Map<string, ServerEntry>
@@ -198,17 +232,32 @@ function collapseByServer(rows: RegistryRow[]): {
       continue
     }
 
+    const description = (row.server?.description ?? '').trim()
     const existing = byServer.get(name)
     const at = meta.updatedAt ?? meta.publishedAt ?? ''
     const existingAt = existing?.meta.updatedAt ?? existing?.meta.publishedAt ?? ''
 
     if (!existing) {
-      byServer.set(name, { row, meta, versions: 1 })
+      byServer.set(name, {
+        row,
+        meta,
+        versions: 1,
+        oldestDescription: description,
+        newestDescription: description,
+      })
+    } else if (at >= existingAt) {
+      byServer.set(name, {
+        row,
+        meta,
+        versions: existing.versions + 1,
+        oldestDescription: existing.oldestDescription || description,
+        newestDescription: description,
+      })
     } else {
       byServer.set(name, {
-        row: at > existingAt ? row : existing.row,
-        meta: at > existingAt ? meta : existing.meta,
+        ...existing,
         versions: existing.versions + 1,
+        oldestDescription: description || existing.oldestDescription,
       })
     }
   }
@@ -227,6 +276,7 @@ function inboxFromUnnamed(row: RegistryRow): WireInboxRow {
   const s = row.server
   return {
     keep: false,
+    pile: 'filtered',
     kind: 'unknown',
     title: s?.title?.trim() || undefined,
     name: s?.name?.trim() || '(unnamed listing)',
@@ -235,6 +285,11 @@ function inboxFromUnnamed(row: RegistryRow): WireInboxRow {
     repoUrl: s?.repository?.url,
     at: '',
     reason: 'Skipped — no registry name or official listing metadata.',
+    whatItIs: firstSentence((s?.description ?? '').trim()),
+    whatHappened: happenedLine('unknown'),
+    whyShown: [],
+    whyShownText: 'Skipped — no registry name or official listing metadata.',
+    publisher: parseGithubOwnerRepo(s?.repository?.url)?.owner,
   }
 }
 
@@ -248,8 +303,9 @@ function decideEntry(name: string, entry: ServerEntry): { item?: WireItem; row: 
   const version = s?.version ?? ''
   const repoUrl = s?.repository?.url
   const note = m.statusMessage?.trim() || undefined
+  const publisher = parseGithubOwnerRepo(repoUrl)?.owner
 
-  const base = {
+  const base: Omit<WireInboxRow, 'keep' | 'pile' | 'reason'> = {
     kind,
     title,
     name,
@@ -257,6 +313,9 @@ function decideEntry(name: string, entry: ServerEntry): { item?: WireItem; row: 
     version,
     repoUrl,
     at,
+    whatItIs: firstSentence(description),
+    whatHappened: happenedLine(kind),
+    publisher,
   }
 
   if (!description) {
@@ -264,7 +323,10 @@ function decideEntry(name: string, entry: ServerEntry): { item?: WireItem; row: 
       row: {
         ...base,
         keep: false,
+        pile: 'filtered',
         reason: 'Skipped — no description to evaluate.',
+        whyShown: [],
+        whyShownText: 'Skipped — no description to evaluate.',
       },
     }
   }
@@ -277,12 +339,25 @@ function decideEntry(name: string, entry: ServerEntry): { item?: WireItem; row: 
         row: {
           ...base,
           keep: false,
+          pile: 'filtered',
           reason: hit.reason,
           filterBucket: hit.bucket,
+          whyShown: [],
+          whyShownText: hit.reason,
         },
       }
     }
   }
+
+  const surfaced = surfaceWhy({
+    kind,
+    name,
+    title,
+    description,
+    version,
+    repoUrl,
+    oldestDescription: entry.oldestDescription,
+  })
 
   const item: WireItem = {
     name,
@@ -295,15 +370,31 @@ function decideEntry(name: string, entry: ServerEntry): { item?: WireItem; row: 
     at,
   }
 
+  if (surfaced.surface) {
+    return {
+      item,
+      row: {
+        ...base,
+        keep: true,
+        pile: 'show',
+        reason: surfaced.why.map(w => w).join(', '),
+        whyShown: surfaced.why,
+        whyShownText: composeWhyShownText({ why: surfaced.why, tracked: surfaced.tracked, kind }),
+        tracked: surfaced.tracked,
+      },
+    }
+  }
+
   return {
-    item,
     row: {
       ...base,
       keep: true,
-      reason:
-        kind === 'withdrawn'
-          ? 'Withdrawn listing — kept even if a low-interest filter would otherwise apply.'
-          : 'No low-interest filter matched.',
+      pile: 'routine',
+      reason: 'Routine update — no SHOW ME signal.',
+      whyShown: [],
+      whyShownText:
+        'No tracked-project, crypto/onchain, consequential-access, withdrawal, or first-release signal — treated as a routine update.',
+      tracked: surfaced.tracked,
     },
   }
 }
@@ -319,42 +410,75 @@ export function buildWireCollection(rows: RegistryRow[]): {
   keptCount: number
   skippedFilterCount: number
   skippedOtherCount: number
+  showMeCount: number
+  routineCount: number
+  filteredCount: number
+  reasonCounts: Partial<Record<WireWhyCode, number>>
 } {
   const { byServer, unnamed } = collapseByServer(rows)
+  const allRows: WireInboxRow[] = []
   const items: WireItem[] = []
-  const inbox: WireInboxRow[] = []
   let skippedFilterCount = 0
   let skippedOtherCount = unnamed.length
 
-  for (const row of unnamed) inbox.push(inboxFromUnnamed(row))
+  for (const row of unnamed) allRows.push(inboxFromUnnamed(row))
 
   for (const [name, entry] of byServer) {
     const decided = decideEntry(name, entry)
-    inbox.push(decided.row)
-    if (decided.item) {
-      items.push(decided.item)
-    } else if (decided.row.filterBucket) {
-      skippedFilterCount += 1
-    } else {
-      skippedOtherCount += 1
+    allRows.push(decided.row)
+    if (decided.item) items.push(decided.item)
+    else if (decided.row.filterBucket) skippedFilterCount += 1
+    else skippedOtherCount += 1
+  }
+
+  const show = allRows.filter(r => r.pile === 'show')
+  const routine = allRows.filter(r => r.pile === 'routine')
+  const filtered = allRows.filter(r => r.pile === 'filtered')
+
+  const rank = { withdrawn: 0, new: 1, revised: 2, unknown: 3 }
+  show.sort(
+    (a, b) =>
+      Number(!!b.tracked) - Number(!!a.tracked) ||
+      rank[a.kind] - rank[b.kind] ||
+      (b.at || '').localeCompare(a.at || ''),
+  )
+  routine.sort((a, b) => (b.at || '').localeCompare(a.at || ''))
+  filtered.sort((a, b) => (b.at || '').localeCompare(a.at || ''))
+
+  const reasonCounts: Partial<Record<WireWhyCode, number>> = {}
+  for (const row of show) {
+    for (const code of row.whyShown ?? []) {
+      reasonCounts[code] = (reasonCounts[code] ?? 0) + 1
     }
   }
 
-  const rank = { withdrawn: 0, new: 1, revised: 2 }
-  items.sort((a, b) => rank[a.kind] - rank[b.kind] || b.at.localeCompare(a.at))
+  const stored = [
+    ...show.slice(0, SHOW_STORE_CAP),
+    ...routine.slice(0, ROUTINE_STORE_CAP),
+    ...filtered.slice(0, FILTERED_STORE_CAP),
+  ]
 
-  inbox.sort((a, b) => {
-    if (a.keep !== b.keep) return a.keep ? -1 : 1
-    return (b.at || '').localeCompare(a.at || '')
-  })
+  const printItems: WireItem[] = show.map(r => ({
+    name: r.name,
+    title: r.title,
+    description: r.description,
+    version: r.version,
+    kind: r.kind === 'unknown' ? 'revised' : r.kind,
+    repoUrl: r.repoUrl,
+    at: r.at,
+  }))
 
   return {
-    items,
-    inbox,
+    items: printItems,
+    inbox: stored,
     rawCount: rows.length,
-    keptCount: items.length,
+    keptCount: show.length + routine.length,
     skippedFilterCount,
     skippedOtherCount,
+    showMeCount: show.length,
+    routineCount: routine.length,
+    filteredCount: filtered.length,
+    reasonCounts,
   }
 }
 
@@ -382,10 +506,17 @@ function emptyAdminRecord(
     skippedFilterCount: 0,
     skippedOtherCount: 0,
     printedCount: 0,
+    showMeCount: 0,
+    routineCount: 0,
+    filteredCount: 0,
+    reasonCounts: {},
     inbox: [],
     inboxCap: INBOX_CAP,
     inboxCapped: false,
     inboxTotal: 0,
+    showStored: 0,
+    routineStored: 0,
+    filteredStored: 0,
     ...extras,
   }
 }
@@ -435,14 +566,14 @@ export async function collectMcpWireDetailed(
       status,
       through,
       items: printed,
-      totalChanges: built.keptCount,
+      totalChanges: built.showMeCount,
       collectedAt,
       error: fetched.complete
         ? undefined
         : `Page safety limit reached (${fetched.pagesFetched} of ${PAGE_CAP} max pages). Watermark not advanced.`,
     }
 
-    const inboxTotal = built.inbox.length
+    const inboxTotal = built.showMeCount + built.routineCount + built.filteredCount
     const record: McpWireAdminRecord = {
       snapshot,
       since,
@@ -456,10 +587,20 @@ export async function collectMcpWireDetailed(
       skippedFilterCount: built.skippedFilterCount,
       skippedOtherCount: built.skippedOtherCount,
       printedCount: printed.length,
-      inbox: built.inbox.slice(0, INBOX_CAP),
+      showMeCount: built.showMeCount,
+      routineCount: built.routineCount,
+      filteredCount: built.filteredCount,
+      reasonCounts: built.reasonCounts,
+      inbox: built.inbox,
       inboxCap: INBOX_CAP,
-      inboxCapped: inboxTotal > INBOX_CAP,
+      inboxCapped:
+        built.showMeCount > SHOW_STORE_CAP ||
+        built.routineCount > ROUTINE_STORE_CAP ||
+        built.filteredCount > FILTERED_STORE_CAP,
       inboxTotal,
+      showStored: Math.min(built.showMeCount, SHOW_STORE_CAP),
+      routineStored: Math.min(built.routineCount, ROUTINE_STORE_CAP),
+      filteredStored: Math.min(built.filteredCount, FILTERED_STORE_CAP),
     }
 
     await savePublic(snapshot)
@@ -523,12 +664,17 @@ export async function getMcpWireAdmin(dateKey: string): Promise<McpWireAdminReco
 }
 
 export function wireRefreshSummary(record: McpWireAdminRecord): string {
-  const skipped = record.skippedFilterCount + record.skippedOtherCount
   if (record.snapshot.status === 'failed') {
-    return `Failed — registry unavailable. Watermark NOT advanced.`
+    return 'Failed — Registry unavailable. Watermark NOT advanced.'
   }
   if (record.snapshot.status === 'partial') {
-    return `Partial — page safety limit reached. Watermark NOT advanced.`
+    return 'Partial — page safety limit reached. Watermark NOT advanced.'
   }
-  return `Complete — ${record.consideredCount} registry changes checked, ${record.keptCount} kept, ${skipped} skipped.`
+  const checked = record.consideredCount
+  const surfaced = record.showMeCount ?? 0
+  if (checked === 0) return 'Complete — no new Registry changes.'
+  if (checked === 1) {
+    return `Complete — 1 new registry change checked, ${surfaced} surfaced.`
+  }
+  return `Complete — ${checked} registry changes checked, ${surfaced} surfaced.`
 }

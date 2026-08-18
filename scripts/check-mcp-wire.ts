@@ -16,6 +16,8 @@ import {
   type McpWireSnapshot,
   type RegistryRow,
 } from '../lib/mcpWire'
+import { matchTrackedProject } from '../lib/mcpWireSignals'
+import { resolveAdminSectionId } from '../lib/adminNav'
 
 function expect(name: string, cond: boolean) {
   if (!cond) throw new Error(`FAIL: ${name}`)
@@ -127,7 +129,7 @@ async function main() {
   expect('failed watermark not advanced', store.admin?.watermarkAdvanced === false)
   expect(
     'failed summary',
-    wireRefreshSummary(store.admin!) === 'Failed — registry unavailable. Watermark NOT advanced.',
+    wireRefreshSummary(store.admin!) === 'Failed — Registry unavailable. Watermark NOT advanced.',
   )
 }
 
@@ -213,14 +215,14 @@ expect(
   ])
 
   const byName = Object.fromEntries(built.inbox.map(r => [r.name, r]))
-  expect('kept calendar', byName['io.example/calendar']?.keep === true)
+  expect('calendar is routine, not filtered', byName['io.example/calendar']?.pile === 'routine')
   expect(
-    'kept reason is plain English',
-    byName['io.example/calendar']?.reason === 'No low-interest filter matched.',
+    'routine reason is plain English',
+    (byName['io.example/calendar']?.whyShownText ?? '').toLowerCase().includes('routine'),
   )
   expect(
     'marketing skip reason',
-    byName['io.example/ads']?.keep === false &&
+    byName['io.example/ads']?.pile === 'filtered' &&
       byName['io.example/ads']?.reason === 'Matched marketing/advertising filter.',
   )
   expect(
@@ -233,9 +235,10 @@ expect(
   )
   expect(
     'crypto-agent project is not filtered as signals',
-    byName['io.example/clawd-agent']?.keep === true,
+    byName['io.example/clawd-agent']?.pile !== 'filtered',
   )
-  expect('kept distinguishable from skipped', built.keptCount === 2 && built.skippedFilterCount === 3)
+  expect('crypto-agent is surfaced as onchain', byName['io.example/clawd-agent']?.pile === 'show')
+  expect('piles distinguishable', built.showMeCount === 1 && built.routineCount === 1 && built.filteredCount === 5)
   expect('empty description skipped with reason', byName['io.example/empty']?.reason.includes('no description'))
 }
 
@@ -270,10 +273,91 @@ expect(
     }),
   })
   expect(
-    'complete summary names kept vs skipped',
-    wireRefreshSummary(record) === 'Complete — 2 registry changes checked, 1 kept, 1 skipped.',
+    'complete summary names surfaced count',
+    wireRefreshSummary(record) === 'Complete — 2 registry changes checked, 0 surfaced.',
   )
-  expect('admin inbox has both decisions', record.inbox.length === 2 && record.inbox.some(r => r.keep) && record.inbox.some(r => !r.keep))
+  expect(
+    'admin inbox has routine vs filtered',
+    record.inbox.some(r => r.pile === 'routine') && record.inbox.some(r => r.pile === 'filtered'),
+  )
+}
+
+{
+  const mastra = matchTrackedProject({
+    name: 'io.github.mastra-ai/mastra',
+    title: 'Mastra Wallet Tools',
+    repoUrl: 'https://github.com/mastra-ai/mastra',
+  })
+  expect('tracked match uses github owner/repo', mastra?.label === 'Mastra')
+
+  const descriptionOnly = matchTrackedProject({
+    name: 'com.random/tools',
+    title: 'Helper',
+    repoUrl: undefined,
+  })
+  expect('no match from empty identifiers', descriptionOnly === null)
+
+  const vague = matchTrackedProject({
+    name: 'com.acme/notes',
+    title: 'A mastra-like agent',
+    repoUrl: 'https://github.com/acme/notes',
+  })
+  expect('no fuzzy title/description match', vague === null)
+
+  const googleNoise = matchTrackedProject({
+    name: 'io.github.google/drive',
+    repoUrl: 'https://github.com/google/drive',
+  })
+  expect('broad org requires focus repo', googleNoise === null)
+
+  const googleHit = matchTrackedProject({
+    name: 'io.github.google/adk-python',
+    repoUrl: 'https://github.com/google/adk-python',
+  })
+  expect('google adk focus repo matches', googleHit?.label === 'Google ADK')
+
+  const baseNoise = matchTrackedProject({
+    name: 'io.github.base/paymaster',
+    repoUrl: 'https://github.com/base/paymaster',
+  })
+  expect('generic Base org is not a blanket match', baseNoise === null)
+}
+
+{
+  const built = buildWireCollection([
+    listing({
+      name: 'io.github.mastra-ai/mastra',
+      title: 'Mastra Wallet Tools',
+      description: 'Lets an assistant inspect blockchain wallet data.',
+      repoUrl: 'https://github.com/mastra-ai/mastra',
+    }),
+    listing({
+      name: 'io.example/fs',
+      description: 'Read local files.',
+      publishedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-08-17T10:00:00.000Z',
+    }),
+    listing({
+      name: 'io.example/ads',
+      description: 'An advertising campaign manager.',
+    }),
+  ])
+  expect('mastra is SHOW ME', built.showMeCount === 1)
+  expect('file connector is routine', built.routineCount === 1)
+  expect('ads is filtered', built.filteredCount === 1)
+  const mastraRow = built.inbox.find(r => r.name.includes('mastra'))
+  expect('mastra has tracked why', !!mastraRow?.whyShown?.includes('tracked'))
+  expect('mastra why text names Yesterday’s Builds', (mastraRow?.whyShownText ?? '').includes('Yesterday'))
+}
+
+{
+  expect('hash #wire → admin-wire', resolveAdminSectionId('#wire') === 'admin-wire')
+  expect('hash #spotted → admin-spotted', resolveAdminSectionId('#spotted') === 'admin-spotted')
+  expect(
+    'hash #podcast-review → admin-podcast-review',
+    resolveAdminSectionId('#podcast-review') === 'admin-podcast-review',
+  )
+  expect('hash #utility stays utility', resolveAdminSectionId('#utility') === 'utility')
 }
 
 console.log('all mcp-wire checks passed')

@@ -1472,6 +1472,7 @@ export default function AdminPage() {
 
       {/* Podcast mentions review */}
       <div id="admin-podcast-review" className="admin-jump-target" style={{ marginBottom: '32px' }}>
+        <div id="podcast-review" />
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Podcast mentions review</h2>
@@ -1704,6 +1705,7 @@ export default function AdminPage() {
 
       {/* Spotted — X mentions */}
       <div id="admin-spotted" className="admin-jump-target" style={{ marginBottom: '32px' }}>
+        <div id="spotted" />
         <div style={{ marginBottom: '16px' }}>
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Spotted (X mentions)</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.6 }}>

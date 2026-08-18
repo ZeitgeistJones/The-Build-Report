@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 
+import { resolveAdminSectionId } from '@/lib/adminNav'
+
 type NavLink = { href: string; label: string; id: string }
 
 type NavGroup = { heading: string; links: NavLink[] }
@@ -38,25 +40,7 @@ const GROUPS: NavGroup[] = [
   },
 ]
 
-const HASH_ALIASES: Record<string, string> = {
-  wire: 'admin-wire',
-  builds: 'admin-builds',
-  brief: 'admin-brief',
-  needle: 'admin-needle',
-  overheard: 'admin-overheard',
-  podcast: 'admin-podcast-review',
-  spotted: 'admin-spotted',
-  github: 'admin-github',
-  'admin-utility': 'utility',
-}
-
 const SECTION_IDS = GROUPS.flatMap(g => g.links.map(l => l.id))
-
-function targetIdFromHash(hash: string): string | null {
-  const raw = hash.replace(/^#/, '')
-  if (!raw) return null
-  return HASH_ALIASES[raw] ?? raw
-}
 
 function scrollToAdminId(id: string) {
   const el = document.getElementById(id)
@@ -76,7 +60,7 @@ export default function AdminSectionNav() {
 
   useEffect(() => {
     const jump = () => {
-      const id = targetIdFromHash(window.location.hash)
+      const id = resolveAdminSectionId(window.location.hash)
       if (id && document.getElementById(id)) scrollToAdminId(id)
     }
     jump()
@@ -115,7 +99,7 @@ export default function AdminSectionNav() {
                 href={link.href}
                 className={active === link.id ? 'is-active' : undefined}
                 onClick={e => {
-                  const id = targetIdFromHash(link.href)
+                  const id = resolveAdminSectionId(link.href)
                   if (!id) return
                   e.preventDefault()
                   history.replaceState(null, '', link.href)
