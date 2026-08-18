@@ -1,6 +1,8 @@
 'use client'
 
 import { useNormieMode } from '@/components/NormieModeProvider'
+import YbIssueNav from '@/components/YbIssueNav'
+import { canonicalYbIssuePath } from '@/lib/ybIssue'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
   EXTERNAL_BRIEF_MAX_COMMITS,
@@ -21,6 +23,9 @@ type Props = {
   running?: Partial<Record<ExternalBriefAccountId, boolean>>
   results?: Partial<Record<ExternalBriefAccountId, string | null>>
   onRegenerate?: (id: ExternalBriefAccountId) => void
+  /** Public dated-issue nav. Omit on Admin. */
+  issueDateKey?: string
+  latestDateKey?: string
 }
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -331,6 +336,8 @@ export default function ExternalBriefsNewspaper({
   running = {},
   results = {},
   onRegenerate,
+  issueDateKey,
+  latestDateKey,
 }: Props) {
   const { normie } = useNormieMode()
 
@@ -357,7 +364,7 @@ export default function ExternalBriefsNewspaper({
   const seconds = filed.slice(1, 3)
   const shorts = filed.slice(3)
 
-  const anyDate = rows.map(r => r.brief?.dateKey).find(Boolean) ?? null
+  const anyDate = issueDateKey ?? rows.map(r => r.brief?.dateKey).find(Boolean) ?? null
   const issue = issueNumber(anyDate)
   const totalCommits = filed.reduce((sum, r) => sum + (r.brief?.commitCount ?? 0), 0)
   const totalRepos = filed.reduce((sum, r) => sum + (r.brief?.repoCount ?? 0), 0)
@@ -373,9 +380,25 @@ export default function ExternalBriefsNewspaper({
     <section className="ext-paper" aria-label="Yesterday's Builds">
       <div className="ext-paper-flag">
         <span className="ext-paper-flag__chip">{outlookFlag(totalCommits, filed.length)}</span>
-        <span className="ext-paper-flag__date">{anyDate ? formatLongDate(anyDate) : 'Edition pending'}</span>
+        <span className="ext-paper-flag__date">
+          {anyDate ? (
+            issueDateKey ? (
+              <a href={canonicalYbIssuePath(issueDateKey)} className="ext-paper-flag__date-link">
+                {formatLongDate(anyDate)}
+              </a>
+            ) : (
+              formatLongDate(anyDate)
+            )
+          ) : (
+            'Edition pending'
+          )}
+        </span>
         <span className="ext-paper-flag__issue">{issue ? `Issue No. ${issue}` : 'Issue —'}</span>
       </div>
+
+      {issueDateKey && latestDateKey && (
+        <YbIssueNav dateKey={issueDateKey} latestDateKey={latestDateKey} />
+      )}
 
       <header className="ext-paper-masthead">
         <h2 className="ext-paper-masthead__title">Yesterday&apos;s Builds</h2>
