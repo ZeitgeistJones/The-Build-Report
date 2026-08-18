@@ -9,7 +9,7 @@ import { shouldSkipRepo } from '@/lib/repoFilters'
 import { REPOS, type Repo } from '@/lib/scores'
 import type { GitHubStats } from '@/lib/github'
 import { stripMarkdown } from '@/lib/textCleanup'
-import { missingNamedRepos, normieVoiceGuidance } from '@/lib/normieVoice'
+import { missingNamedRepos, NORMIE_TEMPERATURE, normieVoiceGuidance } from '@/lib/normieVoice'
 import { BRIEF_DATES_INDEX_KEY, indexArchiveDate } from '@/lib/archiveIndex'
 import {
   calcBuilderGrade,
@@ -75,6 +75,8 @@ export interface DailyDigestCache {
   generatedAt: string
   /** 'ai' = model writeup. 'fallback' = template. Cron retries fallbacks so a failed night cannot stick. */
   source?: 'ai' | 'fallback'
+  /** Generate-time Gemini error. Not stored in Redis. */
+  geminiError?: string
 }
 
 export interface BuildBriefData {
@@ -395,7 +397,7 @@ async function generateDigestWithAi(
 ): Promise<DigestAiPayload | null> {
   if (!hasGeminiApiKey()) return null
 
-  const prompt = `You write copy for The Build Report — an independent dashboard that tracks clawdbotatg's GitHub repos for $CLAWD holders.
+  const facts = `You write copy for The Build Report — an independent dashboard that tracks clawdbotatg's GitHub repos for $CLAWD holders.
 
 Summarize ${mountainDateKey} (America/Denver / Mountain calendar day, midnight to midnight).
 
@@ -403,34 +405,93 @@ COMMITS THAT DAY (sampled active repos only — do not invent repos or work):
 ${formatActivityForPrompt(activity, mountainDateKey)}
 
 CURRENT GRADES (use for context; card copy should match the period label):
-${gradeContext}
+${gradeContext}`
+
+  const overview = await generateDigestOverview(facts, activity)
+  if (!overview) return null
+  const cards = await generateDigestCards(facts)
+  return { ...overview, cards: cards ?? ({} as DailyDigestCards) }
+}
+
+async function generateDigestOverview(
+  facts: string,
+  activity: RepoBuildActivity[],
+): Promise<Pick<DigestAiPayload, 'general' | 'generalNormie'> | null> {
+  const prompt = `${facts}
+
+Return ONLY valid JSON, no markdown fences:
+{"general":"…","generalNormie":"…"}
+
+Rules:
+- general: 5-6 complete sentences, meatier than any single card. Use the extra sentences to name specific repos/work from the commit list and explain why it matters to holders — not repetition. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.
+- generalNormie: same facts and the same repo slugs as general — simpler words, not a compressed summary. Keep every slug general names (optional short plain gloss after a name is fine). Never swap a named project for "the main interface", "the research team", "some backend fixes", or similar vague stand-ins. 2-5 sentences as needed; shorter only when the day was genuinely quiet.
+${normieVoiceGuidance('digestGeneral')}`
+
+  const { text, provider } = await generateTextGeminiOnly({
+    prompt,
+    maxTokens: 3072,
+    temperature: NORMIE_TEMPERATURE,
+    label: 'build-brief-overview',
+  })
+  if (!text) {
+    console.error('[build-brief] empty overview response', { provider })
+    return null
+  }
+  const parsed = parseDigestJson(text)
+  if (!parsed?.general?.trim()) {
+    console.error('[build-brief] failed to parse overview JSON', {
+      provider,
+      length: text.length,
+      preview: text.slice(0, 400),
+    })
+    return null
+  }
+
+  const general = stripMarkdown(parsed.general)
+  let generalNormie = parsed.generalNormie ? stripMarkdown(parsed.generalNormie) : undefined
+  const activitySlugs = activity.map(a => a.slug)
+  if (generalNormie) {
+    const missing = missingNamedRepos(general, generalNormie, activitySlugs)
+    if (missing.length > 0) {
+      console.warn('[build-brief] generalNormie dropped repo names; repairing', { missing })
+      const repaired = await repairGeneralNormie(general, generalNormie, missing)
+      if (repaired) {
+        const stillMissing = missingNamedRepos(general, repaired, activitySlugs)
+        if (stillMissing.length === 0) {
+          generalNormie = repaired
+        } else {
+          console.warn('[build-brief] generalNormie repair still missing names; dropping normie overview', {
+            stillMissing,
+          })
+          generalNormie = undefined
+        }
+      } else {
+        generalNormie = undefined
+      }
+    }
+  }
+
+  return { general, ...(generalNormie ? { generalNormie } : {}) }
+}
+
+async function generateDigestCards(facts: string): Promise<DailyDigestCards | null> {
+  const prompt = `${facts}
 
 Return ONLY valid JSON, no markdown fences:
 {
-  "general": "5-6 sentences. Plain English morning overview of what shipped yesterday. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.",
-  "generalNormie": "Same facts AND the same repo slugs as general, rewritten for someone who knows nothing about code or crypto — warmer and simpler words, not a shorter summary. Keep every repo name general uses; you may add a short plain gloss after a slug. Never replace a named repo with a vague stand-in. 2-5 sentences as needed (fewer only when honestly warranted). Follow the generalNormie voice guide below.",
   "cards": {
     "24h": {
       "builder": "2-3 sentences about builder activity for the last 24 hours.",
       "economic": "2-3 sentences about holder economics for the last 24 hours.",
-      "leverage": "2-3 sentences about shipping leverage (behind-the-scenes tooling and infrastructure that speeds up shipping holder value) for the last 24 hours.",
-      "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the last 24 hours.",
-      "normie": { "builder": "same as builder, extra-plain normie voice", "economic": "same as economic, extra-plain normie voice", "leverage": "same as leverage, extra-plain normie voice", "integrity": "same as integrity, extra-plain normie voice" }
+      "leverage": "2-3 sentences about shipping leverage for the last 24 hours.",
+      "integrity": "2-3 sentences about builder standards for the last 24 hours.",
+      "normie": { "builder": "…", "economic": "…", "leverage": "…", "integrity": "…" }
     },
-    "7d": {
-      "builder": "2-3 sentences about builder activity for the 7-day window.",
-      "economic": "2-3 sentences about holder economics (burn apps and supply locks) for the 7-day window.",
-      "leverage": "2-3 sentences about shipping leverage (tooling and infrastructure that multiplies holder-facing shipping) for the 7-day window.",
-      "integrity": "2-3 sentences about builder standards (safety, testing, transparency where work landed) for the 7-day window.",
-      "normie": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." }
-    },
-    "30d": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "...", "normie": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." } },
-    "60d": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "...", "normie": { "builder": "...", "economic": "...", "leverage": "...", "integrity": "..." } }
+    "7d": { "builder": "…", "economic": "…", "leverage": "…", "integrity": "…", "normie": { "builder": "…", "economic": "…", "leverage": "…", "integrity": "…" } },
+    "30d": { "builder": "…", "economic": "…", "leverage": "…", "integrity": "…", "normie": { "builder": "…", "economic": "…", "leverage": "…", "integrity": "…" } },
+    "60d": { "builder": "…", "economic": "…", "leverage": "…", "integrity": "…", "normie": { "builder": "…", "economic": "…", "leverage": "…", "integrity": "…" } }
   }
 }
-
-GENERAL NORMIE VOICE GUIDE (applies to generalNormie only):
-${normieVoiceGuidance('digestGeneral')}
 
 CARD NORMIE VOICE GUIDE (applies to every card "normie" field):
 ${normieVoiceGuidance('gradeCard')}
@@ -441,8 +502,6 @@ Rules:
 - If holder economics or builder standards have zero commit weight / empty sample, say we cannot draw a strong read for that window yet.
 - 60d cards: describe the two-month arc. Do not imply week-over-week trend or compare to a prior 60d window.
 - 24h with no activity: one short honest sentence per card beats three padded ones.
-- general: 5-6 complete sentences, meatier than any single card. Use the extra sentences to name specific repos/work from the commit list and explain why it matters to holders — not repetition.
-- generalNormie: same facts and the same repo slugs as general — simpler words, not a compressed summary. Keep every slug general names (optional short plain gloss after a name is fine). Never swap a named project for "the main interface", "the research team", "some backend fixes", or similar vague stand-ins. 2-5 sentences as needed; shorter only when the day was genuinely quiet.
 - CARD COPY MUST BE PLAIN WORDS — no percentages, letter grades, or raw stats dumps in the card fields. You MAY name specific projects when PER-PERIOD TOP PROJECTS shows one repo dominated that window.
 - Never use insider jargon in card copy: no "infra", "R&D", "commits", "repos", "rubric", "token mechanics", "TM", "supply-lock", "direct-tag". Explain like you're talking to a normal person who holds the token, not a developer.
 - Say "holder economics" or "how apps and locks serve $CLAWD holders" instead of "token mechanics" or "burn apps" alone.
@@ -450,92 +509,75 @@ Rules:
 - Builder standards copy = observable rubric quality where commits landed — safety, testing, transparency. Not a moral verdict on the builder. Never say "trust" without context (e.g. trust in documented safety practices). Not moralizing.
 - If standards context shows below 60% or mostly low-scoring commits, the copy must acknowledge weak rubric scores — do not describe the window as steady, polished, or low-risk unless that matches the grade context.
 - Holder economics context may show low holder-facing commit share — if so, say plainly that most shipping was background tooling and holder value delivery was thin this window.
-- The general overview MAY name specific repos and describe what shipped; the card fields should stay high-level and plain.`
+- Card fields should stay high-level and plain.`
 
   try {
     const { text, provider } = await generateTextGeminiOnly({
       prompt,
-      // Normie fields roughly doubled the JSON payload (general + generalNormie + 4 periods ×
-      // 8 fields). Gemini 3.x thinking shares this budget with visible text — keep headroom high
-      // so we do not truncate mid-JSON and silently fall back to the template.
-      maxTokens: 8192,
-      label: 'build-brief',
+      maxTokens: 6144,
+      temperature: NORMIE_TEMPERATURE,
+      label: 'build-brief-cards',
     })
     if (!text) {
-      console.error('[build-brief] empty LLM response', { provider })
+      console.warn('[build-brief] empty card response', { provider })
       return null
     }
-    const parsed = parseDigestJson(text)
-    if (!parsed) {
-      console.error('[build-brief] failed to parse digest JSON', {
+    const cards = parseCardsJson(text)
+    if (!cards) {
+      console.warn('[build-brief] card JSON incomplete — using live card copy', {
         provider,
         length: text.length,
-        preview: text.slice(0, 400),
+        preview: text.slice(0, 300),
       })
       return null
     }
-    const general = stripMarkdown(parsed.general)
-    let generalNormie = parsed.generalNormie ? stripMarkdown(parsed.generalNormie) : undefined
-    const activitySlugs = activity.map(a => a.slug)
-    if (generalNormie) {
-      const missing = missingNamedRepos(general, generalNormie, activitySlugs)
-      if (missing.length > 0) {
-        console.warn('[build-brief] generalNormie dropped repo names; repairing', { missing })
-        const repaired = await repairGeneralNormie(general, generalNormie, missing)
-        if (repaired) {
-          const stillMissing = missingNamedRepos(general, repaired, activitySlugs)
-          if (stillMissing.length === 0) {
-            generalNormie = repaired
-          } else {
-            console.warn('[build-brief] generalNormie repair still missing names; dropping normie overview', {
-              stillMissing,
-            })
-            generalNormie = undefined
-          }
-        } else {
-          generalNormie = undefined
-        }
-      }
-    }
-
-    if (!cardsAreComplete(parsed.cards)) {
-      console.warn('[build-brief] keeping AI overview; card JSON incomplete — using live card copy')
-      return {
-        general,
-        ...(generalNormie ? { generalNormie } : {}),
-        cards: {} as DailyDigestCards,
-      }
-    }
-
-    const mapRow = (row: CardBlurbs): CardBlurbs => ({
-      builder: stripMarkdown(row.builder),
-      economic: stripMarkdown(row.economic),
-      integrity: stripMarkdown(row.integrity),
-      ...(row.leverage ? { leverage: stripMarkdown(row.leverage) } : {}),
-      ...(row.normie
-        ? {
-            normie: {
-              builder: stripMarkdown(row.normie.builder),
-              economic: stripMarkdown(row.normie.economic),
-              integrity: stripMarkdown(row.normie.integrity),
-              ...(row.normie.leverage ? { leverage: stripMarkdown(row.normie.leverage) } : {}),
-            },
-          }
-        : {}),
-    })
-    return {
-      general,
-      ...(generalNormie ? { generalNormie } : {}),
-      cards: {
-        '24h': mapRow(parsed.cards['24h']),
-        '7d': mapRow(parsed.cards['7d']),
-        '30d': mapRow(parsed.cards['30d']),
-        '60d': mapRow(parsed.cards['60d']),
-      },
-    }
+    return cards
   } catch (err) {
-    console.error('[build-brief] digest AI generation failed:', err)
+    console.warn('[build-brief] card generation failed; using live card copy:', err)
     return null
+  }
+}
+
+function parseCardsJson(raw: string): DailyDigestCards | null {
+  const trimmed = raw.trim()
+  const start = trimmed.indexOf('{')
+  const end = trimmed.lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+  try {
+    const parsed = JSON.parse(trimmed.slice(start, end + 1)) as {
+      cards?: DailyDigestCards
+      '24h'?: CardBlurbs
+    }
+    const cards = parsed.cards ?? (parsed['24h'] ? (parsed as DailyDigestCards) : undefined)
+    if (!cardsAreComplete(cards)) return null
+    return mapDigestCards(cards)
+  } catch {
+    return null
+  }
+}
+
+function mapDigestCards(cards: DailyDigestCards): DailyDigestCards {
+  const mapRow = (row: CardBlurbs): CardBlurbs => ({
+    builder: stripMarkdown(row.builder),
+    economic: stripMarkdown(row.economic),
+    integrity: stripMarkdown(row.integrity),
+    ...(row.leverage ? { leverage: stripMarkdown(row.leverage) } : {}),
+    ...(row.normie
+      ? {
+          normie: {
+            builder: stripMarkdown(row.normie.builder),
+            economic: stripMarkdown(row.normie.economic),
+            integrity: stripMarkdown(row.normie.integrity),
+            ...(row.normie.leverage ? { leverage: stripMarkdown(row.normie.leverage) } : {}),
+          },
+        }
+      : {}),
+  })
+  return {
+    '24h': mapRow(cards['24h']),
+    '7d': mapRow(cards['7d']),
+    '30d': mapRow(cards['30d']),
+    '60d': mapRow(cards['60d']),
   }
 }
 
@@ -563,6 +605,7 @@ Return ONLY the repaired plain-English overview as plain text (no JSON, no markd
 - Never replace a named repo with a vague stand-in like "the main interface" or "the research team".
 ${normieVoiceGuidance('digestGeneral')}`,
       maxTokens: 1024,
+      temperature: NORMIE_TEMPERATURE,
       label: 'build-brief-normie-repair',
     })
     const cleaned = text ? stripMarkdown(text.trim()) : ''
@@ -608,7 +651,14 @@ export async function generateAndCacheDailyDigest(
   const commitCount = activity.reduce((n, a) => n + a.commits.length, 0)
   const gradeContext = formatGradeContext(stats, repos)
 
-  const ai = await generateDigestWithAi(activity, gradeContext, mountainDateKey)
+  let ai: DigestAiPayload | null = null
+  let geminiError: string | undefined
+  try {
+    ai = await generateDigestWithAi(activity, gradeContext, mountainDateKey)
+  } catch (err) {
+    geminiError = err instanceof Error ? err.message : 'Gemini failed'
+    console.error('[build-brief] digest AI generation failed:', err)
+  }
   const fallback = buildFallbackDigest(stats, repos, activity, mountainDateKey)
   const aiOverview = Boolean(ai?.general?.trim())
   const aiCards = cardsAreComplete(ai?.cards) ? ai.cards : null
@@ -617,6 +667,7 @@ export async function generateAndCacheDailyDigest(
       mountainDateKey,
       repoCount: activity.length,
       commitCount,
+      geminiError: geminiError ?? (hasGeminiApiKey() ? 'empty or unparseable overview' : 'GEMINI_API_KEY missing'),
     })
   } else if (!aiCards) {
     console.warn('[build-brief] AI overview saved; card fields fell back to live copy', {
@@ -636,20 +687,29 @@ export async function generateAndCacheDailyDigest(
   }
 
   await cacheDailyDigest(mountainDateKey, payload)
-  return payload
+  return { ...payload, ...(geminiError && !aiOverview ? { geminiError } : {}) }
 }
 
 export async function generateAndCacheBuildBrief(
   stats: GitHubStats,
   repos: Repo[],
   mountainDateKey = yesterdayMountainDateKey(),
-): Promise<{ text: string; repoCount: number; commitCount: number; generatedAt: string }> {
+): Promise<{
+  text: string
+  repoCount: number
+  commitCount: number
+  generatedAt: string
+  source?: 'ai' | 'fallback'
+  geminiError?: string
+}> {
   const digest = await generateAndCacheDailyDigest(stats, repos, mountainDateKey, { force: true })
   return {
     text: digest.general,
     repoCount: digest.repoCount,
     commitCount: digest.commitCount,
     generatedAt: digest.generatedAt,
+    source: digest.source,
+    ...(digest.geminiError ? { geminiError: digest.geminiError } : {}),
   }
 }
 

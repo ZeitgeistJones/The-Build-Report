@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
       repoCount: brief.repoCount,
       commitCount: brief.commitCount,
       generatedAt: brief.generatedAt,
+      source: brief.source ?? null,
+      geminiError: brief.geminiError ?? null,
       needle: needle
         ? {
             text: needle.text,

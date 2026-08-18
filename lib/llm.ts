@@ -47,36 +47,90 @@ function anthropicModel(): string {
   return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_ANTHROPIC_MODEL
 }
 
-async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
+type GeminiPart = { text?: string; thought?: boolean }
+
+function thinkingConfigFor(model: string, mode: 'auto' | 'off'): Record<string, unknown> | undefined {
+  if (mode === 'off') return undefined
+  // 2.x uses thinkingBudget; 3.x uses thinkingLevel. Wrong field → API 400.
+  if (model.includes('2.5') || model.includes('2.0') || model.includes('1.5')) {
+    return { thinkingBudget: 0 }
+  }
+  if (model.includes('3')) {
+    return { thinkingLevel: ThinkingLevel.MINIMAL }
+  }
+  return undefined
+}
+
+function extractGeminiText(response: {
+  text?: string
+  candidates?: Array<{
+    finishReason?: string
+    content?: { parts?: GeminiPart[] }
+  }>
+}): { text: string; finishReason?: string } {
+  const finishReason = response.candidates?.[0]?.finishReason
+  let direct = ''
+  try {
+    direct = (response.text ?? '').trim()
+  } catch {
+    direct = ''
+  }
+  if (direct) return { text: direct, finishReason }
+  const parts = response.candidates?.[0]?.content?.parts ?? []
+  const text = parts
+    .filter(p => typeof p.text === 'string' && p.thought !== true)
+    .map(p => p.text as string)
+    .join('')
+    .trim()
+  return { text, finishReason }
+}
+
+async function generateWithGeminiOnce(
+  opts: GenerateTextOptions,
+  thinking: 'auto' | 'off',
+  maxTokens?: number,
+): Promise<string> {
   const apiKey = geminiApiKey()
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
 
   const model = geminiModel()
-  // 2.5 uses thinkingBudget; 3.x uses thinkingLevel. Wrong field → API 400 and a dead fallback.
-  const thinkingConfig = model.includes('2.5')
-    ? { thinkingBudget: 0 }
-    : { thinkingLevel: ThinkingLevel.MINIMAL }
-
+  const thinkingConfig = thinkingConfigFor(model, thinking)
   const ai = new GoogleGenAI({ apiKey })
   const response = await ai.models.generateContent({
     model,
     contents: opts.prompt,
     config: {
       ...(opts.system ? { systemInstruction: opts.system } : {}),
-      ...(opts.maxTokens != null ? { maxOutputTokens: opts.maxTokens } : {}),
+      ...(maxTokens != null ? { maxOutputTokens: maxTokens } : {}),
       ...(opts.temperature != null ? { temperature: opts.temperature } : {}),
-      thinkingConfig,
+      ...(thinkingConfig ? { thinkingConfig } : {}),
     },
   })
 
-  const text = (response.text ?? '').trim()
+  const { text, finishReason } = extractGeminiText(response)
   if (!text) {
-    const finish = response.candidates?.[0]?.finishReason
     throw new Error(
-      finish ? `Gemini returned empty text (finishReason=${finish})` : 'Gemini returned empty text',
+      finishReason
+        ? `Gemini returned empty text (finishReason=${finishReason})`
+        : 'Gemini returned empty text',
     )
   }
   return text
+}
+
+async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
+  const label = opts.label ?? 'gemini'
+  const firstMax = opts.maxTokens
+  const retryMax = Math.min(Math.max(opts.maxTokens ?? 2048, 8192), 16384)
+
+  try {
+    return await generateWithGeminiOnce(opts, 'auto', firstMax)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message.includes('GEMINI_API_KEY is not set')) throw err
+    console.warn(`[${label}] Gemini first attempt failed; retrying without thinking:`, err)
+    return await generateWithGeminiOnce(opts, 'off', retryMax)
+  }
 }
 
 async function generateWithAnthropic(opts: GenerateTextOptions): Promise<string> {
@@ -114,8 +168,13 @@ export async function generateTextGeminiOnly(opts: GenerateTextOptions): Promise
   if (!geminiApiKey()) {
     throw new Error('GEMINI_API_KEY is not set')
   }
-  const text = await generateWithGemini(opts)
-  return { text, provider: 'gemini' }
+  try {
+    const text = await generateWithGemini(opts)
+    return { text, provider: 'gemini' }
+  } catch (err) {
+    console.error(`[${label}] Gemini-only generation failed:`, err)
+    throw err
+  }
 }
 
 /**

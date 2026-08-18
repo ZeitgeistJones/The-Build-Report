@@ -657,9 +657,15 @@ export default function AdminPage() {
       })
       const data = await res.json()
       if (data.ok) {
-        setBriefResult(
-          `Brief saved — ${data.repoCount} repos, ${data.commitCount} commits. ${String(data.text).slice(0, 140)}…`,
-        )
+        if (data.source === 'fallback') {
+          setBriefResult(
+            `Gemini did not write Yesterday's Build (${data.geminiError || 'empty/unparseable response'}). Template copy was saved so the homepage is not blank.`,
+          )
+        } else {
+          setBriefResult(
+            `Brief saved — ${data.repoCount} repos, ${data.commitCount} commits. ${String(data.text).slice(0, 140)}…`,
+          )
+        }
       } else {
         setBriefResult(data.error ?? 'Build brief generation failed')
       }

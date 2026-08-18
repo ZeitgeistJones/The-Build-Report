@@ -4,7 +4,7 @@ import { getSlugsRescoredBetween } from '@/lib/scoreHistory'
 import { getRescoreSummaries, type RescoreSummaryRecord } from '@/lib/rescoreSummaries'
 import { REPOS } from '@/lib/scores'
 import { stripMarkdown } from '@/lib/textCleanup'
-import { normieVoiceGuidance } from '@/lib/normieVoice'
+import { NORMIE_TEMPERATURE, normieVoiceGuidance } from '@/lib/normieVoice'
 import {
   dateKeyMountain,
   editionReadKeys,
@@ -100,6 +100,7 @@ ${normieVoiceGuidance('needle')}
     const { text: raw } = await generateTextGeminiOnly({
       prompt,
       maxTokens: 2048,
+      temperature: NORMIE_TEMPERATURE,
       label: 'needle',
     })
     if (!raw) {
