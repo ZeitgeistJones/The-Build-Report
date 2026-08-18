@@ -256,22 +256,17 @@ expect(
     !/\\b|\(\?:/.test(lowInterestMatch('affiliate marketing desk')?.reason ?? ''),
 )
 
-/* 6. Public Yesterday's Builds prints the compact Wire desk, not Admin inbox. */
+/* 6. Live Yesterday's Builds hides The Wire; Admin keeps inbox + desk preview. */
 {
   const yb = readFileSync(join(process.cwd(), 'app/yesterdays-builds/page.tsx'), 'utf8')
-  const paper = readFileSync(join(process.cwd(), 'components/ExternalBriefsNewspaper.tsx'), 'utf8')
   const mcp = readFileSync(join(process.cwd(), 'components/McpWire.tsx'), 'utf8')
-  const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8')
   const adminPage = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
-  expect('public YB passes mcpWire into the newspaper', /mcpWire=\{wire\}/.test(yb))
-  expect('newspaper renders public Wire after tracked desks', paper.includes('<McpWire wire={mcpWire} />'))
-  expect('public McpWire is not admin-gated', !/if \(!admin \|\| !wire\) return null/.test(mcp))
-  expect('public McpWire is not the inbox', !mcp.includes('SHOW ME') && !mcp.includes('ROUTINE UPDATES'))
-  expect('public McpWire has no SHUT DOWN label', !mcp.includes('SHUT DOWN'))
-  expect('public Wire is two-column on desktop', css.includes('.ext-wire__list') && css.includes('grid-template-columns: 1fr 1fr'))
-  expect('public Wire is one column on mobile', /@media \(max-width: 720px\)[\s\S]*\.ext-wire__list[\s\S]*grid-template-columns: 1fr/.test(css))
-  expect('public Wire items are not rounded cards', !/\.ext-wire__item[\s\S]{0,80}border-radius/.test(css))
+  expect('live YB does not pass mcpWire', !/mcpWire=/.test(yb))
+  expect('live YB does not fetch Wire', !yb.includes('getMcpWire'))
+  expect('desk preview is not the inbox', !mcp.includes('SHOW ME') && !mcp.includes('ROUTINE UPDATES'))
+  expect('desk preview has no SHUT DOWN label', !mcp.includes('SHUT DOWN'))
   expect('admin page still mounts Wire Inbox', adminPage.includes('<McpWireInbox record={wireAdmin} />'))
+  expect('admin page still mounts desk preview', adminPage.includes('<McpWire wire={wireAdmin?.snapshot ?? null} preview />'))
 }
 
 {

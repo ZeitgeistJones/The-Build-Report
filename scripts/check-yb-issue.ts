@@ -79,7 +79,8 @@ expect(
 
 {
   const page = readFileSync(join(process.cwd(), 'app/yesterdays-builds/page.tsx'), 'utf8')
-  expect('public YB passes mcpWire into newspaper', /mcpWire=\{wire\}/.test(page))
+  expect('live YB does not pass mcpWire', !/mcpWire=/.test(page))
+  expect('live YB does not fetch Wire', !page.includes('getMcpWire'))
   expect('public YB does not pass admin to newspaper', !/ExternalBriefsNewspaper[\s\S]*admin/.test(page))
 }
 

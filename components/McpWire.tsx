@@ -1,6 +1,6 @@
 /**
- * Public newspaper Wire — compact MCP Registry dispatches.
- * Admin inbox is McpWireInbox. This component is the public desk (and Admin paper preview).
+ * Compact newspaper Wire desk for Admin preview.
+ * Live /yesterdays-builds does not mount this yet. Admin inbox remains McpWireInbox.
  */
 import { officialRegistryRecordUrl, type McpWireSnapshot } from '@/lib/mcpWire'
 import { PUBLIC_WIRE_CAP, toPublicWireDispatch } from '@/lib/mcpWirePublic'
@@ -20,7 +20,7 @@ export default function McpWire({
 
   return (
     <section className="ext-wire" aria-label="The Wire">
-      {preview && <p className="ext-wire__preview">Public desk preview</p>}
+      {preview && <p className="ext-wire__preview">Admin desk preview · not live</p>}
       <p className="ext-paper-sectionhead">The Wire</p>
       <p className="ext-wire__deck">
         New and changed AI-tool connectors from the official MCP Registry.

@@ -1358,7 +1358,7 @@ export default function AdminPage() {
         )}
         <McpWireInbox record={wireAdmin} />
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '16px 0 8px' }}>
-          Public newspaper desk — compact dispatches readers will see on Yesterday’s Builds. Inbox above stays the full newsroom view.
+          Newspaper desk preview — Admin only. Not on the live Yesterday’s Builds page. Inbox above stays the full newsroom view.
         </p>
         <McpWire wire={wireAdmin?.snapshot ?? null} preview />
       </div>
