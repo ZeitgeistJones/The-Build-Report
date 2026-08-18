@@ -2,6 +2,7 @@
 
 import { useNormieMode } from '@/components/NormieModeProvider'
 import YbIssueNav from '@/components/YbIssueNav'
+import McpWire from '@/components/McpWire'
 import { canonicalYbIssuePath } from '@/lib/ybIssue'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
@@ -14,6 +15,7 @@ import {
   type ExternalBriefAccountId,
   type ExternalBriefData,
 } from '@/lib/externalOwnerBrief'
+import type { McpWireSnapshot } from '@/lib/mcpWire'
 
 type Props = {
   briefs: Partial<Record<ExternalBriefAccountId, ExternalBriefData | null>>
@@ -26,6 +28,8 @@ type Props = {
   /** Public dated-issue nav. Omit on Admin. */
   issueDateKey?: string
   latestDateKey?: string
+  /** Public MCP Wire desk. Omit on Admin — inbox lives separately. */
+  mcpWire?: McpWireSnapshot | null
 }
 
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -341,6 +345,7 @@ export default function ExternalBriefsNewspaper({
   onRegenerate,
   issueDateKey,
   latestDateKey,
+  mcpWire,
 }: Props) {
   const { normie } = useNormieMode()
 
@@ -502,6 +507,13 @@ export default function ExternalBriefsNewspaper({
               )
             })}
           </ul>
+        </>
+      )}
+
+      {mcpWire !== undefined && (
+        <>
+          <div className="ext-paper-rule" />
+          <McpWire wire={mcpWire} />
         </>
       )}
 

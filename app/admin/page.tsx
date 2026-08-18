@@ -1358,9 +1358,9 @@ export default function AdminPage() {
         )}
         <McpWireInbox record={wireAdmin} />
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '16px 0 8px' }}>
-          Newspaper preview — what would print from the kept items (admin only, not on the public page):
+          Public newspaper desk — compact dispatches readers will see on Yesterday’s Builds. Inbox above stays the full newsroom view.
         </p>
-        <McpWire wire={wireAdmin?.snapshot ?? null} admin />
+        <McpWire wire={wireAdmin?.snapshot ?? null} preview />
       </div>
 
       {/* Needle */}

@@ -1,67 +1,123 @@
-import type { McpWireSnapshot, WireItem } from '@/lib/mcpWire'
-
-const KIND_LABEL: Record<WireItem['kind'], string> = {
-  new: 'NEW TOOL',
-  revised: 'UPDATED',
-  withdrawn: 'SHUT DOWN',
-}
-
-function stamp(at: string): string {
-  if (!at) return ''
-  const d = new Date(at)
-  if (Number.isNaN(d.getTime())) return ''
-  const hh = String(d.getUTCHours()).padStart(2, '0')
-  const mm = String(d.getUTCMinutes()).padStart(2, '0')
-  return `${hh}:${mm} UTC`
-}
+/**
+ * Public newspaper Wire — compact MCP Registry dispatches.
+ * Admin inbox is McpWireInbox. This component is the public desk (and Admin paper preview).
+ */
+import { officialRegistryRecordUrl, type McpWireSnapshot } from '@/lib/mcpWire'
+import { PUBLIC_WIRE_CAP, toPublicWireDispatch } from '@/lib/mcpWirePublic'
 
 export default function McpWire({
   wire,
-  admin = false,
+  preview = false,
 }: {
   wire: McpWireSnapshot | null
-  admin?: boolean
+  /** Admin-only caption that this is the public desk preview. */
+  preview?: boolean
 }) {
-  if (!admin || !wire) return null
+  const items = (wire?.items ?? []).slice(0, PUBLIC_WIRE_CAP)
+  const dispatches = items.map(toPublicWireDispatch)
+  const failed = wire?.status === 'failed'
+  const quiet = !failed && dispatches.length === 0
 
   return (
-    <section className="ext-wire" aria-label="MCP registry wire">
+    <section className="ext-wire" aria-label="The Wire">
+      {preview && <p className="ext-wire__preview">Public desk preview</p>}
       <p className="ext-paper-sectionhead">The Wire</p>
-      <p className="ext-wire__intro">
-        New tools people published for AI assistants to use, filed since our last edition.
+      <p className="ext-wire__deck">
+        New and changed AI-tool connectors from the official MCP Registry.
       </p>
-      <p className="ext-wire__source">
-        MCP REGISTRY — public listings, not verified usage · admin preview
-      </p>
-
-      {wire.status === 'failed' ? (
-        <p className="ext-wire__closed">Desk closed — source unavailable.</p>
-      ) : wire.status === 'partial' && wire.items.length === 0 ? (
-        <p className="ext-wire__closed">Partial pull — page safety limit reached before anything printable.</p>
-      ) : wire.items.length === 0 ? (
-        <p className="ext-wire__closed">No qualifying listings filed by press time.</p>
-      ) : (
-        <>
-          <ul className="ext-wire__list">
-            {wire.items.map(item => (
-              <li key={`${item.name}-${item.version}`} className="ext-wire__item">
-                <span className={`ext-wire__kind ext-wire__kind--${item.kind}`}>
-                  {KIND_LABEL[item.kind]}
-                </span>
-                <span className="ext-wire__name">{item.title || item.name}</span>
-                <span className="ext-wire__time">{stamp(item.at)}</span>
-                {item.title && <span className="ext-wire__slug">{item.name}</span>}
-                <p className="ext-wire__desc">{item.description}</p>
-                {item.note && <p className="ext-wire__note">{item.note}</p>}
-              </li>
-            ))}
-          </ul>
-          {wire.totalChanges > wire.items.length && (
-            <p className="ext-wire__more">
-              {wire.totalChanges} changes filed; {wire.items.length} printed.
+      <div className="ext-wire__source">
+        <span className="ext-wire__source-text">
+          Official MCP Registry · public listing activity, not verified usage or endorsement
+        </span>
+        {' · '}
+        <details className="ext-wire__limits">
+          <summary>Source &amp; limits</summary>
+          <div className="ext-wire__limits-body">
+            <p>
+              MCP tools are connectors that let AI assistants use outside software, APIs, data, wallets,
+              browsers and other services.
             </p>
-          )}
-        </>
+            <p>
+              The Wire watches public changes in the official MCP Registry and turns a small number of
+              those Registry events into short newspaper dispatches.
+            </p>
+            <p>
+              The Wire is an independent automated digest of public Registry metadata.
+            </p>
+            <p>
+              A Registry listing does not mean The Build Report has verified that a tool is safe,
+              reliable, widely used, endorsed, or works exactly as described.
+            </p>
+            <p>
+              Registry status changes describe the listing in the MCP Registry. For example, ‘Removed
+              from Registry’ does not necessarily mean the underlying project shut down or stopped
+              working.
+            </p>
+            <p>
+              Descriptions and project metadata may come from the publisher’s Registry listing. Where
+              available, separate links are provided to the project’s public source repository.
+            </p>
+            <p>
+              The Build Report is not affiliated with or endorsed by the MCP Registry or the projects
+              listed here. Inclusion is not an endorsement, security review, usage claim, or
+              recommendation.
+            </p>
+          </div>
+        </details>
+      </div>
+
+      <div className="ext-paper-rule" />
+
+      {failed ? (
+        <p className="ext-wire__quiet">Desk closed — Registry source unavailable.</p>
+      ) : quiet ? (
+        <p className="ext-wire__quiet">No notable Registry changes filed overnight.</p>
+      ) : (
+        <ul className="ext-wire__list">
+          {dispatches.map(item => {
+            const registryHref = officialRegistryRecordUrl(item.name, item.version)
+            const label = item.beat ? `${item.status} · ${item.beat}` : item.status
+            return (
+              <li key={`${item.name}-${item.version}`} className="ext-wire__item">
+                <div className="ext-wire__meta">
+                  <span className="ext-wire__kicker">{label}</span>
+                  {item.time && <time className="ext-wire__time">{item.time}</time>}
+                </div>
+                <h3 className="ext-wire__title">{item.title}</h3>
+                {item.trackedNote && <p className="ext-wire__desk">Also covered above</p>}
+                <p className="ext-wire__sentence">{item.sentence}</p>
+                {item.deletionNote && (
+                  <p className="ext-wire__note">
+                    Registry removal does not necessarily mean the underlying project shut down.
+                  </p>
+                )}
+                <p className="ext-wire__receipts">
+                  <a
+                    href={registryHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`View ${item.title} in the official MCP Registry`}
+                  >
+                    Registry ↗
+                  </a>
+                  {item.repoUrl && (
+                    <>
+                      {'   '}
+                      <a
+                        href={item.repoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`View ${item.title} source repository`}
+                      >
+                        Source ↗
+                      </a>
+                    </>
+                  )}
+                </p>
+              </li>
+            )
+          })}
+        </ul>
       )}
     </section>
   )

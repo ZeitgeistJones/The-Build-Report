@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import ExternalBriefsNewspaper from '@/components/ExternalBriefsNewspaper'
-import McpWire from '@/components/McpWire'
 import YbMissingEdition, { missingEditionCopy } from '@/components/YbMissingEdition'
 import { getAllExternalBriefs } from '@/lib/externalOwnerBrief'
 import { getMcpWire } from '@/lib/mcpWire'
@@ -72,8 +71,8 @@ export default async function YesterdaysBuildsPage({
         briefs={briefs}
         issueDateKey={dateKey}
         latestDateKey={latestDateKey}
+        mcpWire={wire}
       />
-      <McpWire wire={wire} />
     </>
   )
 }

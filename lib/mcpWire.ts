@@ -10,6 +10,7 @@ import {
   type TrackedProjectHit,
   type WireWhyCode,
 } from '@/lib/mcpWireSignals'
+import { selectPublicWireItems } from '@/lib/mcpWirePublic'
 
 const REGISTRY = 'https://registry.modelcontextprotocol.io/v0.1/servers'
 const WIRE_KEY = 'build-report:mcp-wire'
@@ -17,7 +18,7 @@ const WIRE_ADMIN_KEY = 'build-report:mcp-wire:admin'
 const TTL_SECONDS = 60 * 60 * 24 * 90
 
 export const PAGE_CAP = 40
-export const PRINT_CAP = 6
+export const PRINT_CAP = 5
 export const INBOX_CAP = 250
 export const SHOW_STORE_CAP = 80
 export const ROUTINE_STORE_CAP = 50
@@ -35,6 +36,9 @@ export type WireItem = {
   note?: string
   repoUrl?: string
   at: string
+  registryStatus?: RegistryLifecycle
+  whyShown?: WireWhyCode[]
+  trackedLabel?: string
 }
 
 export type McpWireStatus = 'ok' | 'partial' | 'failed'
@@ -449,7 +453,6 @@ export function buildWireCollection(rows: RegistryRow[]): {
 } {
   const { byServer, unnamed } = collapseByServer(rows)
   const allRows: WireInboxRow[] = []
-  const items: WireItem[] = []
   let skippedFilterCount = 0
   let skippedOtherCount = unnamed.length
 
@@ -458,9 +461,10 @@ export function buildWireCollection(rows: RegistryRow[]): {
   for (const [name, entry] of byServer) {
     const decided = decideEntry(name, entry)
     allRows.push(decided.row)
-    if (decided.item) items.push(decided.item)
-    else if (decided.row.filterBucket) skippedFilterCount += 1
-    else skippedOtherCount += 1
+    if (!decided.item) {
+      if (decided.row.filterBucket) skippedFilterCount += 1
+      else skippedOtherCount += 1
+    }
   }
 
   const show = allRows.filter(r => r.pile === 'show')
@@ -490,15 +494,7 @@ export function buildWireCollection(rows: RegistryRow[]): {
     ...filtered.slice(0, FILTERED_STORE_CAP),
   ]
 
-  const printItems: WireItem[] = show.map(r => ({
-    name: r.name,
-    title: r.title,
-    description: r.description,
-    version: r.version,
-    kind: r.kind === 'unknown' ? 'revised' : r.kind,
-    repoUrl: r.repoUrl,
-    at: r.at,
-  }))
+  const printItems = selectPublicWireItems(show)
 
   return {
     items: printItems,

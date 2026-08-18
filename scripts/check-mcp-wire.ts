@@ -23,6 +23,7 @@ import {
   registryReasonLine,
 } from '../lib/mcpWireSignals'
 import { resolveAdminSectionId } from '../lib/adminNav'
+import { toPublicWireDispatch } from '../lib/mcpWirePublic'
 
 function expect(name: string, cond: boolean) {
   if (!cond) throw new Error(`FAIL: ${name}`)
@@ -255,12 +256,22 @@ expect(
     !/\\b|\(\?:/.test(lowInterestMatch('affiliate marketing desk')?.reason ?? ''),
 )
 
-/* 6. Public Yesterday's Builds still hides The Wire. */
+/* 6. Public Yesterday's Builds prints the compact Wire desk, not Admin inbox. */
 {
   const yb = readFileSync(join(process.cwd(), 'app/yesterdays-builds/page.tsx'), 'utf8')
+  const paper = readFileSync(join(process.cwd(), 'components/ExternalBriefsNewspaper.tsx'), 'utf8')
   const mcp = readFileSync(join(process.cwd(), 'components/McpWire.tsx'), 'utf8')
-  expect('public YB does not pass admin to McpWire', /<McpWire wire=\{wire\} \/>/.test(yb))
-  expect('McpWire still requires admin to render', /if \(!admin \|\| !wire\) return null/.test(mcp))
+  const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8')
+  const adminPage = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+  expect('public YB passes mcpWire into the newspaper', /mcpWire=\{wire\}/.test(yb))
+  expect('newspaper renders public Wire after tracked desks', paper.includes('<McpWire wire={mcpWire} />'))
+  expect('public McpWire is not admin-gated', !/if \(!admin \|\| !wire\) return null/.test(mcp))
+  expect('public McpWire is not the inbox', !mcp.includes('SHOW ME') && !mcp.includes('ROUTINE UPDATES'))
+  expect('public McpWire has no SHUT DOWN label', !mcp.includes('SHUT DOWN'))
+  expect('public Wire is two-column on desktop', css.includes('.ext-wire__list') && css.includes('grid-template-columns: 1fr 1fr'))
+  expect('public Wire is one column on mobile', /@media \(max-width: 720px\)[\s\S]*\.ext-wire__list[\s\S]*grid-template-columns: 1fr/.test(css))
+  expect('public Wire items are not rounded cards', !/\.ext-wire__item[\s\S]{0,80}border-radius/.test(css))
+  expect('admin page still mounts Wire Inbox', adminPage.includes('<McpWireInbox record={wireAdmin} />'))
 }
 
 {
@@ -504,13 +515,178 @@ expect(
 }
 
 {
-  const yb = readFileSync(join(process.cwd(), 'app/yesterdays-builds/page.tsx'), 'utf8')
   const inbox = readFileSync(join(process.cwd(), 'components/McpWireInbox.tsx'), 'utf8')
-  expect('public YB still omits admin on McpWire', /<McpWire wire=\{wire\} \/>/.test(yb))
-  expect('inbox does not claim listings are verified safe', !/verified safe|officially approved|widely used/i.test(inbox))
+  expect('admin inbox still has SHOW ME / ROUTINE / FILTERED piles', inbox.includes('SHOW ME') && inbox.includes('ROUTINE UPDATES') && inbox.includes('FILTERED / NOISE'))
   expect(
     'inbox treats deletion as a Registry event, not a shutdown',
     inbox.includes('does not necessarily mean the underlying project shut down'),
+  )
+}
+
+/* 7. Public newspaper selection + copy fixtures. */
+{
+  const onchainRepo = buildWireCollection([
+    listing({
+      name: 'io.example/cybercentry',
+      title: 'Cybercentry Verification',
+      description: 'Pay-per-call verification for wallets, contracts and agent applications.',
+      repoUrl: 'https://github.com/example/cybercentry',
+      publishedAt: '2026-08-18T07:24:03.000Z',
+      updatedAt: '2026-08-18T07:24:03.000Z',
+    }),
+  ])
+  const onchainDispatch = toPublicWireDispatch(onchainRepo.items[0])
+  expect('1. new onchain with repo is public', onchainRepo.items.length === 1 && onchainDispatch.status === 'NEW' && onchainDispatch.beat === 'ONCHAIN')
+  expect('1. compact UTC stamp, no seconds', onchainDispatch.time === '07:24 UTC')
+  expect('1. source repo receipt present', onchainDispatch.repoUrl === 'https://github.com/example/cybercentry')
+  expect(
+    '1. registry receipt is official',
+    officialRegistryRecordUrl(onchainDispatch.name, onchainDispatch.version).includes('/servers/') &&
+      officialRegistryRecordUrl(onchainDispatch.name, onchainDispatch.version).includes('include_deleted=true'),
+  )
+
+  const onchainNoRepo = buildWireCollection([
+    listing({
+      name: 'io.example/wallet-brief',
+      title: 'Wallet Brief',
+      description: 'A crypto wallet helper for agents.',
+      publishedAt: '2026-08-18T08:00:00.000Z',
+      updatedAt: '2026-08-18T08:00:00.000Z',
+    }),
+  ])
+  const noRepoDispatch = toPublicWireDispatch(onchainNoRepo.items[0])
+  expect('2. new listing without repo still prints', onchainNoRepo.items.length === 1 && !noRepoDispatch.repoUrl)
+  expect('2. registry receipt still exists', Boolean(officialRegistryRecordUrl(noRepoDispatch.name, noRepoDispatch.version)))
+
+  const deprecated = buildWireCollection([
+    listing({
+      name: 'io.example/old-wallet',
+      title: 'Old Wallet',
+      description: 'Legacy crypto wallet connector.',
+      status: 'deprecated',
+      publishedAt: '2026-08-01T08:00:00.000Z',
+      updatedAt: '2026-08-18T09:00:00.000Z',
+    }),
+  ])
+  const deprecatedDispatch = toPublicWireDispatch(deprecated.items[0])
+  expect('3. deprecated uses DEPRECATED', deprecatedDispatch.status === 'DEPRECATED')
+  expect(
+    '3. deprecated copy is Registry language',
+    deprecatedDispatch.sentence === 'The official MCP Registry now marks this listing as deprecated.',
+  )
+
+  const deletedRepo = buildWireCollection([
+    listing({
+      name: 'systems.entia/entity-verification',
+      title: 'ENTIA Entity Verification',
+      description: '5.5M verified entities across business-data sources.',
+      status: 'deleted',
+      repoUrl: 'https://github.com/ENTIA-IA/entia-mcp-server',
+      publishedAt: '2026-08-01T06:50:00.000Z',
+      updatedAt: '2026-08-18T06:50:00.000Z',
+    }),
+  ])
+  const deletedDispatch = toPublicWireDispatch(deletedRepo.items[0])
+  expect('4. deleted uses REMOVED FROM REGISTRY', deletedDispatch.status === 'REMOVED FROM REGISTRY')
+  expect(
+    '4. deleted copy is Registry language, not shutdown',
+    deletedDispatch.sentence === 'The official MCP Registry now marks this listing as deleted.' &&
+      deletedDispatch.deletionNote &&
+      !deletedDispatch.sentence.toLowerCase().includes('shut down'),
+  )
+  expect('4. deleted with repo keeps Source receipt', Boolean(deletedDispatch.repoUrl))
+
+  const deletedNoRepo = buildWireCollection([
+    listing({
+      name: 'io.example/gone',
+      title: 'Gone Tool',
+      description: 'A connector that used to list wallets.',
+      status: 'deleted',
+      publishedAt: '2026-08-01T06:00:00.000Z',
+      updatedAt: '2026-08-18T06:00:00.000Z',
+    }),
+  ])
+  expect('5. deleted without repo still prints Registry receipt only', deletedNoRepo.items.length === 1 && !toPublicWireDispatch(deletedNoRepo.items[0]).repoUrl)
+
+  const tracked = buildWireCollection([
+    listing({
+      name: 'io.github.mastra-ai/mastra',
+      title: 'Mastra',
+      description: 'Agent workflow tools from the Mastra project.',
+      repoUrl: 'https://github.com/mastra-ai/mastra',
+      publishedAt: '2026-08-18T05:00:00.000Z',
+      updatedAt: '2026-08-18T05:00:00.000Z',
+    }),
+  ])
+  const trackedDispatch = toPublicWireDispatch(tracked.items[0])
+  expect('6. tracked-project match prints', tracked.items.length === 1 && trackedDispatch.trackedNote)
+
+  const crowded = buildWireCollection(
+    [12, 11, 10, 9, 8, 7].map(hour =>
+      listing({
+        name: `io.example/wallet-${String(hour).padStart(2, '0')}`,
+        title: `Wallet ${hour}`,
+        description: 'A crypto wallet helper for agents.',
+        publishedAt: `2026-08-18T${String(hour).padStart(2, '0')}:00:00.000Z`,
+        updatedAt: `2026-08-18T${String(hour).padStart(2, '0')}:00:00.000Z`,
+      }),
+    ),
+  )
+  expect('7. public prints at most 5', crowded.items.length === 5 && crowded.showMeCount === 6)
+  expect(
+    '7. newer timestamps win the cap',
+    crowded.items.every(item => item.name !== 'io.example/wallet-07'),
+  )
+
+  const quiet = buildWireCollection([
+    listing({
+      name: 'io.example/calendar',
+      title: 'Calendar',
+      description: 'Let an assistant read a calendar.',
+      repoUrl: 'https://github.com/example/calendar',
+    }),
+  ])
+  expect('8. quiet day prints nothing public', quiet.items.length === 0 && quiet.routineCount === 1)
+
+  const twins = buildWireCollection([
+    listing({
+      name: 'systems.entia/entity-verification',
+      title: 'ENTIA Entity Verification',
+      description: 'Identity verification for wallets and contracts.',
+      repoUrl: 'https://github.com/ENTIA-IA/entia-mcp-server',
+      publishedAt: '2026-08-18T06:00:00.000Z',
+      updatedAt: '2026-08-18T06:00:00.000Z',
+    }),
+    listing({
+      name: 'systems.entia/entity-verification-v2',
+      title: 'ENTIA Entity Verification v2',
+      description: 'Identity verification for wallets and contracts, v2.',
+      repoUrl: 'https://github.com/ENTIA-IA/entia-mcp-server',
+      publishedAt: '2026-08-18T06:10:00.000Z',
+      updatedAt: '2026-08-18T06:10:00.000Z',
+    }),
+  ])
+  expect('9. same source repo collapses in public', twins.items.length === 1)
+  expect('9. admin inbox still shows both', twins.inbox.filter(r => r.pile === 'show').length === 2)
+
+  const claimed = buildWireCollection([
+    listing({
+      name: 'io.example/entia-claim',
+      title: 'ENTIA Claim',
+      description: '5.5M verified entities spanning business-data sources for wallet checks.',
+      publishedAt: '2026-08-18T04:00:00.000Z',
+      updatedAt: '2026-08-18T04:00:00.000Z',
+    }),
+  ])
+  const claimedDispatch = toPublicWireDispatch(claimed.items[0])
+  expect(
+    '10. publisher metrics are attributed',
+    claimedDispatch.sentence.startsWith('The Registry listing describes it as:') &&
+      !claimedDispatch.sentence.startsWith('5.5M verified entities'),
+  )
+  expect(
+    '24. public copy does not treat Registry presence as safety',
+    !/safe|trusted|approved|endorsed|widely used/.test(claimedDispatch.sentence),
   )
 }
 
