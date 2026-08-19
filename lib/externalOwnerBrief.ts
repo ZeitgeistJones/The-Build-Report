@@ -53,6 +53,7 @@ export type ExternalBriefAccountId =
   | 'aeon'
   | 'clawbank'
   | 'miroshark'
+  | 'clawnchdev'
 
 export type ExternalBriefAccount = {
   id: ExternalBriefAccountId
@@ -212,6 +213,13 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     label: 'MiroShark',
     redisSlug: 'miroshark',
     focusRepos: ['MiroShark'],
+  },
+  {
+    id: 'clawnchdev',
+    owner: 'clawnchdev',
+    ticker: null,
+    label: 'Clawnchdev',
+    redisSlug: 'clawnchdev',
   },
 ]
 
