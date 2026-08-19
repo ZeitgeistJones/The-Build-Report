@@ -17,7 +17,7 @@ import {
 } from '../lib/rescoreSummaries'
 
 const LOOK_ELSEWHERE = /open the rows|expand those rows|plain why|the move itself is not the reason/i
-const SCARY_JARGON = /semantic vad|custom-voice gating|role in ecosystem workflow/i
+const SCARY_JARGON = /semantic vad|custom-voice gating|role in ecosystem workflow|per-VM|login dir|fleet-health|subscription POOL/i
 
 /** Exact shape from the clawd-research screenshot (tech fallback). */
 const CACHED_TECH =
@@ -129,5 +129,42 @@ const siblingFallback = buildNormieWhatChangedBlurb({
 console.log('sibling fallback:', siblingFallback)
 assertCleanBlurb('sibling fallback', siblingFallback)
 expect('sibling mentions fwaah or work', /fwaah|redeploy|Scaffold-ETH|Base/i.test(siblingFallback))
+
+console.log('\n=== Screenshot: clawd-containers commit-dump PE ===')
+const CONTAINERS_COMMITS = [
+  'fleet-health — per-VM in-guest claude-process count — the early burn signal',
+  'cont account auto — pick by subscription POOL (org), not login dir',
+]
+const CONTAINERS_DUMP =
+  'clawd-containers landed fleet-health — per-VM in-guest claude-process count — the early burn signal, and cont account auto — pick by subscription POOL (org), not login dir. Builder standards went up.'
+expect('containers dump is not-normie-enough', summaryNotNormieEnough(CONTAINERS_DUMP) === true)
+const containersWork = plainWorkFromCommitMessages(CONTAINERS_COMMITS)
+console.log('containers work:', containersWork)
+expect('containers work is plain', Boolean(containersWork) && !/per-VM|POOL|login dir|fleet-health|claude-process/i.test(containersWork || ''))
+const containersFallback = buildNormieWhatChangedBlurb({
+  repoName: 'clawd-containers',
+  economicDeltaPct: 0,
+  builderDeltaPct: 13,
+  commitMessages: CONTAINERS_COMMITS,
+})
+console.log('containers fallback:', containersFallback)
+assertCleanBlurb('containers fallback', containersFallback)
+expect('containers fallback has no dump jargon', !/per-VM|POOL|login dir|fleet-health|Shipping leverage|\+13 pts/i.test(containersFallback))
+expect('containers fallback mentions machines or accounts', /machine|account|quality reading went up/i.test(containersFallback))
+
+const containersMeta: RescoreSummaryRecord = {
+  ...badMeta,
+  summary: CONTAINERS_DUMP,
+  summaryNormie: CONTAINERS_DUMP,
+  deltaHeader: 'Shipping leverage flat (100% → 100%). Builder standards +13 pts (80% → 93%).',
+  oldTokenMechanic: 'A+ (100%) SL',
+  newTokenMechanic: 'A+ (100%) SL',
+  oldBuilderIntegrity: 'B- (80%)',
+  newBuilderIntegrity: 'A (93%)',
+}
+const containersShown = rescoreSummaryForDisplay(containersMeta, true, 'clawd-containers')
+console.log('containers display:', containersShown)
+assertCleanBlurb('containers display', containersShown)
+expect('containers display rebuilt', !/per-VM|POOL|login dir|fleet-health|\+13 pts/i.test(containersShown))
 
 console.log('\nAll fixloop checks passed.')

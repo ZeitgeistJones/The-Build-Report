@@ -226,13 +226,15 @@ export function summaryTooLong(text: string): boolean {
 export function summaryNotNormieEnough(text: string): boolean {
   const lower = text.toLowerCase()
   return (
-    /\b(rubric|token mechanic|shipping leverage|holder economics|workflow row)\b/i.test(lower) ||
+    /\b(rubric|token mechanic|shipping leverage|holder economics|workflow row|builder standards \+\d)\b/i.test(lower) ||
     /\b(was )?moved (from|to)\s+(low|mid|high)\b/.test(lower) ||
     /\b(role in ecosystem workflow|multiplies builder shipping capacity|downstream path to holder value)\b/.test(
       lower,
     ) ||
     /~\//.test(text) ||
     /\bTCC\b/.test(text) ||
+    /\b(per-VM|in-guest|login dir|subscription POOL|fleet-health|claude-process)\b/i.test(lower) ||
+    /\bPOOL\s*\(org\)/i.test(text) ||
     /\bsemantic vad\b|\bcustom-voice gating\b/i.test(lower)
   )
 }
@@ -387,6 +389,14 @@ ${evidenceBlock}${shippingLeverageRules}Write TWO "what changed" blurbs with the
 
 1) "summary" — 1–2 short sentences for builders/technical readers. Precise is fine (README, CI, commits, rubric evidence). Still no markdown. Hard max ~90 words.
 2) "summaryNormie" — 1–2 short sentences Plain English for token holders who are not developers. MUST lead with what landed (from RECENT COMMITS) in everyday words, then a soft note on how the score moved. Never open with “money-side went up” / “builder-standards dipped” alone — that just restates the header. Sound like texting a smart friend — not a lab report.
+
+BAD (do not write this — it dumps commit titles):
+"clawd-containers landed fleet-health — per-VM in-guest claude-process count — the early burn signal, and cont account auto — pick by subscription POOL (org), not login dir. Builder standards went up."
+
+GOOD (this is the voice):
+"clawd-containers put in a check that counts how many AI workers are actually running in each little machine — an early heads-up if something starts burning money — plus a smarter way to pick which account to use. The quality reading went up."
+
+Never paste kebab-case feature names, VM/POOL/login-dir jargon, or “Shipping leverage +N pts”. Translate the work into what a person would notice.
 
 ${normieVoiceGuidance('rescoreSummary')}
 

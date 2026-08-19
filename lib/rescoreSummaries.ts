@@ -85,6 +85,14 @@ function moveWord(oldPct: number | null, newPct: number | null): 'went up' | 'di
  * 0x addresses). Detect that shape so Plain English mode can swap in a clean version
  * without needing a rescore.
  */
+function looksLikeDumpedCommitTitle(text: string): boolean {
+  return (
+    /\b(per-VM|in-guest|login dir|subscription POOL|fleet-health|claude-process)\b/i.test(text) ||
+    /\bPOOL\s*\(org\)/i.test(text) ||
+    /\bcont account auto\b/i.test(text)
+  )
+}
+
 function looksLikeJargonFallback(text: string): boolean {
   return (
     /the move itself is not the reason/i.test(text) ||
@@ -96,7 +104,10 @@ function looksLikeJargonFallback(text: string): boolean {
     /~\//.test(text) ||
     /\bTCC\b/.test(text) ||
     /\bbuilder-standards\b/i.test(text) ||
+    /\bshipping leverage\b/i.test(text) ||
+    /\b\+\d+\s*pts?\b/i.test(text) ||
     /\b(low|mid|high|n\/?a)\s*→\s*(low|mid|high|n\/?a)\b/i.test(text) ||
+    looksLikeDumpedCommitTitle(text) ||
     /Security, testing, and cryptographic rigor|On-chain commitments and constraints|Downstream path to holder value|Multiplies builder shipping capacity|Role in ecosystem workflow|User funds, risk, and safety posture|Transparency and verifiability|Governance, token-economics/i.test(
       text,
     )
@@ -131,11 +142,17 @@ export function extractCommitMessagesFromSummary(text: string): string[] {
       .slice(0, 4)
   }
 
-  // Bad PE fallback baked the raw commit into "X landed …." — recover it so we can re-plainify.
+  // Bad PE fallback baked the raw commit into "X landed/added/put in …." — recover it so we can re-plainify.
   const landed = text.match(
-    /\blanded\s+(.+?)\.\s*(?:Money-side|Builder|That work|The live|The score)/i,
+    /\b(?:landed|added|put in)\s+(.+?)\.\s*(?:Money-side|Builder|That work|The live|The score|The quality|Looks|The builder)/i,
   )
-  if (landed?.[1]?.trim()) return [landed[1].trim()]
+  if (landed?.[1]?.trim()) {
+    return landed[1]
+      .split(/\s*, and\s+/)
+      .map(s => s.replace(/\s+/g, ' ').trim())
+      .filter(s => s.length > 3)
+      .slice(0, 4)
+  }
   return []
 }
 
@@ -162,6 +179,12 @@ function plainifyCommitTitle(raw: string): string {
   }
   if (/\bglm-?5\.?3\b|\bGLM-5\.3\b/i.test(t)) {
     return 'notes on the GLM-5.3 AI model and who can use it yet'
+  }
+  if (/\bfleet-health\b|\bclaude-process\b|\bin-guest\b|\bper-VM\b/i.test(t)) {
+    return 'a check that counts how many AI workers are actually running in each little machine — an early heads-up if something starts burning money'
+  }
+  if (/\baccount auto\b|\bsubscription POOL\b|\blogin dir\b/i.test(t)) {
+    return 'a smarter way to pick which account to use (the team subscription, not whoever last logged in)'
   }
   // macOS Desktop → elsewhere / TCC permission traps — never show ~/ paths to holders
   if (/recon/i.test(t) && (/Desktop/i.test(t) || /\bTCC\b/.test(t) || /~\//.test(t))) {
@@ -194,6 +217,11 @@ function plainifyCommitTitle(raw: string): string {
 
   // Keep fallback themes short — long commit titles scare readers.
   if (t.length > 90) t = `${t.slice(0, 87).trimEnd()}…`
+
+  // If it still reads like a commit title (kebab-case, VM/POOL, em-dash jargon), don't dump it.
+  if (looksLikeDumpedCommitTitle(t) || /\b(VM|SSH|POOL)\b/.test(t) || /[a-z]{3,}(?:-[a-z0-9]+){2,}/i.test(t)) {
+    return 'some behind-the-scenes setup work'
+  }
   return t
 }
 
@@ -259,16 +287,16 @@ export function buildNormieWhatChangedBlurb(input: NormieWhatChangedInput): stri
 
   const scoreBits: string[] = []
   if (econMove) scoreBits.push(`the money-side reading ${econMove}`)
-  if (biMove) scoreBits.push(`builder standards ${biMove}`)
+  if (biMove) scoreBits.push(`the quality reading ${biMove}`)
   const scoreClause = scoreBits.length
     ? `${scoreBits.join(' and ')}.`
     : `the overall reading held steady.`
 
   if (work) {
     if (bothFlat || (!econMove && !biMove)) {
-      return `${name} landed ${work}. That work didn't move the overall reading much yet.`
+      return `${name} put in ${work}. That work didn't move the overall reading much yet.`
     }
-    return `${name} landed ${work}. ${scoreClause.charAt(0).toUpperCase()}${scoreClause.slice(1)}`
+    return `${name} put in ${work}. ${scoreClause.charAt(0).toUpperCase()}${scoreClause.slice(1)}`
   }
 
   if (bothFlat || (!econMove && !biMove)) {

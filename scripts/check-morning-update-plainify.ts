@@ -21,7 +21,7 @@ const blurb = buildNormieWhatChangedBlurb({
 if (/~\/|TCC|Builder-standards|landed moving/i.test(blurb)) {
   throw new Error(`bad blurb: ${blurb}`)
 }
-if (!/builder standards went up/i.test(blurb)) throw new Error(`missing score note: ${blurb}`)
+if (!/quality reading went up/i.test(blurb)) throw new Error(`missing score note: ${blurb}`)
 
 const bad =
   'clawd-morning-update landed recon drop — ~/Desktop/recon → ~/recon (macOS TCC blocks cron from Desktop), and report 2026-08-16. Builder-standards went up.'

@@ -441,16 +441,16 @@ function RescoreSummaryBlock({ meta, plain, repoName }: { meta: RescoreSummaryRe
           {meta.commits30dAtRescore.toLocaleString()}
         </div>
       </div>
-      {showWhatChanged && (
+          {showWhatChanged && (
         <div style={{ margin: 0, color: 'var(--text-secondary)' }}>
           <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>What changed: </span>
-          {meta.deltaHeader && (
+          {!plain && meta.deltaHeader && (
             <span style={{ display: 'block', marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
               {meta.deltaHeader}
             </span>
           )}
           {summaryText && (
-            <span style={{ display: 'block', marginTop: meta.deltaHeader ? '6px' : '4px' }}>
+            <span style={{ display: 'block', marginTop: !plain && meta.deltaHeader ? '6px' : '4px' }}>
               {summaryText}
             </span>
           )}
