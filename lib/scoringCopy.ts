@@ -11,7 +11,7 @@ export const ABOUT_SCORE_TYPES_SECTIONS = [
   },
   {
     title: 'Rescore',
-    body: `Same live AI pass, triggered when someone pays 0.000008 ETH — or, during the limited launch promo, free on stale repos with ~$0.01 per stale commit to your wallet and matching ETH queued for CLAWD burns (50/50 subsidy). Approx USD refreshes weekly from ETH price; on-chain amounts are still ETH. Result is cached for everyone. First rescore on a baseline card often shifts the letter — different method, not always a repo change overnight.`,
+    body: `Same live AI pass, triggered when someone pays 0.000008 ETH. Payment goes to the receiver-buy-and-burn contract; CLAWD is burned when execute() runs. Approx USD refreshes weekly from ETH price; on-chain amounts are still ETH. Result is cached for everyone. First rescore on a baseline card often shifts the letter — different method, not always a repo change overnight.`,
   },
 ] as const
 

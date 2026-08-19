@@ -549,4 +549,8 @@ export const CHANGELOG = [
     date: 'Jul 29, 2026',
     note: 'LLM routing back to Haiku-primary (claude-haiku-4-5) with Gemini as fallback — Gemini 3.6 free-tier RPD was capping overnight digests/rescored. Gemini fallback default is gemini-2.5-flash (separate quota bucket from 3.6). Rescore “what changed” blurbs lead with the commits that triggered the rescore; docs-only blurbs that ignore those commits are rejected. First-Score promo earn now credits single-commit repos (~$0.01 wallet half): live commit fetch when the snapshot lags, create-time skew, and fallthrough when timestamps are only pre-create fork history.',
   },
+  {
+    date: 'Aug 19, 2026',
+    note: 'Launch rescore promo ended. Score/Rescore is paid again (0.000008 ETH to receiver-buy-and-burn). Earn-to-rescore, the site promo banner, and “Up to date” hiding of paid Rescore are off.',
+  },
 ]

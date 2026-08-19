@@ -90,7 +90,11 @@ export function getPromoConfig(): PromoConfig {
   }
 }
 
+/** Launch earn-to-rescore promo ended Aug 19, 2026. Paid Score/Rescore is the default again. */
+export const PROMO_ENDED = true
+
 export function isPromoWindowOpen(config: PromoConfig = getPromoConfig()): boolean {
+  if (PROMO_ENDED) return false
   if (!config.enabled) return false
   if (!process.env.RESCORE_PROMO_TREASURY_PRIVATE_KEY?.trim()) return false
   if (!config.endsAt) return true
