@@ -10,6 +10,11 @@ export type GenerateTextOptions = {
   temperature?: number
   /** Log label for provider fallback messages. */
   label?: string
+  /**
+   * Gemini-only retry: if the first reply fails this check, retry without thinking
+   * and with a higher token cap. Does not call Anthropic.
+   */
+  usable?: (text: string) => boolean
 }
 
 export type GenerateTextResult = {
@@ -133,8 +138,12 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
   const firstMax = opts.maxTokens
   const retryMax = Math.min(Math.max(opts.maxTokens ?? 2048, 8192), 16384)
 
+  const accept = (text: string) => !opts.usable || opts.usable(text)
+
   try {
-    return await generateWithGeminiOnce(opts, 'auto', firstMax)
+    const text = await generateWithGeminiOnce(opts, 'auto', firstMax)
+    if (accept(text)) return text
+    console.warn(`[${label}] Gemini output unusable; retrying without thinking`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message.includes('GEMINI_API_KEY is not set')) throw err
@@ -142,8 +151,9 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
       throw err
     }
     console.warn(`[${label}] Gemini first attempt failed; retrying without thinking:`, err)
-    return await generateWithGeminiOnce(opts, 'off', retryMax)
   }
+  const retry = await generateWithGeminiOnce(opts, 'off', retryMax)
+  return retry
 }
 
 async function generateWithAnthropic(opts: GenerateTextOptions): Promise<string> {
@@ -174,7 +184,7 @@ export function hasGeminiApiKey(): boolean {
 
 /**
  * Generate text with Gemini only — never Anthropic.
- * Used for Yesterday's Build, The Needle, and other Gemini-only surfaces.
+ * Used for CLAWD homepage Yesterday's Build + The Needle.
  */
 export async function generateTextGeminiOnly(opts: GenerateTextOptions): Promise<GenerateTextResult> {
   const label = opts.label ?? 'llm-gemini'
@@ -192,7 +202,8 @@ export async function generateTextGeminiOnly(opts: GenerateTextOptions): Promise
 
 /**
  * Gemini first, Anthropic Haiku fallback — for high-volume cheap surfaces
- * (Yesterday's Builds / secondary digests).
+ * (Yesterday's Builds / secondary digests). Do not use this for CLAWD homepage
+ * copy if Anthropic quota is gone; those paths are Gemini-only.
  */
 export async function generateTextGeminiFirst(opts: GenerateTextOptions): Promise<GenerateTextResult> {
   const label = opts.label ?? 'llm'

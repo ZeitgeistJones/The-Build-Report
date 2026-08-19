@@ -22,6 +22,8 @@ export interface NeedleData {
   dateKey: string
   repoCount: number
   generatedAt: string
+  /** Older cache entries omit this. Fallback copy is retryable. */
+  source?: 'ai' | 'fallback'
 }
 
 type QualifyingMove = {
@@ -72,6 +74,39 @@ function buildFallbackNeedle(qualifying: QualifyingMove[]): { text: string; text
   return { text, textNormie }
 }
 
+function isFallbackNeedleCopy(data: Pick<NeedleData, 'text' | 'textNormie' | 'source'>): boolean {
+  if (data.source === 'fallback') return true
+  if (data.source === 'ai') return false
+  const blob = `${data.text} ${data.textNormie ?? ''}`
+  return (
+    blob.includes('got a fresh score and the grade actually moved') ||
+    blob.includes('Biggest signal: grade letters shifted')
+  )
+}
+
+function extractNeedleProse(raw: string | undefined): { text: string; textNormie?: string } | null {
+  if (!raw?.trim()) return null
+  const jsonMatch = raw.match(/\{[\s\S]*\}/)
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]) as { text?: unknown; textNormie?: unknown }
+      const text = typeof parsed.text === 'string' ? stripMarkdown(parsed.text).trim() : ''
+      if (text.length >= 40) {
+        const textNormie =
+          typeof parsed.textNormie === 'string' ? stripMarkdown(parsed.textNormie).trim() : ''
+        return textNormie ? { text, textNormie } : { text }
+      }
+    } catch {
+      // fall through to plain prose
+    }
+  }
+  const text = stripMarkdown(raw).trim()
+  if (text.length < 40) return null
+  if (text.startsWith('{') || text.startsWith('[')) return null
+  if (/^return only valid json/i.test(text)) return null
+  return { text }
+}
+
 async function generateNeedleCopy(
   qualifying: QualifyingMove[],
 ): Promise<{ text: string; textNormie?: string } | null> {
@@ -86,39 +121,45 @@ Write 2-3 sentences total, no more. Pick the single most interesting thing that 
 
 Do NOT invent that README, root files, architecture docs, or plans are missing unless the rescore notes explicitly say so with high confidence. Prefer the deltaHeader grade moves and named rubric changes over speculative documentation-gap stories.
 
-Return ONLY valid JSON (no markdown fences) with this shape:
-{
-  "text": "2-3 sentences following the instructions above.",
-  "textNormie": "Same facts and repo names as text, rewritten for someone who knows nothing about code or crypto."
-}
-
-NORMIE VOICE GUIDE (applies to textNormie only):
-${normieVoiceGuidance('needle')}
-`
+Return ONLY the column as plain prose. No JSON, no markdown, no title.`
 
   try {
     const { text: raw } = await generateTextGeminiOnly({
       prompt,
-      maxTokens: 2048,
+      maxTokens: 1024,
       temperature: NORMIE_TEMPERATURE,
       label: 'needle',
+      usable: r => Boolean(extractNeedleProse(r)?.text),
     })
-    if (!raw) {
-      console.error('[needle] empty LLM response')
+    const parsed = extractNeedleProse(raw)
+    if (!parsed) {
+      console.error('[needle] empty or unreadable LLM response', { preview: (raw ?? '').slice(0, 400) })
       return null
     }
 
-    const jsonMatch = raw.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      console.error('[needle] failed to parse JSON', { preview: raw.slice(0, 400) })
-      return null
+    if (parsed.textNormie) return parsed
+
+    try {
+      const { text: normieRaw } = await generateTextGeminiOnly({
+        prompt: `Rewrite this Needle column for someone who knows nothing about code or crypto. Keep the same facts and the same repo names.
+
+STANDARD COLUMN:
+${parsed.text}
+
+${normieVoiceGuidance('needle')}
+
+Return ONLY the rewrite as plain prose. No JSON, no markdown.`,
+        maxTokens: 1024,
+        temperature: NORMIE_TEMPERATURE,
+        label: 'needle-normie',
+        usable: r => Boolean(extractNeedleProse(r)?.text),
+      })
+      const normie = extractNeedleProse(normieRaw)?.text
+      return normie ? { text: parsed.text, textNormie: normie } : parsed
+    } catch (err) {
+      console.warn('[needle] normie rewrite failed; keeping standard column', err)
+      return parsed
     }
-    const parsed = JSON.parse(jsonMatch[0]) as { text?: string; textNormie?: string }
-    const text = typeof parsed.text === 'string' ? stripMarkdown(parsed.text).trim() : ''
-    if (!text) return null
-    const textNormie =
-      typeof parsed.textNormie === 'string' ? stripMarkdown(parsed.textNormie).trim() : ''
-    return textNormie ? { text, textNormie } : { text }
   } catch (err) {
     console.error('[needle] AI generation failed', err)
     return null
@@ -137,13 +178,11 @@ export async function generateAndCacheNeedle(
 ): Promise<NeedleData | null> {
   const redis = getRedis()
   const dateKey = options.dateKey ?? dateKeyMountain()
-  if (!options.force) {
-    const existing = await readCachedNeedle(dateKey)
-    if (existing) return existing
-  }
+  const existing = await readCachedNeedle(dateKey)
+  if (!options.force && existing && !isFallbackNeedleCopy(existing)) return existing
   const { startMs, endMs } = mountainDateKeyBoundsMs(dateKey)
   const slugs = await getSlugsRescoredBetween(startMs, endMs)
-  if (!slugs.length) return null
+  if (!slugs.length) return existing ?? null
 
   const summaries = await getRescoreSummaries(slugs)
   const nameBySlug = new Map(REPOS.map(r => [r.githubSlug, r.name]))
@@ -165,9 +204,13 @@ export async function generateAndCacheNeedle(
       summary: meta.summary ?? null,
     }))
 
-  if (!qualifying.length) return null
+  if (!qualifying.length) return existing ?? null
 
   const ai = await generateNeedleCopy(qualifying)
+  if (!ai && existing && !isFallbackNeedleCopy(existing)) {
+    console.warn('[needle] AI failed; keeping previous AI Needle', { dateKey })
+    return existing
+  }
   const fallback = buildFallbackNeedle(qualifying)
   const text = ai?.text ?? fallback.text
   const textNormie = ai?.textNormie ?? fallback.textNormie
@@ -178,6 +221,7 @@ export async function generateAndCacheNeedle(
     dateKey,
     repoCount: qualifying.length,
     generatedAt: new Date().toISOString(),
+    source: ai ? 'ai' : 'fallback',
   }
 
   await redis.set(needleRedisKey(dateKey), data, { ex: NEEDLE_TTL_SEC })

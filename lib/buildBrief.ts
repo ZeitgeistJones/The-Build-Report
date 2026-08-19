@@ -334,6 +334,17 @@ function cardsAreComplete(cards: DailyDigestCards | undefined): cards is DailyDi
   })
 }
 
+/** Plain overview (or JSON `general` if the model still wraps it). */
+function extractOverviewProse(raw: string | undefined): string | null {
+  if (!raw?.trim()) return null
+  const fromJson = parseDigestJson(raw)?.general?.trim()
+  if (fromJson) return stripMarkdown(fromJson)
+  const text = stripMarkdown(raw).trim()
+  if (text.length < 80) return null
+  if (text.startsWith('{') || text.startsWith('[')) return null
+  return text
+}
+
 /** Last-ditch pull of "general" when the model truncates mid-JSON. */
 function extractGeneralFromPartial(raw: string): string | null {
   const match = raw.match(/"general"\s*:\s*"((?:\\.|[^"\\])*)"/)
@@ -419,36 +430,49 @@ async function generateDigestOverview(
 ): Promise<Pick<DigestAiPayload, 'general' | 'generalNormie'> | null> {
   const prompt = `${facts}
 
-Return ONLY valid JSON, no markdown fences:
-{"general":"…","generalNormie":"…"}
+Write the day's overview as 5-6 complete sentences, meatier than any single grade card. Use the extra sentences to name specific repos/work from the commit list and explain why it matters to holders — not repetition. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.
 
-Rules:
-- general: 5-6 complete sentences, meatier than any single card. Use the extra sentences to name specific repos/work from the commit list and explain why it matters to holders — not repetition. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.
-- generalNormie: same facts and the same repo slugs as general — simpler words, not a compressed summary. Keep every slug general names (optional short plain gloss after a name is fine). Never swap a named project for "the main interface", "the research team", "some backend fixes", or similar vague stand-ins. 2-5 sentences as needed; shorter only when the day was genuinely quiet.
-${normieVoiceGuidance('digestGeneral')}`
+Return ONLY the overview as plain prose. No JSON, no markdown, no title, no bullet list.`
 
   const { text, provider } = await generateTextGeminiOnly({
     prompt,
     maxTokens: 3072,
     temperature: NORMIE_TEMPERATURE,
     label: 'build-brief-overview',
+    usable: raw => Boolean(extractOverviewProse(raw)),
   })
-  if (!text) {
-    console.error('[build-brief] empty overview response', { provider })
-    return null
-  }
-  const parsed = parseDigestJson(text)
-  if (!parsed?.general?.trim()) {
-    console.error('[build-brief] failed to parse overview JSON', {
+  const general = extractOverviewProse(text)
+  if (!general) {
+    console.error('[build-brief] failed to read overview prose', {
       provider,
-      length: text.length,
-      preview: text.slice(0, 400),
+      length: text?.length ?? 0,
+      preview: (text ?? '').slice(0, 400),
     })
     return null
   }
 
-  const general = stripMarkdown(parsed.general)
-  let generalNormie = parsed.generalNormie ? stripMarkdown(parsed.generalNormie) : undefined
+  let generalNormie: string | undefined
+  try {
+    const { text: normieRaw } = await generateTextGeminiOnly({
+      prompt: `${facts}
+
+STANDARD OVERVIEW (source of truth for which repos and topics):
+${general}
+
+Rewrite that overview for someone who knows nothing about code. Same facts and the same repo slugs — simpler words, not a compressed summary. Keep every slug the overview names (optional short plain gloss after a name is fine). Never swap a named project for "the main interface", "the research team", "some backend fixes", or similar vague stand-ins. 2-5 sentences as needed; shorter only when the day was genuinely quiet.
+${normieVoiceGuidance('digestGeneral')}
+
+Return ONLY the rewrite as plain prose. No JSON, no markdown.`,
+      maxTokens: 2048,
+      temperature: NORMIE_TEMPERATURE,
+      label: 'build-brief-overview-normie',
+      usable: raw => Boolean(extractOverviewProse(raw)),
+    })
+    generalNormie = extractOverviewProse(normieRaw) ?? undefined
+  } catch (err) {
+    console.warn('[build-brief] overview normie rewrite failed; keeping standard overview', err)
+  }
+
   const activitySlugs = activity.map(a => a.slug)
   if (generalNormie) {
     const missing = missingNamedRepos(general, generalNormie, activitySlugs)
@@ -517,6 +541,7 @@ Rules:
       maxTokens: 6144,
       temperature: NORMIE_TEMPERATURE,
       label: 'build-brief-cards',
+      usable: raw => Boolean(parseCardsJson(raw)),
     })
     if (!text) {
       console.warn('[build-brief] empty card response', { provider })
@@ -641,8 +666,8 @@ export async function generateAndCacheDailyDigest(
   mountainDateKey = yesterdayMountainDateKey(),
   options?: { force?: boolean },
 ): Promise<DailyDigestCache> {
+  const existing = await readCachedDigest(mountainDateKey)
   if (!options?.force) {
-    const existing = await readCachedDigest(mountainDateKey)
     // A template fallback is not "done" — retry so CLAWD cannot get stuck on backup copy.
     if (existing?.general?.trim() && !isRetryableDigest(existing)) return existing
   }
@@ -662,6 +687,10 @@ export async function generateAndCacheDailyDigest(
   const fallback = buildFallbackDigest(stats, repos, activity, mountainDateKey)
   const aiOverview = Boolean(ai?.general?.trim())
   const aiCards = cardsAreComplete(ai?.cards) ? ai.cards : null
+  if (!aiOverview && existing && !isRetryableDigest(existing)) {
+    console.warn('[build-brief] AI failed; keeping previous AI digest', { mountainDateKey })
+    return existing
+  }
   if (!aiOverview) {
     console.warn('[build-brief] using template fallback digest', {
       mountainDateKey,
