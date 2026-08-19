@@ -47,6 +47,7 @@ type PromoQuote = {
   eligible: boolean
   staleCommits: number
   rewardEth: number
+  treasuryFunded: boolean
   buttonLabel: string
   promoBanner: string | null
   reason: string | null
@@ -128,8 +129,13 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
   const ethUsdRate = useEthUsdRate()
   const label = scoringStatus === 'unscored' ? 'Score' : 'Rescore'
   const promoEligible = Boolean(promoQuote?.eligible)
+  // Only hide paid Rescore when the promo can still pay. Empty treasury used to
+  // mark every scored repo "Up to date" even when it had new commits.
   const paidRescorePaused =
-    scoringStatus === 'scored' && Boolean(promoQuote?.promoActive) && !promoEligible
+    scoringStatus === 'scored' &&
+    Boolean(promoQuote?.promoActive) &&
+    promoQuote?.treasuryFunded === true &&
+    !promoEligible
   const busy = phase !== 'idle' || isSending
   const buttonDisabled = busy || paidRescorePaused
   const needsHold =
@@ -454,7 +460,9 @@ export default function RepoScoreButton({ repoSlug, scoringStatus, activity, onS
               ? scoringStatus === 'unscored'
                 ? `First Score on this repo — earn ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)} for ${promoQuote?.staleCommits ?? 0} commit${promoQuote?.staleCommits === 1 ? '' : 's'}. Continue?`
                 : `This repo has ${promoQuote?.staleCommits ?? 0} commit${promoQuote?.staleCommits === 1 ? '' : 's'} since the last score — earn ${formatApproxUsdFromEth(promoQuote?.rewardEth ?? 0, ethUsdRate)}. Continue?`
-              : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'}
+              : promoQuote?.reason?.toLowerCase().includes('treasury')
+                ? 'Promo funds are too low to pay a reward right now. You can still pay to rescore.'
+                : 'No new commits and scoring context is up to date since the last score. Rescore anyway?'}
           </p>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button
