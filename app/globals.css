@@ -1190,29 +1190,45 @@ button {
   }
 }
 
-/* --- Shorts: masonry columns of small items --- */
+/* --- Shorts: full-width long briefs + up-to-2-col pack for short ones --- */
+.ext-paper-shorts-long {
+  margin: 0 0 8px;
+}
+
+.ext-paper-shorts-long > .ext-paper-story {
+  margin: 0 0 22px;
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ext-paper-shorts-long > .ext-paper-story:last-child {
+  margin-bottom: 14px;
+}
+
 .ext-paper-shorts {
   column-count: 1;
   column-gap: 30px;
   column-rule: 1px solid var(--border);
+  margin: 0 0 4px;
 }
 
 @media (min-width: 860px) {
-  .ext-paper-shorts {
+  .ext-paper-shorts:not(.ext-paper-shorts--solo) {
     column-count: 2;
   }
 }
 
-@media (min-width: 1200px) {
-  .ext-paper-shorts {
-    column-count: 3;
-  }
+.ext-paper-shorts--solo {
+  column-count: 1;
+  column-rule: none;
 }
 
 .ext-paper-shorts > .ext-paper-story {
   margin: 0 0 20px;
   padding: 0 0 16px;
   border-bottom: 1px solid var(--border);
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 /* --- Off the wire --- */

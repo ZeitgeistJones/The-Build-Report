@@ -84,4 +84,14 @@ expect(
   expect('public YB does not pass admin to newspaper', !/ExternalBriefsNewspaper[\s\S]*admin/.test(page))
 }
 
+{
+  const newspaper = readFileSync(join(process.cwd(), 'components/ExternalBriefsNewspaper.tsx'), 'utf8')
+  const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8')
+  expect('Also filed splits long briefs out of the pack', newspaper.includes('isLongAlsoFiled') && newspaper.includes('ext-paper-shorts-long'))
+  expect('Also filed solo pack stays single column', newspaper.includes('ext-paper-shorts--solo'))
+  expect('Also filed closes with a double rule', /Also filed[\s\S]*ext-paper-rule--double/.test(newspaper))
+  expect('Also filed pack caps at 2 columns', !/\.ext-paper-shorts \{[\s\S]*?column-count: 3/.test(css) && css.includes('.ext-paper-shorts:not(.ext-paper-shorts--solo)'))
+  expect('long Also filed threshold is 700 chars / 2 paras', newspaper.includes('ALSO_FILED_LONG_CHARS = 700') && newspaper.includes('ALSO_FILED_LONG_PARAS = 2'))
+}
+
 console.log('all yb-issue checks passed')

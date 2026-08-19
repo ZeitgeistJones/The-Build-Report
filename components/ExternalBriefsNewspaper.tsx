@@ -121,6 +121,22 @@ function briefDeck(brief: ExternalBriefData | null, normie: boolean): string | n
   return value && value.trim() ? value.trim() : null
 }
 
+type Story = {
+  account: ExternalBriefAccount
+  brief: ExternalBriefData | null
+  text: string
+}
+
+/** Long Also filed writeups must not sit in multi-column packs (empty neighbor shafts). */
+const ALSO_FILED_LONG_CHARS = 700
+const ALSO_FILED_LONG_PARAS = 2
+
+function isLongAlsoFiled(story: Story): boolean {
+  const text = story.text.trim()
+  if (text.length > ALSO_FILED_LONG_CHARS) return true
+  return toParagraphs(text).length > ALSO_FILED_LONG_PARAS
+}
+
 function toParagraphs(text: string): string[] {
   if (!text) return []
   return text.includes('\n\n')
@@ -154,12 +170,6 @@ function commitLine(brief: ExternalBriefData | null): string | null {
     return `${brief.repoCount} repo${brief.repoCount === 1 ? '' : 's'} · ${c}`
   }
   return c
-}
-
-type Story = {
-  account: ExternalBriefAccount
-  brief: ExternalBriefData | null
-  text: string
 }
 
 function frontPageScore(story: Story): number {
@@ -371,6 +381,8 @@ export default function ExternalBriefsNewspaper({
   const lead = filed[0] ?? null
   const seconds = filed.slice(1, 3)
   const shorts = filed.slice(3)
+  const longShorts = shorts.filter(s => isLongAlsoFiled(s))
+  const packShorts = shorts.filter(s => !isLongAlsoFiled(s))
 
   const anyDate = issueDateKey ?? rows.map(r => r.brief?.dateKey).find(Boolean) ?? null
   const issue = issueNumber(anyDate)
@@ -456,18 +468,41 @@ export default function ExternalBriefsNewspaper({
             <>
               <div className="ext-paper-rule" />
               <p className="ext-paper-sectionhead">Also filed</p>
-              <div className="ext-paper-shorts">
-                {shorts.map(story => (
-                  <StoryBlock
-                    key={story.account.id}
-                    story={story}
-                    variant="brief"
-                    admin={admin}
-                    normie={normie}
-                    {...stateFor(story.account.id)}
-                  />
-                ))}
-              </div>
+              {longShorts.length > 0 && (
+                <div className="ext-paper-shorts-long">
+                  {longShorts.map(story => (
+                    <StoryBlock
+                      key={story.account.id}
+                      story={story}
+                      variant="brief"
+                      admin={admin}
+                      normie={normie}
+                      {...stateFor(story.account.id)}
+                    />
+                  ))}
+                </div>
+              )}
+              {packShorts.length > 0 && (
+                <div
+                  className={
+                    packShorts.length === 1
+                      ? 'ext-paper-shorts ext-paper-shorts--solo'
+                      : 'ext-paper-shorts'
+                  }
+                >
+                  {packShorts.map(story => (
+                    <StoryBlock
+                      key={story.account.id}
+                      story={story}
+                      variant="brief"
+                      admin={admin}
+                      normie={normie}
+                      {...stateFor(story.account.id)}
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="ext-paper-rule ext-paper-rule--double" aria-hidden="true" />
             </>
           )}
         </>
