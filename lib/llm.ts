@@ -27,13 +27,38 @@ const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash'
 const RETIRED_GEMINI_MODELS = ['gemini-2.5-flash', 'models/gemini-2.5-flash']
 const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
 
-function geminiApiKey(): string | undefined {
+function isGeminiQuotaError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
   return (
-    process.env.GEMINI_API_KEY?.trim() ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
-    process.env.GOOGLE_API_KEY?.trim() ||
-    undefined
+    message.includes('RESOURCE_EXHAUSTED') ||
+    message.includes('"code":429') ||
+    message.includes('exceeded your current quota') ||
+    message.includes('GenerateRequestsPerDayPerProjectPerModel') ||
+    message.includes('free_tier_requests')
   )
+}
+
+/** Primary + optional backup keys. Dedupe so the same value isn't tried twice. */
+function geminiApiKeys(): string[] {
+  const raw = [
+    process.env.GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    process.env.GOOGLE_API_KEY,
+  ]
+  const seen = new Set<string>()
+  const keys: string[] = []
+  for (const value of raw) {
+    const key = value?.trim()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    keys.push(key)
+  }
+  return keys
+}
+
+function geminiApiKey(): string | undefined {
+  return geminiApiKeys()[0]
 }
 
 function anthropicApiKey(): string | undefined {
@@ -102,12 +127,10 @@ function extractGeminiText(response: {
 
 async function generateWithGeminiOnce(
   opts: GenerateTextOptions,
+  apiKey: string,
   thinking: 'auto' | 'off',
   maxTokens?: number,
 ): Promise<string> {
-  const apiKey = geminiApiKey()
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
-
   const model = geminiModel()
   const thinkingConfig = thinkingConfigFor(model, thinking)
   const ai = new GoogleGenAI({ apiKey })
@@ -133,27 +156,51 @@ async function generateWithGeminiOnce(
   return text
 }
 
-async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
+async function generateWithGeminiKey(
+  opts: GenerateTextOptions,
+  apiKey: string,
+  keyIndex: number,
+): Promise<string> {
   const label = opts.label ?? 'gemini'
+  const keyLabel = keyIndex === 0 ? 'primary' : `backup#${keyIndex}`
   const firstMax = opts.maxTokens
   const retryMax = Math.min(Math.max(opts.maxTokens ?? 2048, 8192), 16384)
-
   const accept = (text: string) => !opts.usable || opts.usable(text)
 
   try {
-    const text = await generateWithGeminiOnce(opts, 'auto', firstMax)
+    const text = await generateWithGeminiOnce(opts, apiKey, 'auto', firstMax)
     if (accept(text)) return text
-    console.warn(`[${label}] Gemini output unusable; retrying without thinking`)
+    console.warn(`[${label}] Gemini (${keyLabel}) output unusable; retrying without thinking`)
   } catch (err) {
+    if (isGeminiQuotaError(err)) throw err
     const message = err instanceof Error ? err.message : String(err)
-    if (message.includes('GEMINI_API_KEY is not set')) throw err
     if (message.includes('"code":404') || message.includes('NOT_FOUND') || message.includes('no longer available')) {
       throw err
     }
-    console.warn(`[${label}] Gemini first attempt failed; retrying without thinking:`, err)
+    console.warn(`[${label}] Gemini (${keyLabel}) first attempt failed; retrying without thinking:`, err)
   }
-  const retry = await generateWithGeminiOnce(opts, 'off', retryMax)
-  return retry
+  return generateWithGeminiOnce(opts, apiKey, 'off', retryMax)
+}
+
+async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
+  const label = opts.label ?? 'gemini'
+  const keys = geminiApiKeys()
+  if (!keys.length) throw new Error('GEMINI_API_KEY is not set')
+
+  let lastErr: unknown
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      return await generateWithGeminiKey(opts, keys[i], i)
+    } catch (err) {
+      lastErr = err
+      if (isGeminiQuotaError(err) && i < keys.length - 1) {
+        console.warn(`[${label}] Gemini key ${i === 0 ? 'primary' : `backup#${i}`} quota exhausted; trying next key`)
+        continue
+      }
+      throw err
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
 }
 
 async function generateWithAnthropic(opts: GenerateTextOptions): Promise<string> {
@@ -179,16 +226,17 @@ async function generateWithAnthropic(opts: GenerateTextOptions): Promise<string>
 
 /** True when Gemini is configured (used for Gemini-only surfaces). */
 export function hasGeminiApiKey(): boolean {
-  return Boolean(geminiApiKey())
+  return geminiApiKeys().length > 0
 }
 
 /**
  * Generate text with Gemini only — never Anthropic.
  * Used for CLAWD homepage Yesterday's Build + The Needle.
+ * Rotates GEMINI_API_KEY → GEMINI_API_KEY_2 on quota errors.
  */
 export async function generateTextGeminiOnly(opts: GenerateTextOptions): Promise<GenerateTextResult> {
   const label = opts.label ?? 'llm-gemini'
-  if (!geminiApiKey()) {
+  if (!hasGeminiApiKey()) {
     throw new Error('GEMINI_API_KEY is not set')
   }
   try {
@@ -202,19 +250,17 @@ export async function generateTextGeminiOnly(opts: GenerateTextOptions): Promise
 
 /**
  * Gemini first, Anthropic Haiku fallback — for high-volume cheap surfaces
- * (Yesterday's Builds / secondary digests). Do not use this for CLAWD homepage
- * copy if Anthropic quota is gone; those paths are Gemini-only.
+ * (Yesterday's Builds / secondary digests).
  */
 export async function generateTextGeminiFirst(opts: GenerateTextOptions): Promise<GenerateTextResult> {
   const label = opts.label ?? 'llm'
   const anthropicKey = anthropicApiKey()
-  const geminiKey = geminiApiKey()
 
-  if (!anthropicKey && !geminiKey) {
+  if (!anthropicKey && !hasGeminiApiKey()) {
     throw new Error('No LLM API key configured (ANTHROPIC_API_KEY or GEMINI_API_KEY)')
   }
 
-  if (geminiKey) {
+  if (hasGeminiApiKey()) {
     try {
       const text = await generateWithGemini(opts)
       return { text, provider: 'gemini' }
@@ -231,13 +277,13 @@ export async function generateTextGeminiFirst(opts: GenerateTextOptions): Promis
 /**
  * Generate text with Anthropic Haiku as primary and Gemini as fallback.
  * Falls back when Anthropic is unset or the Anthropic call fails.
+ * Gemini itself rotates GEMINI_API_KEY → GEMINI_API_KEY_2 on quota errors.
  */
 export async function generateText(opts: GenerateTextOptions): Promise<GenerateTextResult> {
   const label = opts.label ?? 'llm'
   const anthropicKey = anthropicApiKey()
-  const geminiKey = geminiApiKey()
 
-  if (!anthropicKey && !geminiKey) {
+  if (!anthropicKey && !hasGeminiApiKey()) {
     throw new Error('No LLM API key configured (ANTHROPIC_API_KEY or GEMINI_API_KEY)')
   }
 
@@ -246,7 +292,7 @@ export async function generateText(opts: GenerateTextOptions): Promise<GenerateT
       const text = await generateWithAnthropic(opts)
       return { text, provider: 'anthropic' }
     } catch (err) {
-      if (!geminiKey) throw err
+      if (!hasGeminiApiKey()) throw err
       console.warn(`[${label}] Anthropic failed; falling back to Gemini:`, err)
     }
   }
