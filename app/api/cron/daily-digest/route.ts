@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadGitHubStatsForCron } from '@/lib/githubStatsSnapshot'
-import { generateAndCacheDailyDigest, loadReposForBrief, yesterdayMountainDateKey } from '@/lib/buildBrief'
+import {
+  collectBuildActivityForMountainDay,
+  generateAndCacheDailyDigest,
+  loadReposForBrief,
+  yesterdayMountainDateKey,
+} from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
 import { generateAllExternalDigests } from '@/lib/externalOwnerBrief'
 import { collectMcpWire } from '@/lib/mcpWire'
+import { runOvernightActiveRescores } from '@/lib/overnightActiveRescore'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -27,8 +33,24 @@ export async function GET(req: NextRequest) {
 
     const repos = await loadReposForBrief(stats)
     const editionKey = yesterdayMountainDateKey()
+    const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
+
+    const overnight = await runOvernightActiveRescores({
+      stats,
+      dateKey: editionKey,
+      batchSize: 3,
+      refreshNeedle: false,
+    }).catch(err => {
+      console.error('[daily-digest] overnight rescore failed', err)
+      return null
+    })
+
     const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
-    const needle = await generateAndCacheNeedle({ dateKey: editionKey }).catch(err => {
+    const needle = await generateAndCacheNeedle({
+      dateKey: editionKey,
+      force: true,
+      activity,
+    }).catch(err => {
       console.error('[daily-digest] needle generation failed', err)
       return null
     })
@@ -45,6 +67,7 @@ export async function GET(req: NextRequest) {
       generatedAt: digest.generatedAt,
       needleDateKey: needle?.dateKey ?? null,
       needleRepoCount: needle?.repoCount ?? 0,
+      overnight,
       externalBriefs: external,
       mcpWire: wire ? { status: wire.status, printed: wire.items.length, total: wire.totalChanges } : null,
     })

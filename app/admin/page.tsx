@@ -42,6 +42,9 @@ export default function AdminPage() {
   const [briefResult, setBriefResult] = useState<string | null>(null)
   const [needleRunning, setNeedleRunning] = useState(false)
   const [needleResult, setNeedleResult] = useState<string | null>(null)
+  const [adminRescoreSlug, setAdminRescoreSlug] = useState('')
+  const [adminRescoreRunning, setAdminRescoreRunning] = useState(false)
+  const [adminRescoreResult, setAdminRescoreResult] = useState<string | null>(null)
   const [wireRunning, setWireRunning] = useState(false)
   const [wireResult, setWireResult] = useState<string | null>(null)
   const [wireAdmin, setWireAdmin] = useState<McpWireAdminRecord | null>(null)
@@ -644,6 +647,34 @@ export default function AdminPage() {
       setNeedleResult('Needle request failed')
     }
     setNeedleRunning(false)
+  }
+
+  async function runAdminRescore() {
+    const repoSlug = adminRescoreSlug.trim()
+    if (!repoSlug) {
+      setAdminRescoreResult('Enter a GitHub slug (owner/repo)')
+      return
+    }
+    setAdminRescoreRunning(true)
+    setAdminRescoreResult(null)
+    try {
+      const res = await fetch('/api/admin/rescore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, repoSlug }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setAdminRescoreResult(
+          `Rescored ${repoSlug} — ${data.rescoreMeta?.deltaHeader ?? 'saved'}. ${String(data.changeSummary ?? '').slice(0, 160)}`,
+        )
+      } else {
+        setAdminRescoreResult(data.error ?? 'Admin rescore failed')
+      }
+    } catch {
+      setAdminRescoreResult('Admin rescore request failed')
+    }
+    setAdminRescoreRunning(false)
   }
 
   async function regenerateBuildBrief() {
@@ -1363,13 +1394,68 @@ export default function AdminPage() {
         <McpWire wire={wireAdmin?.snapshot ?? null} preview />
       </div>
 
+      {/* Manual Score / Rescore — public cards no longer have this */}
+      <div id="admin-rescore" className="admin-jump-target" style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Score / Rescore</h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '560px', lineHeight: 1.55 }}>
+            Live cards no longer Score/Rescore. Overnight cron rescored active repos; use this for a free one-off pass (writes grades + What changed + feeds The Needle).
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            value={adminRescoreSlug}
+            onChange={e => setAdminRescoreSlug(e.target.value)}
+            placeholder="owner/repo"
+            style={{
+              fontSize: '13px',
+              padding: '8px 12px',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border-strong)',
+              background: 'var(--surface-1)',
+              color: 'var(--text-primary)',
+              minWidth: '220px',
+              fontFamily: 'var(--font-mono)',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => void runAdminRescore()}
+            disabled={adminRescoreRunning}
+            style={{
+              fontSize: '12px',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius)',
+              background: 'var(--surface-3)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-strong)',
+            }}
+          >
+            {adminRescoreRunning ? 'Scoring…' : 'Rescore now'}
+          </button>
+        </div>
+        {adminRescoreResult && (
+          <div style={{
+            marginTop: '12px',
+            padding: '10px 14px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            fontSize: '13px',
+            color: 'var(--text-secondary)',
+          }}>
+            {adminRescoreResult}
+          </div>
+        )}
+      </div>
+
       {/* Needle */}
       <div id="admin-needle" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
             <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>The Needle</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Short daily column on rescore movement for the previous Mountain calendar day. Regenerates automatically overnight Mountain (~1am MDT / midnight MST); use this to refresh immediately after testing a rescore.
+              Short holder-focused column from overnight rescores + Yesterday&apos;s Build activity. Regenerates with the daily digest; use this to refresh after a manual rescore.
             </p>
           </div>
           <button

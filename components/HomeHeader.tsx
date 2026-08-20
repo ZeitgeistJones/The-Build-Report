@@ -17,9 +17,7 @@ interface Props {
 
 export default function HomeHeader({ rescoreBurns, latestCommitLabel, dataAsOfLabel, dataStale }: Props) {
   const isMobile = useIsMobile()
-  const showBurn =
-    rescoreBurns &&
-    (rescoreBurns.count > 0 || rescoreBurns.clawdBurnedOnChain > 0 || rescoreBurns.ethPendingInReceiver > 0)
+  const showBurn = rescoreBurns && rescoreBurns.clawdBurnedOnChain > 0
 
   return (
     <div
@@ -43,7 +41,7 @@ export default function HomeHeader({ rescoreBurns, latestCommitLabel, dataAsOfLa
             maxWidth: '56ch',
           }}
         >
-          A plain English look at the repos, scored and sourced.
+          A plain English look at the repos, scored and sourced. Rescored overnight when repos ship.
         </p>
         <p className="site-deck" style={{ marginTop: '8px', lineHeight: 1.5 }}>
           Independent community project · Interpretive scores ·{' '}

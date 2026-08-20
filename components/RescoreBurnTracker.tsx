@@ -2,15 +2,11 @@
 
 import InfoTooltip from '@/components/InfoTooltip'
 import { useIsMobile } from '@/hooks/useIsMobile'
-import {
-  BURN_TRACKER_TOOLTIP,
-  formatEthPendingLabel,
-} from '@/lib/burnTrackerCopy'
+import { BURN_TRACKER_TOOLTIP } from '@/lib/burnTrackerCopy'
 import {
   formatClawdAmount,
   formatLastBurnLabel,
 } from '@/lib/clawdBurnIndex'
-import TriggerExecuteBurnButton from '@/components/TriggerExecuteBurnButton'
 
 interface Props {
   count: number
@@ -19,18 +15,15 @@ interface Props {
   lastBurnAt: string | null
 }
 
+/** Public header burn stat — CLAWD burned only (no funded-rescore / execute chrome). */
 export default function RescoreBurnTracker({
-  count,
-  ethPendingInReceiver,
   clawdBurnedOnChain,
   lastBurnAt,
 }: Props) {
   const isMobile = useIsMobile()
   const lastBurnLabel = formatLastBurnLabel(lastBurnAt)
-  const ethPendingLabel = formatEthPendingLabel(ethPendingInReceiver)
-  const showMeta = count > 0 || Boolean(lastBurnLabel) || Boolean(ethPendingLabel)
 
-  if (count <= 0 && clawdBurnedOnChain <= 0 && ethPendingInReceiver <= 0) return null
+  if (clawdBurnedOnChain <= 0 && !lastBurnLabel) return null
 
   return (
     <div
@@ -39,8 +32,8 @@ export default function RescoreBurnTracker({
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
         padding: '12px 14px',
-        minWidth: isMobile ? undefined : '220px',
-        maxWidth: isMobile ? undefined : '260px',
+        minWidth: isMobile ? undefined : '200px',
+        maxWidth: isMobile ? undefined : '240px',
         boxShadow: 'var(--card-elevated)',
       }}
     >
@@ -50,9 +43,9 @@ export default function RescoreBurnTracker({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '8px',
-          paddingBottom: showMeta ? '8px' : 0,
-          borderBottom: showMeta ? '1px solid var(--border)' : undefined,
-          marginBottom: showMeta ? '8px' : 0,
+          paddingBottom: lastBurnLabel ? '8px' : 0,
+          borderBottom: lastBurnLabel ? '1px solid var(--border)' : undefined,
+          marginBottom: lastBurnLabel ? '8px' : 0,
         }}
       >
         <span
@@ -69,39 +62,23 @@ export default function RescoreBurnTracker({
         </span>
         <InfoTooltip
           content={BURN_TRACKER_TOOLTIP}
-          ariaLabel="About CLAWD burned, rescores, and ETH queued"
+          ariaLabel="About CLAWD burned"
           compact
           width={280}
         />
       </div>
 
-      {showMeta && (
+      {lastBurnLabel && (
         <div
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
             fontSize: '11px',
             color: 'var(--text-muted)',
             lineHeight: 1.45,
-            marginBottom: '10px',
           }}
         >
-          {count > 0 && (
-            <div>
-              {count.toLocaleString('en-US')} rescore{count === 1 ? '' : 's'} funded
-            </div>
-          )}
-          {lastBurnLabel && <div>Last burn · {lastBurnLabel}</div>}
-          {ethPendingLabel && <div>{ethPendingLabel}</div>}
+          Last burn · {lastBurnLabel}
         </div>
       )}
-
-      <TriggerExecuteBurnButton
-        ethPending={ethPendingInReceiver}
-        compact
-        fullWidth={isMobile}
-      />
     </div>
   )
 }

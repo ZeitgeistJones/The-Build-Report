@@ -9,6 +9,7 @@ import {
   dateKeyMountain,
   editionReadKeys,
   mountainDateKeyBoundsMs,
+  type RepoBuildActivity,
 } from '@/lib/buildBrief'
 import { indexArchiveDate, NEEDLE_DATES_INDEX_KEY } from '@/lib/archiveIndex'
 
@@ -40,11 +41,8 @@ function needleRedisKey(dateKey: string): string {
   return `${NEEDLE_KEY_PREFIX}${dateKey}`
 }
 
-function qualifyingChange(_meta: RescoreSummaryRecord): boolean {
-  return true
-}
-
 function formatMoveLines(qualifying: QualifyingMove[]): string {
+  if (!qualifying.length) return '(none)'
   return qualifying
     .map(q => {
       const gradeMoved = q.biOld !== q.biNew || q.ecOld !== q.ecNew
@@ -56,21 +54,54 @@ function formatMoveLines(qualifying: QualifyingMove[]): string {
     .join('\n\n')
 }
 
-function buildFallbackNeedle(qualifying: QualifyingMove[]): { text: string; textNormie: string } {
-  const names = qualifying.map(q => q.name)
-  const lead = names[0]
+function formatActivityLines(activity: RepoBuildActivity[]): string {
+  if (!activity.length) return '(none)'
+  return activity
+    .slice(0, 12)
+    .map(row => {
+      const msgs = row.commits.slice(0, 6).map(m => `  - ${m}`).join('\n')
+      const extra = row.commits.length > 6 ? `\n  - …and ${row.commits.length - 6} more` : ''
+      return `${row.slug} (${row.commits.length} commit${row.commits.length === 1 ? '' : 's'}):\n${msgs}${extra}`
+    })
+    .join('\n\n')
+}
+
+function buildFallbackNeedle(
+  qualifying: QualifyingMove[],
+  activity: RepoBuildActivity[],
+): { text: string; textNormie: string } {
+  if (qualifying.length) {
+    const names = qualifying.map(q => q.name)
+    const lead = names[0]
+    const rest =
+      names.length === 1
+        ? ''
+        : names.length === 2
+          ? ` and ${names[1]}`
+          : `, plus ${names.length - 1} other repos`
+    const text =
+      `${lead}${rest} got a fresh overnight score. ` +
+      `Biggest holder signal: grades moved where the work actually changed the read — not just commit noise.`
+    const textNormie =
+      `${lead}${rest} got a fresh overnight score. ` +
+      `That means the scoreboard changed for holders for real, not just because someone pushed code.`
+    return { text, textNormie }
+  }
+
+  const names = activity.slice(0, 3).map(a => a.slug)
+  const lead = names[0] ?? 'Tracked repos'
   const rest =
-    names.length === 1
+    names.length <= 1
       ? ''
       : names.length === 2
         ? ` and ${names[1]}`
-        : `, plus ${names.length - 1} other repos`
+        : `, plus ${activity.length - 1} other projects`
   const text =
-    `${lead}${rest} moved on a rescore in the last day. ` +
-    `Biggest signal: grade letters shifted where the score actually changed — not just commit noise.`
+    `${lead}${rest} shipped overnight. ` +
+    `Holder takeaway: watch whether that work shows up in apps, locks, or shipping leverage — grades refresh on the overnight pass.`
   const textNormie =
-    `${lead}${rest} got a fresh score and the grade actually moved. ` +
-    `That means the scoreboard changed for real, not just because someone pushed code.`
+    `${lead}${rest} got updates overnight. ` +
+    `For holders: look for work that helps apps, burns/locks, or the tools that make shipping those things faster.`
   return { text, textNormie }
 }
 
@@ -80,13 +111,21 @@ function isFallbackNeedleCopy(data: Pick<NeedleData, 'text' | 'textNormie' | 'so
   const blob = `${data.text} ${data.textNormie ?? ''}`
   return (
     blob.includes('got a fresh score and the grade actually moved') ||
-    blob.includes('Biggest signal: grade letters shifted')
+    blob.includes('Biggest signal: grade letters shifted') ||
+    blob.includes('got a fresh overnight score')
   )
 }
 
-function extractNeedleProse(raw: string | undefined): { text: string; textNormie?: string } | null {
+function extractLabeledNeedle(raw: string | undefined): { text: string; textNormie?: string } | null {
   if (!raw?.trim()) return null
-  const jsonMatch = raw.match(/\{[\s\S]*\}/)
+  const cleaned = stripMarkdown(raw).trim()
+  const plainMatch = cleaned.match(/\nPLAIN(?: ENGLISH)?:\s*/i)
+  if (plainMatch && plainMatch.index != null) {
+    const text = cleaned.slice(0, plainMatch.index).replace(/^STANDARD:\s*/i, '').trim()
+    const textNormie = cleaned.slice(plainMatch.index + plainMatch[0].length).trim()
+    if (text.length >= 40) return { text, ...(textNormie.length >= 40 ? { textNormie } : {}) }
+  }
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]) as { text?: unknown; textNormie?: unknown }
@@ -97,31 +136,40 @@ function extractNeedleProse(raw: string | undefined): { text: string; textNormie
         return textNormie ? { text, textNormie } : { text }
       }
     } catch {
-      // fall through to plain prose
+      // fall through
     }
   }
-  const text = stripMarkdown(raw).trim()
-  if (text.length < 40) return null
-  if (text.startsWith('{') || text.startsWith('[')) return null
-  if (/^return only valid json/i.test(text)) return null
-  return { text }
+  if (cleaned.length < 40) return null
+  if (cleaned.startsWith('{') || cleaned.startsWith('[')) return null
+  return { text: cleaned }
 }
 
 async function generateNeedleCopy(
   qualifying: QualifyingMove[],
+  activity: RepoBuildActivity[],
 ): Promise<{ text: string; textNormie?: string } | null> {
   if (!hasGeminiApiKey()) return null
 
-  const lines = formatMoveLines(qualifying)
-  const prompt = `You write a very short daily column called "The Needle" for a crypto ecosystem scoring site. It reports on today's rescores — sometimes the overall grade moved, sometimes it held flat even though specific rubric rows changed underneath. Here is today's rescore data:
+  const prompt = `You write a very short daily column called "The Needle" for The Build Report — for $CLAWD token holders.
 
-${lines}
+Date window: Mountain calendar overnight edition.
 
-Write 2-3 sentences total, no more. Pick the single most interesting thing that happened — this could be an overall grade move, OR a specific rubric row that improved/declined even though the overall grade held flat. If nothing moved overall, explain specifically what DID change at the rubric level and why it wasn't enough to shift the letter grade or percentage yet. Be specific — name the actual thing that changed (a security audit, a new test, a dependency, whatever the rescore notes mention), not just "held steady." Casual, direct, no fluff, no headers, no bullet points. Just plain prose.
+SHIPPING ACTIVITY (same sample Yesterday's Build sees — commits that day):
+${formatActivityLines(activity)}
 
-Do NOT invent that README, root files, architecture docs, or plans are missing unless the rescore notes explicitly say so with high confidence. Prefer the deltaHeader grade moves and named rubric changes over speculative documentation-gap stories.
+OVERNIGHT / RESCORE NOTES (grades + What changed when a live rescore ran):
+${formatMoveLines(qualifying)}
 
-Return ONLY the column as plain prose. No JSON, no markdown, no title.`
+Write TWO versions in this exact layout:
+
+STANDARD:
+2-3 sentences. Pick the single most holder-relevant signal — an app/lock/burn path, shipping leverage that multiplies holder-facing work, or a grade move that changes the holder read. Casual, direct. Name specific repos when listed above. Do NOT invent grade moves from commits alone — only cite grade/rubric changes when OVERNIGHT / RESCORE NOTES include them. Do NOT invent missing README/docs unless a rescore note says so.
+
+PLAIN:
+Same facts and repo names, for someone who knows nothing about code.
+${normieVoiceGuidance('needle')}
+
+Return ONLY those two labeled blocks. No JSON, no markdown, no title.`
 
   try {
     const { text: raw } = await generateTextGeminiOnly({
@@ -129,37 +177,14 @@ Return ONLY the column as plain prose. No JSON, no markdown, no title.`
       maxTokens: 1024,
       temperature: NORMIE_TEMPERATURE,
       label: 'needle',
-      usable: r => Boolean(extractNeedleProse(r)?.text),
+      usable: r => Boolean(extractLabeledNeedle(r)?.text),
     })
-    const parsed = extractNeedleProse(raw)
+    const parsed = extractLabeledNeedle(raw)
     if (!parsed) {
       console.error('[needle] empty or unreadable LLM response', { preview: (raw ?? '').slice(0, 400) })
       return null
     }
-
-    if (parsed.textNormie) return parsed
-
-    try {
-      const { text: normieRaw } = await generateTextGeminiOnly({
-        prompt: `Rewrite this Needle column for someone who knows nothing about code or crypto. Keep the same facts and the same repo names.
-
-STANDARD COLUMN:
-${parsed.text}
-
-${normieVoiceGuidance('needle')}
-
-Return ONLY the rewrite as plain prose. No JSON, no markdown.`,
-        maxTokens: 1024,
-        temperature: NORMIE_TEMPERATURE,
-        label: 'needle-normie',
-        usable: r => Boolean(extractNeedleProse(r)?.text),
-      })
-      const normie = extractNeedleProse(normieRaw)?.text
-      return normie ? { text: parsed.text, textNormie: normie } : parsed
-    } catch (err) {
-      console.warn('[needle] normie rewrite failed; keeping standard column', err)
-      return parsed
-    }
+    return parsed
   } catch (err) {
     console.error('[needle] AI generation failed', err)
     return null
@@ -171,6 +196,8 @@ export type GenerateNeedleOptions = {
   dateKey?: string
   /** Regenerate even if a cached Needle already exists for the date. */
   force?: boolean
+  /** Same Mountain-day activity YB uses — expands Needle inputs beyond paid/overnight rescored slugs. */
+  activity?: RepoBuildActivity[]
 }
 
 export async function generateAndCacheNeedle(
@@ -180,16 +207,15 @@ export async function generateAndCacheNeedle(
   const dateKey = options.dateKey ?? dateKeyMountain()
   const existing = await readCachedNeedle(dateKey)
   if (!options.force && existing && !isFallbackNeedleCopy(existing)) return existing
+
+  const activity = options.activity ?? []
   const { startMs, endMs } = mountainDateKeyBoundsMs(dateKey)
   const slugs = await getSlugsRescoredBetween(startMs, endMs)
-  if (!slugs.length) return existing ?? null
-
-  const summaries = await getRescoreSummaries(slugs)
+  const summaries = slugs.length ? await getRescoreSummaries(slugs) : {}
   const nameBySlug = new Map(REPOS.map(r => [r.githubSlug, r.name]))
 
   const qualifying: QualifyingMove[] = Object.entries(summaries)
     .filter(([, meta]) => {
-      if (!qualifyingChange(meta)) return false
       const at = Date.parse(meta.rescoreAt)
       if (!Number.isFinite(at)) return false
       return at >= startMs && at < endMs && dateKeyMountain(new Date(at)) === dateKey
@@ -204,22 +230,26 @@ export async function generateAndCacheNeedle(
       summary: meta.summary ?? null,
     }))
 
-  if (!qualifying.length) return existing ?? null
+  if (!qualifying.length && !activity.length) return existing ?? null
 
-  const ai = await generateNeedleCopy(qualifying)
+  const ai = await generateNeedleCopy(qualifying, activity)
   if (!ai && existing && !isFallbackNeedleCopy(existing)) {
     console.warn('[needle] AI failed; keeping previous AI Needle', { dateKey })
     return existing
   }
-  const fallback = buildFallbackNeedle(qualifying)
+  const fallback = buildFallbackNeedle(qualifying, activity)
   const text = ai?.text ?? fallback.text
   const textNormie = ai?.textNormie ?? fallback.textNormie
+  const evidenceSlugs = new Set([
+    ...qualifying.map(q => q.name),
+    ...activity.map(a => a.slug),
+  ])
 
   const data: NeedleData = {
     text,
     textNormie,
     dateKey,
-    repoCount: qualifying.length,
+    repoCount: evidenceSlugs.size || Math.max(qualifying.length, activity.length),
     generatedAt: new Date().toISOString(),
     source: ai ? 'ai' : 'fallback',
   }

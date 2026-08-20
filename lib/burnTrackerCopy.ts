@@ -14,11 +14,8 @@ export const RESCORE_COUNT_TOOLTIP =
   'Score/Rescore runs that funded ETH into the receiver (paid rescore fees). CLAWD burned only increases after someone calls execute().'
 
 /** Combined tooltip for the burn tracker stat card headline. */
-export const BURN_TRACKER_TOOLTIP = [
-  CLAWD_BURNED_TOOLTIP,
-  RESCORE_COUNT_TOOLTIP,
-  ETH_PENDING_TOOLTIP,
-].join(' ')
+export const BURN_TRACKER_TOOLTIP =
+  'Cumulative CLAWD sent to dead from execute() on the receiver contract — counted on-chain.'
 
 /** Compact label for pending ETH in the header burn tracker. */
 export function formatEthPendingLabel(ethPending: number): string {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin } from '@/lib/admin'
 import { getGitHubStats } from '@/lib/github'
-import { generateAndCacheBuildBrief, loadReposForBrief, yesterdayMountainDateKey } from '@/lib/buildBrief'
+import { generateAndCacheBuildBrief, loadReposForBrief, yesterdayMountainDateKey, collectBuildActivityForMountainDay } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
 
 export const dynamic = 'force-dynamic'
@@ -18,8 +18,13 @@ export async function POST(req: NextRequest) {
     const stats = await getGitHubStats({ fresh: true })
     const repos = await loadReposForBrief(stats)
     const editionKey = yesterdayMountainDateKey()
+    const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
     const brief = await generateAndCacheBuildBrief(stats, repos, editionKey)
-    const needle = await generateAndCacheNeedle({ dateKey: editionKey, force: true }).catch(err => {
+    const needle = await generateAndCacheNeedle({
+      dateKey: editionKey,
+      force: true,
+      activity,
+    }).catch(err => {
       console.error('[admin/build-brief] needle generation failed', err)
       return null
     })

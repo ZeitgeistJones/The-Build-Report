@@ -34,7 +34,6 @@ import HomeRepoSection from '@/components/HomeRepoSection'
 import GradesPanel from '@/components/GradesPanel'
 import AllTimeStats from '@/components/AllTimeStats'
 import HomeHeader from '@/components/HomeHeader'
-import BriefFreshnessNudge from '@/components/BriefFreshnessNudge'
 import BuildBriefCard from '@/components/BuildBriefCard'
 import NeedleCard from '@/components/NeedleCard'
 import { getNeedle } from '@/lib/needle'
@@ -48,8 +47,6 @@ import { getRescoreSummaries } from '@/lib/rescoreSummaries'
 import { getBuildBrief } from '@/lib/buildBrief'
 import { isCommunityContextEnabled, getContextSummaryBySlug, buildCommunityPulse } from '@/lib/communityContext'
 import { calcEcosystemPulse } from '@/lib/ecosystemPulse'
-import { summarizeOpenPromoRewards } from '@/lib/rescorePromo'
-import { getEthUsdRateCached } from '@/lib/ethUsdRate'
 import type { GitHubStats } from '@/lib/github'
 import type { RepoContextSummary } from '@/lib/communityContextTypes'
 
@@ -168,11 +165,7 @@ export default async function Home() {
     applyExcludedToRepos(reposWithLive, excludedMap),
   )
 
-  const [rescoreSummaries, ethUsdRate] = await Promise.all([
-    getRescoreSummaries(repos.map(r => r.githubSlug)).catch(() => ({})),
-    getEthUsdRateCached().catch(() => undefined),
-  ])
-  const openPromoRewards = summarizeOpenPromoRewards(repos, ethUsdRate)
+  const rescoreSummaries = await getRescoreSummaries(repos.map(r => r.githubSlug)).catch(() => ({}))
 
   const githubOrder = stats ? githubSlugOrder(trackableGithub) : []
 
@@ -385,8 +378,6 @@ export default async function Home() {
           )}
         </div>
       )}
-
-      <BriefFreshnessNudge openRewards={openPromoRewards} />
 
       <BuildBriefCard brief={buildBrief} />
       <NeedleCard needle={needle} />

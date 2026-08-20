@@ -3,8 +3,14 @@ import { getGitHubStats } from '@/lib/github'
 import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
 import { syncEthUsdRate } from '@/lib/ethUsdRate'
-import { generateAndCacheDailyDigest, loadReposForBrief, yesterdayMountainDateKey } from '@/lib/buildBrief'
+import {
+  collectBuildActivityForMountainDay,
+  generateAndCacheDailyDigest,
+  loadReposForBrief,
+  yesterdayMountainDateKey,
+} from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
+import { runOvernightActiveRescores } from '@/lib/overnightActiveRescore'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -29,11 +35,27 @@ export async function GET(req: NextRequest) {
       syncEthUsdRate(),
     ])
 
-    // Keep Yesterday's build fresh even when the dedicated daily-digest cron misses a run.
     const repos = await loadReposForBrief(stats)
     const editionKey = yesterdayMountainDateKey()
+    const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
+
+    // Continue overnight rescore queue if daily-digest left work unfinished.
+    const overnight = await runOvernightActiveRescores({
+      stats,
+      dateKey: editionKey,
+      batchSize: 3,
+      refreshNeedle: false,
+    }).catch(err => {
+      console.error('[warm-cache] overnight rescore failed', err)
+      return null
+    })
+
     const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
-    const needle = await generateAndCacheNeedle({ dateKey: editionKey }).catch(err => {
+    const needle = await generateAndCacheNeedle({
+      dateKey: editionKey,
+      force: Boolean(overnight?.scored.length),
+      activity,
+    }).catch(err => {
       console.error('[warm-cache] needle generation failed', err)
       return null
     })
@@ -53,6 +75,7 @@ export async function GET(req: NextRequest) {
       briefGeneratedAt: digest.generatedAt,
       needleDateKey: needle?.dateKey ?? null,
       needleRepoCount: needle?.repoCount ?? 0,
+      overnight,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Warm cache cron failed'

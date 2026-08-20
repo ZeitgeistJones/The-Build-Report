@@ -47,7 +47,7 @@ export default function NeedleCard({ needle }: Props) {
           The Needle
         </span>
         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          {needle.repoCount} repo{needle.repoCount === 1 ? '' : 's'} moved
+          {needle.repoCount} repo{needle.repoCount === 1 ? '' : 's'} overnight
         </span>
       </div>
 

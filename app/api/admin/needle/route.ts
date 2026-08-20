@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guardAdmin } from '@/lib/admin'
-import { yesterdayMountainDateKey } from '@/lib/buildBrief'
+import {
+  collectBuildActivityForMountainDay,
+  loadReposForBrief,
+  yesterdayMountainDateKey,
+} from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
+import { getGitHubStats } from '@/lib/github'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -14,7 +19,11 @@ export async function POST(req: NextRequest) {
   if (denied) return denied
 
   try {
-    const needle = await generateAndCacheNeedle({ dateKey: yesterdayMountainDateKey(), force: true })
+    const stats = await getGitHubStats({ fresh: true })
+    const repos = await loadReposForBrief(stats)
+    const dateKey = yesterdayMountainDateKey()
+    const activity = collectBuildActivityForMountainDay(stats, repos, dateKey)
+    const needle = await generateAndCacheNeedle({ dateKey, force: true, activity })
     return NextResponse.json({
       ok: true,
       generated: Boolean(needle),

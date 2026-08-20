@@ -2,9 +2,8 @@
 
 import { usePathname } from 'next/navigation'
 import NavBar from '@/components/NavBar'
-import RescorePromoBannerShell from '@/components/RescorePromoBannerShell'
 
-// Routes that should render edge-to-edge with no nav, banner, or footer.
+// Routes that should render edge-to-edge with no nav or footer.
 // Matches the route itself and any sub-paths (e.g. "/sky/foo").
 const FULLSCREEN_ROUTES = ['/sky']
 
@@ -29,7 +28,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   if (isFullscreenRoute(pathname)) {
-    // Full-bleed: no nav, no promo banner, no padded main, no footer.
+    // Full-bleed: no nav, no padded main, no footer.
     // EcosystemSky.jsx already renders its own "← The Build Report" back link.
     return <>{children}</>
   }
@@ -39,7 +38,6 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   return (
     <>
       <NavBar />
-      <RescorePromoBannerShell />
       <main
         className={fullBleedContent ? 'site-main site-main--fullbleed' : 'site-main'}
         style={

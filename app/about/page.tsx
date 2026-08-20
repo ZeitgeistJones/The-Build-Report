@@ -28,7 +28,7 @@ This is not a real-time data feed. Launch baseline grades are a fixed Jun 15 sna
     },
     {
       heading: 'What’s in the tabs',
-      body: `Repos is the main Build Report — ecosystem grades, repo cards, the clawdbotatg “Yesterday’s build” digest, and Score / Rescore. That’s the scored ledger.
+      body: `Repos is the main Build Report — ecosystem grades, repo cards, the clawdbotatg “Yesterday’s build” digest, and overnight rescores. That’s the scored ledger.
 
 Yesterday’s Builds (nav) is a separate overnight newspaper for other GitHub projects we track outside clawdbotatg. Unofficial shipping digests only — no grades, not affiliated with those projects. Not the same as the homepage clawdbotatg brief.
 
@@ -45,8 +45,8 @@ How we score is the methodology handbook — rubrics, grade math, evidence rules
 About (this page) is identity, disclaimers, and this tab map — not the homepage walkthrough or the full scoring math.`,
     },
     {
-      heading: 'Scores & Rescore',
-      body: `Repo cards can run Score or Rescore (Claude inference on that repo). Results are cached and shared. Wallet + CLAWDGate details, promo notes, and “do I need a wallet?” live in Start Here → Wallets & Rescore. Rubric weights, evidence rules, and context layers live in How we score.`,
+      heading: 'Scores & overnight rescore',
+      body: `Repo grades refresh overnight when tracked repos ship (and operators can rescore from Admin). Results are cached and shared. Rubric weights, evidence rules, and context layers live in How we score.`,
     },
     ...(communityContextEnabled
       ? [
@@ -137,7 +137,7 @@ Future directions could include community rubric proposals, richer commit meanin
       {sections.map(section => (
         <div
           key={section.heading}
-          id={section.heading === 'Scores & Rescore' ? 'score-types' : undefined}
+          id={section.heading === 'Scores & overnight rescore' ? 'score-types' : undefined}
           className="about-prose-section"
           style={{ marginBottom: '28px' }}
         >

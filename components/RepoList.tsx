@@ -20,12 +20,10 @@ import { isCreatedInPeriod, isTimestampInPeriod, timeAgo } from '@/lib/github'
 import { gradeColor } from '@/lib/gradeLetters'
 import { isUnscoredRecent } from '@/lib/recentRepos'
 import { isAutoInferredNote } from '@/lib/repoFilters'
-import { getScoringStatus } from '@/lib/scoringStatus'
 import GateBlur from '@/components/wallet/GateBlur'
 import GateOverlay from '@/components/wallet/GateOverlay'
 import { useClawdAccess } from '@/components/wallet/ClawdAccessContext'
 import { useNormieMode } from '@/components/NormieModeProvider'
-import RepoScoreButton from '@/components/RepoScoreButton'
 import { RepoWindowToggle } from '@/components/GradePeriodContext'
 import { periodKeyLabel, repoCommitsForPeriodKey, type Period } from '@/lib/grades'
 import RubricCriterionRow from '@/components/RubricCriterionRow'
@@ -136,7 +134,6 @@ function gradeLetterStyle(gradeLetter: number, color: string) {
 
 const META_MUTED = '#5e5a55'
 const STALE_AMBER = '#f59e0b'
-const STALE_RED = '#ef4444'
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const GITHUB_COMMITS_CAP = 100
 
@@ -182,7 +179,6 @@ function repoMatchesFilter(
   filter: RepoFilter,
   collectionSets: Record<RepoCollectionId, Set<string>>,
   contextSummary: Record<string, RepoContextSummary>,
-  pinnedNeedsRescoreSlugs: readonly string[] = [],
   period: Period = '24h',
   rescoreSummaries: Record<string, RescoreSummaryRecord> = {},
 ): boolean {
@@ -190,7 +186,6 @@ function repoMatchesFilter(
   const tag = getEffectiveTag(repo)
   if (filter === 'all') return true
   if (filter === 'needs-rescore') {
-    if (pinnedNeedsRescoreSlugs.includes(slug)) return true
     return repoNeedsRescore(repo.scoredAt, repo.commitTimestamps, {
       lastCommitAt: repo.lastCommitAt,
       pushedAt: repo.pushedAt,
@@ -550,8 +545,8 @@ function getScoreAgeDisplay(repo: RepoWithLive, pending: boolean): ScoreAgeDispl
 }
 
 function commitsSinceScoredColor(count: number): string {
-  if (count > 50) return STALE_RED
-  if (count > 20) return STALE_AMBER
+  // Soft signal only — overnight system refreshes grades; not a click-to-fix CTA.
+  if (count > 80) return STALE_AMBER
   return META_MUTED
 }
 
@@ -612,8 +607,7 @@ export default function RepoList({
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set())
   const [repoItems, setRepoItems] = useState(repos)
-  const [rescoreSummaries, setRescoreSummaries] = useState(initialRescoreSummaries)
-  const [pinnedNeedsRescoreSlugs, setPinnedNeedsRescoreSlugs] = useState<string[]>([])
+  const [rescoreSummaries] = useState(initialRescoreSummaries)
   const { unlocked } = useClawdAccess()
   const { normie } = useNormieMode()
   const isMobile = useIsMobile()
@@ -652,44 +646,9 @@ export default function RepoList({
     })
   }, [repos])
 
-  function handleScored(updated: Repo, rescoreMeta?: RescoreSummaryRecord | null) {
-    if (rescoreMeta) {
-      setRescoreSummaries(prev => ({ ...prev, [updated.githubSlug]: rescoreMeta }))
-    }
-    setPinnedNeedsRescoreSlugs(prev => {
-      if (activeFilter !== 'needs-rescore') return prev
-      return [updated.githubSlug, ...prev.filter(slug => slug !== updated.githubSlug)]
-    })
-    setRepoItems(prev =>
-      prev.map(r =>
-        r.githubSlug === updated.githubSlug
-          ? {
-              ...r,
-              ...updated,
-              id: r.id,
-              githubSlug: r.githubSlug,
-              scoredAt: updated.scoredAt,
-              adminNote: updated.adminNote,
-              description: r.description,
-              createdAt: r.createdAt,
-              lastCommitAt: r.lastCommitAt,
-              pushedAt: r.pushedAt,
-              commits24h: r.commits24h,
-              commits30d: r.commits30d,
-              commits7d: r.commits7d,
-              commits7_14: r.commits7_14,
-              commits30_60: r.commits30_60,
-              commitTimestamps: r.commitTimestamps,
-              commitsCapped: r.commitsCapped,
-            }
-          : r,
-      ),
-    )
-  }
-
   const filters: { key: RepoFilter; label: string; tooltip?: string }[] = [
     { key: 'all', label: 'All', tooltip: REPO_FILTER_TOOLTIPS.all },
-    { key: 'needs-rescore', label: 'Needs rescore', tooltip: REPO_FILTER_TOOLTIPS['needs-rescore'] },
+    { key: 'needs-rescore', label: 'Awaiting overnight', tooltip: REPO_FILTER_TOOLTIPS['needs-rescore'] },
     { key: 'recently-rescored', label: 'Recently rescored', tooltip: REPO_FILTER_TOOLTIPS['recently-rescored'] },
     { key: 'new-arrivals', label: 'New arrivals', tooltip: REPO_FILTER_TOOLTIPS['new-arrivals'] },
     { key: 'clawd-cv-perks', label: 'Clawd/CV perks', tooltip: REPO_FILTER_TOOLTIPS['clawd-cv-perks'] },
@@ -721,7 +680,6 @@ export default function RepoList({
           activeFilter,
           collectionSets,
           contextSummary,
-          pinnedNeedsRescoreSlugs,
           repoPeriod,
           rescoreSummaries,
         ),
@@ -730,8 +688,8 @@ export default function RepoList({
     const c = repoCommitsForPeriodKey(r, repoPeriod)
     return c != null && c > 0
   })
-  // Period "Active" scope applies to Needs rescore too — otherwise that filter
-  // ignores 24h/7d/30d/60d and lists stale repos that only need a rescore someday.
+  // Period "Active" scope applies to Awaiting overnight too — otherwise that filter
+  // ignores 24h/7d/30d/60d and lists stale repos that only need a refresh someday.
   // New arrivals / recently rescored already apply period inside repoMatchesFilter.
   const skipActiveScope =
     isSearching ||
@@ -741,16 +699,6 @@ export default function RepoList({
     .sort((a, b) => {
       if (isSearching) {
         return a.name.localeCompare(b.name)
-      }
-
-      if (activeFilter === 'needs-rescore' && pinnedNeedsRescoreSlugs.length) {
-        const aPinned = pinnedNeedsRescoreSlugs.indexOf(a.githubSlug)
-        const bPinned = pinnedNeedsRescoreSlugs.indexOf(b.githubSlug)
-        if (aPinned !== -1 || bPinned !== -1) {
-          if (aPinned === -1) return 1
-          if (bPinned === -1) return -1
-          return aPinned - bPinned
-        }
       }
 
       if (activeFilter === 'recently-rescored') {
@@ -1121,17 +1069,21 @@ export default function RepoList({
                       title={
                         sinceScored.count === 0 && periodCommits != null && periodCommits > 0
                           ? `${periodCommits} commit${periodCommits === 1 ? '' : 's'} in this window landed before the last score — only post-score commits count here.`
-                          : undefined
+                          : sinceScored.count > 0
+                            ? `${sinceScored.count} new commit${sinceScored.count === 1 ? '' : 's'} since last score — next overnight pass can refresh`
+                            : undefined
                       }
                     >
-                      {sinceScored.label}
+                      {sinceScored.count > 0
+                        ? `${sinceScored.count}${sinceScored.capped ? '+' : ''} new · next overnight`
+                        : sinceScored.label}
                     </span>
                   </>
                 )}
                 {sinceScored.kind === 'auto_new' && (
                   <>
                     {' · '}
-                    <span style={{ color: STALE_AMBER }}>New commits since scored</span>
+                    <span style={{ color: STALE_AMBER }}>New commits · next overnight</span>
                   </>
                 )}
                 {sinceScored.kind === 'auto_age' && (
@@ -1242,21 +1194,25 @@ export default function RepoList({
             </div>
           </button>
 
-          <RepoScoreButton
-            repoSlug={repo.githubSlug}
-            scoringStatus={getScoringStatus(repo)}
-            activity={{
-              scoredAt: repo.scoredAt,
-              lastCommitAt: repo.lastCommitAt,
-              pushedAt: repo.pushedAt,
-              commits7d: repo.commits7d,
-              commits30d: repo.commits30d,
-              commitTimestamps: repo.commitTimestamps,
-              adminNote: repo.adminNote,
-              scoringContextVersion: repo.scoringContextVersion,
-            }}
-            onScored={handleScored}
-          />
+          {rescoreMeta?.rescoreAt && (
+            <div
+              style={{
+                flexShrink: 0,
+                alignSelf: isMobile ? 'stretch' : 'center',
+                textAlign: isMobile ? 'left' : 'right',
+                fontSize: '11px',
+                color: 'var(--text-muted)',
+                lineHeight: 1.4,
+                minWidth: isMobile ? undefined : '108px',
+              }}
+            >
+              Rescored
+              <br />
+              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                {formatScoredDateLabel(rescoreMeta.rescoreAt)}
+              </span>
+            </div>
+          )}
         </div>
 
         {isExpanded && (
@@ -1272,7 +1228,7 @@ export default function RepoList({
                 color: 'var(--text-muted)',
                 lineHeight: 1.45,
               }}>
-                This repo was recently pushed on GitHub and appears here for recency tracking. Run autoscore or Score to add rubric grades.
+                This repo was recently pushed on GitHub and appears here for recency tracking. Grades land on the overnight pass (or via Admin).
               </div>
             )}
             {!pending && (() => {

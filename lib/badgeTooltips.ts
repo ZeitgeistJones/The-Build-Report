@@ -9,9 +9,10 @@ export const COMMUNITY_CONTEXT_FILTER_TOOLTIP =
 
 export const REPO_FILTER_TOOLTIPS = {
   all: 'Every tracked repo in the ecosystem.',
-  'needs-rescore': 'Scored repos with new GitHub commits since the last score — a paid Rescore can refresh the grade.',
+  'needs-rescore':
+    'Scored repos with new GitHub commits since the last score — the overnight pass refreshes grades when repos ship.',
   'recently-rescored':
-    'Repos that received a live Score or Rescore in the selected window — useful for checking what fed The Needle.',
+    'Repos that got an overnight (or Admin) rescore in the selected window — useful for checking what fed The Needle.',
   'new-arrivals': 'Repos created on GitHub in the selected window.',
   'holder-economics': 'Direct-burn and supply-lock repos — the Holder economics sample.',
   'shipping-leverage':
@@ -23,7 +24,7 @@ export const REPO_FILTER_TOOLTIPS = {
 export const REPO_SORT_TOOLTIPS = {
   recent: 'Sorted by last GitHub push — newest activity first.',
   commits: 'Sorted by commit count in the selected window.',
-  'needs-rescore': 'Sorted by commits since the last score — most outdated first.',
+  'needs-rescore': 'Sorted by commits since the last score — most overdue for the overnight refresh first.',
   grade: 'Sorted by overall rubric grades — highest first.',
 } as const
 
