@@ -7,6 +7,7 @@ import {
 } from '@/lib/archiveIndex'
 import {
   getCachedDigestForDate,
+  toBuildBriefData,
   type BuildBriefData,
   type DailyDigestCache,
 } from '@/lib/buildBrief'
