@@ -755,7 +755,7 @@ export default function RepoList({
   const repoCountLabel = isSearching
     ? ` · ${filtered.length} match${filtered.length === 1 ? '' : 'es'}`
     : activeFilter === 'needs-rescore'
-    ? ` · ${filtered.length} need rescore`
+    ? ` · ${filtered.length} awaiting overnight`
     : activeFilter === 'recently-rescored'
       ? ` · ${filtered.length} rescored (${periodKeyLabel(repoPeriod)})`
     : activeFilter === 'new-arrivals'
