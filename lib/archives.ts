@@ -52,16 +52,10 @@ function digestHasRealCards(digest: DailyDigestCache): boolean {
 }
 
 function digestToBrief(digest: DailyDigestCache): BuildBriefData {
+  const brief = toBuildBriefData(digest)
   return {
-    text: digest.general,
-    general: digest.general,
-    ...(digest.generalNormie ? { generalNormie: digest.generalNormie } : {}),
+    ...brief,
     cards: digestHasRealCards(digest) ? digest.cards : null,
-    dateKey: digest.dateKey,
-    isToday: false,
-    repoCount: digest.repoCount,
-    commitCount: digest.commitCount,
-    generatedAt: digest.generatedAt,
   }
 }
 

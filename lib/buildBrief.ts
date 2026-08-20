@@ -295,24 +295,36 @@ function buildFallbackDigest(
   }
 
   let general = QUIET_GENERAL
+  let generalNormie =
+    'It was a quiet day — none of the tracked projects got new updates. The grades above still cover longer windows. Check back tomorrow for a fresher picture of what shipped.'
   if (activity.length) {
     const names = activity
       .slice(0, 5)
       .map(a => `${a.slug} (${a.commits.length} commit${a.commits.length === 1 ? '' : 's'})`)
       .join(', ')
+    const plainNames = activity
+      .slice(0, 5)
+      .map(a => `${a.slug} (${a.commits.length} update${a.commits.length === 1 ? '' : 's'})`)
+      .join(', ')
     const extra = activity.length > 5 ? ` and ${activity.length - 5} more repos` : ''
+    const plainExtra = activity.length > 5 ? ` and ${activity.length - 5} more projects` : ''
     general = `On ${mountainDateKey}, work landed on ${names}${extra}. `
+    generalNormie = `On ${mountainDateKey}, these projects got updates: ${plainNames}${plainExtra}. `
     const burnCount = activity.filter(a => !hasShippingLeverageTag(a.tag as Repo['tag'])).length
     const leverageCount = activity.length - burnCount
     if (burnCount && leverageCount) {
       general += `${burnCount} burn-app repo${burnCount === 1 ? '' : 's'} and ${leverageCount} infra/leverage repo${leverageCount === 1 ? '' : 's'} saw commits. `
+      generalNormie += `${burnCount} holder-facing app${burnCount === 1 ? '' : 's'} and ${leverageCount} behind-the-scenes tool${leverageCount === 1 ? '' : 's'} saw updates. `
     }
     general +=
       'The grade cards below put that activity in context across the 24-hour, 7-day, 30-day, and 60-day windows.'
+    generalNormie +=
+      'The grade cards below explain what that means for holders over the last day, week, month, and two months.'
   }
 
   return {
     general,
+    generalNormie,
     cards,
     dateKey: mountainDateKey,
     repoCount: activity.length,
@@ -343,6 +355,48 @@ function extractOverviewProse(raw: string | undefined): string | null {
   if (text.length < 80) return null
   if (text.startsWith('{') || text.startsWith('[')) return null
   return text
+}
+
+/** Parse STANDARD: / PLAIN: dual blocks (or JSON general/generalNormie). */
+function extractLabeledPair(raw: string | undefined): { standard: string; plain?: string } | null {
+  if (!raw?.trim()) return null
+  const text = stripMarkdown(raw).trim()
+  const plainMatch = text.match(/\nPLAIN(?: ENGLISH)?:\s*/i)
+  if (plainMatch && plainMatch.index != null) {
+    const standard = text.slice(0, plainMatch.index).replace(/^STANDARD:\s*/i, '').trim()
+    const plain = text.slice(plainMatch.index + plainMatch[0].length).trim()
+    if (standard.length >= 80) return { standard, ...(plain.length >= 40 ? { plain } : {}) }
+  }
+  const fromJson = parseDigestJson(raw)
+  if (fromJson?.general?.trim()) {
+    return {
+      standard: stripMarkdown(fromJson.general),
+      ...(fromJson.generalNormie?.trim() ? { plain: stripMarkdown(fromJson.generalNormie) } : {}),
+    }
+  }
+  return null
+}
+
+/**
+ * Deterministic Plain English when Redis has no generalNormie (old template /
+ * AI overview without a rewrite). Keeps the toggle from looking broken.
+ */
+function simplifyBriefForNormie(general: string): string {
+  const g = general.trim()
+  if (!g) return g
+  if (g === QUIET_GENERAL) {
+    return 'It was a quiet day — none of the tracked projects got new updates. The grades above still cover longer windows. Check back tomorrow for a fresher picture of what shipped.'
+  }
+  return g
+    .replace(/\bburn-app repos?\b/gi, 'holder-facing apps')
+    .replace(/\binfra\/leverage repos?\b/gi, 'behind-the-scenes tools')
+    .replace(/\brepos?\b/gi, 'projects')
+    .replace(/\bcommits?\b/gi, 'updates')
+    .replace(/\bwork landed on\b/gi, 'these projects got updates:')
+    .replace(
+      /The grade cards below put that activity in context across the 24-hour, 7-day, 30-day, and 60-day windows\./gi,
+      'The grade cards below explain what that means for holders over the last day, week, month, and two months.',
+    )
 }
 
 /** Last-ditch pull of "general" when the model truncates mid-JSON. */
@@ -430,18 +484,26 @@ async function generateDigestOverview(
 ): Promise<Pick<DigestAiPayload, 'general' | 'generalNormie'> | null> {
   const prompt = `${facts}
 
-Write the day's overview as 5-6 complete sentences, meatier than any single grade card. Use the extra sentences to name specific repos/work from the commit list and explain why it matters to holders — not repetition. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.
+Write TWO versions of the day's overview, in this exact layout:
 
-Return ONLY the overview as plain prose. No JSON, no markdown, no title, no bullet list.`
+STANDARD:
+5-6 complete sentences, meatier than any single grade card. Name specific repos/work from the commit list and explain why it matters to holders. Warm, clear, a little personality — like a sharp friend explaining the day. Not degen, not hype, no crypto slang. Mention specific repos only if listed above.
+
+PLAIN:
+Same facts and the same repo slugs — simpler words, not a compressed summary. Keep every slug STANDARD names (optional short plain gloss after a name is fine). Never swap a named project for "the main interface", "the research team", "some backend fixes", or similar vague stand-ins. 2-5 sentences as needed.
+${normieVoiceGuidance('digestGeneral')}
+
+Return ONLY those two labeled blocks. No JSON, no markdown, no title.`
 
   const { text, provider } = await generateTextGeminiOnly({
     prompt,
     maxTokens: 3072,
     temperature: NORMIE_TEMPERATURE,
     label: 'build-brief-overview',
-    usable: raw => Boolean(extractOverviewProse(raw)),
+    usable: raw => Boolean(extractLabeledPair(raw)?.standard || extractOverviewProse(raw)),
   })
-  const general = extractOverviewProse(text)
+  const pair = extractLabeledPair(text)
+  const general = pair?.standard ?? extractOverviewProse(text)
   if (!general) {
     console.error('[build-brief] failed to read overview prose', {
       provider,
@@ -451,48 +513,16 @@ Return ONLY the overview as plain prose. No JSON, no markdown, no title, no bull
     return null
   }
 
-  let generalNormie: string | undefined
-  try {
-    const { text: normieRaw } = await generateTextGeminiOnly({
-      prompt: `${facts}
-
-STANDARD OVERVIEW (source of truth for which repos and topics):
-${general}
-
-Rewrite that overview for someone who knows nothing about code. Same facts and the same repo slugs — simpler words, not a compressed summary. Keep every slug the overview names (optional short plain gloss after a name is fine). Never swap a named project for "the main interface", "the research team", "some backend fixes", or similar vague stand-ins. 2-5 sentences as needed; shorter only when the day was genuinely quiet.
-${normieVoiceGuidance('digestGeneral')}
-
-Return ONLY the rewrite as plain prose. No JSON, no markdown.`,
-      maxTokens: 2048,
-      temperature: NORMIE_TEMPERATURE,
-      label: 'build-brief-overview-normie',
-      usable: raw => Boolean(extractOverviewProse(raw)),
-    })
-    generalNormie = extractOverviewProse(normieRaw) ?? undefined
-  } catch (err) {
-    console.warn('[build-brief] overview normie rewrite failed; keeping standard overview', err)
-  }
-
+  let generalNormie = pair?.plain
   const activitySlugs = activity.map(a => a.slug)
   if (generalNormie) {
     const missing = missingNamedRepos(general, generalNormie, activitySlugs)
     if (missing.length > 0) {
-      console.warn('[build-brief] generalNormie dropped repo names; repairing', { missing })
-      const repaired = await repairGeneralNormie(general, generalNormie, missing)
-      if (repaired) {
-        const stillMissing = missingNamedRepos(general, repaired, activitySlugs)
-        if (stillMissing.length === 0) {
-          generalNormie = repaired
-        } else {
-          console.warn('[build-brief] generalNormie repair still missing names; dropping normie overview', {
-            stillMissing,
-          })
-          generalNormie = undefined
-        }
-      } else {
-        generalNormie = undefined
-      }
+      // Keep the rewrite anyway — dropping it makes Plain English look broken.
+      console.warn('[build-brief] generalNormie missing some repo names; keeping rewrite', { missing })
     }
+  } else {
+    generalNormie = simplifyBriefForNormie(general)
   }
 
   return { general, ...(generalNormie ? { generalNormie } : {}) }
@@ -704,9 +734,14 @@ export async function generateAndCacheDailyDigest(
     })
   }
 
+  const general = aiOverview ? ai!.general : fallback.general
+  const generalNormie =
+    (aiOverview ? ai?.generalNormie : fallback.generalNormie)?.trim() ||
+    simplifyBriefForNormie(general)
+
   const payload: DailyDigestCache = {
-    general: aiOverview ? ai!.general : fallback.general,
-    ...(ai?.generalNormie ? { generalNormie: ai.generalNormie } : {}),
+    general,
+    ...(generalNormie ? { generalNormie } : {}),
     cards: aiCards ?? fallback.cards,
     dateKey: mountainDateKey,
     repoCount: activity.length,
@@ -787,11 +822,13 @@ async function readLegacyBrief(
   }
 }
 
-function toBuildBriefData(digest: DailyDigestCache): BuildBriefData {
+export function toBuildBriefData(digest: DailyDigestCache): BuildBriefData {
+  const general = digest.general
+  const generalNormie = digest.generalNormie?.trim() || simplifyBriefForNormie(general)
   return {
-    text: digest.general,
-    general: digest.general,
-    ...(digest.generalNormie ? { generalNormie: digest.generalNormie } : {}),
+    text: general,
+    general,
+    ...(generalNormie ? { generalNormie } : {}),
     cards: digest.cards,
     dateKey: digest.dateKey,
     isToday: false,
