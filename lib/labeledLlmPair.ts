@@ -20,7 +20,7 @@ export function splitStandardPlainLabeled(
     const after = text.slice(plainMatch.index + plainMatch[0].length).trim()
     const standard = before.replace(/^STANDARD\s*:\s*/i, '').trim()
     if (standard.length >= 40) {
-      return { standard, ...(after.length >= 40 ? { plain: after } : {}) }
+      return { standard, ...(after.length >= 20 ? { plain: after } : {}) }
     }
   }
 

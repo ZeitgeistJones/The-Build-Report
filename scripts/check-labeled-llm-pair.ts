@@ -11,8 +11,11 @@ assert.ok(sameLine.plain)
 assert.match(sameLine.plain, /busy day/)
 assert.doesNotMatch(sameLine.plain, /STANDARD/i)
 
-const newline = splitStandardPlainLabeled('STANDARD:\nHello world engine room stuff here.\n\nPLAIN:\nBusy day behind the scenes.')
+const newline = splitStandardPlainLabeled(
+  'STANDARD:\nHello world engine room stuff here for holders.\n\nPLAIN:\nBusy day behind the scenes for people holding CLAWD.',
+)
 assert.ok(newline?.plain)
 assert.match(newline!.standard, /Hello world/)
+assert.match(newline!.plain!, /Busy day/)
 
 console.log('ok: labeled STANDARD/PLAIN split')
