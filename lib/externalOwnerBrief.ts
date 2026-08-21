@@ -269,6 +269,12 @@ export type ExternalDigestCache = {
   ticker: string | null
   /** Optional Lead Policy v1 classification. Older cache entries omit this. */
   leadPolicy?: YbLeadPolicy
+  /**
+   * True when the GitHub fetch hit 403/429. Quiet + rateLimited must not stick —
+   * Base and other busy orgs were getting false "quiet day" editions that hid
+   * real shipping until a manual Admin regenerate.
+   */
+  rateLimited?: boolean
 }
 
 /**
@@ -634,7 +640,7 @@ function toBriefData(digest: ExternalDigestCache): ExternalBriefData {
 
 export async function generateAndCacheExternalDigest(
   accountId: ExternalBriefAccountId,
-  options?: { force?: boolean; dateKey?: string },
+  options?: { force?: boolean; dateKey?: string; recheckQuiet?: boolean },
 ): Promise<ExternalDigestCache> {
   const account = getExternalBriefAccount(accountId)
   if (!account) throw new Error(`Unknown external brief account: ${accountId}`)
@@ -642,20 +648,37 @@ export async function generateAndCacheExternalDigest(
   const dateKey = options?.dateKey ?? yesterdayMountainDateKey()
   if (!options?.force) {
     const existing = await readCachedDigest(account, dateKey)
-    if (existing?.general?.trim()) return existing
+    if (existing?.general?.trim()) {
+      if (existing.commitCount > 0) return existing
+      // Successful empty fetch — real quiet day. Do not keep re-hitting GitHub.
+      if (existing.rateLimited === false) return existing
+      // rateLimited quiet, or legacy quiet with no flag: recheck on cron/warm.
+      if (existing.rateLimited === true || options?.recheckQuiet) {
+        console.warn(`[${account.id}-brief] rechecking quiet cache`, {
+          dateKey,
+          rateLimited: existing.rateLimited ?? null,
+          recheckQuiet: Boolean(options?.recheckQuiet),
+        })
+      } else {
+        return existing
+      }
+    }
   }
 
   const snapshot = await fetchExternalOwnerDayActivity(account.owner, dateKey, {
     focusRepos: account.focusRepos,
   })
   if (snapshot.rateLimited && snapshot.activity.length === 0) {
-    console.warn(`[${account.id}-brief] rate limited with no activity; writing quiet fallback`, {
+    console.warn(`[${account.id}-brief] rate limited with no activity; not caching quiet shell`, {
       dateKey,
     })
   }
 
-  const ai = await generateOverviewWithAi(account, snapshot)
-  if (!ai) {
+  const ai =
+    snapshot.rateLimited && snapshot.commitCount === 0
+      ? null
+      : await generateOverviewWithAi(account, snapshot)
+  if (!ai && !(snapshot.rateLimited && snapshot.commitCount === 0)) {
     console.warn(`[${account.id}-brief] using template fallback`, {
       dateKey,
       repoCount: snapshot.repoCount,
@@ -681,6 +704,12 @@ export async function generateAndCacheExternalDigest(
     generatedAt: new Date().toISOString(),
     owner: account.owner,
     ticker: account.ticker,
+    rateLimited: snapshot.rateLimited,
+  }
+
+  // Never persist a rate-limited empty day — next cron/Admin pass must retry.
+  if (snapshot.rateLimited && snapshot.commitCount === 0) {
+    return payload
   }
 
   await cacheDigest(account, payload)
@@ -715,6 +744,8 @@ export async function getAllExternalBriefs(
 export async function generateAllExternalDigests(options?: {
   force?: boolean
   dateKey?: string
+  /** Overnight/warm: re-fetch desks cached as quiet so rate-limit shells can heal. */
+  recheckQuiet?: boolean
 }): Promise<
   Array<{
     id: ExternalBriefAccountId
@@ -722,19 +753,24 @@ export async function generateAllExternalDigests(options?: {
     dateKey?: string
     repoCount?: number
     commitCount?: number
+    rateLimited?: boolean
     error?: string
   }>
 > {
   const results = []
   for (const account of EXTERNAL_BRIEF_ACCOUNTS) {
     try {
-      const digest = await generateAndCacheExternalDigest(account.id, options)
+      const digest = await generateAndCacheExternalDigest(account.id, {
+        ...options,
+        recheckQuiet: options?.recheckQuiet ?? true,
+      })
       results.push({
         id: account.id,
         ok: true,
         dateKey: digest.dateKey,
         repoCount: digest.repoCount,
         commitCount: digest.commitCount,
+        rateLimited: digest.rateLimited,
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'external brief failed'

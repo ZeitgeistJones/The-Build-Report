@@ -35,6 +35,13 @@ export async function GET(req: NextRequest) {
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
 
+    // Secondary desks first — overnight rescores used to eat the 300s budget and
+    // leave Base/etc. on sticky false-quiet caches (or uncached).
+    const external = await generateAllExternalDigests({
+      dateKey: editionKey,
+      recheckQuiet: true,
+    })
+
     const overnight = await runOvernightActiveRescores({
       stats,
       dateKey: editionKey,
@@ -54,7 +61,6 @@ export async function GET(req: NextRequest) {
       console.error('[daily-digest] needle generation failed', err)
       return null
     })
-    const external = await generateAllExternalDigests({ dateKey: editionKey })
     const wire = await collectMcpWire(editionKey).catch(err => {
       console.error('[daily-digest] mcp wire failed', err)
       return null

@@ -10,6 +10,7 @@ import {
   yesterdayMountainDateKey,
 } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
+import { generateAllExternalDigests } from '@/lib/externalOwnerBrief'
 import { runOvernightActiveRescores } from '@/lib/overnightActiveRescore'
 
 export const dynamic = 'force-dynamic'
@@ -38,6 +39,15 @@ export async function GET(req: NextRequest) {
     const repos = await loadReposForBrief(stats)
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
+
+    // Heal missing / sticky false-quiet secondary desks before the 7:00 digest.
+    const external = await generateAllExternalDigests({
+      dateKey: editionKey,
+      recheckQuiet: true,
+    }).catch(err => {
+      console.error('[warm-cache] external digests failed', err)
+      return null
+    })
 
     // Continue overnight rescore queue if daily-digest left work unfinished.
     const overnight = await runOvernightActiveRescores({
@@ -76,10 +86,10 @@ export async function GET(req: NextRequest) {
       needleDateKey: needle?.dateKey ?? null,
       needleRepoCount: needle?.repoCount ?? 0,
       overnight,
+      externalBriefs: external,
     })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Warm cache cron failed'
-    const status = message === 'rate_limited' ? 429 : 500
-    return NextResponse.json({ ok: false, error: message }, { status })
+    const message = err instanceof Error ? err.message : 'Warm cache failed'
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }
