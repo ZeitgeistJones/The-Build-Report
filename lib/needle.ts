@@ -6,6 +6,11 @@ import { REPOS } from '@/lib/scores'
 import { stripMarkdown } from '@/lib/textCleanup'
 import { NORMIE_TEMPERATURE, normieVoiceGuidance } from '@/lib/normieVoice'
 import {
+  preferPlainFromLabeled,
+  preferStandardFromLabeled,
+  splitStandardPlainLabeled,
+} from '@/lib/labeledLlmPair'
+import {
   dateKeyMountain,
   editionReadKeys,
   mountainDateKeyBoundsMs,
@@ -118,13 +123,14 @@ function isFallbackNeedleCopy(data: Pick<NeedleData, 'text' | 'textNormie' | 'so
 
 function extractLabeledNeedle(raw: string | undefined): { text: string; textNormie?: string } | null {
   if (!raw?.trim()) return null
-  const cleaned = stripMarkdown(raw).trim()
-  const plainMatch = cleaned.match(/\nPLAIN(?: ENGLISH)?:\s*/i)
-  if (plainMatch && plainMatch.index != null) {
-    const text = cleaned.slice(0, plainMatch.index).replace(/^STANDARD:\s*/i, '').trim()
-    const textNormie = cleaned.slice(plainMatch.index + plainMatch[0].length).trim()
-    if (text.length >= 40) return { text, ...(textNormie.length >= 40 ? { textNormie } : {}) }
+  const labeled = splitStandardPlainLabeled(raw)
+  if (labeled?.standard) {
+    return {
+      text: labeled.standard,
+      ...(labeled.plain ? { textNormie: labeled.plain } : {}),
+    }
   }
+  const cleaned = stripMarkdown(raw).trim()
   const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
   if (jsonMatch) {
     try {
@@ -141,7 +147,43 @@ function extractLabeledNeedle(raw: string | undefined): { text: string; textNorm
   }
   if (cleaned.length < 40) return null
   if (cleaned.startsWith('{') || cleaned.startsWith('[')) return null
-  return { text: cleaned }
+  return { text: cleaned.replace(/^STANDARD\s*:\s*/i, '').trim() }
+}
+
+/** Fix cached dual STANDARD/PLAIN blobs so Plain English can show the PLAIN half. */
+function sanitizeNeedleData(data: NeedleData): NeedleData {
+  const split = splitStandardPlainLabeled(data.text)
+  const text =
+    preferStandardFromLabeled(data.text) ??
+    data.text.replace(/^STANDARD\s*:\s*/i, '').trim()
+
+  let textNormie = data.textNormie?.trim() || undefined
+  if (textNormie) {
+    const fromNormieField = preferPlainFromLabeled(textNormie)
+    if (fromNormieField) textNormie = fromNormieField
+  }
+
+  // AI often landed both halves in `text` while `textNormie` stayed on template fallback.
+  if (split?.plain) {
+    const normieIsFallback =
+      !textNormie ||
+      data.source === 'fallback' ||
+      textNormie.includes('got a fresh overnight score') ||
+      textNormie.includes('That means the scoreboard changed for holders for real')
+    if (normieIsFallback) textNormie = split.plain
+  }
+
+  if (!textNormie) {
+    textNormie =
+      preferPlainFromLabeled(data.text) ??
+      undefined
+  }
+
+  return {
+    ...data,
+    text,
+    ...(textNormie ? { textNormie } : {}),
+  }
 }
 
 async function generateNeedleCopy(
@@ -254,9 +296,10 @@ export async function generateAndCacheNeedle(
     source: ai ? 'ai' : 'fallback',
   }
 
-  await redis.set(needleRedisKey(dateKey), data, { ex: NEEDLE_TTL_SEC })
+  const sanitized = sanitizeNeedleData(data)
+  await redis.set(needleRedisKey(dateKey), sanitized, { ex: NEEDLE_TTL_SEC })
   await indexArchiveDate(NEEDLE_DATES_INDEX_KEY, dateKey)
-  return data
+  return sanitized
 }
 
 /** Fire-and-forget refresh after a rescore so The Needle stays current intraday. */
@@ -268,7 +311,8 @@ export function refreshNeedleAfterRescore(): void {
 
 async function readCachedNeedle(dateKey: string): Promise<NeedleData | null> {
   const redis = getRedis()
-  return redis.get<NeedleData>(needleRedisKey(dateKey))
+  const cached = await redis.get<NeedleData>(needleRedisKey(dateKey))
+  return cached ? sanitizeNeedleData(cached) : null
 }
 
 /** Public read for Archives — one Mountain calendar edition. */

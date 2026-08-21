@@ -10,6 +10,11 @@ import { REPOS, type Repo } from '@/lib/scores'
 import type { GitHubStats } from '@/lib/github'
 import { stripMarkdown } from '@/lib/textCleanup'
 import { missingNamedRepos, NORMIE_TEMPERATURE, normieVoiceGuidance } from '@/lib/normieVoice'
+import {
+  preferPlainFromLabeled,
+  preferStandardFromLabeled,
+  splitStandardPlainLabeled,
+} from '@/lib/labeledLlmPair'
 import { BRIEF_DATES_INDEX_KEY, indexArchiveDate } from '@/lib/archiveIndex'
 import {
   calcBuilderGrade,
@@ -360,13 +365,8 @@ function extractOverviewProse(raw: string | undefined): string | null {
 /** Parse STANDARD: / PLAIN: dual blocks (or JSON general/generalNormie). */
 function extractLabeledPair(raw: string | undefined): { standard: string; plain?: string } | null {
   if (!raw?.trim()) return null
-  const text = stripMarkdown(raw).trim()
-  const plainMatch = text.match(/\nPLAIN(?: ENGLISH)?:\s*/i)
-  if (plainMatch && plainMatch.index != null) {
-    const standard = text.slice(0, plainMatch.index).replace(/^STANDARD:\s*/i, '').trim()
-    const plain = text.slice(plainMatch.index + plainMatch[0].length).trim()
-    if (standard.length >= 80) return { standard, ...(plain.length >= 40 ? { plain } : {}) }
-  }
+  const labeled = splitStandardPlainLabeled(raw)
+  if (labeled?.standard) return labeled
   const fromJson = parseDigestJson(raw)
   if (fromJson?.general?.trim()) {
     return {
@@ -382,7 +382,8 @@ function extractLabeledPair(raw: string | undefined): { standard: string; plain?
  * AI overview without a rewrite). Keeps the toggle from looking broken.
  */
 function simplifyBriefForNormie(general: string): string {
-  const g = general.trim()
+  const fromLabeled = preferPlainFromLabeled(general)
+  const g = (fromLabeled ?? general).trim()
   if (!g) return g
   if (g === QUIET_GENERAL) {
     return 'It was a quiet day — none of the tracked projects got new updates. The grades above still cover longer windows. Check back tomorrow for a fresher picture of what shipped.'
@@ -823,8 +824,25 @@ async function readLegacyBrief(
 }
 
 export function toBuildBriefData(digest: DailyDigestCache): BuildBriefData {
-  const general = digest.general
-  const generalNormie = digest.generalNormie?.trim() || simplifyBriefForNormie(general)
+  // Cached digests sometimes store the whole STANDARD:/PLAIN: blob in `general`
+  // when the model omitted a newline before PLAIN — split on read so the toggle works.
+  const split = splitStandardPlainLabeled(digest.general)
+  const general =
+    preferStandardFromLabeled(digest.general) ?? digest.general.replace(/^STANDARD\s*:\s*/i, '').trim()
+
+  let generalNormie = digest.generalNormie?.trim() || undefined
+  if (generalNormie) {
+    generalNormie =
+      preferPlainFromLabeled(generalNormie) ??
+      preferStandardFromLabeled(generalNormie) ??
+      generalNormie
+  } else if (split?.plain) {
+    generalNormie = split.plain
+  }
+  if (!generalNormie) {
+    generalNormie = simplifyBriefForNormie(general)
+  }
+
   return {
     text: general,
     general,

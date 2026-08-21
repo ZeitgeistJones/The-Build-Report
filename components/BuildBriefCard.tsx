@@ -94,7 +94,8 @@ export default function BuildBriefCard({ brief }: Props) {
             <>
               {' '}
               · {brief.repoCount} repo{brief.repoCount === 1 ? '' : 's'}
-              {brief.commitCount > 0 && ` · ${brief.commitCount} commits`}
+          {brief.commitCount > 0 &&
+            ` · ${brief.commitCount} ${normie ? 'updates' : 'commits'}`}
             </>
           )}
         </span>
