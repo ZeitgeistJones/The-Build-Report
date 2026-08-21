@@ -45,6 +45,10 @@ export default function AdminPage() {
   const [adminRescoreSlug, setAdminRescoreSlug] = useState('')
   const [adminRescoreRunning, setAdminRescoreRunning] = useState(false)
   const [adminRescoreResult, setAdminRescoreResult] = useState<string | null>(null)
+  const [behindCount, setBehindCount] = useState<number | null>(null)
+  const [behindPreview, setBehindPreview] = useState<string[]>([])
+  const [behindRunning, setBehindRunning] = useState(false)
+  const [behindResult, setBehindResult] = useState<string | null>(null)
   const [wireRunning, setWireRunning] = useState(false)
   const [wireResult, setWireResult] = useState<string | null>(null)
   const [wireAdmin, setWireAdmin] = useState<McpWireAdminRecord | null>(null)
@@ -137,6 +141,7 @@ export default function AdminPage() {
             ? `Refreshed — ${data.trackableRepos} trackable repos. Homepage cache cleared · rate limit hit, commit data may be partial.`
             : `Refreshed — ${data.trackableRepos} trackable repos. Homepage cache cleared.`,
         )
+        void loadBehindStatus()
       } else {
         setRefreshResult(data.error ?? 'GitHub refresh failed')
       }
@@ -723,6 +728,7 @@ export default function AdminPage() {
       setCollections(data.collections ?? { 'cv-related': [], 'clawd-gated': [] })
       setForceInclude(data.forceInclude ?? [])
       void loadBulkStatus()
+      void loadBehindStatus()
       void loadUtilityIndex(password)
       void loadMcpWire(password)
       for (const account of EXTERNAL_BRIEF_ACCOUNTS) {
@@ -923,6 +929,121 @@ export default function AdminPage() {
     } catch {
       // non-fatal
     }
+  }
+
+  async function loadBehindStatus(): Promise<string[] | null> {
+    try {
+      const res = await fetch('/api/admin/rescore-behind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'status', password }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        const slugs = Array.isArray(data.slugs) ? (data.slugs as string[]) : []
+        setBehindCount(typeof data.count === 'number' ? data.count : slugs.length)
+        setBehindPreview(Array.isArray(data.preview) ? (data.preview as string[]) : slugs.slice(0, 20))
+        return slugs
+      }
+      setBehindCount(null)
+      setBehindPreview([])
+      return null
+    } catch {
+      setBehindCount(null)
+      setBehindPreview([])
+      return null
+    }
+  }
+
+  async function runBehindRescores() {
+    setBehindRunning(true)
+    setBehindResult(null)
+    let totalScored = 0
+    let totalFailed = 0
+    const failedNames: string[] = []
+
+    try {
+      const slugs = await loadBehindStatus()
+      if (!slugs || slugs.length === 0) {
+        setBehindResult('Nothing behind — all scored repos look current vs GitHub activity.')
+        setBehindRunning(false)
+        return
+      }
+
+      const total = slugs.length
+      setBehindResult(`Rescoring 0/${total}…`)
+
+      for (let i = 0; i < slugs.length; i += BULK_REGEN_DEFAULT_BATCH) {
+        const chunk = slugs.slice(i, i + BULK_REGEN_DEFAULT_BATCH)
+        const isLast = i + BULK_REGEN_DEFAULT_BATCH >= slugs.length
+        const res = await fetch('/api/admin/rescore-behind', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'batch',
+            password,
+            slugs: chunk,
+            limit: BULK_REGEN_DEFAULT_BATCH,
+            refreshNeedle: isLast,
+          }),
+        })
+
+        if (!res.ok) {
+          const statusHint =
+            res.status === 504
+              ? 'Server timed out (504).'
+              : `HTTP ${res.status}.`
+          setBehindResult(
+            `${statusHint} ${totalScored} of ${total} scored so far — click again to continue (safe).`,
+          )
+          break
+        }
+
+        let data: {
+          ok?: boolean
+          error?: string
+          scored?: string[]
+          failed?: Array<{ slug: string; error: string }>
+        }
+        try {
+          data = await res.json()
+        } catch {
+          setBehindResult(
+            `Bad response after ${totalScored} of ${total} — click again to continue (safe).`,
+          )
+          break
+        }
+
+        if (!data.ok) {
+          setBehindResult(data.error ?? `Batch failed after ${totalScored} of ${total}`)
+          break
+        }
+
+        totalScored += data.scored?.length ?? 0
+        for (const f of data.failed ?? []) {
+          totalFailed += 1
+          failedNames.push(f.slug)
+        }
+        setBehindResult(
+          `Rescoring ${Math.min(i + chunk.length, total)}/${total}… (${totalScored} ok${totalFailed ? `, ${totalFailed} failed` : ''})`,
+        )
+      }
+
+      await loadBehindStatus()
+      const failNote =
+        failedNames.length > 0
+          ? ` Failed: ${failedNames.slice(0, 8).join(', ')}${failedNames.length > 8 ? '…' : ''}.`
+          : ''
+      setBehindResult(
+        `Done — ${totalScored} rescored${totalFailed ? `, ${totalFailed} failed` : ''}.${failNote} Needle refresh queued if any finished.`,
+      )
+    } catch {
+      setBehindResult(
+        `Request failed after ${totalScored} scored — click again to continue (safe).`,
+      )
+    }
+
+    setBehindRunning(false)
   }
 
   async function downloadBaselineBackup() {
@@ -1400,6 +1521,7 @@ export default function AdminPage() {
           <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Score / Rescore</h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '560px', lineHeight: 1.55 }}>
             Live cards no longer Score/Rescore. Overnight cron rescored active repos; use this for a free one-off pass (writes grades + What changed + feeds The Needle).
+            Refresh GitHub data first so the behind list matches live commits.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1421,7 +1543,7 @@ export default function AdminPage() {
           <button
             type="button"
             onClick={() => void runAdminRescore()}
-            disabled={adminRescoreRunning}
+            disabled={adminRescoreRunning || behindRunning}
             style={{
               fontSize: '12px',
               padding: '8px 16px',
@@ -1447,6 +1569,84 @@ export default function AdminPage() {
             {adminRescoreResult}
           </div>
         )}
+
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '560px', lineHeight: 1.55, marginBottom: '10px' }}>
+            Rescore every scored repo with new GitHub activity since last score — same set as homepage{' '}
+            <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Awaiting overnight</strong>
+            {behindCount != null ? (
+              <>
+                {' '}
+                ({behindCount} behind)
+              </>
+            ) : null}
+            . Runs in batches of {BULK_REGEN_DEFAULT_BATCH}; safe to click again after a timeout.
+          </p>
+          {behindPreview.length > 0 && (
+            <p
+              style={{
+                fontSize: '11px',
+                color: 'var(--text-muted)',
+                fontFamily: 'var(--font-mono)',
+                marginBottom: '10px',
+                lineHeight: 1.45,
+                wordBreak: 'break-all',
+              }}
+            >
+              {behindPreview.join(', ')}
+              {behindCount != null && behindCount > behindPreview.length ? '…' : ''}
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => void runBehindRescores()}
+              disabled={behindRunning || adminRescoreRunning || behindCount === 0}
+              style={{
+                fontSize: '12px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius)',
+                background: behindCount && behindCount > 0 ? 'var(--accent-dim)' : 'var(--surface-3)',
+                color: behindCount && behindCount > 0 ? 'var(--accent)' : 'var(--text-muted)',
+                border: `1px solid ${behindCount && behindCount > 0 ? 'var(--accent-border)' : 'var(--border-strong)'}`,
+              }}
+            >
+              {behindRunning
+                ? 'Rescoring behind…'
+                : behindCount === 0
+                  ? 'Nothing behind'
+                  : `Rescore all behind${behindCount != null ? ` (${behindCount})` : ''}`}
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadBehindStatus()}
+              disabled={behindRunning}
+              style={{
+                fontSize: '12px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius)',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              Refresh count
+            </button>
+          </div>
+          {behindResult && (
+            <div style={{
+              marginTop: '12px',
+              padding: '10px 14px',
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              fontSize: '13px',
+              color: 'var(--text-secondary)',
+            }}>
+              {behindResult}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Needle */}
