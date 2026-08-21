@@ -31,11 +31,12 @@ const GROUPS: NavGroup[] = [
   {
     heading: 'Scoring',
     links: [
+      { href: '#admin-rescore', label: 'Behind', id: 'admin-rescore' },
       { href: '#admin-scoring-context', label: 'Scoring', id: 'admin-scoring-context' },
       { href: '#admin-community', label: 'Community', id: 'admin-community' },
       { href: '#admin-filters', label: 'Filters', id: 'admin-filters' },
       { href: '#admin-bulk', label: 'Bulk', id: 'admin-bulk' },
-      { href: '#admin-scores', label: 'Scores', id: 'admin-scores' },
+      { href: '#admin-scores', label: 'Autoscore', id: 'admin-scores' },
     ],
   },
 ]

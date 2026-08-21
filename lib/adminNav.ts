@@ -11,6 +11,9 @@ const HASH_ALIASES: Record<string, string> = {
   spotted: 'admin-spotted',
   github: 'admin-github',
   'admin-utility': 'utility',
+  rescore: 'admin-rescore',
+  behind: 'admin-rescore',
+  'catch-up': 'admin-rescore',
 }
 
 export function resolveAdminSectionId(hash: string): string | null {

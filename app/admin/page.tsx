@@ -1515,72 +1515,40 @@ export default function AdminPage() {
         <McpWire wire={wireAdmin?.snapshot ?? null} preview />
       </div>
 
-      {/* Manual Score / Rescore — public cards no longer have this */}
+      {/* Catch up stale scores — not the same as Autoscore */}
       <div id="admin-rescore" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Score / Rescore</h2>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>
+            Behind — catch up stale scores
+          </h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '560px', lineHeight: 1.55 }}>
-            Live cards no longer Score/Rescore. Overnight cron rescored active repos; use this for a free one-off pass (writes grades + What changed + feeds The Needle).
-            Refresh GitHub data first so the behind list matches live commits.
+            For scored repos with new GitHub commits since last score (homepage{' '}
+            <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Awaiting overnight</strong>
+            ). Updates grades + What changed. Refresh GitHub data first.
+            {' '}
+            <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
+              Not Autoscore
+            </strong>
+            {' '}
+            — that only scores never-scored repos (nav → Autoscore).
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            value={adminRescoreSlug}
-            onChange={e => setAdminRescoreSlug(e.target.value)}
-            placeholder="owner/repo"
-            style={{
-              fontSize: '13px',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius)',
-              border: '1px solid var(--border-strong)',
-              background: 'var(--surface-1)',
-              color: 'var(--text-primary)',
-              minWidth: '220px',
-              fontFamily: 'var(--font-mono)',
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => void runAdminRescore()}
-            disabled={adminRescoreRunning || behindRunning}
-            style={{
-              fontSize: '12px',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius)',
-              background: 'var(--surface-3)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-strong)',
-            }}
-          >
-            {adminRescoreRunning ? 'Scoring…' : 'Rescore now'}
-          </button>
-        </div>
-        {adminRescoreResult && (
-          <div style={{
-            marginTop: '12px',
-            padding: '10px 14px',
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            fontSize: '13px',
-            color: 'var(--text-secondary)',
-          }}>
-            {adminRescoreResult}
-          </div>
-        )}
 
-        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '560px', lineHeight: 1.55, marginBottom: '10px' }}>
-            Rescore every scored repo with new GitHub activity since last score — same set as homepage{' '}
-            <strong style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Awaiting overnight</strong>
-            {behindCount != null ? (
-              <>
-                {' '}
-                ({behindCount} behind)
-              </>
-            ) : null}
-            . Runs in batches of {BULK_REGEN_DEFAULT_BATCH}; safe to click again after a timeout.
+        <div
+          style={{
+            padding: '14px 16px',
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border-strong)',
+            borderRadius: 'var(--radius)',
+            marginBottom: '16px',
+          }}
+        >
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+            Catch up all behind
+            {behindCount != null ? ` · ${behindCount} repo${behindCount === 1 ? '' : 's'}` : ''}
+          </div>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, margin: '0 0 12px', maxWidth: '520px' }}>
+            Same free pipeline as overnight — batches of {BULK_REGEN_DEFAULT_BATCH}. Safe to click again after a timeout.
           </p>
           {behindPreview.length > 0 && (
             <p
@@ -1588,7 +1556,7 @@ export default function AdminPage() {
                 fontSize: '11px',
                 color: 'var(--text-muted)',
                 fontFamily: 'var(--font-mono)',
-                marginBottom: '10px',
+                marginBottom: '12px',
                 lineHeight: 1.45,
                 wordBreak: 'break-all',
               }}
@@ -1603,8 +1571,9 @@ export default function AdminPage() {
               onClick={() => void runBehindRescores()}
               disabled={behindRunning || adminRescoreRunning || behindCount === 0}
               style={{
-                fontSize: '12px',
-                padding: '8px 16px',
+                fontSize: '13px',
+                fontWeight: 600,
+                padding: '10px 18px',
                 borderRadius: 'var(--radius)',
                 background: behindCount && behindCount > 0 ? 'var(--accent-dim)' : 'var(--surface-3)',
                 color: behindCount && behindCount > 0 ? 'var(--accent)' : 'var(--text-muted)',
@@ -1612,10 +1581,10 @@ export default function AdminPage() {
               }}
             >
               {behindRunning
-                ? 'Rescoring behind…'
+                ? 'Catching up…'
                 : behindCount === 0
                   ? 'Nothing behind'
-                  : `Rescore all behind${behindCount != null ? ` (${behindCount})` : ''}`}
+                  : `Catch up all behind${behindCount != null ? ` (${behindCount})` : ''}`}
             </button>
             <button
               type="button"
@@ -1647,6 +1616,61 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+
+        <div style={{ marginTop: '4px' }}>
+          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '6px' }}>
+            One repo
+          </div>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 10px', lineHeight: 1.45 }}>
+            Free Score/Rescore for a single slug (owner/repo).
+          </p>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              value={adminRescoreSlug}
+              onChange={e => setAdminRescoreSlug(e.target.value)}
+              placeholder="owner/repo"
+              style={{
+                fontSize: '13px',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--border-strong)',
+                background: 'var(--surface-1)',
+                color: 'var(--text-primary)',
+                minWidth: '220px',
+                fontFamily: 'var(--font-mono)',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => void runAdminRescore()}
+              disabled={adminRescoreRunning || behindRunning}
+              style={{
+                fontSize: '12px',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius)',
+                background: 'var(--surface-3)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-strong)',
+              }}
+            >
+              {adminRescoreRunning ? 'Scoring…' : 'Rescore this repo'}
+            </button>
+          </div>
+          {adminRescoreResult && (
+            <div style={{
+              marginTop: '12px',
+              padding: '10px 14px',
+              background: 'var(--surface-1)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              fontSize: '13px',
+              color: 'var(--text-secondary)',
+            }}>
+              {adminRescoreResult}
+            </div>
+          )}
+        </div>
+        <AdminBackToNav />
       </div>
 
       {/* Needle */}
@@ -2752,9 +2776,12 @@ export default function AdminPage() {
       <div id="admin-scores" className="admin-jump-target" style={{ marginBottom: '32px' }}>
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Auto-inferred scores</h2>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>Autoscore (never scored)</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '520px' }}>
-              Unscored GitHub repos are inferred by Claude and cached in Redis. On Vercel Hobby, autoscore runs once daily via cron (up to 15 repos per run). Use the button below to score immediately. Priority follows GitHub repo order (visible list first).
+              Only for repos with <strong style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>no score yet</strong>.
+              Unscored GitHub repos are inferred and cached in Redis. For already-scored cards with new commits, use nav →{' '}
+              <strong style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>Behind</strong> instead.
+              On Vercel Hobby, autoscore also runs once daily via cron (up to 15 repos per run).
             </p>
           </div>
           <button
