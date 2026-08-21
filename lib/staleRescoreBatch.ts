@@ -112,6 +112,18 @@ export async function runBehindRescoreBatch(options: {
       const message = err instanceof Error ? err.message : 'rescore failed'
       console.error(`[stale-rescore-batch] ${slug} failed:`, err)
       failed.push({ slug, error: message })
+      // Don't burn the rest of the batch on free-tier daily quota.
+      if (
+        /quota|429|RESOURCE_EXHAUSTED|free_tier|rate.?limit/i.test(message)
+      ) {
+        for (const rest of batch.slice(batch.indexOf(slug) + 1)) {
+          failed.push({
+            slug: rest,
+            error: 'Skipped — Gemini quota already exhausted this batch',
+          })
+        }
+        break
+      }
     }
   }
 

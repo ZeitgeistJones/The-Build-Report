@@ -961,6 +961,8 @@ export default function AdminPage() {
     let totalScored = 0
     let totalFailed = 0
     const failedNames: string[] = []
+    const errorSamples: string[] = []
+    let stoppedForQuota = false
 
     try {
       const slugs = await loadBehindStatus()
@@ -1020,23 +1022,45 @@ export default function AdminPage() {
         }
 
         totalScored += data.scored?.length ?? 0
-        for (const f of data.failed ?? []) {
+        const batchFailed = data.failed ?? []
+        for (const f of batchFailed) {
           totalFailed += 1
           failedNames.push(f.slug)
+          const sample = `${f.slug}: ${f.error.slice(0, 160)}`
+          if (errorSamples.length < 2 && !errorSamples.includes(sample)) {
+            errorSamples.push(sample)
+          }
         }
+
+        const quotaHit = batchFailed.some(f =>
+          /quota|429|RESOURCE_EXHAUSTED|rate.?limit|free_tier/i.test(f.error),
+        )
         setBehindResult(
           `Rescoring ${Math.min(i + chunk.length, total)}/${total}… (${totalScored} ok${totalFailed ? `, ${totalFailed} failed` : ''})`,
         )
+        if (quotaHit) {
+          stoppedForQuota = true
+          setBehindResult(
+            `Stopped — Gemini free-tier quota hit (20 requests/day on gemini-3.6-flash). ${totalScored} rescored, ${totalFailed} failed this run. Wait for daily reset, add a paid Gemini key, or set GEMINI_API_KEY_2 to a different Google project. Sample: ${errorSamples[0] ?? 'quota exceeded'}`,
+          )
+          break
+        }
       }
 
-      await loadBehindStatus()
-      const failNote =
-        failedNames.length > 0
-          ? ` Failed: ${failedNames.slice(0, 8).join(', ')}${failedNames.length > 8 ? '…' : ''}.`
-          : ''
-      setBehindResult(
-        `Done — ${totalScored} rescored${totalFailed ? `, ${totalFailed} failed` : ''}.${failNote} Needle refresh queued if any finished.`,
-      )
+      if (!stoppedForQuota) {
+        await loadBehindStatus()
+        const failNote =
+          errorSamples.length > 0
+            ? ` Sample: ${errorSamples.join(' · ')}`
+            : failedNames.length > 0
+              ? ` Failed: ${failedNames.slice(0, 8).join(', ')}${failedNames.length > 8 ? '…' : ''}.`
+              : ''
+        setBehindResult(
+          `Done — ${totalScored} rescored${totalFailed ? `, ${totalFailed} failed` : ''}.${failNote}${totalScored > 0 ? ' Needle refresh queued.' : ''}`,
+        )
+      } else {
+        await loadBehindStatus()
+      }
     } catch {
       setBehindResult(
         `Request failed after ${totalScored} scored — click again to continue (safe).`,
@@ -1548,7 +1572,9 @@ export default function AdminPage() {
             {behindCount != null ? ` · ${behindCount} repo${behindCount === 1 ? '' : 's'}` : ''}
           </div>
           <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5, margin: '0 0 12px', maxWidth: '520px' }}>
-            Same free pipeline as overnight — batches of {BULK_REGEN_DEFAULT_BATCH}. Safe to click again after a timeout.
+            Same free pipeline as overnight — batches of {BULK_REGEN_DEFAULT_BATCH}.
+            Needs Gemini quota (free tier is ~20 requests/day on gemini-3.6-flash; each repo uses several).
+            Safe to click again after a timeout or tomorrow&apos;s reset.
           </p>
           {behindPreview.length > 0 && (
             <p
