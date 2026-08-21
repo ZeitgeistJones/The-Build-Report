@@ -38,23 +38,33 @@ export async function listBehindRescoreSlugs(
 ): Promise<string[]> {
   const resolved = stats ?? (await loadStats())
   const repos = await loadReposForBrief(resolved)
+  const trackableBySlug = new Map(
+    (resolved.trackableRepos ?? []).map(r => [r.name, r] as const),
+  )
 
   const ranked = repos
     .filter(repo => {
       const slug = repo.githubSlug
       if (!slug || shouldSkipRepo(slug) || repo.excluded) return false
-      return repoNeedsRescore(repo.scoredAt, repo.commitTimestamps, {
-        lastCommitAt: repo.lastCommitAt,
-        pushedAt: repo.pushedAt,
+      const activity = resolved.repoActivity[slug]
+      const gh = trackableBySlug.get(slug)
+      return repoNeedsRescore(repo.scoredAt, activity?.commitTimestamps ?? null, {
+        lastCommitAt: activity?.lastCommitAt ?? null,
+        pushedAt: gh?.pushedAt ?? activity?.pushedAt ?? null,
       })
     })
-    .map(repo => ({
-      slug: repo.githubSlug,
-      key: repoNeedsRescoreSortKey(repo.scoredAt, repo.commitTimestamps, {
-        lastCommitAt: repo.lastCommitAt,
-        pushedAt: repo.pushedAt,
-      }),
-    }))
+    .map(repo => {
+      const slug = repo.githubSlug
+      const activity = resolved.repoActivity[slug]
+      const gh = trackableBySlug.get(slug)
+      return {
+        slug,
+        key: repoNeedsRescoreSortKey(repo.scoredAt, activity?.commitTimestamps ?? null, {
+          lastCommitAt: activity?.lastCommitAt ?? null,
+          pushedAt: gh?.pushedAt ?? activity?.pushedAt ?? null,
+        }),
+      }
+    })
     .sort((a, b) => b.key - a.key || a.slug.localeCompare(b.slug))
 
   return ranked.map(r => r.slug)
