@@ -383,14 +383,12 @@ function formatRescoreOldGrade(label: string | null | undefined): string {
   return label
 }
 
-function RescoreSummaryBlock({ meta, plain, repoName }: { meta: RescoreSummaryRecord; plain: boolean; repoName?: string }) {
+function RescoreSummaryBlock({ meta }: { meta: RescoreSummaryRecord }) {
   const rescoreDate = formatScoredDateLabel(meta.rescoreAt)
   const oldDate = formatRescoreOldDateLabel(meta.oldScoredAt)
   const fromBaseline = looksLikeBaselineDate(meta.oldScoredAt)
   const oldEconomic = meta.oldTokenMechanic ?? RESCORE_NOT_SCORED_LABEL
   const newEconomic = meta.newTokenMechanic ?? 'N/A'
-  const summaryText = rescoreSummaryForDisplay(meta, plain, repoName)
-  const showWhatChanged = Boolean(meta.deltaHeader || summaryText)
 
   return (
     <div style={{
@@ -418,7 +416,7 @@ function RescoreSummaryBlock({ meta, plain, repoName }: { meta: RescoreSummaryRe
           {RESCORE_SUMMARY_NOTE}
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: showWhatChanged ? '8px' : 0, fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
         <div>
           <span style={{ color: 'var(--text-muted)' }}>Economic: </span>
           {oldEconomic} → {newEconomic}
@@ -436,20 +434,80 @@ function RescoreSummaryBlock({ meta, plain, repoName }: { meta: RescoreSummaryRe
           {meta.commits30dAtRescore.toLocaleString()}
         </div>
       </div>
-          {showWhatChanged && (
-        <div style={{ margin: 0, color: 'var(--text-secondary)' }}>
-          <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>What changed: </span>
-          {!plain && meta.deltaHeader && (
-            <span style={{ display: 'block', marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
-              {meta.deltaHeader}
-            </span>
-          )}
-          {summaryText && (
-            <span style={{ display: 'block', marginTop: !plain && meta.deltaHeader ? '6px' : '4px' }}>
-              {summaryText}
-            </span>
-          )}
-        </div>
+    </div>
+  )
+}
+
+/** Quieter sibling to Why holders care — same anatomy, muted accent. */
+function WhatChangedLead({
+  meta,
+  plain,
+  repoName,
+}: {
+  meta: RescoreSummaryRecord
+  plain: boolean
+  repoName?: string
+}) {
+  const summaryText = rescoreSummaryForDisplay(meta, plain, repoName)
+  const showDeltaHeader = !plain && Boolean(meta.deltaHeader?.trim())
+  if (!summaryText && !showDeltaHeader) return null
+
+  return (
+    <div
+      style={{
+        marginBottom: '12px',
+        padding: '10px 12px',
+        borderLeft: '3px solid var(--text-muted)',
+        background: 'var(--surface-2)',
+        borderRadius: '0 var(--radius) var(--radius) 0',
+      }}
+    >
+      <div
+        style={{
+          fontSize: '10px',
+          fontWeight: 600,
+          color: 'var(--text-muted)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          marginBottom: '2px',
+        }}
+      >
+        What changed
+      </div>
+      <div
+        style={{
+          fontSize: '11px',
+          color: 'var(--text-muted)',
+          marginBottom: '6px',
+          lineHeight: 1.4,
+        }}
+      >
+        Since last rescore · {formatScoredDateLabel(meta.rescoreAt)}
+      </div>
+      {showDeltaHeader && (
+        <p
+          style={{
+            margin: '0 0 6px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            color: 'var(--text-muted)',
+            lineHeight: 1.45,
+          }}
+        >
+          {meta.deltaHeader}
+        </p>
+      )}
+      {summaryText && (
+        <p
+          style={{
+            margin: 0,
+            fontSize: plain ? '14px' : '13px',
+            color: 'var(--text-secondary)',
+            lineHeight: 1.55,
+          }}
+        >
+          {summaryText}
+        </p>
       )}
     </div>
   )
@@ -1278,6 +1336,13 @@ export default function RepoList({
                       </p>
                     </div>
                   )}
+                  {rescoreMeta && (
+                    <WhatChangedLead
+                      meta={rescoreMeta}
+                      plain={normie}
+                      repoName={repo.githubSlug || repo.name}
+                    />
+                  )}
                 <div
                   style={{
                     display: 'grid',
@@ -1374,7 +1439,7 @@ export default function RepoList({
               )
             })()}
 
-            {rescoreMeta && <RescoreSummaryBlock meta={rescoreMeta} plain={normie} repoName={repo.githubSlug || repo.name} />}
+            {rescoreMeta && <RescoreSummaryBlock meta={rescoreMeta} />}
 
             {showSeparateVerdict && (
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', marginBottom: '10px' }}>
