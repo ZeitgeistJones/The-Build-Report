@@ -1,6 +1,9 @@
 import { getEffectiveTag } from './criticalPath'
 import { showsEconomicNa } from './economicGrade'
-import type { Repo } from './scores'
+import type { Repo, RubricRow } from './scores'
+
+/** Shipping-leverage row that answers “how does this help $CLAWD holders?” */
+export const HOLDER_PATH_LABEL = 'Downstream path to holder value'
 
 /** One-line framing under expanded rubric sections — quick glance vs detail rows. */
 export function integritySectionFraming(repo: Repo, plain = false): string | null {
@@ -41,6 +44,30 @@ export function economicSectionFraming(repo: Repo, plain = false): string | null
       : 'Direct CLAWD burn or lock on use.'
   }
   return null
+}
+
+/**
+ * Promote the “Downstream path to holder value” source as a card lead.
+ * Prefer Plain English rewrite when requested.
+ */
+export function holderCareLeadFromRubric(
+  rows: RubricRow[] | undefined,
+  plain = false,
+): string | null {
+  if (!rows?.length) return null
+  const row = rows.find(r => r.label === HOLDER_PATH_LABEL)
+  if (!row) return null
+  const plainSource = row.sourceNormie?.trim()
+  const technical = row.source?.trim()
+  const text = (plain && plainSource) || technical
+  return text || null
+}
+
+/** Put the holder-path row first so the SL column matches the lead. */
+export function orderShippingLeverageRowsForDisplay(rows: RubricRow[]): RubricRow[] {
+  const path = rows.filter(r => r.label === HOLDER_PATH_LABEL)
+  const rest = rows.filter(r => r.label !== HOLDER_PATH_LABEL)
+  return path.length ? [...path, ...rest] : rows
 }
 
 export function integrityGradeFootnote(): string {

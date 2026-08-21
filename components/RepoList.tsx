@@ -44,7 +44,7 @@ import {
   RESCORE_SUMMARY_NOTE,
 } from '@/lib/scoringCopy'
 import { diffRubricRows, rowDeltaByLabel } from '@/lib/rescoreDeltas'
-import { integritySectionFraming, economicSectionFraming, economicSectionTitle } from '@/lib/cardFraming'
+import { integritySectionFraming, economicSectionFraming, economicSectionTitle, holderCareLeadFromRubric, orderShippingLeverageRowsForDisplay, HOLDER_PATH_LABEL } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 import { commitsSinceScoreLabel, countCommitsSinceScore, repoNeedsRescore, repoNeedsRescoreSortKey } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
@@ -1236,8 +1236,49 @@ export default function RepoList({
               const hasTM = !!tokenMechanic
               const gridColumns = isMobile ? '1fr' : hasSL || hasTM ? '1fr 1fr' : '1fr'
               const economicRowDeltas = hasSL ? slRowDeltas : tmRowDeltas
+              const holderLead = hasSL
+                ? holderCareLeadFromRubric(shippingLeverage?.rubric, normie)
+                : null
+              const economicRows = hasSL
+                ? orderShippingLeverageRowsForDisplay(economicScore?.rubric ?? [])
+                : (economicScore?.rubric ?? [])
 
               return (
+                <>
+                  {holderLead && (
+                    <div
+                      style={{
+                        marginBottom: '12px',
+                        padding: '10px 12px',
+                        borderLeft: '3px solid var(--accent)',
+                        background: 'var(--surface-2)',
+                        borderRadius: '0 var(--radius) var(--radius) 0',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          color: 'var(--accent)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        Why holders care
+                      </div>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: normie ? '14px' : '13px',
+                          color: 'var(--text-secondary)',
+                          lineHeight: 1.55,
+                        }}
+                      >
+                        {holderLead}
+                      </p>
+                    </div>
+                  )}
                 <div
                   style={{
                     display: 'grid',
@@ -1256,16 +1297,18 @@ export default function RepoList({
                           {economicSectionFraming(repo, normie)}
                         </p>
                       )}
-                      {economicScore.rubric.map((row, i) => {
+                      {economicRows.map((row, i) => {
                         const delta = economicRowDeltas?.get(row.label)
+                        const hideSource =
+                          Boolean(holderLead) && row.label === HOLDER_PATH_LABEL
                         return (
                         <RubricCriterionRow
                           key={i}
                           label={row.label}
                           weight={row.weight}
                           level={row.level}
-                          source={row.source}
-                          sourceNormie={row.sourceNormie}
+                          source={hideSource ? '' : row.source}
+                          sourceNormie={hideSource ? null : row.sourceNormie}
                           preferNormieSource={normie}
                           isMobile={isMobile}
                           deltaEarned={economicRowDeltas ? (delta?.deltaEarned ?? 0) : null}
@@ -1329,6 +1372,7 @@ export default function RepoList({
                     </p>
                   )}
                 </div>
+                </>
               )
             })()}
 
