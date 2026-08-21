@@ -44,7 +44,7 @@ import {
   RESCORE_SUMMARY_NOTE,
 } from '@/lib/scoringCopy'
 import { diffRubricRows, rowDeltaByLabel } from '@/lib/rescoreDeltas'
-import { integritySectionFraming, economicSectionFraming, economicSectionTitle, holderCareLeadFromRubric, orderShippingLeverageRowsForDisplay, HOLDER_PATH_LABEL } from '@/lib/cardFraming'
+import { integritySectionFraming, economicSectionFraming, economicSectionTitle, holderCareLeadFromRubric, orderEconomicRowsForDisplay } from '@/lib/cardFraming'
 import { formatScoringContextLabel, scoringContextTooltip } from '@/lib/scoringContext'
 import { commitsSinceScoreLabel, countCommitsSinceScore, repoNeedsRescore, repoNeedsRescoreSortKey } from '@/lib/commitsSinceScore'
 import RepoBadge from '@/components/RepoBadge'
@@ -1236,12 +1236,11 @@ export default function RepoList({
               const hasTM = !!tokenMechanic
               const gridColumns = isMobile ? '1fr' : hasSL || hasTM ? '1fr 1fr' : '1fr'
               const economicRowDeltas = hasSL ? slRowDeltas : tmRowDeltas
-              const holderLead = hasSL
-                ? holderCareLeadFromRubric(shippingLeverage?.rubric, normie)
-                : null
-              const economicRows = hasSL
-                ? orderShippingLeverageRowsForDisplay(economicScore?.rubric ?? [])
-                : (economicScore?.rubric ?? [])
+              const holderLead = holderCareLeadFromRubric(economicScore?.rubric, normie)
+              const economicRows = orderEconomicRowsForDisplay(
+                economicScore?.rubric ?? [],
+                holderLead?.sourceLabel ?? null,
+              )
 
               return (
                 <>
@@ -1275,7 +1274,7 @@ export default function RepoList({
                           lineHeight: 1.55,
                         }}
                       >
-                        {holderLead}
+                        {holderLead.text}
                       </p>
                     </div>
                   )}
@@ -1300,7 +1299,7 @@ export default function RepoList({
                       {economicRows.map((row, i) => {
                         const delta = economicRowDeltas?.get(row.label)
                         const hideSource =
-                          Boolean(holderLead) && row.label === HOLDER_PATH_LABEL
+                          Boolean(holderLead) && row.label === holderLead.sourceLabel
                         return (
                         <RubricCriterionRow
                           key={i}
