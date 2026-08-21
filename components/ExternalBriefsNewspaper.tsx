@@ -16,6 +16,10 @@ import {
   type ExternalBriefData,
 } from '@/lib/externalOwnerBrief'
 import type { McpWireSnapshot } from '@/lib/mcpWire'
+import {
+  legacyPublicLeadScore,
+  orderStoriesForYbFrontPage,
+} from '@/lib/yesterdaysBuildsLeadPolicy'
 
 type Props = {
   briefs: Partial<Record<ExternalBriefAccountId, ExternalBriefData | null>>
@@ -43,32 +47,23 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const ISSUE_EPOCH = Date.UTC(2025, 11, 31)
 
 /* ------------------------------------------------------------------
-   FRONT-PAGE RANKING — how a story gets pegged as the lead.
-
-   score = significance × 100
-         + min(commits, COMMIT_CAP)
-         + repos × 2
-         + (has a token ticker ? TICKER_EDGE : 0)
-
-   significance (1-5) is the model's read of how much the day actually
-   mattered for that account, judged on what the commits DID, not how
-   many there were. It dominates on purpose: 40 dependency bumps is a 1,
-   one real feature merge is a 4.
-
-   Commits are capped so a bot-spam day can't buy the front page — they
-   only break ties between stories of equal significance.
-
-   TICKER_EDGE is a thumb on the scale for accounts with a token, since
-   holders are who this page is for. Set it to 0 for a neutral desk.
-
-   Editions cached before significance existed default to NEUTRAL.
-
-   Public ranking lives HERE, not in yesterdaysBuildsLeadPolicy.
-   Do not import YB-LEAD-v1 for story order. Shadow comparison is Admin-only.
+   FRONT-PAGE RANKING — YB-LEAD-v1 when leadPolicy exists on briefs.
+   Falls back to legacy significance × commits × repos + ticker when an
+   edition has no classifications yet (older cache / failed classify).
    ------------------------------------------------------------------ */
 const COMMIT_CAP = 40
-const TICKER_EDGE = 15
 const NEUTRAL_SIGNIFICANCE = 3
+
+function legacyFrontPageScore(story: Story): number {
+  const brief = story.brief
+  if (!brief) return 0
+  return legacyPublicLeadScore({
+    significance: brief.significance ?? NEUTRAL_SIGNIFICANCE,
+    commitCount: Math.min(brief.commitCount ?? 0, COMMIT_CAP),
+    repoCount: brief.repoCount ?? 0,
+    ticker: story.account.ticker,
+  })
+}
 
 function parseDateKey(dateKey: string): { y: number; m: number; d: number } | null {
   const [y, m, d] = dateKey.split('-').map(Number)
@@ -173,12 +168,7 @@ function commitLine(brief: ExternalBriefData | null): string | null {
 }
 
 function frontPageScore(story: Story): number {
-  const brief = story.brief
-  if (!brief) return 0
-  const significance = brief.significance ?? NEUTRAL_SIGNIFICANCE
-  const commits = Math.min(brief.commitCount ?? 0, COMMIT_CAP)
-  const repos = brief.repoCount ?? 0
-  return significance * 100 + commits + repos * 2 + (story.account.ticker ? TICKER_EDGE : 0)
+  return legacyFrontPageScore(story)
 }
 
 type CommitPick = { quote: string; repo: string; label: string }
@@ -279,6 +269,7 @@ function StoryBlock({
   running,
   result,
   onRegenerate,
+  leadKicker,
 }: {
   story: Story
   variant: 'lead' | 'second' | 'brief'
@@ -288,6 +279,8 @@ function StoryBlock({
   running: boolean
   result: string | null
   onRegenerate?: () => void
+  /** Override the lead-slot label (e.g. Strongest observed when no material lead). */
+  leadKicker?: string
 }) {
   const { account, brief, text } = story
   const paragraphs = toParagraphs(text)
@@ -301,7 +294,12 @@ function StoryBlock({
   const deck = modelDeck ?? sliced.deck
   const body = sliced.body
 
-  const label = variant === 'lead' ? 'Lead story' : variant === 'second' ? 'Report' : 'In brief'
+  const label =
+    variant === 'lead'
+      ? leadKicker ?? 'Lead story'
+      : variant === 'second'
+        ? 'Report'
+        : 'In brief'
 
   return (
     <article id={account.id} className={`ext-paper-story ext-paper-story--${variant}`}>
@@ -366,14 +364,27 @@ export default function ExternalBriefsNewspaper({
 
   // Public paper: only projects that actually shipped yesterday. Quiet/blank
   // desks stay visible in Admin so you can regenerate and inspect them.
-  const filed = rows
+  const shipped = rows
     .filter(r => r.text.length > 0)
     .filter(r => admin || (r.brief?.commitCount ?? 0) > 0)
-    .sort((a, b) => {
-      const diff = frontPageScore(b) - frontPageScore(a)
-      if (diff !== 0) return diff
-      return (b.brief?.commitCount ?? 0) - (a.brief?.commitCount ?? 0)
-    })
+
+  const frontPage = orderStoriesForYbFrontPage(
+    shipped.map(s => ({
+      accountId: s.account.id,
+      label: s.account.label,
+      ticker: s.account.ticker,
+      text: s.text,
+      commitCount: s.brief?.commitCount ?? 0,
+      repoCount: s.brief?.repoCount ?? 0,
+      significance: s.brief?.significance,
+      leadPolicy: s.brief?.leadPolicy,
+    })),
+  )
+
+  const byId = new Map(shipped.map(s => [s.account.id, s]))
+  const filed = frontPage.orderedIds
+    .map(id => byId.get(id))
+    .filter((s): s is Story => Boolean(s))
 
   const wire = admin ? rows.filter(r => !r.text.length) : []
   const commitOfTheDay = admin ? pickCommitOfTheDay(filed) : null
@@ -383,6 +394,8 @@ export default function ExternalBriefsNewspaper({
   const shorts = filed.slice(3)
   const longShorts = shorts.filter(s => isLongAlsoFiled(s))
   const packShorts = shorts.filter(s => !isLongAlsoFiled(s))
+  const leadKicker =
+    frontPage.usedV1 && !frontPage.materialLead ? 'Strongest observed' : 'Lead story'
 
   const anyDate = issueDateKey ?? rows.map(r => r.brief?.dateKey).find(Boolean) ?? null
   const issue = issueNumber(anyDate)
@@ -443,6 +456,7 @@ export default function ExternalBriefsNewspaper({
             variant="lead"
             admin={admin}
             normie={normie}
+            leadKicker={leadKicker}
             {...stateFor(lead.account.id)}
           />
 

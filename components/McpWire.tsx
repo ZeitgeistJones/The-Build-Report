@@ -1,6 +1,5 @@
 /**
- * Compact newspaper Wire desk for Admin preview.
- * Live /yesterdays-builds does not mount this yet. Admin inbox remains McpWireInbox.
+ * Compact newspaper Wire desk for public /yesterdays-builds + Admin preview.
  */
 import { officialRegistryRecordUrl, type McpWireSnapshot } from '@/lib/mcpWire'
 import { PUBLIC_WIRE_CAP, toPublicWireDispatch } from '@/lib/mcpWirePublic'
@@ -23,7 +22,8 @@ export default function McpWire({
       {preview && <p className="ext-wire__preview">Admin desk preview · not live</p>}
       <p className="ext-paper-sectionhead">The Wire</p>
       <p className="ext-wire__deck">
-        New and changed AI-tool connectors from the official MCP Registry.
+        New and changed AI-tool connectors from the official MCP Registry — open the drop links
+        below to jump to the listing or source.
       </p>
       <div className="ext-wire__source">
         <span className="ext-wire__source-text">
@@ -76,14 +76,29 @@ export default function McpWire({
         <ul className="ext-wire__list">
           {dispatches.map(item => {
             const registryHref = officialRegistryRecordUrl(item.name, item.version)
+            const dropHref = item.repoUrl || registryHref
+            const isNewDrop = item.status === 'NEW'
             const label = item.beat ? `${item.status} · ${item.beat}` : item.status
             return (
-              <li key={`${item.name}-${item.version}`} className="ext-wire__item">
+              <li
+                key={`${item.name}-${item.version}`}
+                className={isNewDrop ? 'ext-wire__item ext-wire__item--new' : 'ext-wire__item'}
+              >
                 <div className="ext-wire__meta">
                   <span className="ext-wire__kicker">{label}</span>
                   {item.time && <time className="ext-wire__time">{item.time}</time>}
                 </div>
-                <h3 className="ext-wire__title">{item.title}</h3>
+                <h3 className="ext-wire__title">
+                  <a
+                    href={dropHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ext-wire__title-link"
+                    aria-label={`Open ${item.title} drop`}
+                  >
+                    {item.title}
+                  </a>
+                </h3>
                 {item.trackedNote && <p className="ext-wire__desk">Also covered above</p>}
                 <p className="ext-wire__sentence">{item.sentence}</p>
                 {item.deletionNote && (
@@ -92,6 +107,17 @@ export default function McpWire({
                   </p>
                 )}
                 <p className="ext-wire__receipts">
+                  {isNewDrop && (
+                    <a
+                      href={dropHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ext-wire__drop-link"
+                      aria-label={`Open new drop: ${item.title}`}
+                    >
+                      Open drop ↗
+                    </a>
+                  )}
                   <a
                     href={registryHref}
                     target="_blank"
@@ -101,17 +127,14 @@ export default function McpWire({
                     Registry ↗
                   </a>
                   {item.repoUrl && (
-                    <>
-                      {'   '}
-                      <a
-                        href={item.repoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`View ${item.title} source repository`}
-                      >
-                        Source ↗
-                      </a>
-                    </>
+                    <a
+                      href={item.repoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`View ${item.title} source repository`}
+                    >
+                      Source ↗
+                    </a>
                   )}
                 </p>
               </li>

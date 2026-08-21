@@ -9,6 +9,7 @@ import {
   decideYbLeadV1,
   isLeadEligible,
   leadPolicyTotal,
+  orderStoriesForYbFrontPage,
   parseLeadPolicy,
   pickLegacyPublicLead,
   YB_LEAD_MIN_CONFIDENCE,
@@ -403,22 +404,79 @@ expect('confidence gate is 0.75', YB_LEAD_MIN_CONFIDENCE === 0.75)
   expect('v1 ranker body has no repoCount', !decideFn.includes('repoCount') && !compareFn.includes('repoCount'))
 }
 
-/* ---- Public ranking must stay on the old formula ---- */
+/* ---- Public front-page order helper ---- */
+{
+  const weak = policy({
+    eventType: 'maintenance',
+    tier: 4,
+    consequence: 5,
+    audienceRelevance: 2,
+    novelty: 1,
+    deliveryEvidence: 4,
+    realChangeScope: 1,
+    coherentMultiRepo: 0,
+    validatedWorkDensity: 0,
+    confidence: 0.9,
+  })
+  const strong = policy({
+    eventType: 'major_feature',
+    tier: 2,
+    consequence: 28,
+    audienceRelevance: 12,
+    novelty: 8,
+    deliveryEvidence: 16,
+    realChangeScope: 8,
+    coherentMultiRepo: 0,
+    validatedWorkDensity: 2,
+    confidence: 0.9,
+  })
+  const ordered = orderStoriesForYbFrontPage([
+    {
+      accountId: 'busy-token',
+      label: 'Busy Token Desk',
+      ticker: '$BUSY',
+      text: 'Lots of commits but maintenance.',
+      commitCount: 80,
+      repoCount: 12,
+      significance: 5,
+      leadPolicy: weak,
+    },
+    {
+      accountId: 'quiet-ship',
+      label: 'Quiet Ship',
+      text: 'One real feature.',
+      commitCount: 3,
+      repoCount: 1,
+      significance: 2,
+      leadPolicy: strong,
+    },
+  ])
+  expect('v1 front page prefers evidenced ship over busy ticker desk', ordered.orderedIds[0] === 'quiet-ship')
+  expect('v1 front page marks material lead', ordered.materialLead === true)
+  expect('v1 front page used v1', ordered.usedV1 === true)
+}
+
+/* ---- Public ranking uses YB-LEAD-v1 when classifications exist ---- */
 {
   const newspaper = readFileSync(join(process.cwd(), 'components/ExternalBriefsNewspaper.tsx'), 'utf8')
   const publicPage = readFileSync(join(process.cwd(), 'app/yesterdays-builds/page.tsx'), 'utf8')
   const admin = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
+  const policyMod = readFileSync(join(process.cwd(), 'lib/yesterdaysBuildsLeadPolicy.ts'), 'utf8')
   expect(
-    'newspaper still ranks with local ticker/commit formula',
-    newspaper.includes('significance * 100 + commits + repos * 2 + (story.account.ticker ? TICKER_EDGE : 0)'),
+    'newspaper imports orderStoriesForYbFrontPage',
+    newspaper.includes('orderStoriesForYbFrontPage'),
   )
   expect(
-    'newspaper does not import the v1 ranker',
-    !newspaper.includes("from '@/lib/yesterdaysBuildsLeadPolicy'") && !newspaper.includes('decideYbLeadV1'),
+    'newspaper calls orderStoriesForYbFrontPage',
+    newspaper.includes('orderStoriesForYbFrontPage('),
   )
   expect(
-    'public YB page does not import the v1 ranker',
-    !publicPage.includes('yesterdaysBuildsLeadPolicy') && !publicPage.includes('YbLeadStoryLab'),
+    'policy module exports orderStoriesForYbFrontPage',
+    policyMod.includes('export function orderStoriesForYbFrontPage'),
+  )
+  expect(
+    'public YB page does not import the Admin lab',
+    !publicPage.includes('YbLeadStoryLab'),
   )
   expect('Admin mounts the lead lab', admin.includes('YbLeadStoryLab'))
   expect('public newspaper is not admin', !/ExternalBriefsNewspaper[\s\S]*admin/.test(publicPage))

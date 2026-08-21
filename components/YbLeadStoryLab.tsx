@@ -107,18 +107,18 @@ export default function YbLeadStoryLab({ briefs }: Props) {
   return (
     <section className="yb-lead-lab" aria-label="Lead story lab">
       <header className="yb-lead-lab__head">
-        <p className="yb-lead-lab__kicker">Lead story lab · shadow / Admin only</p>
-        <h3 className="yb-lead-lab__title">Why this would become the lead</h3>
+        <p className="yb-lead-lab__kicker">Lead story lab · Admin</p>
+        <h3 className="yb-lead-lab__title">Why this became the lead</h3>
         <p className="yb-lead-lab__note">
-          Compares the current public formula with proposed {YB_LEAD_POLICY_VERSION}. Does not
-          change /yesterdays-builds. Token ticker, stars, and raw commit/repo counts get zero
-          ranking points in the proposed ranker.
+          Public /yesterdays-builds now ranks with {YB_LEAD_POLICY_VERSION} when classifications
+          exist. This lab still shows the legacy formula beside it so you can spot disagreements.
+          Token ticker, stars, and raw commit/repo counts get zero ranking points in v1.
         </p>
       </header>
 
       <div className="yb-lead-lab__compare">
         <article className="yb-lead-lab__card">
-          <p className="yb-lead-lab__card-kicker">Current public lead</p>
+          <p className="yb-lead-lab__card-kicker">Legacy formula (reference)</p>
           <p className="yb-lead-lab__card-name">{legacy ? legacy.label : 'None filed'}</p>
           <p className="yb-lead-lab__muted">
             Existing methodology — significance × 100 + capped commits + repo count × 2 + ticker
@@ -127,7 +127,7 @@ export default function YbLeadStoryLab({ briefs }: Props) {
         </article>
 
         <article className="yb-lead-lab__card yb-lead-lab__card--proposed">
-          <p className="yb-lead-lab__card-kicker">Proposed — {YB_LEAD_POLICY_VERSION}</p>
+          <p className="yb-lead-lab__card-kicker">Public lead — {YB_LEAD_POLICY_VERSION}</p>
           {decision.kind === 'unavailable' ? (
             <>
               <p className="yb-lead-lab__card-name">Unavailable</p>

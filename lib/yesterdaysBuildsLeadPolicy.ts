@@ -2,8 +2,9 @@
  * Yesterday's Builds Lead Policy v1 (YB-LEAD-v1).
  *
  * The LLM classifies evidence. This module validates scores and chooses a lead.
- * Shadow / Admin only — public ranking still uses the legacy formula in
- * ExternalBriefsNewspaper.
+ * Public ranking uses YB-LEAD-v1 via orderStoriesForYbFrontPage when
+ * leadPolicy classifications exist; otherwise falls back to the legacy
+ * significance/commits formula.
  */
 
 export const YB_LEAD_POLICY_VERSION = 'YB-LEAD-v1' as const
@@ -371,7 +372,7 @@ export function annotateCandidates(candidates: YbLeadCandidate[]): YbLeadCandida
     }))
 }
 
-/** Legacy public formula — Admin comparison only. Must stay in lockstep with ExternalBriefsNewspaper. */
+/** Legacy public formula — fallback when an edition has no leadPolicy classifications. */
 export const LEGACY_PUBLIC_COMMIT_CAP = 40
 export const LEGACY_PUBLIC_TICKER_EDGE = 15
 export const LEGACY_PUBLIC_NEUTRAL_SIGNIFICANCE = 3
@@ -419,4 +420,96 @@ export function pickLegacyPublicLead(
     }))
     .sort((a, b) => b.score - a.score || a.accountId.localeCompare(b.accountId))
   return filed[0] ?? null
+}
+
+export type YbFrontPageStoryInput = {
+  accountId: string
+  label: string
+  ticker?: string | null
+  text: string
+  commitCount: number
+  repoCount: number
+  significance?: number
+  leadPolicy?: unknown
+}
+
+export type YbFrontPageOrder = {
+  orderedIds: string[]
+  /** Present when at least one story had a parseable leadPolicy. */
+  decision: YbLeadDecision | null
+  /** True when ranking used YB-LEAD-v1 for any story. */
+  usedV1: boolean
+  /** True when the first card is a real T1–T3 lead (not fallback / strongest-observed). */
+  materialLead: boolean
+}
+
+/**
+ * Public Yesterday's Builds front-page order.
+ * Prefers YB-LEAD-v1 when classifications exist; falls back to the legacy
+ * significance/commits formula for stories (or whole editions) without policy.
+ */
+export function orderStoriesForYbFrontPage(inputs: YbFrontPageStoryInput[]): YbFrontPageOrder {
+  const filed = inputs.filter(s => s.text.trim().length > 0 && s.commitCount > 0)
+  if (!filed.length) {
+    return { orderedIds: [], decision: null, usedV1: false, materialLead: false }
+  }
+
+  const byId = new Map(filed.map(s => [s.accountId, s]))
+  const candidates: YbLeadCandidate[] = []
+  for (const s of filed) {
+    const policy = parseLeadPolicy(s.leadPolicy)
+    if (policy) candidates.push({ accountId: s.accountId, label: s.label, policy })
+  }
+
+  if (!candidates.length) {
+    const ordered = [...filed].sort(
+      (a, b) =>
+        legacyPublicLeadScore(b) - legacyPublicLeadScore(a) ||
+        a.accountId.localeCompare(b.accountId),
+    )
+    return {
+      orderedIds: ordered.map(s => s.accountId),
+      decision: null,
+      usedV1: false,
+      materialLead: true,
+    }
+  }
+
+  const decision = decideYbLeadV1(candidates)
+  const remaining = new Set(filed.map(s => s.accountId))
+  const orderedIds: string[] = []
+
+  const push = (id: string) => {
+    if (!remaining.has(id)) return
+    orderedIds.push(id)
+    remaining.delete(id)
+  }
+
+  if (decision.kind === 'lead') {
+    push(decision.winner.accountId)
+    for (const c of decision.eligible.slice(1)) push(c.accountId)
+  } else if (decision.kind === 'no-material-lead' && decision.bestObserved) {
+    push(decision.bestObserved.accountId)
+  }
+
+  const restWithPolicy = candidates
+    .filter(c => remaining.has(c.accountId))
+    .sort(compareEligible)
+  for (const c of restWithPolicy) push(c.accountId)
+
+  const noPolicy = [...remaining]
+    .map(id => byId.get(id)!)
+    .sort(
+      (a, b) =>
+        legacyPublicLeadScore(b) - legacyPublicLeadScore(a) ||
+        a.accountId.localeCompare(b.accountId),
+    )
+  for (const s of noPolicy) push(s.accountId)
+
+  return {
+    orderedIds,
+    decision,
+    usedV1: true,
+    materialLead: decision.kind === 'lead',
+  }
 }
