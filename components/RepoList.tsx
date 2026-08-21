@@ -1298,8 +1298,7 @@ export default function RepoList({
                       )}
                       {economicRows.map((row, i) => {
                         const delta = economicRowDeltas?.get(row.label)
-                        const hideSource =
-                          Boolean(holderLead) && row.label === holderLead.sourceLabel
+                        const hideSource = holderLead != null && row.label === holderLead.sourceLabel
                         return (
                         <RubricCriterionRow
                           key={i}
