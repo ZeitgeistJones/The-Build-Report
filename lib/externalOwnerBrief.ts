@@ -218,14 +218,14 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
   {
     id: 'clawnchdev',
     owner: 'clawnchdev',
-    ticker: null,
+    ticker: '$CLAWNCH',
     label: 'Clawnchdev',
     redisSlug: 'clawnchdev',
   },
   {
     id: 'tachikomared',
     owner: 'tachikomared',
-    ticker: null,
+    ticker: '$TACHI',
     label: 'TachikomaRed',
     redisSlug: 'tachikomared',
   },
