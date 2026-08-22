@@ -1041,7 +1041,7 @@ export default function AdminPage() {
         if (quotaHit) {
           stoppedForQuota = true
           setBehindResult(
-            `Stopped — Gemini free-tier quota hit (20 requests/day on gemini-3.6-flash). ${totalScored} rescored, ${totalFailed} failed this run. Wait for daily reset, add a paid Gemini key, or set GEMINI_API_KEY_2 to a different Google project. Sample: ${errorSamples[0] ?? 'quota exceeded'}`,
+            `Stopped — Gemini free-tier quota hit (20 requests/day on gemini-3.6-flash). ${totalScored} rescored, ${totalFailed} failed this run. Wait for daily reset, add a paid Gemini key, or set GEMINI_API_KEY_2 / GEMINI_API_KEY_3 to different Google projects. Sample: ${errorSamples[0] ?? 'quota exceeded'}`,
           )
           break
         }

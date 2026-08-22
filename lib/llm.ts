@@ -43,6 +43,7 @@ function geminiApiKeys(): string[] {
   const raw = [
     process.env.GEMINI_API_KEY,
     process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
     process.env.GOOGLE_GENERATIVE_AI_API_KEY,
     process.env.GOOGLE_API_KEY,
   ]
@@ -232,7 +233,7 @@ export function hasGeminiApiKey(): boolean {
 /**
  * Generate text with Gemini only — never Anthropic.
  * Used for CLAWD homepage Yesterday's Build + The Needle.
- * Rotates GEMINI_API_KEY → GEMINI_API_KEY_2 on quota errors.
+ * Rotates GEMINI_API_KEY → GEMINI_API_KEY_2 → GEMINI_API_KEY_3 on quota errors.
  */
 export async function generateTextGeminiOnly(opts: GenerateTextOptions): Promise<GenerateTextResult> {
   const label = opts.label ?? 'llm-gemini'
@@ -277,7 +278,7 @@ export async function generateTextGeminiFirst(opts: GenerateTextOptions): Promis
 /**
  * Generate text with Anthropic Haiku as primary and Gemini as fallback.
  * Falls back when Anthropic is unset or the Anthropic call fails.
- * Gemini itself rotates GEMINI_API_KEY → GEMINI_API_KEY_2 on quota errors.
+ * Gemini itself rotates GEMINI_API_KEY → GEMINI_API_KEY_2 → GEMINI_API_KEY_3 on quota errors.
  */
 export async function generateText(opts: GenerateTextOptions): Promise<GenerateTextResult> {
   const label = opts.label ?? 'llm'
