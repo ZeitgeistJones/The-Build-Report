@@ -230,7 +230,7 @@ export function composeWhyShownText(args: {
 
   const bits: string[] = []
   if (args.why.includes('tracked') && args.tracked) {
-    bits.push(`${args.tracked.label} is already tracked by Yesterday’s Builds`)
+    bits.push(`${args.tracked.label} is already tracked by Outside Desk`)
   }
   if (args.why.includes('newTool') || args.kind === 'new') bits.push('New registration')
   if (args.why.includes('crypto')) bits.push('crypto/onchain capability')

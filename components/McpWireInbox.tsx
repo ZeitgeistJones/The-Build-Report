@@ -114,7 +114,7 @@ function InboxCard({
       {row.tracked && (
         <p className="wire-card__tracked">
           Tracked as: {row.tracked.label}{' '}
-          <a href={row.tracked.buildsHref}>Yesterday’s Builds ↗</a>
+          <a href={row.tracked.buildsHref}>Outside Desk ↗</a>
         </p>
       )}
       {related && (

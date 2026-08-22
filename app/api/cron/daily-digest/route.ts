@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
+  const startedAt = Date.now()
+
   try {
     const stats = await loadGitHubStatsForCron()
     if (!stats) {
@@ -35,11 +37,15 @@ export async function GET(req: NextRequest) {
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
 
-    // Secondary desks first — overnight rescores used to eat the 300s budget and
-    // leave Base/etc. on sticky false-quiet caches (or uncached).
-    const external = await generateAllExternalDigests({
+    // CLAWD homepage columns first — Outside Desk must not starve these again.
+    const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
+    const needle = await generateAndCacheNeedle({
       dateKey: editionKey,
-      recheckQuiet: true,
+      force: true,
+      activity,
+    }).catch(err => {
+      console.error('[daily-digest] needle generation failed', err)
+      return null
     })
 
     const overnight = await runOvernightActiveRescores({
@@ -52,15 +58,17 @@ export async function GET(req: NextRequest) {
       return null
     })
 
-    const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
-    const needle = await generateAndCacheNeedle({
+    // Outside Desk (secondary digests): budgeted so Base/rate-limits cannot blank the paper.
+    const external = await generateAllExternalDigests({
       dateKey: editionKey,
-      force: true,
-      activity,
+      recheckQuiet: false,
+      maxAttempts: 12,
+      deadlineMs: startedAt + 240_000,
     }).catch(err => {
-      console.error('[daily-digest] needle generation failed', err)
+      console.error('[daily-digest] external digests failed', err)
       return null
     })
+
     const wire = await collectMcpWire(editionKey).catch(err => {
       console.error('[daily-digest] mcp wire failed', err)
       return null

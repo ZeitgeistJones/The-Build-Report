@@ -86,7 +86,10 @@ export default function BuildBriefCard({ brief }: Props) {
             letterSpacing: '0.08em',
           }}
         >
-          Yesterday&apos;s build
+          Yesterday&apos;s Build
+          <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0, marginLeft: 6, color: 'var(--text-muted)' }}>
+            · CLAWD
+          </span>
         </span>
         <span className="build-brief-meta" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
           {dayLabel}

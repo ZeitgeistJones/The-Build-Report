@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import YbIssueNav from '@/components/YbIssueNav'
+import { OUTSIDE_DESK_DECK, OUTSIDE_DESK_TITLE } from '@/lib/externalOwnerBrief'
 import { formatIssueLong } from '@/lib/ybIssue'
 
 export default function YbMissingEdition({
@@ -14,10 +15,10 @@ export default function YbMissingEdition({
   body: string
 }) {
   return (
-    <section className="ext-paper yb-missing-edition" aria-label="Yesterday's Builds">
+    <section className="ext-paper yb-missing-edition" aria-label={OUTSIDE_DESK_TITLE}>
       <header className="ext-paper-masthead">
-        <h2 className="ext-paper-masthead__title">Yesterday&apos;s Builds</h2>
-        <p className="ext-paper-masthead__deck">Free · Independent community project</p>
+        <h2 className="ext-paper-masthead__title">{OUTSIDE_DESK_TITLE}</h2>
+        <p className="ext-paper-masthead__deck">{OUTSIDE_DESK_DECK}</p>
       </header>
       <div className="ext-paper-rule ext-paper-rule--double" />
       <YbIssueNav dateKey={dateKey} latestDateKey={latestDateKey} showLatestLink />
@@ -33,6 +34,6 @@ export default function YbMissingEdition({
 export function missingEditionCopy(dateKey: string): { title: string; body: string } {
   return {
     title: 'NO EDITION ON FILE',
-    body: `No archived Yesterday’s Builds edition was found for ${formatIssueLong(dateKey)}.`,
+    body: `No archived Outside Desk edition was found for ${formatIssueLong(dateKey)}.`,
   }
 }

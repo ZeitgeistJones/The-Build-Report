@@ -24,15 +24,22 @@ import {
 
 const DIGEST_TTL_SEC = 90 * 24 * 3600
 
-/** Shown once above all secondary-account Yesterday's Builds in Admin. */
+/** Shown once above all Outside Desk digests in Admin. */
 export const EXTERNAL_BRIEFS_SUPER_DISCLAIMER =
-  'SUPER DISCLAIMER — UNOFFICIAL / ALL PROJECTS BELOW. The Build Report is an independent community project. These Yesterday’s Builds are NOT affiliated with, endorsed by, sponsored by, or connected to the listed GitHub accounts, orgs, tokens, teams, employers, or related companies (including Base, Coinbase, OpenAI, Google, and others where applicable). Each brief is an automated, interpretive skim of public GitHub activity only — sometimes a single tracked repo, sometimes a capped sample of an org. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
+  'SUPER DISCLAIMER — UNOFFICIAL / ALL PROJECTS BELOW. The Build Report is an independent community project. The Outside Desk is NOT affiliated with, endorsed by, sponsored by, or connected to the listed GitHub accounts, orgs, tokens, teams, employers, or related companies (including Base, Coinbase, OpenAI, Google, and others where applicable). Each brief is an automated, interpretive skim of public GitHub activity only — sometimes a single tracked repo, sometimes a capped sample of an org. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
 
 /** Matches vercel.json cron for /api/cron/daily-digest (`0 7 * * *`). */
 export const EXTERNAL_BRIEFS_REFRESH_NOTE =
-  'Refreshes daily at 7:00 UTC · overnight Mountain'
+  'Outside Desk · refreshes daily at 7:00 UTC · overnight Mountain — not the CLAWD homepage brief'
 
-/** Max commits fed into each Yesterday's Builds writeup (newest first). */
+/** Public name for the secondary-account newspaper (nav + masthead). */
+export const OUTSIDE_DESK_TITLE = 'Outside Desk'
+
+/** One-line deck under the Outside Desk masthead. */
+export const OUTSIDE_DESK_DECK =
+  'Unofficial overnight shipping notes for tracked GitHub projects outside clawdbotatg — not CLAWD’s homepage Yesterday’s Build.'
+
+/** Max commits fed into each Outside Desk writeup (newest first). */
 export const EXTERNAL_BRIEF_MAX_COMMITS = 40
 
 export type ExternalBriefAccountId =
@@ -108,13 +115,6 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     ticker: null,
     label: 'Gblinproject',
     redisSlug: 'gblinproject',
-  },
-  {
-    id: 'base',
-    owner: 'base',
-    ticker: null,
-    label: 'Base',
-    redisSlug: 'base',
   },
   {
     id: 'openclaw',
@@ -220,6 +220,14 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     ticker: null,
     label: 'Clawnchdev',
     redisSlug: 'clawnchdev',
+  },
+  {
+    // Last: whole-org scan is expensive and used to rate-limit the rest of the desk.
+    id: 'base',
+    owner: 'base',
+    ticker: null,
+    label: 'Base',
+    redisSlug: 'base',
   },
 ]
 
@@ -740,16 +748,26 @@ export async function getAllExternalBriefs(
   return Object.fromEntries(entries)
 }
 
-/** Cron/warm: generate each secondary account; failures stay isolated. */
+/** Cron/warm: generate secondary Outside Desk digests; failures stay isolated. */
 export async function generateAllExternalDigests(options?: {
   force?: boolean
   dateKey?: string
-  /** Overnight/warm: re-fetch desks cached as quiet so rate-limit shells can heal. */
+  /**
+   * Re-fetch desks cached as quiet. Prefer false on warm-cache — full quiet
+   * rechecks (esp. Base) burn GitHub quota and leave the paper empty.
+   */
   recheckQuiet?: boolean
+  /** Only attempt missing or rateLimited-stuck desks (skip confirmed activity/quiet). */
+  healOnly?: boolean
+  /** Cap how many GitHub generate attempts run in this invocation. */
+  maxAttempts?: number
+  /** Stop starting new desks after this timestamp (Date.now() ms). */
+  deadlineMs?: number
 }): Promise<
   Array<{
     id: ExternalBriefAccountId
     ok: boolean
+    skipped?: boolean
     dateKey?: string
     repoCount?: number
     commitCount?: number
@@ -757,12 +775,77 @@ export async function generateAllExternalDigests(options?: {
     error?: string
   }>
 > {
-  const results = []
+  const results: Array<{
+    id: ExternalBriefAccountId
+    ok: boolean
+    skipped?: boolean
+    dateKey?: string
+    repoCount?: number
+    commitCount?: number
+    rateLimited?: boolean
+    error?: string
+  }> = []
+  let attempts = 0
+  let consecutiveRateLimits = 0
+  const maxAttempts = options?.maxAttempts ?? EXTERNAL_BRIEF_ACCOUNTS.length
+  const healOnly = Boolean(options?.healOnly)
+  const recheckQuiet = Boolean(options?.recheckQuiet)
+
   for (const account of EXTERNAL_BRIEF_ACCOUNTS) {
+    if (options?.deadlineMs != null && Date.now() >= options.deadlineMs) {
+      console.warn('[external-brief] batch stopped — deadline reached', {
+        next: account.id,
+        attempts,
+      })
+      break
+    }
+    if (attempts >= maxAttempts) {
+      console.warn('[external-brief] batch stopped — maxAttempts', { maxAttempts })
+      break
+    }
+
     try {
+      if (!options?.force) {
+        const existing = await readCachedDigest(account, options?.dateKey ?? yesterdayMountainDateKey())
+        if (existing?.general?.trim()) {
+          const confirmedActivity = existing.commitCount > 0
+          const confirmedQuiet = existing.commitCount === 0 && existing.rateLimited === false
+          const needsHeal = existing.rateLimited === true
+          if (confirmedActivity || confirmedQuiet) {
+            results.push({
+              id: account.id,
+              ok: true,
+              skipped: true,
+              dateKey: existing.dateKey,
+              repoCount: existing.repoCount,
+              commitCount: existing.commitCount,
+              rateLimited: existing.rateLimited,
+            })
+            consecutiveRateLimits = 0
+            continue
+          }
+          if (healOnly && !needsHeal && !recheckQuiet) {
+            results.push({
+              id: account.id,
+              ok: true,
+              skipped: true,
+              dateKey: existing.dateKey,
+              repoCount: existing.repoCount,
+              commitCount: existing.commitCount,
+              rateLimited: existing.rateLimited,
+            })
+            continue
+          }
+        } else if (healOnly && !recheckQuiet) {
+          // missing — fall through to generate
+        }
+      }
+
+      attempts += 1
       const digest = await generateAndCacheExternalDigest(account.id, {
-        ...options,
-        recheckQuiet: options?.recheckQuiet ?? true,
+        force: options?.force,
+        dateKey: options?.dateKey,
+        recheckQuiet: recheckQuiet || undefined,
       })
       results.push({
         id: account.id,
@@ -772,10 +855,24 @@ export async function generateAllExternalDigests(options?: {
         commitCount: digest.commitCount,
         rateLimited: digest.rateLimited,
       })
+
+      if (digest.rateLimited && digest.commitCount === 0) {
+        consecutiveRateLimits += 1
+        if (consecutiveRateLimits >= 2) {
+          console.warn(
+            '[external-brief] batch stopped — consecutive GitHub rate limits (avoid empty paper)',
+            { last: account.id },
+          )
+          break
+        }
+      } else {
+        consecutiveRateLimits = 0
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'external brief failed'
       console.error(`[external-brief] ${account.id} generation failed`, err)
       results.push({ id: account.id, ok: false, error: message })
+      attempts += 1
     }
   }
   return results

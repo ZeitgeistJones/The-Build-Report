@@ -360,7 +360,7 @@ expect(
   expect('ads is filtered', built.filteredCount === 1)
   const mastraRow = built.inbox.find(r => r.name.includes('mastra'))
   expect('mastra has tracked why', !!mastraRow?.whyShown?.includes('tracked'))
-  expect('mastra why text names Yesterday’s Builds', (mastraRow?.whyShownText ?? '').includes('Yesterday'))
+  expect('mastra why text names Outside Desk', (mastraRow?.whyShownText ?? '').includes('Outside Desk'))
 }
 
 {

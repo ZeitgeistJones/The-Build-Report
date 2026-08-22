@@ -9,6 +9,8 @@ import {
   EXTERNAL_BRIEF_MAX_COMMITS,
   EXTERNAL_BRIEFS_REFRESH_NOTE,
   EXTERNAL_BRIEFS_SUPER_DISCLAIMER,
+  OUTSIDE_DESK_DECK,
+  OUTSIDE_DESK_TITLE,
   externalBriefGithubLabel,
   externalBriefGithubUrl,
   type ExternalBriefAccount,
@@ -410,7 +412,7 @@ export default function ExternalBriefsNewspaper({
   })
 
   return (
-    <section className="ext-paper" aria-label="Yesterday's Builds">
+    <section className="ext-paper" aria-label={OUTSIDE_DESK_TITLE}>
       <div className="ext-paper-flag">
         <span className="ext-paper-flag__chip">{outlookFlag(totalCommits, filed.length)}</span>
         <span className="ext-paper-flag__date">
@@ -434,9 +436,10 @@ export default function ExternalBriefsNewspaper({
       )}
 
       <header className="ext-paper-masthead">
-        <h2 className="ext-paper-masthead__title">Yesterday&apos;s Builds</h2>
+        <h2 className="ext-paper-masthead__title">{OUTSIDE_DESK_TITLE}</h2>
         <p className="ext-paper-masthead__deck">
-          {admin ? 'Admin desk · ' : ''}Free · Independent community project
+          {admin ? 'Admin desk · ' : ''}
+          {OUTSIDE_DESK_DECK}
         </p>
         <p className="ext-paper-masthead__refresh">{EXTERNAL_BRIEFS_REFRESH_NOTE}</p>
       </header>

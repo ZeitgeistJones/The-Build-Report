@@ -28,6 +28,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
 
+  const startedAt = Date.now()
+
   try {
     const stats = await getGitHubStats({ fresh: true })
     const githubSnapshotUpdatedAt = await syncGitHubStatsSnapshot(stats)
@@ -40,16 +42,8 @@ export async function GET(req: NextRequest) {
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
 
-    // Heal missing / sticky false-quiet secondary desks before the 7:00 digest.
-    const external = await generateAllExternalDigests({
-      dateKey: editionKey,
-      recheckQuiet: true,
-    }).catch(err => {
-      console.error('[warm-cache] external digests failed', err)
-      return null
-    })
-
-    // Continue overnight rescore queue if daily-digest left work unfinished.
+    // Homepage columns before Outside Desk heal.
+    const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
     const overnight = await runOvernightActiveRescores({
       stats,
       dateKey: editionKey,
@@ -60,13 +54,24 @@ export async function GET(req: NextRequest) {
       return null
     })
 
-    const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
     const needle = await generateAndCacheNeedle({
       dateKey: editionKey,
       force: Boolean(overnight?.scored.length),
       activity,
     }).catch(err => {
       console.error('[warm-cache] needle generation failed', err)
+      return null
+    })
+
+    // Heal only missing / rateLimited-stuck desks — do not re-scan every quiet desk.
+    const external = await generateAllExternalDigests({
+      dateKey: editionKey,
+      healOnly: true,
+      recheckQuiet: false,
+      maxAttempts: 8,
+      deadlineMs: startedAt + 240_000,
+    }).catch(err => {
+      console.error('[warm-cache] external digests failed', err)
       return null
     })
 

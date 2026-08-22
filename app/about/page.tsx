@@ -30,7 +30,9 @@ This is not a real-time data feed. Launch baseline grades are a fixed Jun 15 sna
       heading: 'What’s in the tabs',
       body: `Repos is the main Build Report — ecosystem grades, repo cards, the clawdbotatg “Yesterday’s build” digest, and overnight rescores. That’s the scored ledger.
 
-Yesterday’s Builds (nav) is a separate overnight newspaper for other GitHub projects we track outside clawdbotatg. Unofficial shipping digests only — no grades, not affiliated with those projects. Not the same as the homepage clawdbotatg brief.
+Yesterday’s Build (homepage) is the clawdbotatg overnight digest on Repos.
+
+Outside Desk (nav) is a separate overnight newspaper for other GitHub projects we track outside clawdbotatg. Unofficial shipping digests only — no grades, not affiliated with those projects. Not the same as the homepage CLAWD brief.
 
 Archives keeps past clawdbotatg Build Briefs for about 90 days. Brief-only.
 
@@ -91,7 +93,7 @@ Future directions could include community rubric proposals, richer commit meanin
   function linkify(text: string): ReactNode[] {
     const parts: ReactNode[] = []
     const pattern =
-      /(Start Here|How we score|Dictionary|Yesterday’s Builds|Night Sky|Archives|Repos)/g
+      /(Start Here|How we score|Dictionary|Outside Desk|Yesterday’s Builds|Night Sky|Archives|Repos)/g
     let last = 0
     let match: RegExpExecArray | null
     let key = 0
@@ -105,7 +107,7 @@ Future directions could include community rubric proposals, richer commit meanin
             ? '/how-we-score'
             : label === 'Dictionary'
               ? '/dictionary'
-              : label === 'Yesterday’s Builds'
+              : label === 'Outside Desk' || label === 'Yesterday’s Builds'
                 ? '/yesterdays-builds'
                 : label === 'Night Sky'
                   ? '/sky'
