@@ -51,7 +51,7 @@ export function ybIssueNumber(dateKey: string | null | undefined): number | null
 }
 
 export function canonicalYbIssuePath(dateKey: string): string {
-  return `/yesterdays-builds?date=${dateKey}`
+  return `/daily-loop?date=${dateKey}`
 }
 
 export function ybIssueHref(dateKey: string): string {

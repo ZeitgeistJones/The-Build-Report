@@ -459,7 +459,7 @@ expect('confidence gate is 0.75', YB_LEAD_MIN_CONFIDENCE === 0.75)
 /* ---- Public ranking uses YB-LEAD-v1 when classifications exist ---- */
 {
   const newspaper = readFileSync(join(process.cwd(), 'components/ExternalBriefsNewspaper.tsx'), 'utf8')
-  const publicPage = readFileSync(join(process.cwd(), 'app/yesterdays-builds/page.tsx'), 'utf8')
+  const publicPage = readFileSync(join(process.cwd(), 'app/daily-loop/page.tsx'), 'utf8')
   const admin = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
   const policyMod = readFileSync(join(process.cwd(), 'lib/yesterdaysBuildsLeadPolicy.ts'), 'utf8')
   expect(

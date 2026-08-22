@@ -108,7 +108,7 @@ Future directions could include community rubric proposals, richer commit meanin
             : label === 'Dictionary'
               ? '/dictionary'
               : label === 'The Daily Loop' || label === 'Yesterday’s Builds'
-                ? '/yesterdays-builds'
+                ? '/daily-loop'
                 : label === 'Night Sky'
                   ? '/sky'
                   : label === 'Archives'

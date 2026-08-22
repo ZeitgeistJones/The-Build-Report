@@ -7,6 +7,11 @@ const nextConfig = {
         destination: '/how-we-score#context',
         permanent: false,
       },
+      {
+        source: '/yesterdays-builds',
+        destination: '/daily-loop',
+        permanent: true,
+      },
     ]
   },
   webpack: (config) => {

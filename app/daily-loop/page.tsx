@@ -8,15 +8,9 @@ import {
   resolveYbIssueDate,
 } from '@/lib/ybIssue'
 
-export const metadata = {
-  title: 'The Daily Loop — The Build Report',
-  description:
-    'Stay in it — unofficial overnight shipping notes for tracked AI agent projects outside clawdbotatg — separate from CLAWD’s homepage Yesterday’s Build.',
-}
-
 export const dynamic = 'force-dynamic'
 
-export default async function YesterdaysBuildsPage({
+export default async function DailyLoopPage({
   searchParams,
 }: {
   searchParams?: Record<string, string | string[] | undefined>

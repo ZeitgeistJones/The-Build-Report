@@ -1,5 +1,5 @@
 /**
- * Compact newspaper Wire desk for public /yesterdays-builds + Admin preview.
+ * Compact newspaper Wire desk for public /daily-loop + Admin preview.
  */
 import { officialRegistryRecordUrl, type McpWireSnapshot } from '@/lib/mcpWire'
 import { PUBLIC_WIRE_CAP, toPublicWireDispatch } from '@/lib/mcpWirePublic'

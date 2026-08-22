@@ -258,7 +258,7 @@ expect(
 
 /* 6. Live Yesterday's Builds hides The Wire; Admin keeps inbox + desk preview. */
 {
-  const yb = readFileSync(join(process.cwd(), 'app/yesterdays-builds/page.tsx'), 'utf8')
+  const yb = readFileSync(join(process.cwd(), 'app/daily-loop/page.tsx'), 'utf8')
   const mcp = readFileSync(join(process.cwd(), 'components/McpWire.tsx'), 'utf8')
   const adminPage = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
   expect('live YB does not pass mcpWire', !/mcpWire=/.test(yb))

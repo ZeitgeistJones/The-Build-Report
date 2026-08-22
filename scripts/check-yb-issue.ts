@@ -55,7 +55,7 @@ expect('next cannot pass latest', ybIssueNavDates('2026-08-16', latest).nextDate
 
 expect(
   'canonical issue path includes date',
-  canonicalYbIssuePath('2026-08-16') === '/yesterdays-builds?date=2026-08-16',
+  canonicalYbIssuePath('2026-08-16') === '/daily-loop?date=2026-08-16',
 )
 
 expect('issue 1 is Aug 13', ybIssueNumber('2026-08-13') === 1)
@@ -84,7 +84,7 @@ expect(
 )
 
 {
-  const page = readFileSync(join(process.cwd(), 'app/yesterdays-builds/page.tsx'), 'utf8')
+  const page = readFileSync(join(process.cwd(), 'app/daily-loop/page.tsx'), 'utf8')
   expect('live YB does not pass mcpWire', !/mcpWire=/.test(page))
   expect('live YB does not fetch Wire', !page.includes('getMcpWire'))
   expect('public YB does not pass admin to newspaper', !/ExternalBriefsNewspaper[\s\S]*admin/.test(page))

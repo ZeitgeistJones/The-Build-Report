@@ -34,8 +34,8 @@ export type TrackedProjectHit = {
   label: string
   owner: string
   githubUrl: string
-  /** Yesterday's Builds newspaper — the existing internal destination. */
-  buildsHref: '/yesterdays-builds'
+  /** The Daily Loop newspaper — the existing internal destination. */
+  buildsHref: '/daily-loop'
 }
 
 /** Generic GitHub orgs we watch only by exact repo, never by owner-wide match. */
@@ -138,7 +138,7 @@ export function matchTrackedProject(input: {
       label: account.label,
       owner: account.owner,
       githubUrl: externalBriefGithubUrl(account),
-      buildsHref: '/yesterdays-builds',
+      buildsHref: '/daily-loop',
     })
 
     if (gh && aliases.includes(gh.owner) && repoAllowed(account, gh.repo)) return hit()

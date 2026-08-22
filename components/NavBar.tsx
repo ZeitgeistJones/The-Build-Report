@@ -13,7 +13,7 @@ function DesktopNavLinks() {
       <a href="/" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Repos
       </a>
-      <a href="/yesterdays-builds" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+      <a href="/daily-loop" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         The Daily Loop
       </a>
       <a href="/archives" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -69,7 +69,7 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         <a href="/" className="mobile-nav-link" onClick={onClose}>
           Repos
         </a>
-        <a href="/yesterdays-builds" className="mobile-nav-link" onClick={onClose}>
+        <a href="/daily-loop" className="mobile-nav-link" onClick={onClose}>
           The Daily Loop
         </a>
         <a href="/archives" className="mobile-nav-link" onClick={onClose}>

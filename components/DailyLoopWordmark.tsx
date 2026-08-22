@@ -3,7 +3,7 @@
  */
 
 function LoopO({ gap = 'top-left' }: { gap?: 'top-left' | 'bottom-right' }) {
-  // Circumference ≈ 138. Circumference of open ring leaves a small gap (~22).
+  // Circumference ≈ 138. Open ring leaves a small gap (~22).
   // Default dash starts at 3 o'clock; offset rotates the gap.
   const dash = '116 22'
   const offset = gap === 'top-left' ? '28' : '97'

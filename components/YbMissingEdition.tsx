@@ -29,7 +29,7 @@ export default function YbMissingEdition({
       <p className="yb-missing-edition__kicker">{title}</p>
       <p className="yb-missing-edition__body">{body}</p>
       <p className="yb-missing-edition__back">
-        <Link href="/yesterdays-builds">← Latest issue</Link>
+        <Link href="/daily-loop">← Latest issue</Link>
       </p>
     </section>
   )

@@ -110,7 +110,7 @@ export default function YbLeadStoryLab({ briefs }: Props) {
         <p className="yb-lead-lab__kicker">Lead story lab · Admin</p>
         <h3 className="yb-lead-lab__title">Why this became the lead</h3>
         <p className="yb-lead-lab__note">
-          Public /yesterdays-builds now ranks with {YB_LEAD_POLICY_VERSION} when classifications
+          Public /daily-loop now ranks with {YB_LEAD_POLICY_VERSION} when classifications
           exist. This lab still shows the legacy formula beside it so you can spot disagreements.
           Token ticker, stars, and raw commit/repo counts get zero ranking points in v1.
         </p>

@@ -28,7 +28,7 @@ export default function YbIssueNav({
       <div className="yb-issue-nav__mid">
         <CopyIssueLink path={canonicalYbIssuePath(dateKey)} />
         {(showLatestLink || !isLatest) && (
-          <Link href="/yesterdays-builds" className="yb-issue-nav__latest">
+          <Link href="/daily-loop" className="yb-issue-nav__latest">
             Latest issue
           </Link>
         )}

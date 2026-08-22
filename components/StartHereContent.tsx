@@ -260,8 +260,8 @@ export default function StartHereContent() {
             )}
             {section.id === 'sh-elsewhere' && (
               <p style={{ ...PROSE_STYLE, marginTop: '12px', fontSize: '12px' }}>
-                <Link href="/yesterdays-builds" style={{ color: 'var(--accent)' }}>
-                  Yesterday&apos;s Builds ↗
+                <Link href="/daily-loop" style={{ color: 'var(--accent)' }}>
+                  The Daily Loop ↗
                 </Link>
                 {' · '}
                 <Link href="/archives" style={{ color: 'var(--accent)' }}>

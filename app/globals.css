@@ -1007,7 +1007,6 @@ button {
   height: 0.92em;
   margin: 0 -0.02em;
   flex: 0 0 auto;
-  transform: translateY(0.02em);
 }
 
 .ext-paper-masthead__tag {
