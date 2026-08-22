@@ -383,7 +383,7 @@ export default function ExternalBriefsNewspaper({
     })),
   )
 
-  const byId = new Map(shipped.map(s => [s.account.id, s]))
+  const byId = new Map<string, Story>(shipped.map(s => [s.account.id, s]))
   const filed = frontPage.orderedIds
     .map(id => byId.get(id))
     .filter((s): s is Story => Boolean(s))
