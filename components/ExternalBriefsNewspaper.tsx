@@ -3,13 +3,15 @@
 import { useNormieMode } from '@/components/NormieModeProvider'
 import YbIssueNav from '@/components/YbIssueNav'
 import McpWire from '@/components/McpWire'
-import { canonicalYbIssuePath } from '@/lib/ybIssue'
+import DailyLoopWordmark from '@/components/DailyLoopWordmark'
+import { canonicalYbIssuePath, ybIssueNumber } from '@/lib/ybIssue'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
   EXTERNAL_BRIEF_MAX_COMMITS,
   EXTERNAL_BRIEFS_REFRESH_NOTE,
   EXTERNAL_BRIEFS_SUPER_DISCLAIMER,
   OUTSIDE_DESK_DECK,
+  OUTSIDE_DESK_TAG,
   OUTSIDE_DESK_TITLE,
   externalBriefGithubLabel,
   externalBriefGithubUrl,
@@ -44,9 +46,6 @@ const LONG_MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-
-/** Issue numbering epoch — day 1 of the paper. Bump only if you want to re-baseline. */
-const ISSUE_EPOCH = Date.UTC(2025, 11, 31)
 
 /* ------------------------------------------------------------------
    FRONT-PAGE RANKING — YB-LEAD-v1 when leadPolicy exists on briefs.
@@ -84,14 +83,6 @@ function formatLongDate(dateKey: string): string {
   if (!p) return dateKey
   const dt = new Date(Date.UTC(p.y, p.m - 1, p.d))
   return `${WEEKDAYS[dt.getUTCDay()]}, ${LONG_MONTHS[p.m - 1]} ${p.d}, ${p.y}`
-}
-
-function issueNumber(dateKey: string | null): number | null {
-  if (!dateKey) return null
-  const p = parseDateKey(dateKey)
-  if (!p) return null
-  const days = Math.round((Date.UTC(p.y, p.m - 1, p.d) - ISSUE_EPOCH) / 86400000)
-  return days > 0 ? days : null
 }
 
 function outlookFlag(commits: number, projects: number): string {
@@ -400,7 +391,7 @@ export default function ExternalBriefsNewspaper({
     frontPage.usedV1 && !frontPage.materialLead ? 'Strongest observed' : 'Lead story'
 
   const anyDate = issueDateKey ?? rows.map(r => r.brief?.dateKey).find(Boolean) ?? null
-  const issue = issueNumber(anyDate)
+  const issue = ybIssueNumber(anyDate)
   const totalCommits = filed.reduce((sum, r) => sum + (r.brief?.commitCount ?? 0), 0)
   const totalRepos = filed.reduce((sum, r) => sum + (r.brief?.repoCount ?? 0), 0)
 
@@ -436,7 +427,10 @@ export default function ExternalBriefsNewspaper({
       )}
 
       <header className="ext-paper-masthead">
-        <h2 className="ext-paper-masthead__title">{OUTSIDE_DESK_TITLE}</h2>
+        <h2 className="ext-paper-masthead__title">
+          <DailyLoopWordmark />
+        </h2>
+        <p className="ext-paper-masthead__tag">{OUTSIDE_DESK_TAG}</p>
         <p className="ext-paper-masthead__deck">
           {admin ? 'Admin desk · ' : ''}
           {OUTSIDE_DESK_DECK}

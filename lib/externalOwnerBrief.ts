@@ -35,9 +35,12 @@ export const EXTERNAL_BRIEFS_REFRESH_NOTE =
 /** Public name for the secondary-account newspaper (nav + masthead). */
 export const OUTSIDE_DESK_TITLE = 'The Daily Loop'
 
+/** Short lockup under the wordmark. */
+export const OUTSIDE_DESK_TAG = 'Stay in it.'
+
 /** One-line deck under The Daily Loop masthead. */
 export const OUTSIDE_DESK_DECK =
-  'Stay in the Loop — unofficial overnight shipping notes for tracked AI agent projects outside clawdbotatg — not CLAWD’s homepage Yesterday’s Build.'
+  'Unofficial overnight shipping notes for tracked AI agent projects outside clawdbotatg — not CLAWD’s homepage Yesterday’s Build.'
 
 /** Max commits fed into each Daily Loop writeup (newest first). */
 export const EXTERNAL_BRIEF_MAX_COMMITS = 40

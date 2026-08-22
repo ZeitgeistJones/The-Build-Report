@@ -11,6 +11,7 @@ import {
   resolveYbIssueDate,
   shiftDateKey,
   ybIssueNavDates,
+  ybIssueNumber,
 } from '../lib/ybIssue'
 
 function expect(name: string, cond: boolean) {
@@ -57,6 +58,11 @@ expect(
   canonicalYbIssuePath('2026-08-16') === '/yesterdays-builds?date=2026-08-16',
 )
 
+expect('issue 1 is Aug 13', ybIssueNumber('2026-08-13') === 1)
+expect('Aug 21 is issue 9', ybIssueNumber('2026-08-21') === 9)
+expect('day before the paper has no number', ybIssueNumber('2026-08-12') === null)
+expect('old year-count dates have no number', ybIssueNumber('2026-01-01') === null)
+
 expect(
   'empty briefs are not a cached edition',
   hasCachedYbEdition({ gitlawb: null, mastra: null }) === false,
@@ -87,6 +93,8 @@ expect(
 {
   const newspaper = readFileSync(join(process.cwd(), 'components/ExternalBriefsNewspaper.tsx'), 'utf8')
   const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8')
+  expect('newspaper uses shared issue numbers', newspaper.includes('ybIssueNumber('))
+  expect('newspaper does not keep the 2025 year-count epoch', !newspaper.includes('2025, 11, 31'))
   expect('Also filed splits long briefs out of the pack', newspaper.includes('isLongAlsoFiled') && newspaper.includes('ext-paper-shorts-long'))
   expect('Also filed solo pack stays single column', newspaper.includes('ext-paper-shorts--solo'))
   expect('Also filed closes with a double rule', /Also filed[\s\S]*ext-paper-rule--double/.test(newspaper))

@@ -35,6 +35,21 @@ export function latestYbIssueDateKey(now = new Date()): string {
   return yesterdayMountainDateKey(now)
 }
 
+/**
+ * Day before Issue No. 1. The paper’s first edition is 2026-08-13;
+ * 2026-08-21 is Issue No. 9. Dates on or before the epoch have no number.
+ */
+export const YB_ISSUE_EPOCH_UTC = Date.UTC(2026, 7, 12)
+
+/** Sequential issue number for a Mountain-calendar edition date. */
+export function ybIssueNumber(dateKey: string | null | undefined): number | null {
+  const parsed = parseValidDateKey(dateKey)
+  if (!parsed) return null
+  const [y, m, d] = parsed.split('-').map(Number)
+  const days = Math.round((Date.UTC(y, m - 1, d) - YB_ISSUE_EPOCH_UTC) / 86400000)
+  return days > 0 ? days : null
+}
+
 export function canonicalYbIssuePath(dateKey: string): string {
   return `/yesterdays-builds?date=${dateKey}`
 }

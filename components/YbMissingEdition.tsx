@@ -1,6 +1,7 @@
 import Link from 'next/link'
+import DailyLoopWordmark from '@/components/DailyLoopWordmark'
 import YbIssueNav from '@/components/YbIssueNav'
-import { OUTSIDE_DESK_DECK, OUTSIDE_DESK_TITLE } from '@/lib/externalOwnerBrief'
+import { OUTSIDE_DESK_DECK, OUTSIDE_DESK_TAG, OUTSIDE_DESK_TITLE } from '@/lib/externalOwnerBrief'
 import { formatIssueLong } from '@/lib/ybIssue'
 
 export default function YbMissingEdition({
@@ -17,7 +18,10 @@ export default function YbMissingEdition({
   return (
     <section className="ext-paper yb-missing-edition" aria-label={OUTSIDE_DESK_TITLE}>
       <header className="ext-paper-masthead">
-        <h2 className="ext-paper-masthead__title">{OUTSIDE_DESK_TITLE}</h2>
+        <h2 className="ext-paper-masthead__title">
+          <DailyLoopWordmark />
+        </h2>
+        <p className="ext-paper-masthead__tag">{OUTSIDE_DESK_TAG}</p>
         <p className="ext-paper-masthead__deck">{OUTSIDE_DESK_DECK}</p>
       </header>
       <div className="ext-paper-rule ext-paper-rule--double" />
