@@ -61,6 +61,7 @@ export type ExternalBriefAccountId =
   | 'clawbank'
   | 'miroshark'
   | 'clawnchdev'
+  | 'tachikomared'
 
 export type ExternalBriefAccount = {
   id: ExternalBriefAccountId
@@ -220,6 +221,13 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     ticker: null,
     label: 'Clawnchdev',
     redisSlug: 'clawnchdev',
+  },
+  {
+    id: 'tachikomared',
+    owner: 'tachikomared',
+    ticker: null,
+    label: 'TachikomaRed',
+    redisSlug: 'tachikomared',
   },
   {
     // Last: whole-org scan is expensive and used to rate-limit the rest of the desk.
