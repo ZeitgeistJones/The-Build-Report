@@ -36,7 +36,7 @@ export const EXTERNAL_BRIEFS_REFRESH_NOTE =
 export const OUTSIDE_DESK_TITLE = 'The Daily Loop'
 
 /** Short lockup under the wordmark. */
-export const OUTSIDE_DESK_TAG = 'Stay in it.'
+export const OUTSIDE_DESK_TAG = '— STAY IN IT —'
 
 /** One-line deck under The Daily Loop masthead. */
 export const OUTSIDE_DESK_DECK =

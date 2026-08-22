@@ -998,24 +998,27 @@ button {
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 0 0.02em;
+  gap: 0 0.015em;
 }
 
 .daily-loop-o {
   display: block;
-  width: 0.78em;
-  height: 0.78em;
-  margin: 0 -0.01em;
+  width: 0.92em;
+  height: 0.92em;
+  margin: 0 -0.02em;
   flex: 0 0 auto;
+  transform: translateY(0.02em);
 }
 
 .ext-paper-masthead__tag {
-  margin: 8px 0 0;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: clamp(15px, 2.4vw, 22px);
-  letter-spacing: 0.03em;
-  color: var(--paper-red);
+  margin: 10px 0 0;
+  font-family: var(--font-kicker);
+  font-style: normal;
+  font-weight: 500;
+  font-size: clamp(11px, 1.8vw, 14px);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--paper-ink);
 }
 
 .ext-paper-masthead__deck {

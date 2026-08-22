@@ -11,7 +11,7 @@ import {
 export const metadata = {
   title: 'The Daily Loop — The Build Report',
   description:
-    'Stay in it. Unofficial overnight shipping notes for tracked AI agent projects outside clawdbotatg — separate from CLAWD’s homepage Yesterday’s Build.',
+    'Stay in it — unofficial overnight shipping notes for tracked AI agent projects outside clawdbotatg — separate from CLAWD’s homepage Yesterday’s Build.',
 }
 
 export const dynamic = 'force-dynamic'

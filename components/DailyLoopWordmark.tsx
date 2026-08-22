@@ -1,8 +1,13 @@
 /**
- * Daily Loop masthead wordmark — LOOP’s O’s are looping strokes, not font O’s.
+ * Daily Loop masthead wordmark — LOOP’s O’s are open arcs with opposite gaps.
  */
 
-function LoopO({ flip = false }: { flip?: boolean }) {
+function LoopO({ gap = 'top-left' }: { gap?: 'top-left' | 'bottom-right' }) {
+  // Circumference ≈ 138. Circumference of open ring leaves a small gap (~22).
+  // Default dash starts at 3 o'clock; offset rotates the gap.
+  const dash = '116 22'
+  const offset = gap === 'top-left' ? '28' : '97'
+
   return (
     <svg
       className="daily-loop-o"
@@ -10,14 +15,16 @@ function LoopO({ flip = false }: { flip?: boolean }) {
       aria-hidden
       focusable="false"
     >
-      <path
-        d="M23 19 A 20 20 0 1 1 22 53 A 16 16 0 1 1 41 23"
+      <circle
+        cx="36"
+        cy="36"
+        r="22"
         fill="none"
         stroke="currentColor"
-        strokeWidth="12.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        transform={flip ? 'rotate(180 36 36)' : undefined}
+        strokeWidth="14"
+        strokeDasharray={dash}
+        strokeDashoffset={offset}
+        strokeLinecap="butt"
       />
     </svg>
   )
@@ -29,8 +36,8 @@ export default function DailyLoopWordmark() {
       <span className="daily-loop-sr">The Daily Loop</span>
       <span className="daily-loop-wordmark" aria-hidden="true">
         <span>The Daily L</span>
-        <LoopO />
-        <LoopO flip />
+        <LoopO gap="top-left" />
+        <LoopO gap="bottom-right" />
         <span>P</span>
       </span>
     </>
