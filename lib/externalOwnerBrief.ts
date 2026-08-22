@@ -63,6 +63,7 @@ export type ExternalBriefAccountId =
   | 'clawnchdev'
   | 'tachikomared'
   | 'darks0l'
+  | 'irora-dev'
 
 export type ExternalBriefAccount = {
   id: ExternalBriefAccountId
@@ -236,6 +237,13 @@ export const EXTERNAL_BRIEF_ACCOUNTS: ExternalBriefAccount[] = [
     ticker: '$DARKSOL',
     label: 'Darksol',
     redisSlug: 'darks0l',
+  },
+  {
+    id: 'irora-dev',
+    owner: 'Irora-dev',
+    ticker: '$PRISM',
+    label: 'Prism',
+    redisSlug: 'irora-dev',
   },
   {
     // Last: whole-org scan is expensive and used to rate-limit the rest of the desk.
