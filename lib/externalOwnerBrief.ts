@@ -24,22 +24,22 @@ import {
 
 const DIGEST_TTL_SEC = 90 * 24 * 3600
 
-/** Shown once above all Outside Desk digests in Admin. */
+/** Shown once above all Daily Loop digests in Admin. */
 export const EXTERNAL_BRIEFS_SUPER_DISCLAIMER =
-  'SUPER DISCLAIMER — UNOFFICIAL / ALL PROJECTS BELOW. The Build Report is an independent community project. The Outside Desk is NOT affiliated with, endorsed by, sponsored by, or connected to the listed GitHub accounts, orgs, tokens, teams, employers, or related companies (including Base, Coinbase, OpenAI, Google, and others where applicable). Each brief is an automated, interpretive skim of public GitHub activity only — sometimes a single tracked repo, sometimes a capped sample of an org. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
+  'SUPER DISCLAIMER — UNOFFICIAL / ALL PROJECTS BELOW. The Build Report is an independent community project. The Daily Loop is NOT affiliated with, endorsed by, sponsored by, or connected to the listed GitHub accounts, orgs, tokens, teams, employers, or related companies (including Base, Coinbase, OpenAI, Google, and others where applicable). Each brief is an automated, interpretive skim of public GitHub activity only — sometimes a single tracked repo, sometimes a capped sample of an org. Coverage can be incomplete, sampled, outdated, or wrong. None of this is an official product update, roadmap, endorsement, or financial advice. Do not treat anything here as any project’s official position.'
 
 /** Matches vercel.json cron for /api/cron/daily-digest (`0 7 * * *`). */
 export const EXTERNAL_BRIEFS_REFRESH_NOTE =
-  'Outside Desk · refreshes daily at 7:00 UTC · overnight Mountain — not the CLAWD homepage brief'
+  'The Daily Loop · refreshes daily at 7:00 UTC · overnight Mountain — not the CLAWD homepage brief'
 
 /** Public name for the secondary-account newspaper (nav + masthead). */
-export const OUTSIDE_DESK_TITLE = 'Outside Desk'
+export const OUTSIDE_DESK_TITLE = 'The Daily Loop'
 
-/** One-line deck under the Outside Desk masthead. */
+/** One-line deck under The Daily Loop masthead. */
 export const OUTSIDE_DESK_DECK =
-  'Unofficial overnight shipping notes for tracked GitHub projects outside clawdbotatg — not CLAWD’s homepage Yesterday’s Build.'
+  'Stay in the Loop — unofficial overnight shipping notes for tracked AI agent projects outside clawdbotatg — not CLAWD’s homepage Yesterday’s Build.'
 
-/** Max commits fed into each Outside Desk writeup (newest first). */
+/** Max commits fed into each Daily Loop writeup (newest first). */
 export const EXTERNAL_BRIEF_MAX_COMMITS = 40
 
 export type ExternalBriefAccountId =
@@ -507,7 +507,7 @@ BASE / COINBASE RULES (mandatory):
     ? `Tracked repo(s) only: ${account.focusRepos.map(r => `${account.owner}/${r}`).join(', ')} — do not invent activity from other repos in this org.`
     : `Owner scan: up to ~40 recently pushed public repos under github.com/${account.owner}.`
 
-  const prompt = `You write Outside Desk for The Build Report — a short shipping summary for a tracked GitHub project that is NOT clawdbotatg / CLAWD.
+  const prompt = `You write The Daily Loop for The Build Report — a short shipping summary for a tracked GitHub project that is NOT clawdbotatg / CLAWD.
 
 Project label: ${account.label}
 Account: github.com/${account.owner}
@@ -779,7 +779,7 @@ export async function getAllExternalBriefs(
   return Object.fromEntries(entries)
 }
 
-/** Cron/warm: generate secondary Outside Desk digests; failures stay isolated. */
+/** Cron/warm: generate secondary Daily Loop digests; failures stay isolated. */
 export async function generateAllExternalDigests(options?: {
   force?: boolean
   dateKey?: string

@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
 
-    // CLAWD homepage columns first — Outside Desk must not starve these again.
+    // CLAWD homepage columns first — The Daily Loop must not starve these again.
     const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
     const needle = await generateAndCacheNeedle({
       dateKey: editionKey,
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       return null
     })
 
-    // Outside Desk (secondary digests): budgeted so Base/rate-limits cannot blank the paper.
+    // The Daily Loop (secondary digests): budgeted so Base/rate-limits cannot blank the paper.
     const external = await generateAllExternalDigests({
       dateKey: editionKey,
       recheckQuiet: false,

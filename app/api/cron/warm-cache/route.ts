@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
 
-    // Homepage columns before Outside Desk heal.
+    // Homepage columns before The Daily Loop heal.
     const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
     const overnight = await runOvernightActiveRescores({
       stats,

@@ -9,9 +9,9 @@ import {
 } from '@/lib/ybIssue'
 
 export const metadata = {
-  title: 'Outside Desk — The Build Report',
+  title: 'The Daily Loop — The Build Report',
   description:
-    'Unofficial overnight shipping notes for tracked GitHub projects outside clawdbotatg — separate from CLAWD’s homepage Yesterday’s Build.',
+    'Stay in the Loop — unofficial overnight shipping notes for tracked AI agent projects outside clawdbotatg — separate from CLAWD’s homepage Yesterday’s Build.',
 }
 
 export const dynamic = 'force-dynamic'

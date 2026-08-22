@@ -1480,7 +1480,7 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* Outside Desk — secondary-account newspaper */}
+      {/* The Daily Loop — secondary-account newspaper */}
       <div id="admin-builds" className="admin-jump-target">
       <YbLeadStoryLab briefs={externalBriefs} />
       <ExternalBriefsNewspaper
@@ -1534,7 +1534,7 @@ export default function AdminPage() {
         )}
         <McpWireInbox record={wireAdmin} />
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '16px 0 8px' }}>
-          Newspaper desk preview — Admin only. Not on the live Outside Desk page. Inbox above stays the full newsroom view.
+          Newspaper desk preview — Admin only. Not on The Daily Loop. Inbox above stays the full newsroom view.
         </p>
         <McpWire wire={wireAdmin?.snapshot ?? null} preview />
       </div>

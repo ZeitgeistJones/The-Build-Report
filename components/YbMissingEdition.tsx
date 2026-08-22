@@ -34,6 +34,6 @@ export default function YbMissingEdition({
 export function missingEditionCopy(dateKey: string): { title: string; body: string } {
   return {
     title: 'NO EDITION ON FILE',
-    body: `No archived Outside Desk edition was found for ${formatIssueLong(dateKey)}.`,
+    body: `No archived Daily Loop edition was found for ${formatIssueLong(dateKey)}.`,
   }
 }

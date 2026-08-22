@@ -248,8 +248,8 @@ export const START_HERE_SECTIONS: StartHereSection[] = [
     subtitle: 'Other tabs after you can read the homepage',
     subsections: [
       {
-        title: 'Outside Desk (nav) vs Yesterday’s Build (homepage)',
-        body: 'On the Repos homepage, “Yesterday’s Build · CLAWD” is the overnight digest for clawdbotatg — the scored org this site tracks. The nav tab Outside Desk is different: an unofficial newspaper of shipping digests for other GitHub projects we follow (agent tools, token builders, Base samples, and similar). No Build Report grades there, and quiet days often don’t show.',
+        title: 'The Daily Loop (nav) vs Yesterday’s Build (homepage)',
+        body: 'On the Repos homepage, “Yesterday’s Build · CLAWD” is the overnight digest for clawdbotatg — the scored org this site tracks. The nav tab The Daily Loop is different: an unofficial newspaper of shipping digests for other AI agent projects we follow. No Build Report grades there, and quiet days often don’t show.',
       },
       {
         title: 'Archives',
