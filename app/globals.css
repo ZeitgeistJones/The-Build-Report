@@ -24,8 +24,32 @@
   --font-kicker: 'Oswald', 'Arial Narrow', 'Helvetica Neue', system-ui, sans-serif;
 }
 
-/* Default + light frost */
+/* Default + Pressroom — 90s metro daily: near-white page, cards lift to white, heavy black ink */
 :root,
+[data-color-theme='light-90s'] {
+  --bg: #FAFAFA;
+  --surface-1: #FFFFFF;
+  --surface-2: #F3F3F1;
+  --surface-3: #E8E8E6;
+  --border: #D0CFCD;
+  --border-strong: #121212;
+  --text-primary: #111111;
+  --text-secondary: #2C2C2C;
+  --text-muted: #5A5A5A;
+  --accent: #8B2323;
+  --accent-dim: rgba(139, 35, 35, 0.1);
+  --accent-border: rgba(139, 35, 35, 0.35);
+  --grade-a: #23402F;
+  --grade-b: #2E4256;
+  --grade-c: #5A4E28;
+  --grade-d: #6C4026;
+  --grade-f: #7C2626;
+  --radius: 3px;
+  --radius-lg: 4px;
+  --card-elevated: 0 1px 0 rgba(17,17,17,0.08);
+}
+
+/* Light frost */
 [data-color-theme='light'] {
   --bg: #F4F6F8;
   --surface-1: #FFFFFF;
@@ -87,30 +111,6 @@
   --grade-d: #EA580C;
   --grade-f: #DC2626;
   --card-elevated: 0 1px 0 rgba(0,0,0,0.04), 0 4px 16px rgba(15,23,42,0.08);
-}
-
-/* Pressroom — 90s metro daily: near-white page, cards lift to white, heavy black ink */
-[data-color-theme='light-90s'] {
-  --bg: #FAFAFA;
-  --surface-1: #FFFFFF;
-  --surface-2: #F3F3F1;
-  --surface-3: #E8E8E6;
-  --border: #D0CFCD;
-  --border-strong: #121212;
-  --text-primary: #111111;
-  --text-secondary: #2C2C2C;
-  --text-muted: #5A5A5A;
-  --accent: #8B2323;
-  --accent-dim: rgba(139, 35, 35, 0.1);
-  --accent-border: rgba(139, 35, 35, 0.35);
-  --grade-a: #23402F;
-  --grade-b: #2E4256;
-  --grade-c: #5A4E28;
-  --grade-d: #6C4026;
-  --grade-f: #7C2626;
-  --radius: 3px;
-  --radius-lg: 4px;
-  --card-elevated: 0 1px 0 rgba(17,17,17,0.08);
 }
 
 /* Dark themes */

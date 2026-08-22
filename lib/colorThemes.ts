@@ -10,6 +10,9 @@ export type ColorThemeId =
 
 export const COLOR_THEME_STORAGE_KEY = 'build-report-color-theme'
 export const CUSTOM_THEME_STORAGE_KEY = 'build-report-custom-theme'
+export const DEFAULT_COLOR_THEME: ColorThemeId = 'light-90s'
+
+const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
 export type CustomThemeVars = {
   bg: string
@@ -76,6 +79,13 @@ export const COLOR_THEME_GROUPS: { label: string; themes: ColorThemeMeta[] }[] =
     label: 'Light',
     themes: [
       {
+        id: 'light-90s',
+        label: 'Pressroom',
+        hint: '90s metro daily',
+        swatchBg: '#FAFAFA',
+        swatchAccent: '#8B2323',
+      },
+      {
         id: 'light',
         label: 'Frost',
         hint: 'Cool gray',
@@ -95,13 +105,6 @@ export const COLOR_THEME_GROUPS: { label: string; themes: ColorThemeMeta[] }[] =
         hint: 'Crisp white + navy',
         swatchBg: '#FFFFFF',
         swatchAccent: '#2563EB',
-      },
-      {
-        id: 'light-90s',
-        label: 'Pressroom',
-        hint: '90s metro daily',
-        swatchBg: '#FAFAFA',
-        swatchAccent: '#8B2323',
       },
     ],
   },
@@ -160,9 +163,106 @@ const LEGACY_THEME_MAP: Record<string, ColorThemeId> = {
 export function resolveColorThemeId(value: string | null | undefined): ColorThemeId {
   if (value && isColorThemeId(value)) return value
   if (value && value in LEGACY_THEME_MAP) return LEGACY_THEME_MAP[value]
-  return 'light'
+  return DEFAULT_COLOR_THEME
 }
 
 export function getColorThemeMeta(id: ColorThemeId): ColorThemeMeta {
   return COLOR_THEMES.find(t => t.id === id) ?? COLOR_THEMES[0]
+}
+
+export function parseCustomThemeVars(raw: string | null | undefined): CustomThemeVars | null {
+  if (!raw) return null
+  try {
+    const value = JSON.parse(raw) as Partial<CustomThemeVars>
+    if (typeof value.bg !== 'string' || typeof value.accent !== 'string') return null
+    if (value.base !== 'light' && value.base !== 'dark') return null
+    return { bg: value.bg, accent: value.accent, base: value.base }
+  } catch {
+    return null
+  }
+}
+
+function writeCookie(name: string, value: string): void {
+  if (typeof document === 'undefined') return
+  document.cookie = `${name}=${encodeURIComponent(value)};path=/;max-age=${THEME_COOKIE_MAX_AGE};samesite=lax`
+}
+
+function clearCookie(name: string): void {
+  if (typeof document === 'undefined') return
+  document.cookie = `${name}=;path=/;max-age=0;samesite=lax`
+}
+
+export function readThemeCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null
+  const prefix = `${name}=`
+  const parts = document.cookie.split(';')
+  for (const part of parts) {
+    const row = part.trim()
+    if (!row.startsWith(prefix)) continue
+    try {
+      return decodeURIComponent(row.slice(prefix.length))
+    } catch {
+      return row.slice(prefix.length)
+    }
+  }
+  return null
+}
+
+function readLocal(name: string): string | null {
+  try {
+    return localStorage.getItem(name)
+  } catch (err) {
+    console.error('[theme] failed to read saved theme', err)
+    return null
+  }
+}
+
+function writeLocal(name: string, value: string): void {
+  try {
+    localStorage.setItem(name, value)
+  } catch (err) {
+    console.error('[theme] failed to save theme', err)
+  }
+}
+
+function removeLocal(name: string): void {
+  try {
+    localStorage.removeItem(name)
+  } catch (err) {
+    console.error('[theme] failed to clear theme', err)
+  }
+}
+
+/** Last saved preset or custom theme — localStorage first, cookie as backup. */
+export function readStoredColorTheme(): {
+  theme: ColorThemeId
+  customVars: CustomThemeVars | null
+  hadStored: boolean
+} {
+  const customVars = parseCustomThemeVars(
+    readLocal(CUSTOM_THEME_STORAGE_KEY) ?? readThemeCookie(CUSTOM_THEME_STORAGE_KEY),
+  )
+  if (customVars) {
+    return { theme: DEFAULT_COLOR_THEME, customVars, hadStored: true }
+  }
+  const stored = readLocal(COLOR_THEME_STORAGE_KEY) ?? readThemeCookie(COLOR_THEME_STORAGE_KEY)
+  return { theme: resolveColorThemeId(stored), customVars: null, hadStored: Boolean(stored) }
+}
+
+export function persistPresetTheme(id: ColorThemeId): void {
+  writeLocal(COLOR_THEME_STORAGE_KEY, id)
+  removeLocal(CUSTOM_THEME_STORAGE_KEY)
+  writeCookie(COLOR_THEME_STORAGE_KEY, id)
+  clearCookie(CUSTOM_THEME_STORAGE_KEY)
+}
+
+export function persistCustomTheme(vars: CustomThemeVars): void {
+  const raw = JSON.stringify(vars)
+  writeLocal(CUSTOM_THEME_STORAGE_KEY, raw)
+  writeCookie(CUSTOM_THEME_STORAGE_KEY, raw)
+}
+
+export function clearPersistedCustomTheme(): void {
+  removeLocal(CUSTOM_THEME_STORAGE_KEY)
+  clearCookie(CUSTOM_THEME_STORAGE_KEY)
 }

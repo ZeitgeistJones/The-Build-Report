@@ -48,11 +48,13 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#F4F6F8',
+  themeColor: '#FAFAFA',
 }
 
 const themeBootScript = `(function(){try{
-  var c=localStorage.getItem('${CUSTOM_THEME_STORAGE_KEY}');
+  function ck(n){n=n+'=';var a=document.cookie.split(';');for(var i=0;i<a.length;i++){var s=a[i].replace(/^\\s+/,'');if(s.indexOf(n)===0){try{return decodeURIComponent(s.slice(n.length))}catch(e){return s.slice(n.length)}}}return null}
+  function ls(n){try{return localStorage.getItem(n)}catch(e){return null}}
+  var c=ls('${CUSTOM_THEME_STORAGE_KEY}')||ck('${CUSTOM_THEME_STORAGE_KEY}');
   if(c){
     var v=JSON.parse(c);
     var bg=v.bg||'#FAFAFA',ac=v.accent||'#3D9A88',dark=v.base==='dark';
@@ -77,8 +79,8 @@ const themeBootScript = `(function(){try{
     document.documentElement.setAttribute('style',style);
     return;
   }
-  var t=localStorage.getItem('${COLOR_THEME_STORAGE_KEY}');
-  if(t)document.documentElement.dataset.colorTheme=t;
+  var t=ls('${COLOR_THEME_STORAGE_KEY}')||ck('${COLOR_THEME_STORAGE_KEY}');
+  document.documentElement.dataset.colorTheme=t||'light-90s';
 }catch(e){}
 try{
   if(localStorage.getItem('${NORMIE_MODE_STORAGE_KEY}')!=='0')document.documentElement.dataset.normie='1';
