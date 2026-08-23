@@ -21,7 +21,6 @@ import {
 } from '@/lib/externalOwnerBrief'
 import type { McpWireSnapshot } from '@/lib/mcpWire'
 import {
-  legacyPublicLeadScore,
   orderStoriesForYbFrontPage,
 } from '@/lib/yesterdaysBuildsLeadPolicy'
 
@@ -47,24 +46,7 @@ const LONG_MONTHS = [
 ]
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-/* ------------------------------------------------------------------
-   FRONT-PAGE RANKING — YB-LEAD-v1 when leadPolicy exists on briefs.
-   Falls back to legacy significance × commits × repos + ticker when an
-   edition has no classifications yet (older cache / failed classify).
-   ------------------------------------------------------------------ */
-const COMMIT_CAP = 40
-const NEUTRAL_SIGNIFICANCE = 3
-
-function legacyFrontPageScore(story: Story): number {
-  const brief = story.brief
-  if (!brief) return 0
-  return legacyPublicLeadScore({
-    significance: brief.significance ?? NEUTRAL_SIGNIFICANCE,
-    commitCount: Math.min(brief.commitCount ?? 0, COMMIT_CAP),
-    repoCount: brief.repoCount ?? 0,
-    ticker: story.account.ticker,
-  })
-}
+/* ------------------------------------------------------------------ */
 
 function parseDateKey(dateKey: string): { y: number; m: number; d: number } | null {
   const [y, m, d] = dateKey.split('-').map(Number)
@@ -160,48 +142,35 @@ function commitLine(brief: ExternalBriefData | null): string | null {
   return c
 }
 
-function frontPageScore(story: Story): number {
-  return legacyFrontPageScore(story)
+function chunkPairs<T>(items: T[]): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += 2) out.push(items.slice(i, i + 2))
+  return out
 }
 
-type CommitPick = { quote: string; repo: string; label: string }
+/** Admin-only comic strip — not on the live Daily Loop until you say so. */
+const DAILY_LOOP_COMIC = {
+  src: '/daily-loop-comic-building-in-public.jpg',
+  alt: 'Comic: an agent posts that it is building in public; someone asks if it built anything.',
+  credit: 'Building in public',
+} as const
 
-/**
- * One quote per edition, picked across every filed desk. Highest quoteScore
- * wins; front-page score breaks ties so the lead desk gets the nod.
- */
-function pickCommitOfTheDay(stories: Story[]): CommitPick | null {
-  let best: (CommitPick & { score: number; tie: number }) | null = null
-  for (const story of stories) {
-    const brief = story.brief
-    if (!brief?.quote || !brief.quoteRepo) continue
-    const score = brief.quoteScore ?? 1
-    const tie = frontPageScore(story)
-    if (!best || score > best.score || (score === best.score && tie > best.tie)) {
-      best = {
-        quote: brief.quote,
-        repo: brief.quoteRepo,
-        label: story.account.label,
-        score,
-        tie,
-      }
-    }
-  }
-  if (!best) return null
-  return { quote: best.quote, repo: best.repo, label: best.label }
-}
-
-function CommitOfTheDay({ pick }: { pick: CommitPick }) {
+function DailyLoopComic({ adminPreview }: { adminPreview?: boolean }) {
   return (
-    <aside className="ext-paper-cotd" aria-label="Commit of the day">
-      <p className="ext-paper-sectionhead">Commit of the day</p>
-      <blockquote className="ext-paper-cotd__quote">{pick.quote}</blockquote>
-      <p className="ext-paper-cotd__attr">
-        {pick.repo} · {pick.label}
-      </p>
-      <p className="ext-paper-cotd__note">
-        Verbatim from a public commit message. Admin preview — not on the public page.
-      </p>
+    <aside className="ext-paper-comic" aria-label="Comic">
+      <p className="ext-paper-sectionhead">Comic</p>
+      {adminPreview && (
+        <p className="ext-paper-comic__preview">Admin preview · not on the live Daily Loop yet</p>
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        className="ext-paper-comic__img"
+        src={DAILY_LOOP_COMIC.src}
+        alt={DAILY_LOOP_COMIC.alt}
+        width={1200}
+        height={900}
+      />
+      <p className="ext-paper-comic__credit">{DAILY_LOOP_COMIC.credit}</p>
     </aside>
   )
 }
@@ -211,17 +180,23 @@ function RegenButton({
   loading,
   onRegenerate,
   small,
+  overlay,
 }: {
   running: boolean
   loading: boolean
   onRegenerate?: () => void
   small?: boolean
+  /** Absolute on the story card so Admin layout matches live. */
+  overlay?: boolean
 }) {
   if (!onRegenerate) return null
+  const classes = ['ext-paper-regen']
+  if (small) classes.push('ext-paper-regen--sm')
+  if (overlay) classes.push('ext-paper-regen--overlay')
   return (
     <button
       type="button"
-      className={small ? 'ext-paper-regen ext-paper-regen--sm' : 'ext-paper-regen'}
+      className={classes.join(' ')}
       onClick={onRegenerate}
       disabled={running || loading}
     >
@@ -233,11 +208,9 @@ function RegenButton({
 function Byline({
   account,
   brief,
-  admin,
 }: {
   account: ExternalBriefAccount
   brief: ExternalBriefData | null
-  admin: boolean
 }) {
   const commits = commitLine(brief)
   return (
@@ -248,7 +221,6 @@ function Byline({
       {brief?.dateKey ? ` · ${formatDigestDate(brief.dateKey)}` : ''}
       {commits ? ` · ${commits}` : ''}
       {account.ticker ? ` · ${account.ticker}` : ''}
-      {admin && brief?.significance ? ` · sig ${brief.significance}/5` : ''}
     </p>
   )
 }
@@ -298,6 +270,15 @@ function StoryBlock({
 
   return (
     <article id={account.id} className={`ext-paper-story ext-paper-story--${variant}`}>
+      {admin && (
+        <RegenButton
+          running={running}
+          loading={loading}
+          onRegenerate={onRegenerate}
+          small={variant === 'brief'}
+          overlay
+        />
+      )}
       <div className="ext-paper-story__head">
         <div className="ext-paper-story__headwrap">
           <p className="ext-paper-kicker">
@@ -307,16 +288,8 @@ function StoryBlock({
           </p>
           <h3 className="ext-paper-headline">{modelHeadline ?? account.label}</h3>
           {deck && <p className="ext-paper-deck">{deck}</p>}
-          <Byline account={account} brief={brief} admin={admin} />
+          <Byline account={account} brief={brief} />
         </div>
-        {admin && (
-          <RegenButton
-            running={running}
-            loading={loading}
-            onRegenerate={onRegenerate}
-            small={variant === 'brief'}
-          />
-        )}
       </div>
 
       <div className="ext-paper-hairline" />
@@ -357,10 +330,8 @@ export default function ExternalBriefsNewspaper({
     return { account, brief, text: brief ? briefBody(brief, normie).trim() : '' } as Story
   })
 
-  // Public: only desks that shipped (commits > 0).
-  // Admin: keep quiet editions (0 commits, still have writeup text) after the
-  // ranked shipping desks — orderStoriesForYbFrontPage drops commitCount === 0,
-  // which used to make quiet desks vanish from both the paper and Off the wire.
+  // Paper body matches live: only desks with commits. Quiet editions (Admin)
+  // render in a separate chrome section below so they do not change the layout.
   const withText = rows.filter(r => r.text.length > 0)
   const shipping = withText.filter(r => (r.brief?.commitCount ?? 0) > 0)
   const quiet = admin
@@ -387,15 +358,14 @@ export default function ExternalBriefsNewspaper({
     .map(id => byId.get(id))
     .filter((s): s is Story => Boolean(s))
 
-  const filed = [...ranked, ...quiet]
   const wire = admin ? rows.filter(r => !r.text.length) : []
-  const commitOfTheDay = admin ? pickCommitOfTheDay(ranked) : null
 
   const lead = ranked[0] ?? null
   const seconds = ranked.slice(1, 3)
-  const shorts = [...ranked.slice(3), ...quiet]
+  const shorts = ranked.slice(3)
   const longShorts = shorts.filter(s => isLongAlsoFiled(s))
   const packShorts = shorts.filter(s => !isLongAlsoFiled(s))
+  const shortPairs = chunkPairs(packShorts)
   const leadKicker =
     frontPage.usedV1 && !frontPage.materialLead ? 'Strongest observed' : 'Lead story'
 
@@ -412,7 +382,14 @@ export default function ExternalBriefsNewspaper({
   })
 
   return (
-    <section className="ext-paper" aria-label={OUTSIDE_DESK_TITLE}>
+    <>
+      {admin && (
+        <p className="ext-paper-live-match">
+          Paper below matches the live Daily Loop layout. Regen sits on top of stories without
+          shifting columns. Quiet desks and empty desks are listed under the paper — not on live.
+        </p>
+      )}
+      <section className="ext-paper" aria-label={OUTSIDE_DESK_TITLE}>
       <div className="ext-paper-flag">
         <span className="ext-paper-flag__chip">{outlookFlag(totalCommits, ranked.length)}</span>
         <span className="ext-paper-flag__date">
@@ -440,22 +417,24 @@ export default function ExternalBriefsNewspaper({
           <DailyLoopWordmark />
         </h2>
         <p className="ext-paper-masthead__tag">{OUTSIDE_DESK_TAG}</p>
-        <p className="ext-paper-masthead__deck">
-          {admin ? 'Admin desk · ' : ''}
-          {OUTSIDE_DESK_DECK}
-        </p>
+        <p className="ext-paper-masthead__deck">{OUTSIDE_DESK_DECK}</p>
         <p className="ext-paper-masthead__refresh">{EXTERNAL_BRIEFS_REFRESH_NOTE}</p>
       </header>
 
       <div className="ext-paper-rule ext-paper-rule--double" />
 
       <div className="ext-paper-ticker">
-        {filed.length
-          ? admin && quiet.length > 0
-            ? `Overnight desk — ${ranked.length} shipped · ${quiet.length} quiet · ${totalRepos} repo${totalRepos === 1 ? '' : 's'} · ${totalCommits} commit${totalCommits === 1 ? '' : 's'}`
-            : `Overnight desk — ${filed.length} project${filed.length === 1 ? '' : 's'} filed · ${totalRepos} repo${totalRepos === 1 ? '' : 's'} · ${totalCommits} commit${totalCommits === 1 ? '' : 's'}`
+        {ranked.length
+          ? `Overnight desk — ${ranked.length} project${ranked.length === 1 ? '' : 's'} filed · ${totalRepos} repo${totalRepos === 1 ? '' : 's'} · ${totalCommits} commit${totalCommits === 1 ? '' : 's'}`
           : 'Overnight desk — no editions filed yet'}
       </div>
+
+      {admin && (
+        <>
+          <div className="ext-paper-rule" />
+          <DailyLoopComic adminPreview />
+        </>
+      )}
 
       {lead ? (
         <>
@@ -486,10 +465,10 @@ export default function ExternalBriefsNewspaper({
             </>
           )}
         </>
-      ) : filed.length === 0 ? (
+      ) : ranked.length === 0 ? (
         <p className="ext-paper-empty">
           {admin
-            ? 'No cached editions yet — hit Regenerate on a desk below or wait for the daily digest cron.'
+            ? 'No shipped editions on file for this window — quiet desks are listed below.'
             : 'No editions filed for this window yet — check back after the overnight refresh.'}
         </p>
       ) : null}
@@ -497,7 +476,7 @@ export default function ExternalBriefsNewspaper({
       {shorts.length > 0 && (
         <>
           <div className="ext-paper-rule" />
-          <p className="ext-paper-sectionhead">{lead ? 'Also filed' : 'Quiet overnight'}</p>
+          <p className="ext-paper-sectionhead">Also filed</p>
           {longShorts.length > 0 && (
             <div className="ext-paper-shorts-long">
               {longShorts.map(story => (
@@ -512,15 +491,16 @@ export default function ExternalBriefsNewspaper({
               ))}
             </div>
           )}
-          {packShorts.length > 0 && (
+          {shortPairs.map((pair, idx) => (
             <div
+              key={pair.map(s => s.account.id).join('-') || `pair-${idx}`}
               className={
-                packShorts.length === 1
-                  ? 'ext-paper-shorts ext-paper-shorts--solo'
-                  : 'ext-paper-shorts'
+                pair.length === 2
+                  ? 'ext-paper-shorts-row ext-paper-shorts-row--pair'
+                  : 'ext-paper-shorts-row'
               }
             >
-              {packShorts.map(story => (
+              {pair.map(story => (
                 <StoryBlock
                   key={story.account.id}
                   story={story}
@@ -531,39 +511,8 @@ export default function ExternalBriefsNewspaper({
                 />
               ))}
             </div>
-          )}
+          ))}
           <div className="ext-paper-rule ext-paper-rule--double" aria-hidden="true" />
-        </>
-      )}
-
-      {commitOfTheDay && (
-        <>
-          <div className="ext-paper-rule" />
-          <CommitOfTheDay pick={commitOfTheDay} />
-        </>
-      )}
-
-      {wire.length > 0 && (
-        <>
-          <div className="ext-paper-rule" />
-          <p className="ext-paper-sectionhead">Off the wire</p>
-          <ul className="ext-paper-wire">
-            {wire.map(({ account }) => {
-              const s = stateFor(account.id)
-              return (
-                <li key={account.id} id={account.id} className="ext-paper-wire__row">
-                  <span className="ext-paper-wire__name">{account.label}</span>
-                  <span className="ext-paper-wire__path">{externalBriefGithubLabel(account)}</span>
-                  <span className="ext-paper-wire__note">
-                    {s.loading ? 'Loading edition…' : 'No edition this window'}
-                  </span>
-                  {admin && (
-                    <RegenButton running={s.running} loading={s.loading} onRegenerate={s.onRegenerate} small />
-                  )}
-                </li>
-              )
-            })}
-          </ul>
         </>
       )}
 
@@ -578,5 +527,49 @@ export default function ExternalBriefsNewspaper({
 
       <p className="ext-paper-disclaimer">{EXTERNAL_BRIEFS_SUPER_DISCLAIMER}</p>
     </section>
+
+      {admin && quiet.length > 0 && (
+        <section className="ext-paper-admin-extra" aria-label="Quiet desks">
+          <p className="ext-paper-sectionhead">Quiet desks</p>
+          <p className="ext-paper-admin-extra__note">
+            0 commits — not shown on the live Daily Loop. Regenerate here without changing the paper
+            layout above.
+          </p>
+          <div className="ext-paper-shorts-long">
+            {quiet.map(story => (
+              <StoryBlock
+                key={story.account.id}
+                story={story}
+                variant="brief"
+                admin={admin}
+                normie={normie}
+                {...stateFor(story.account.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {wire.length > 0 && (
+        <section className="ext-paper-admin-extra" aria-label="Off the wire">
+          <p className="ext-paper-sectionhead">Off the wire</p>
+          <ul className="ext-paper-wire">
+            {wire.map(({ account }) => {
+              const s = stateFor(account.id)
+              return (
+                <li key={account.id} id={account.id} className="ext-paper-wire__row">
+                  <span className="ext-paper-wire__name">{account.label}</span>
+                  <span className="ext-paper-wire__path">{externalBriefGithubLabel(account)}</span>
+                  <span className="ext-paper-wire__note">
+                    {s.loading ? 'Loading edition…' : 'No edition this window'}
+                  </span>
+                  <RegenButton running={s.running} loading={s.loading} onRegenerate={s.onRegenerate} small />
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+    </>
   )
 }

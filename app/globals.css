@@ -1089,19 +1089,23 @@ button {
 
 /* --- Stories --- */
 .ext-paper-story {
+  position: relative;
   break-inside: avoid;
   page-break-inside: avoid;
 }
 
 .ext-paper-story__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  display: block;
 }
 
 .ext-paper-story__headwrap {
   min-width: 0;
+  padding-right: 0;
+}
+
+.ext-paper--admin .ext-paper-story__headwrap,
+.ext-paper-story:has(.ext-paper-regen--overlay) .ext-paper-story__headwrap {
+  padding-right: 96px;
 }
 
 .ext-paper-kicker {
@@ -1229,7 +1233,7 @@ button {
   }
 }
 
-/* --- Shorts: full-width long briefs + up-to-2-col pack for short ones --- */
+/* --- Shorts: full-width long briefs + paired rows (no empty column shafts) --- */
 .ext-paper-shorts-long {
   margin: 0 0 8px;
 }
@@ -1244,30 +1248,86 @@ button {
   margin-bottom: 14px;
 }
 
-.ext-paper-shorts {
-  column-count: 1;
-  column-gap: 30px;
-  column-rule: 1px solid var(--border);
-  margin: 0 0 4px;
+.ext-paper-shorts-row {
+  margin: 0 0 8px;
 }
 
-@media (min-width: 860px) {
-  .ext-paper-shorts:not(.ext-paper-shorts--solo) {
-    column-count: 2;
-  }
-}
-
-.ext-paper-shorts--solo {
-  column-count: 1;
-  column-rule: none;
-}
-
-.ext-paper-shorts > .ext-paper-story {
+.ext-paper-shorts-row > .ext-paper-story {
   margin: 0 0 20px;
   padding: 0 0 16px;
   border-bottom: 1px solid var(--border);
-  break-inside: avoid;
-  page-break-inside: avoid;
+}
+
+@media (min-width: 860px) {
+  .ext-paper-shorts-row--pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 30px;
+    align-items: start;
+  }
+
+  .ext-paper-shorts-row--pair > .ext-paper-story {
+    margin: 0 0 20px;
+  }
+
+  .ext-paper-shorts-row--pair > .ext-paper-story + .ext-paper-story {
+    padding-left: 30px;
+    border-left: 1px solid var(--border);
+  }
+}
+
+.ext-paper-live-match {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ext-paper-admin-extra {
+  margin: 28px 0 0;
+  padding: 18px 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+.ext-paper-admin-extra__note {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.ext-paper-comic {
+  margin: 0 0 22px;
+}
+
+.ext-paper-comic__preview {
+  margin: 0 0 10px;
+  font-family: var(--font-kicker);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ext-paper-comic__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+}
+
+.ext-paper-comic__credit {
+  margin: 8px 0 0;
+  font-family: var(--font-kicker);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 /* --- Off the wire --- */
@@ -1352,6 +1412,13 @@ button {
 .ext-paper-regen--sm {
   font-size: 10px;
   padding: 4px 8px;
+}
+
+.ext-paper-regen--overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
 }
 
 .ext-paper-regen:disabled {
