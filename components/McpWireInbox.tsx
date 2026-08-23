@@ -88,21 +88,31 @@ function InboxCard({
 
   return (
     <li className="wire-card">
-      {pile === 'show' && why.length > 0 && (
+      {pile === 'show' && (why.length > 0 || typeof row.stars === 'number') && (
         <div className="wire-card__labels">
           {why.map(label => (
             <span key={label} className="wire-card__label">
               {label}
             </span>
           ))}
+          {typeof row.stars === 'number' && (
+            <span className="wire-card__label wire-card__label--stars">
+              {formatWireStars(row.stars)}
+            </span>
+          )}
         </div>
       )}
       {pile === 'filtered' && (
         <span className="wire-inbox__keep is-skip">SKIP</span>
       )}
       <p className="wire-card__title">{row.title || row.name}</p>
-      {typeof row.stars === 'number' && (
+      {typeof row.stars === 'number' ? (
         <p className="wire-card__stars">{formatWireStars(row.stars)} on GitHub</p>
+      ) : (
+        pile === 'show' &&
+        !parseGithubOwnerRepo(row.repoUrl) && (
+          <p className="wire-card__stars wire-card__stars--none">No public GitHub source linked</p>
+        )
       )}
       <p className="wire-card__what">
         <strong>What it is:</strong> {row.whatItIs || row.description || '—'}

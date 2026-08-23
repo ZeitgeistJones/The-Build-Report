@@ -750,15 +750,44 @@ export async function getMcpWire(dateKey: string): Promise<McpWireSnapshot | nul
 export async function getMcpWireAdmin(dateKey: string): Promise<McpWireAdminRecord | null> {
   try {
     const redis = getRedis()
-    const record = await redis.get<McpWireAdminRecord>(`${WIRE_ADMIN_KEY}:${dateKey}`)
-    if (record) return record
-    const snapshot = await redis.get<McpWireSnapshot>(`${WIRE_KEY}:${dateKey}`)
-    if (!snapshot) return null
-    return emptyAdminRecord(snapshot, {
-      since: snapshot.through || '',
-      printedCount: snapshot.items.length,
-      keptCount: snapshot.totalChanges,
-    })
+    let record = await redis.get<McpWireAdminRecord>(`${WIRE_ADMIN_KEY}:${dateKey}`)
+    if (!record) {
+      const snapshot = await redis.get<McpWireSnapshot>(`${WIRE_KEY}:${dateKey}`)
+      if (!snapshot) return null
+      return emptyAdminRecord(snapshot, {
+        since: snapshot.through || '',
+        printedCount: snapshot.items.length,
+        keptCount: snapshot.totalChanges,
+      })
+    }
+
+    // Older caches predate star lookups — fill them in on Admin load (SHOW ME only).
+    const needsStars = record.inbox.some(
+      r => r.pile === 'show' && parseGithubOwnerRepo(r.repoUrl) && typeof r.stars !== 'number',
+    )
+    if (needsStars) {
+      await attachGithubStarsToShowRows(record.inbox)
+      const show = record.inbox.filter(r => r.pile === 'show').sort(sortShowMeRows)
+      const routine = record.inbox.filter(r => r.pile === 'routine')
+      const filtered = record.inbox.filter(r => r.pile === 'filtered')
+      const byName = new Map(show.map(r => [`${r.name}@${r.version}`, r]))
+      record = {
+        ...record,
+        inbox: [...show, ...routine, ...filtered],
+        snapshot: {
+          ...record.snapshot,
+          items: record.snapshot.items.map(item => {
+            const row = byName.get(`${item.name}@${item.version}`)
+            return row && typeof row.stars === 'number' ? { ...item, stars: row.stars } : item
+          }),
+        },
+      }
+      await redisSaveAdmin(record).catch(err => {
+        console.warn('[mcp-wire] failed to persist star backfill:', err)
+      })
+    }
+
+    return record
   } catch {
     return null
   }

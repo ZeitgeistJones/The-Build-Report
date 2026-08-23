@@ -2220,6 +2220,15 @@ button {
   color: var(--text-muted);
 }
 
+.wire-card__stars--none {
+  font-style: italic;
+}
+
+.wire-card__label--stars {
+  border-color: var(--text-muted);
+  color: var(--text-secondary);
+}
+
 .wire-card__what,
 .wire-card__why,
 .wire-card__tracked {
