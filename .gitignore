@@ -8,3 +8,6 @@ tsconfig.tsbuildinfo
 .vercel
 
 .env.cron.local
+
+.env.force-regen.local
+
