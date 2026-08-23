@@ -292,7 +292,9 @@ function StoryBlock({
       ? leadKicker ?? 'Lead story'
       : variant === 'second'
         ? 'Report'
-        : 'In brief'
+        : (brief?.commitCount ?? 0) <= 0
+          ? 'Quiet'
+          : 'In brief'
 
   return (
     <article id={account.id} className={`ext-paper-story ext-paper-story--${variant}`}>
@@ -355,14 +357,20 @@ export default function ExternalBriefsNewspaper({
     return { account, brief, text: brief ? briefBody(brief, normie).trim() : '' } as Story
   })
 
-  // Public paper: only projects that actually shipped yesterday. Quiet/blank
-  // desks stay visible in Admin so you can regenerate and inspect them.
-  const shipped = rows
-    .filter(r => r.text.length > 0)
-    .filter(r => admin || (r.brief?.commitCount ?? 0) > 0)
+  // Public: only desks that shipped (commits > 0).
+  // Admin: keep quiet editions (0 commits, still have writeup text) after the
+  // ranked shipping desks — orderStoriesForYbFrontPage drops commitCount === 0,
+  // which used to make quiet desks vanish from both the paper and Off the wire.
+  const withText = rows.filter(r => r.text.length > 0)
+  const shipping = withText.filter(r => (r.brief?.commitCount ?? 0) > 0)
+  const quiet = admin
+    ? withText
+        .filter(r => (r.brief?.commitCount ?? 0) <= 0)
+        .sort((a, b) => a.account.label.localeCompare(b.account.label))
+    : []
 
   const frontPage = orderStoriesForYbFrontPage(
-    shipped.map(s => ({
+    shipping.map(s => ({
       accountId: s.account.id,
       label: s.account.label,
       ticker: s.account.ticker,
@@ -374,17 +382,18 @@ export default function ExternalBriefsNewspaper({
     })),
   )
 
-  const byId = new Map<string, Story>(shipped.map(s => [s.account.id, s]))
-  const filed = frontPage.orderedIds
+  const byId = new Map<string, Story>(shipping.map(s => [s.account.id, s]))
+  const ranked = frontPage.orderedIds
     .map(id => byId.get(id))
     .filter((s): s is Story => Boolean(s))
 
+  const filed = [...ranked, ...quiet]
   const wire = admin ? rows.filter(r => !r.text.length) : []
-  const commitOfTheDay = admin ? pickCommitOfTheDay(filed) : null
+  const commitOfTheDay = admin ? pickCommitOfTheDay(ranked) : null
 
-  const lead = filed[0] ?? null
-  const seconds = filed.slice(1, 3)
-  const shorts = filed.slice(3)
+  const lead = ranked[0] ?? null
+  const seconds = ranked.slice(1, 3)
+  const shorts = [...ranked.slice(3), ...quiet]
   const longShorts = shorts.filter(s => isLongAlsoFiled(s))
   const packShorts = shorts.filter(s => !isLongAlsoFiled(s))
   const leadKicker =
@@ -392,8 +401,8 @@ export default function ExternalBriefsNewspaper({
 
   const anyDate = issueDateKey ?? rows.map(r => r.brief?.dateKey).find(Boolean) ?? null
   const issue = ybIssueNumber(anyDate)
-  const totalCommits = filed.reduce((sum, r) => sum + (r.brief?.commitCount ?? 0), 0)
-  const totalRepos = filed.reduce((sum, r) => sum + (r.brief?.repoCount ?? 0), 0)
+  const totalCommits = ranked.reduce((sum, r) => sum + (r.brief?.commitCount ?? 0), 0)
+  const totalRepos = ranked.reduce((sum, r) => sum + (r.brief?.repoCount ?? 0), 0)
 
   const stateFor = (id: ExternalBriefAccountId) => ({
     loading: Boolean(loading[id]),
@@ -405,7 +414,7 @@ export default function ExternalBriefsNewspaper({
   return (
     <section className="ext-paper" aria-label={OUTSIDE_DESK_TITLE}>
       <div className="ext-paper-flag">
-        <span className="ext-paper-flag__chip">{outlookFlag(totalCommits, filed.length)}</span>
+        <span className="ext-paper-flag__chip">{outlookFlag(totalCommits, ranked.length)}</span>
         <span className="ext-paper-flag__date">
           {anyDate ? (
             issueDateKey ? (
@@ -442,7 +451,9 @@ export default function ExternalBriefsNewspaper({
 
       <div className="ext-paper-ticker">
         {filed.length
-          ? `Overnight desk — ${filed.length} project${filed.length === 1 ? '' : 's'} filed · ${totalRepos} repo${totalRepos === 1 ? '' : 's'} · ${totalCommits} commit${totalCommits === 1 ? '' : 's'}`
+          ? admin && quiet.length > 0
+            ? `Overnight desk — ${ranked.length} shipped · ${quiet.length} quiet · ${totalRepos} repo${totalRepos === 1 ? '' : 's'} · ${totalCommits} commit${totalCommits === 1 ? '' : 's'}`
+            : `Overnight desk — ${filed.length} project${filed.length === 1 ? '' : 's'} filed · ${totalRepos} repo${totalRepos === 1 ? '' : 's'} · ${totalCommits} commit${totalCommits === 1 ? '' : 's'}`
           : 'Overnight desk — no editions filed yet'}
       </div>
 
@@ -474,55 +485,55 @@ export default function ExternalBriefsNewspaper({
               </div>
             </>
           )}
-
-          {shorts.length > 0 && (
-            <>
-              <div className="ext-paper-rule" />
-              <p className="ext-paper-sectionhead">Also filed</p>
-              {longShorts.length > 0 && (
-                <div className="ext-paper-shorts-long">
-                  {longShorts.map(story => (
-                    <StoryBlock
-                      key={story.account.id}
-                      story={story}
-                      variant="brief"
-                      admin={admin}
-                      normie={normie}
-                      {...stateFor(story.account.id)}
-                    />
-                  ))}
-                </div>
-              )}
-              {packShorts.length > 0 && (
-                <div
-                  className={
-                    packShorts.length === 1
-                      ? 'ext-paper-shorts ext-paper-shorts--solo'
-                      : 'ext-paper-shorts'
-                  }
-                >
-                  {packShorts.map(story => (
-                    <StoryBlock
-                      key={story.account.id}
-                      story={story}
-                      variant="brief"
-                      admin={admin}
-                      normie={normie}
-                      {...stateFor(story.account.id)}
-                    />
-                  ))}
-                </div>
-              )}
-              <div className="ext-paper-rule ext-paper-rule--double" aria-hidden="true" />
-            </>
-          )}
         </>
-      ) : (
+      ) : filed.length === 0 ? (
         <p className="ext-paper-empty">
           {admin
             ? 'No cached editions yet — hit Regenerate on a desk below or wait for the daily digest cron.'
             : 'No editions filed for this window yet — check back after the overnight refresh.'}
         </p>
+      ) : null}
+
+      {shorts.length > 0 && (
+        <>
+          <div className="ext-paper-rule" />
+          <p className="ext-paper-sectionhead">{lead ? 'Also filed' : 'Quiet overnight'}</p>
+          {longShorts.length > 0 && (
+            <div className="ext-paper-shorts-long">
+              {longShorts.map(story => (
+                <StoryBlock
+                  key={story.account.id}
+                  story={story}
+                  variant="brief"
+                  admin={admin}
+                  normie={normie}
+                  {...stateFor(story.account.id)}
+                />
+              ))}
+            </div>
+          )}
+          {packShorts.length > 0 && (
+            <div
+              className={
+                packShorts.length === 1
+                  ? 'ext-paper-shorts ext-paper-shorts--solo'
+                  : 'ext-paper-shorts'
+              }
+            >
+              {packShorts.map(story => (
+                <StoryBlock
+                  key={story.account.id}
+                  story={story}
+                  variant="brief"
+                  admin={admin}
+                  normie={normie}
+                  {...stateFor(story.account.id)}
+                />
+              ))}
+            </div>
+          )}
+          <div className="ext-paper-rule ext-paper-rule--double" aria-hidden="true" />
+        </>
       )}
 
       {commitOfTheDay && (
