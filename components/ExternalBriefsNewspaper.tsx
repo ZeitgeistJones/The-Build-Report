@@ -148,20 +148,16 @@ function chunkPairs<T>(items: T[]): T[][] {
   return out
 }
 
-/** Admin-only comic strip — not on the live Daily Loop until you say so. */
 const DAILY_LOOP_COMIC = {
   src: '/daily-loop-comic-building-in-public.jpg',
   alt: 'Comic: an agent posts that it is building in public; someone asks if it built anything.',
   credit: 'Building in public',
 } as const
 
-function DailyLoopComic({ adminPreview }: { adminPreview?: boolean }) {
+function DailyLoopComic() {
   return (
     <aside className="ext-paper-comic" aria-label="Comic">
       <p className="ext-paper-sectionhead">Comic</p>
-      {adminPreview && (
-        <p className="ext-paper-comic__preview">Admin preview · not on the live Daily Loop yet</p>
-      )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         className="ext-paper-comic__img"
@@ -425,16 +421,9 @@ export default function ExternalBriefsNewspaper({
 
       <div className="ext-paper-ticker">
         {ranked.length
-          ? `Overnight desk — ${ranked.length} project${ranked.length === 1 ? '' : 's'} filed · ${totalRepos} repo${totalRepos === 1 ? '' : 's'} · ${totalCommits} commit${totalCommits === 1 ? '' : 's'}`
-          : 'Overnight desk — no editions filed yet'}
+          ? `This issue — ${ranked.length} project${ranked.length === 1 ? '' : 's'} · ${totalRepos} repo${totalRepos === 1 ? '' : 's'} · ${totalCommits} commit${totalCommits === 1 ? '' : 's'}`
+          : 'This issue — no editions filed yet'}
       </div>
-
-      {admin && (
-        <>
-          <div className="ext-paper-rule" />
-          <DailyLoopComic adminPreview />
-        </>
-      )}
 
       {lead ? (
         <>
@@ -515,6 +504,9 @@ export default function ExternalBriefsNewspaper({
           <div className="ext-paper-rule ext-paper-rule--double" aria-hidden="true" />
         </>
       )}
+
+      <div className="ext-paper-rule" />
+      <DailyLoopComic />
 
       {mcpWire !== undefined && (
         <>
