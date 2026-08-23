@@ -501,11 +501,10 @@ export default function ExternalBriefsNewspaper({
               ))}
             </div>
           ))}
-          <div className="ext-paper-rule ext-paper-rule--double" aria-hidden="true" />
         </>
       )}
 
-      <div className="ext-paper-rule" />
+      <div className="ext-paper-rule ext-paper-rule--double" />
       <DailyLoopComic />
 
       {mcpWire !== undefined && (

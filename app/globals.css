@@ -1129,12 +1129,11 @@ button {
 }
 
 .ext-paper-story--lead .ext-paper-headline {
-  font-size: clamp(26px, 4.2vw, 42px);
-  max-width: 18ch;
+  font-size: clamp(30px, 5.4vw, 56px);
 }
 
 .ext-paper-story--second .ext-paper-headline {
-  font-size: clamp(20px, 2.6vw, 26px);
+  font-size: clamp(22px, 3vw, 30px);
 }
 
 .ext-paper-story--brief .ext-paper-headline {
@@ -1151,8 +1150,7 @@ button {
 }
 
 .ext-paper-story--lead .ext-paper-deck {
-  font-size: clamp(15px, 1.5vw, 18px);
-  max-width: 38rem;
+  font-size: clamp(15px, 1.7vw, 19px);
 }
 
 .ext-paper-byline {
@@ -1182,17 +1180,21 @@ button {
   margin-bottom: 0;
 }
 
-/* Digests are short — one readable measure beats skinny multi-columns. */
 .ext-paper-story--lead .ext-paper-body {
-  max-width: 40rem;
-  font-size: 16px;
-  line-height: 1.68;
-  column-count: 1;
+  column-gap: 30px;
+  column-rule: 1px solid var(--border);
 }
 
-.ext-paper-story--lead .ext-paper-body p {
-  font-size: inherit;
-  line-height: inherit;
+@media (min-width: 780px) {
+  .ext-paper-story--lead .ext-paper-body {
+    column-count: 2;
+  }
+}
+
+@media (min-width: 1200px) {
+  .ext-paper-story--lead .ext-paper-body {
+    column-count: 3;
+  }
 }
 
 /* Drop cap on the lead */
@@ -1200,9 +1202,9 @@ button {
   float: left;
   font-family: var(--font-slab);
   font-weight: 900;
-  font-size: 3.1em;
-  line-height: 0.85;
-  padding: 2px 8px 0 0;
+  font-size: 3.4em;
+  line-height: 0.82;
+  padding: 4px 8px 0 0;
   color: var(--paper-red);
 }
 
@@ -1299,27 +1301,27 @@ button {
 }
 
 .ext-paper-comic {
-  margin: 4px auto 18px;
-  max-width: 480px;
-  text-align: center;
+  margin: 0 0 22px;
+}
+
+.ext-paper-comic .ext-paper-sectionhead {
+  margin-bottom: 10px;
 }
 
 .ext-paper-comic__img {
   display: block;
   width: 100%;
-  max-height: min(46vh, 420px);
   height: auto;
-  object-fit: contain;
   border: 1px solid var(--border-strong);
   background: var(--surface-1);
-  padding: 6px;
 }
 
 .ext-paper-comic__credit {
   margin: 8px 0 0;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 12px;
+  font-family: var(--font-kicker);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-muted);
 }
 
