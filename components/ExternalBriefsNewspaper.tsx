@@ -462,7 +462,6 @@ export default function ExternalBriefsNewspaper({
       {shorts.length > 0 && (
         <>
           <div className="ext-paper-rule" />
-          <p className="ext-paper-sectionhead">Also filed</p>
           {longShorts.length > 0 && (
             <div className="ext-paper-shorts-long">
               {longShorts.map(story => (
