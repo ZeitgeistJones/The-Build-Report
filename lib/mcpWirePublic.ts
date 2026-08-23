@@ -9,7 +9,7 @@ import {
   type WireWhyCode,
 } from '@/lib/mcpWireSignals'
 
-export const PUBLIC_WIRE_CAP = 5
+export const PUBLIC_WIRE_CAP = 2
 
 export type PublicWireStatus = 'NEW' | 'UPDATED' | 'DEPRECATED' | 'REMOVED FROM REGISTRY'
 export type PublicWireBeat = 'ONCHAIN' | 'BROWSER' | 'AGENT INFRA' | 'DATA' | 'DEVELOPER TOOL'
@@ -113,6 +113,21 @@ export function inboxRowToWireItem(row: WireInboxRow): WireItem {
 export function selectPublicWireItems(showRows: WireInboxRow[]): WireItem[] {
   const worthy = showRows.filter(isPublicWireWorthy)
   const collapsed = collapseRelatedPublicRows(worthy)
+
+  // Live paper: the 2 SHOW ME listings with the most GitHub stars (need a linked repo).
+  const starred = collapsed
+    .filter(r => parseGithubOwnerRepo(r.repoUrl) && typeof r.stars === 'number')
+    .sort(
+      (a, b) =>
+        (b.stars ?? 0) - (a.stars ?? 0) ||
+        (b.at || '').localeCompare(a.at || '') ||
+        a.name.localeCompare(b.name),
+    )
+  if (starred.length > 0) {
+    return starred.slice(0, PUBLIC_WIRE_CAP).map(inboxRowToWireItem)
+  }
+
+  // Fallback before star backfill / when nothing has a public repo.
   return collapsed.sort(comparePublicRows).slice(0, PUBLIC_WIRE_CAP).map(inboxRowToWireItem)
 }
 

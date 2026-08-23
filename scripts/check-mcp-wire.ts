@@ -627,7 +627,7 @@ expect(
       }),
     ),
   )
-  expect('7. public prints at most 5', crowded.items.length === 5 && crowded.showMeCount === 6)
+  expect('7. public prints at most 2', crowded.items.length === 2 && crowded.showMeCount === 6)
   expect(
     '7. newer timestamps win the cap',
     crowded.items.every(item => item.name !== 'io.example/wallet-07'),

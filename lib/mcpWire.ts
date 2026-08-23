@@ -20,7 +20,7 @@ const WIRE_ADMIN_KEY = 'build-report:mcp-wire:admin'
 const TTL_SECONDS = 60 * 60 * 24 * 90
 
 export const PAGE_CAP = 40
-export const PRINT_CAP = 5
+export const PRINT_CAP = 2
 export const INBOX_CAP = 250
 export const SHOW_STORE_CAP = 80
 export const ROUTINE_STORE_CAP = 50
@@ -765,26 +765,34 @@ export async function getMcpWireAdmin(dateKey: string): Promise<McpWireAdminReco
     const needsStars = record.inbox.some(
       r => r.pile === 'show' && parseGithubOwnerRepo(r.repoUrl) && typeof r.stars !== 'number',
     )
-    if (needsStars) {
-      await attachGithubStarsToShowRows(record.inbox)
+    const needsReprint =
+      needsStars ||
+      record.snapshot.items.length > PRINT_CAP ||
+      record.snapshot.items.some(item => typeof item.stars !== 'number' && Boolean(item.repoUrl))
+
+    if (needsReprint) {
+      if (needsStars) await attachGithubStarsToShowRows(record.inbox)
       const show = record.inbox.filter(r => r.pile === 'show').sort(sortShowMeRows)
       const routine = record.inbox.filter(r => r.pile === 'routine')
       const filtered = record.inbox.filter(r => r.pile === 'filtered')
-      const byName = new Map(show.map(r => [`${r.name}@${r.version}`, r]))
+      const printed = selectPublicWireItems(show).slice(0, PRINT_CAP)
       record = {
         ...record,
+        printedCount: printed.length,
         inbox: [...show, ...routine, ...filtered],
         snapshot: {
           ...record.snapshot,
-          items: record.snapshot.items.map(item => {
-            const row = byName.get(`${item.name}@${item.version}`)
-            return row && typeof row.stars === 'number' ? { ...item, stars: row.stars } : item
-          }),
+          items: printed,
         },
       }
-      await redisSaveAdmin(record).catch(err => {
-        console.warn('[mcp-wire] failed to persist star backfill:', err)
-      })
+      await Promise.all([
+        redisSaveAdmin(record).catch(err => {
+          console.warn('[mcp-wire] failed to persist star backfill:', err)
+        }),
+        redisSavePublic(record.snapshot).catch(err => {
+          console.warn('[mcp-wire] failed to persist public wire reprint:', err)
+        }),
+      ])
     }
 
     return record
