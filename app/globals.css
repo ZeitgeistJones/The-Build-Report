@@ -1183,6 +1183,7 @@ button {
 .ext-paper-story--lead .ext-paper-body {
   column-gap: 30px;
   column-rule: 1px solid var(--border);
+  column-fill: balance;
 }
 
 @media (min-width: 780px) {
@@ -1264,11 +1265,17 @@ button {
     display: grid;
     grid-template-columns: 1fr 1fr;
     column-gap: 20px;
-    align-items: start;
+    align-items: stretch;
+    margin: 0 0 12px;
+    padding: 0 0 10px;
+    border-bottom: 1px solid var(--border);
   }
 
+  /* One shared row rule — not a staggered line per column */
   .ext-paper-shorts-row--pair > .ext-paper-story {
-    margin: 0 0 12px;
+    margin: 0;
+    padding-bottom: 0;
+    border-bottom: none;
   }
 
   .ext-paper-shorts-row--pair > .ext-paper-story + .ext-paper-story {
