@@ -38,6 +38,16 @@ function isGeminiQuotaError(err: unknown): boolean {
   )
 }
 
+/** Bad/revoked key — skip to the next configured Gemini key instead of aborting the chain. */
+function isGeminiInvalidKeyError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return (
+    message.includes('API_KEY_INVALID') ||
+    message.includes('API key not valid') ||
+    message.includes('"status":"INVALID_ARGUMENT"') && message.includes('API key')
+  )
+}
+
 /** Primary + optional backup keys. Dedupe so the same value isn't tried twice. */
 function geminiApiKeys(): string[] {
   const raw = [
@@ -173,7 +183,8 @@ async function generateWithGeminiKey(
     if (accept(text)) return text
     console.warn(`[${label}] Gemini (${keyLabel}) output unusable; retrying without thinking`)
   } catch (err) {
-    if (isGeminiQuotaError(err)) throw err
+    // Don't burn a second attempt on a dead key — let the rotator advance.
+    if (isGeminiQuotaError(err) || isGeminiInvalidKeyError(err)) throw err
     const message = err instanceof Error ? err.message : String(err)
     if (message.includes('"code":404') || message.includes('NOT_FOUND') || message.includes('no longer available')) {
       throw err
@@ -194,8 +205,13 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
       return await generateWithGeminiKey(opts, keys[i], i)
     } catch (err) {
       lastErr = err
-      if (isGeminiQuotaError(err) && i < keys.length - 1) {
-        console.warn(`[${label}] Gemini key ${i === 0 ? 'primary' : `backup#${i}`} quota exhausted; trying next key`)
+      const canRotate =
+        i < keys.length - 1 && (isGeminiQuotaError(err) || isGeminiInvalidKeyError(err))
+      if (canRotate) {
+        const why = isGeminiInvalidKeyError(err) ? 'invalid' : 'quota exhausted'
+        console.warn(
+          `[${label}] Gemini key ${i === 0 ? 'primary' : `backup#${i}`} ${why}; trying next key`,
+        )
         continue
       }
       throw err
