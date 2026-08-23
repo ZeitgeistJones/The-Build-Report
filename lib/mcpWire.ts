@@ -36,7 +36,7 @@ export function formatWireStars(stars: number): string {
   return `${stars}★`
 }
 
-/** Admin + public SHOW ME order: tracked, kind, then GitHub stars, then recency. */
+/** Admin + public SHOW ME order: tracked, kind, public repo, stars, then recency. */
 export function sortShowMeRows(a: WireInboxRow, b: WireInboxRow): number {
   const rank: Record<WireInboxRow['kind'], number> = {
     new: 0,
@@ -44,9 +44,11 @@ export function sortShowMeRows(a: WireInboxRow, b: WireInboxRow): number {
     revised: 2,
     unknown: 3,
   }
+  const repoScore = (row: WireInboxRow) => (parseGithubOwnerRepo(row.repoUrl) ? 1 : 0)
   return (
     Number(!!b.tracked) - Number(!!a.tracked) ||
     rank[a.kind] - rank[b.kind] ||
+    repoScore(b) - repoScore(a) ||
     (b.stars ?? -1) - (a.stars ?? -1) ||
     (b.at || '').localeCompare(a.at || '') ||
     a.name.localeCompare(b.name)

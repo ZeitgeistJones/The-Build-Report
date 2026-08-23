@@ -56,6 +56,9 @@ export function publicWireClassRank(row: WireInboxRow): number {
 function comparePublicRows(a: WireInboxRow, b: WireInboxRow): number {
   const classDiff = publicWireClassRank(a) - publicWireClassRank(b)
   if (classDiff !== 0) return classDiff
+  const repoA = parseGithubOwnerRepo(a.repoUrl) ? 1 : 0
+  const repoB = parseGithubOwnerRepo(b.repoUrl) ? 1 : 0
+  if (repoB !== repoA) return repoB - repoA
   const starsDiff = (b.stars ?? -1) - (a.stars ?? -1)
   if (starsDiff !== 0) return starsDiff
   const timeDiff = (b.at || '').localeCompare(a.at || '')
