@@ -310,6 +310,12 @@ export type ExternalDigestCache = {
    * real shipping until a manual Admin regenerate.
    */
   rateLimited?: boolean
+  /**
+   * True when Gemini/Anthropic failed and we stored the deterministic
+   * "WORK LANDS ON…" / shipping-summary template. Those must not stick as
+   * confirmed activity — later cron/warm should retry LLM writeups.
+   */
+  llmFallback?: boolean
 }
 
 /**
@@ -390,6 +396,16 @@ function buildFallbackGeneral(
     ? `the ${account.ticker} builder account`
     : `github.com/${account.owner}`
   return `On ${snapshot.dateKey}, work landed on ${names}${extra} under github.com/${account.owner}. This is a shipping summary for ${who} — not a scored Build Report grade card.`
+}
+
+/** Detect cached template copy (including editions written before llmFallback existed). */
+function looksLikeTemplateFallback(general: string | undefined): boolean {
+  const text = (general || '').trim()
+  if (!text) return false
+  return (
+    text.includes('This is a shipping summary') &&
+    text.includes('not a scored Build Report grade card')
+  )
 }
 
 /** Used when the LLM is unavailable — never invents news. */
@@ -568,9 +584,17 @@ ${YB_LEAD_POLICY_PROMPT_RULES}`
   try {
     const { text, provider } = await generateTextGeminiFirst({
       prompt,
-      maxTokens: 3072,
+      // Large commit samples + dual voice + leadPolicy JSON need headroom;
+      // 3072 was truncating into unparseable JSON → template fallbacks.
+      maxTokens: 8192,
       temperature: NORMIE_TEMPERATURE,
       label: `${account.id}-brief`,
+      usable: raw => {
+        const t = raw.trim()
+        const start = t.indexOf('{')
+        const end = t.lastIndexOf('}')
+        return start >= 0 && end > start && t.slice(start, end + 1).includes('"general"')
+      },
     })
     if (!text) {
       console.error(`[${account.id}-brief] empty LLM response`, { provider })
@@ -691,14 +715,18 @@ export async function generateAndCacheExternalDigest(
   if (!options?.force) {
     const existing = await readCachedDigest(account, dateKey)
     if (existing?.general?.trim()) {
-      if (existing.commitCount > 0) return existing
+      const needsLlmHeal =
+        existing.llmFallback === true || looksLikeTemplateFallback(existing.general)
+      // Successful activity writeup — keep unless it was only the template fallback.
+      if (existing.commitCount > 0 && !needsLlmHeal) return existing
       // Successful empty fetch — real quiet day. Do not keep re-hitting GitHub.
-      if (existing.rateLimited === false) return existing
-      // rateLimited quiet, or legacy quiet with no flag: recheck on cron/warm.
-      if (existing.rateLimited === true || options?.recheckQuiet) {
-        console.warn(`[${account.id}-brief] rechecking quiet cache`, {
+      if (existing.commitCount === 0 && existing.rateLimited === false) return existing
+      // rateLimited quiet, LLM template fallback, or legacy quiet with no flag: recheck.
+      if (existing.rateLimited === true || needsLlmHeal || options?.recheckQuiet) {
+        console.warn(`[${account.id}-brief] rechecking cache`, {
           dateKey,
           rateLimited: existing.rateLimited ?? null,
+          llmFallback: needsLlmHeal,
           recheckQuiet: Boolean(options?.recheckQuiet),
         })
       } else {
@@ -720,7 +748,8 @@ export async function generateAndCacheExternalDigest(
     snapshot.rateLimited && snapshot.commitCount === 0
       ? null
       : await generateOverviewWithAi(account, snapshot)
-  if (!ai && !(snapshot.rateLimited && snapshot.commitCount === 0)) {
+  const usedLlmFallback = !ai && !(snapshot.rateLimited && snapshot.commitCount === 0)
+  if (usedLlmFallback) {
     console.warn(`[${account.id}-brief] using template fallback`, {
       dateKey,
       repoCount: snapshot.repoCount,
@@ -747,6 +776,7 @@ export async function generateAndCacheExternalDigest(
     owner: account.owner,
     ticker: account.ticker,
     rateLimited: snapshot.rateLimited,
+    ...(usedLlmFallback ? { llmFallback: true } : {}),
   }
 
   // Never persist a rate-limited empty day — next cron/Admin pass must retry.
@@ -842,9 +872,11 @@ export async function generateAllExternalDigests(options?: {
       if (!options?.force) {
         const existing = await readCachedDigest(account, options?.dateKey ?? yesterdayMountainDateKey())
         if (existing?.general?.trim()) {
-          const confirmedActivity = existing.commitCount > 0
+          const needsLlmHeal =
+            existing.llmFallback === true || looksLikeTemplateFallback(existing.general)
+          const confirmedActivity = existing.commitCount > 0 && !needsLlmHeal
           const confirmedQuiet = existing.commitCount === 0 && existing.rateLimited === false
-          const needsHeal = existing.rateLimited === true
+          const needsHeal = existing.rateLimited === true || needsLlmHeal
           if (confirmedActivity || confirmedQuiet) {
             results.push({
               id: account.id,
@@ -869,6 +901,12 @@ export async function generateAllExternalDigests(options?: {
               rateLimited: existing.rateLimited,
             })
             continue
+          }
+          if (needsLlmHeal) {
+            console.warn(`[external-brief] ${account.id} healing LLM template fallback`, {
+              dateKey: existing.dateKey,
+              commitCount: existing.commitCount,
+            })
           }
         } else if (healOnly && !recheckQuiet) {
           // missing — fall through to generate
