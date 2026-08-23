@@ -471,7 +471,8 @@ export function buildWireCollection(rows: RegistryRow[]): {
   const routine = allRows.filter(r => r.pile === 'routine')
   const filtered = allRows.filter(r => r.pile === 'filtered')
 
-  const rank = { withdrawn: 0, new: 1, revised: 2, unknown: 3 }
+  // Admin SHOW ME: new registrations first so they're easy to find; removals next.
+  const rank = { new: 0, withdrawn: 1, revised: 2, unknown: 3 }
   show.sort(
     (a, b) =>
       Number(!!b.tracked) - Number(!!a.tracked) ||

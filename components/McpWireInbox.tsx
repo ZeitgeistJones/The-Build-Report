@@ -243,7 +243,21 @@ export default function McpWireInbox({ record }: { record: McpWireAdminRecord | 
   const showMe = record.showMeCount ?? 0
   const routine = record.routineCount ?? 0
   const filtered = record.filteredCount ?? record.skippedFilterCount + record.skippedOtherCount
-  const showRows = record.inbox.filter(r => pileOf(r) === 'show')
+  const showRank: Record<WireInboxRow['kind'], number> = {
+    new: 0,
+    withdrawn: 1,
+    revised: 2,
+    unknown: 3,
+  }
+  const showRows = record.inbox
+    .filter(r => pileOf(r) === 'show')
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(!!b.tracked) - Number(!!a.tracked) ||
+        showRank[a.kind] - showRank[b.kind] ||
+        (b.at || '').localeCompare(a.at || ''),
+    )
   const routineRows = record.inbox.filter(r => pileOf(r) === 'routine')
   const filteredRows = record.inbox.filter(r => pileOf(r) === 'filtered')
   const reasonEntries = Object.entries(record.reasonCounts ?? {}) as [WireWhyCode, number][]
