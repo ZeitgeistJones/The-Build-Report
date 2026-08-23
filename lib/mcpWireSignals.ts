@@ -41,8 +41,9 @@ export type TrackedProjectHit = {
 /** Generic GitHub orgs we watch only by exact repo, never by owner-wide match. */
 const BROAD_OWNERS = new Set(['base', 'google', 'openai'])
 
+/** Keyword scan on name/title/description — blunt, not smart classification. */
 const CRYPTO_RE =
-  /\b(wallets?|blockchains?|on-?chain|smart\s*contracts?|defi|web3|solana|ethereum|bitcoin|evm|erc-?20|polygon|arbitrum)\b/i
+  /\b(wallets?|blockchains?|on-?chain|off-?chain|smart\s*contracts?|defi|web3|crypto(?:currenc(?:y|ies))?|solana|ethereum|bitcoin|btc\b|eth\b|evm|erc-?(20|721|1155)|polygon|arbitrum|optimism|base\s*chain|coinbase\s*base|avalanche|cosmos|sui\b|aptos|near\s*protocol|ton\b|hyperliquid|uniswap|metamask|phantom|ledger|trezor|dex\b|amm\b|nft|stablecoins?|usdc|usdt|mempool|mev\b|rollups?|zk-?rollups?|layer\s*2|l2\b|multisig|multi-?sig|account\s*abstraction|gasless|bridg(?:e|ing)|staking|airdrops?|liquidity\s*pools?|yield\s*farming|perps?|perpetuals?|custody|seed\s*phrases?|private\s*keys?|token\s*transfers?|fungible\s*tokens?)\b/i
 
 const CONSEQUENTIAL_RE =
   /\b(browser\s*control|puppeteer|playwright|headless\s*browser|shell\s*access|command\s*execution|terminal\s*access|ssh\b|cloud\s*infrastructure|deployments?|kubernetes|wallets?|money\s*movement|payments?|smart\s*contracts?|hardware\s*control|account\s*management|send(?:s|ing)?\s+messages?)\b/i
