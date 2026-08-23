@@ -1498,7 +1498,7 @@ export default function AdminPage() {
         <div id="wire" />
         <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>The Wire</h2>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '6px' }}>MCP MVP</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', maxWidth: '620px', lineHeight: 1.55 }}>
               New tools published to the public MCP registry since the last successful collection. Runs automatically with the nightly digest; use this to pull immediately. Running it twice in a row should return almost nothing — that means the watermark is working.
             </p>

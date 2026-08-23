@@ -2,6 +2,7 @@ import Link from 'next/link'
 import ExternalBriefsNewspaper from '@/components/ExternalBriefsNewspaper'
 import YbMissingEdition, { missingEditionCopy } from '@/components/YbMissingEdition'
 import { getAllExternalBriefs } from '@/lib/externalOwnerBrief'
+import { getMcpWireAdmin } from '@/lib/mcpWire'
 import {
   hasCachedYbEdition,
   latestYbIssueDateKey,
@@ -38,7 +39,10 @@ export default async function DailyLoopPage({
   }
 
   const dateKey = resolved.dateKey
-  const briefs = await getAllExternalBriefs(dateKey)
+  const [briefs, wireAdmin] = await Promise.all([
+    getAllExternalBriefs(dateKey),
+    getMcpWireAdmin(dateKey),
+  ])
 
   if (resolved.requested && !hasCachedYbEdition(briefs)) {
     const copy = missingEditionCopy(dateKey)
@@ -62,6 +66,7 @@ export default async function DailyLoopPage({
         briefs={briefs}
         issueDateKey={dateKey}
         latestDateKey={latestDateKey}
+        mcpWire={wireAdmin?.snapshot ?? null}
       />
     </>
   )

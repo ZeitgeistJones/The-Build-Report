@@ -267,16 +267,16 @@ export default function McpWireInbox({ record }: { record: McpWireAdminRecord | 
 
   return (
     <div className="wire-inbox">
-      <h3 className="wire-inbox__what">What is The Wire?</h3>
+      <h3 className="wire-inbox__what">What is MCP MVP?</h3>
       <p className="wire-inbox__explain">
         MCP tools are connectors that let AI assistants use outside software, data, APIs, wallets,
         browsers, and other services.
       </p>
       <p className="wire-inbox__explain">
-        The Wire watches the{' '}
+        MCP MVP watches the{' '}
         <span
           className="wire-inbox__term"
-          title="The public directory this Wire watches for MCP listing changes."
+          title="The public directory this desk watches for MCP listing changes."
         >
           official MCP Registry
         </span>{' '}
@@ -309,7 +309,7 @@ export default function McpWireInbox({ record }: { record: McpWireAdminRecord | 
             <strong>About this data</strong>
           </p>
           <p>
-            The Wire is an independent automated digest of public metadata from the official MCP
+            MCP MVP is an independent automated digest of public metadata from the official MCP
             Registry.
           </p>
           <p>

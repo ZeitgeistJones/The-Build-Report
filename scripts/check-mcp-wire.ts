@@ -256,15 +256,16 @@ expect(
     !/\\b|\(\?:/.test(lowInterestMatch('affiliate marketing desk')?.reason ?? ''),
 )
 
-/* 6. Live Yesterday's Builds hides The Wire; Admin keeps inbox + desk preview. */
+/* 6. Live Daily Loop prints MCP MVP; Admin keeps inbox + desk preview. */
 {
   const yb = readFileSync(join(process.cwd(), 'app/daily-loop/page.tsx'), 'utf8')
   const mcp = readFileSync(join(process.cwd(), 'components/McpWire.tsx'), 'utf8')
   const adminPage = readFileSync(join(process.cwd(), 'app/admin/page.tsx'), 'utf8')
-  expect('live YB does not pass mcpWire', !/mcpWire=/.test(yb))
-  expect('live YB does not fetch Wire', !yb.includes('getMcpWire'))
+  expect('live Daily Loop passes mcpWire', /mcpWire=/.test(yb))
+  expect('live Daily Loop fetches Wire admin snapshot', yb.includes('getMcpWireAdmin'))
   expect('desk preview is not the inbox', !mcp.includes('SHOW ME') && !mcp.includes('ROUTINE UPDATES'))
   expect('desk preview has no SHUT DOWN label', !mcp.includes('SHUT DOWN'))
+  expect('public desk is labeled MCP MVP', mcp.includes('>MCP MVP<') || mcp.includes('MCP MVP'))
   expect('admin page still mounts Wire Inbox', adminPage.includes('<McpWireInbox record={wireAdmin} />'))
   expect('admin page still mounts desk preview', adminPage.includes('<McpWire wire={wireAdmin?.snapshot ?? null} preview />'))
 }

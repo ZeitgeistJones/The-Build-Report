@@ -85,8 +85,8 @@ expect(
 
 {
   const page = readFileSync(join(process.cwd(), 'app/daily-loop/page.tsx'), 'utf8')
-  expect('live YB does not pass mcpWire', !/mcpWire=/.test(page))
-  expect('live YB does not fetch Wire', !page.includes('getMcpWire'))
+  expect('live Daily Loop passes mcpWire', /mcpWire=/.test(page))
+  expect('live Daily Loop fetches Wire admin snapshot', page.includes('getMcpWireAdmin'))
   expect('public YB does not pass admin to newspaper', !/ExternalBriefsNewspaper[\s\S]*admin/.test(page))
 }
 
@@ -96,9 +96,9 @@ expect(
   expect('newspaper uses shared issue numbers', newspaper.includes('ybIssueNumber('))
   expect('newspaper does not keep the 2025 year-count epoch', !newspaper.includes('2025, 11, 31'))
   expect('Also filed splits long briefs out of the pack', newspaper.includes('isLongAlsoFiled') && newspaper.includes('ext-paper-shorts-long'))
-  expect('Also filed solo pack stays single column', newspaper.includes('ext-paper-shorts--solo'))
+  expect('Also filed uses paired rows', newspaper.includes('ext-paper-shorts-row--pair'))
   expect('shorts section precedes comic double rule', /ext-paper-shorts[\s\S]*ext-paper-rule--double[\s\S]*DailyLoopComic/.test(newspaper))
-  expect('Also filed pack caps at 2 columns', !/\.ext-paper-shorts \{[\s\S]*?column-count: 3/.test(css) && css.includes('.ext-paper-shorts:not(.ext-paper-shorts--solo)'))
+  expect('Also filed pair caps at 2 columns', css.includes('.ext-paper-shorts-row--pair') && css.includes('grid-template-columns: 1fr 1fr'))
   expect('long Also filed threshold is 700 chars / 2 paras', newspaper.includes('ALSO_FILED_LONG_CHARS = 700') && newspaper.includes('ALSO_FILED_LONG_PARAS = 2'))
   expect('paper has no Also filed section chip', !newspaper.includes('>Also filed<'))
 }

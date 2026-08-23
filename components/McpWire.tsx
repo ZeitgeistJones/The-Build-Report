@@ -18,12 +18,12 @@ export default function McpWire({
   const quiet = !failed && dispatches.length === 0
 
   return (
-    <section className="ext-wire" aria-label="The Wire">
+    <section className="ext-wire" aria-label="MCP MVP">
       {preview && <p className="ext-wire__preview">Admin desk preview · not live</p>}
-      <p className="ext-paper-sectionhead">The Wire</p>
+      <p className="ext-paper-sectionhead">MCP MVP</p>
       <p className="ext-wire__deck">
-        New and changed AI-tool connectors from the official MCP Registry — open the drop links
-        below to jump to the listing or source.
+        Two standout new or notable AI-tool connectors from the official MCP Registry — ranked by
+        GitHub stars. Open the drop links below to jump to the listing or source.
       </p>
       <div className="ext-wire__source">
         <span className="ext-wire__source-text">
@@ -38,11 +38,11 @@ export default function McpWire({
               browsers and other services.
             </p>
             <p>
-              The Wire watches public changes in the official MCP Registry and turns a small number of
-              those Registry events into short newspaper dispatches.
+              MCP MVP watches public changes in the official MCP Registry and prints the two listings
+              with the most GitHub stars from that window&apos;s notable drops.
             </p>
             <p>
-              The Wire is an independent automated digest of public Registry metadata.
+              MCP MVP is an independent automated digest of public Registry metadata.
             </p>
             <p>
               A Registry listing does not mean The Build Report has verified that a tool is safe,
