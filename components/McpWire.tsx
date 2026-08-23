@@ -1,5 +1,5 @@
 /**
- * Compact newspaper Wire desk for public /daily-loop + Admin preview.
+ * Compact newspaper MCP MVP desk for public /daily-loop + Admin preview.
  */
 import { officialRegistryRecordUrl, formatWireStars, type McpWireSnapshot } from '@/lib/mcpWire'
 import { PUBLIC_WIRE_CAP, toPublicWireDispatch } from '@/lib/mcpWirePublic'
@@ -16,14 +16,16 @@ export default function McpWire({
   const dispatches = items.map(toPublicWireDispatch)
   const failed = wire?.status === 'failed'
   const quiet = !failed && dispatches.length === 0
+  const solo = dispatches.length === 1
 
   return (
     <section className="ext-wire" aria-label="MCP MVP">
       {preview && <p className="ext-wire__preview">Admin desk preview · not live</p>}
       <p className="ext-paper-sectionhead">MCP MVP</p>
       <p className="ext-wire__deck">
-        Two standout new or notable AI-tool connectors from the official MCP Registry — ranked by
-        GitHub stars. Open the drop links below to jump to the listing or source.
+        {solo
+          ? 'Today’s standout AI-tool connector from the official MCP Registry — ranked by GitHub stars among notable drops. Open the links below to jump to the listing or source.'
+          : 'Two standout new or notable AI-tool connectors from the official MCP Registry — ranked by GitHub stars. Open the drop links below to jump to the listing or source.'}
       </p>
       <div className="ext-wire__source">
         <span className="ext-wire__source-text">
@@ -38,7 +40,7 @@ export default function McpWire({
               browsers and other services.
             </p>
             <p>
-              MCP MVP watches public changes in the official MCP Registry and prints the two listings
+              MCP MVP watches public changes in the official MCP Registry and prints up to two listings
               with the most GitHub stars from that window&apos;s notable drops.
             </p>
             <p>
@@ -73,23 +75,29 @@ export default function McpWire({
       ) : quiet ? (
         <p className="ext-wire__quiet">No notable Registry changes filed overnight.</p>
       ) : (
-        <ul className="ext-wire__list">
+        <ul className={solo ? 'ext-wire__list ext-wire__list--solo' : 'ext-wire__list'}>
           {dispatches.map(item => {
             const registryHref = officialRegistryRecordUrl(item.name, item.version)
             const dropHref = item.repoUrl || registryHref
             const isNewDrop = item.status === 'NEW'
             const label = item.beat ? `${item.status} · ${item.beat}` : item.status
+            const itemClass = [
+              'ext-wire__item',
+              isNewDrop ? 'ext-wire__item--new' : '',
+              solo ? 'ext-wire__item--solo' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')
             return (
-              <li
-                key={`${item.name}-${item.version}`}
-                className={isNewDrop ? 'ext-wire__item ext-wire__item--new' : 'ext-wire__item'}
-              >
+              <li key={`${item.name}-${item.version}`} className={itemClass}>
                 <div className="ext-wire__meta">
                   <span className="ext-wire__kicker">{label}</span>
-                  {typeof item.stars === 'number' && (
-                    <span className="ext-wire__stars">{formatWireStars(item.stars)}</span>
-                  )}
-                  {item.time && <time className="ext-wire__time">{item.time}</time>}
+                  <span className="ext-wire__meta-right">
+                    {typeof item.stars === 'number' && (
+                      <span className="ext-wire__stars">{formatWireStars(item.stars)}</span>
+                    )}
+                    {item.time && <time className="ext-wire__time">{item.time}</time>}
+                  </span>
                 </div>
                 <h3 className="ext-wire__title">
                   <a
@@ -103,7 +111,11 @@ export default function McpWire({
                   </a>
                 </h3>
                 {item.trackedNote && <p className="ext-wire__desk">Also covered above</p>}
-                <p className="ext-wire__sentence">{item.sentence}</p>
+                <div className="ext-wire__body">
+                  {item.paragraphs.map((p, i) => (
+                    <p key={i}>{p}</p>
+                  ))}
+                </div>
                 {item.deletionNote && (
                   <p className="ext-wire__note">
                     Registry removal does not necessarily mean the underlying project shut down.

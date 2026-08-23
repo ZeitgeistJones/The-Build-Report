@@ -21,7 +21,10 @@ export type PublicWireDispatch = {
   status: PublicWireStatus
   beat?: PublicWireBeat
   time: string
+  /** Short first line — kept for checks / compact previews. */
   sentence: string
+  /** Newspaper-style paragraphs explaining what the connector is for. */
+  paragraphs: string[]
   deletionNote: boolean
   trackedNote: boolean
   repoUrl?: string
@@ -186,6 +189,69 @@ export function publicWireSentence(item: WireItem): string {
   return raw
 }
 
+/** Article-style paragraphs for the public MCP MVP desk. */
+export function publicWireArticle(item: WireItem): string[] {
+  const status = publicWireStatus(item)
+  const title = item.title?.trim() || item.name
+  const beat = publicWireBeat(item)
+  const stars = item.stars
+
+  if (status === 'REMOVED FROM REGISTRY') {
+    return [
+      `The official MCP Registry now marks ${title} as deleted.`,
+      'That is a Registry listing change — not proof the underlying project shut down or stopped working elsewhere.',
+    ]
+  }
+  if (status === 'DEPRECATED') {
+    return [
+      `The official MCP Registry now marks ${title} as deprecated.`,
+      'Deprecation means the publisher is steering people away from this listing; check the Registry record and source for what replaced it.',
+    ]
+  }
+
+  const desc = item.description.trim().replace(/\s+/g, ' ')
+  const paras: string[] = []
+
+  if (desc) {
+    let what = desc.slice(0, 520)
+    if (desc.length > 520) what = `${what.replace(/\s+\S*$/, '')}…`
+    if (!/[.!?]$/.test(what)) what = `${what}.`
+    if (publisherClaimNeedsAttribution(what)) {
+      paras.push(`The Registry listing describes ${title} as: ${what.replace(/\.$/, '')}.`)
+    } else {
+      paras.push(what)
+    }
+  } else {
+    paras.push(`${title} is a connector listed in the official MCP Registry.`)
+  }
+
+  const context: string[] = [
+    'MCP connectors let an AI agent use outside tools — databases, browsers, wallets, APIs — during a session, instead of only chatting in text.',
+  ]
+  if (status === 'NEW') {
+    context.push('This one first appeared in the Registry during this collection window.')
+  } else {
+    context.push('This listing was updated in the Registry during this collection window.')
+  }
+  if (typeof stars === 'number') {
+    context.push(
+      `Among today’s notable drops with a public GitHub repo, it ranks by star count (${stars.toLocaleString()}★).`,
+    )
+  }
+  if (beat === 'ONCHAIN') {
+    context.push('The listing reads as crypto or onchain-related.')
+  } else if (beat === 'BROWSER') {
+    context.push('The listing points at browser automation or control.')
+  } else if (beat === 'DATA') {
+    context.push('The listing points at data or database access.')
+  } else if (beat === 'AGENT INFRA') {
+    context.push('The listing suggests consequential agent access — powerful system hooks.')
+  }
+  paras.push(context.join(' '))
+
+  return paras
+}
+
 export function toPublicWireDispatch(item: WireItem): PublicWireDispatch {
   const title = item.title?.trim() || item.name
   const status = publicWireStatus(item)
@@ -198,6 +264,7 @@ export function toPublicWireDispatch(item: WireItem): PublicWireDispatch {
     beat: status === 'REMOVED FROM REGISTRY' || status === 'DEPRECATED' ? undefined : beat,
     time: publicWireStamp(item.at),
     sentence: publicWireSentence(item),
+    paragraphs: publicWireArticle(item),
     deletionNote: status === 'REMOVED FROM REGISTRY',
     trackedNote: Boolean(item.trackedLabel),
     repoUrl: item.repoUrl,

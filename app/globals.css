@@ -1649,6 +1649,10 @@ button {
   gap: 0 28px;
 }
 
+.ext-wire__list--solo {
+  grid-template-columns: 1fr;
+}
+
 .ext-wire__item {
   padding: 12px 0;
   border-bottom: 1px solid var(--paper-ink);
@@ -1663,12 +1667,24 @@ button {
   border-bottom: 1px solid var(--paper-ink);
 }
 
+.ext-wire__item--solo.ext-wire__item--new {
+  margin: 0;
+  padding: 16px 18px 16px 20px;
+}
+
 .ext-wire__meta {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
   margin-bottom: 6px;
+}
+
+.ext-wire__meta-right {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .ext-wire__kicker {
@@ -1702,6 +1718,11 @@ button {
   color: var(--text-primary);
 }
 
+.ext-wire__item--solo .ext-wire__title {
+  font-size: clamp(22px, 3.2vw, 30px);
+  max-width: 28ch;
+}
+
 .ext-wire__title-link {
   color: inherit;
   text-decoration: none;
@@ -1727,6 +1748,32 @@ button {
   font-size: 15px;
   line-height: 1.45;
   color: var(--text-secondary);
+}
+
+.ext-wire__body {
+  margin: 10px 0 0;
+  max-width: 42rem;
+}
+
+.ext-wire__item--solo .ext-wire__body {
+  max-width: 46rem;
+}
+
+.ext-wire__body p {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.ext-wire__body p:last-child {
+  margin-bottom: 0;
+}
+
+.ext-wire__item--solo .ext-wire__body p {
+  font-size: 16px;
+  line-height: 1.62;
 }
 
 .ext-wire__note {
