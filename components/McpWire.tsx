@@ -1,7 +1,7 @@
 /**
  * Compact newspaper Wire desk for public /daily-loop + Admin preview.
  */
-import { officialRegistryRecordUrl, type McpWireSnapshot } from '@/lib/mcpWire'
+import { officialRegistryRecordUrl, formatWireStars, type McpWireSnapshot } from '@/lib/mcpWire'
 import { PUBLIC_WIRE_CAP, toPublicWireDispatch } from '@/lib/mcpWirePublic'
 
 export default function McpWire({
@@ -86,6 +86,9 @@ export default function McpWire({
               >
                 <div className="ext-wire__meta">
                   <span className="ext-wire__kicker">{label}</span>
+                  {typeof item.stars === 'number' && (
+                    <span className="ext-wire__stars">{formatWireStars(item.stars)}</span>
+                  )}
                   {item.time && <time className="ext-wire__time">{item.time}</time>}
                 </div>
                 <h3 className="ext-wire__title">

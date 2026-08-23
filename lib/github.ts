@@ -814,6 +814,26 @@ export async function fetchRepoBySlug(
   }
 }
 
+/** Cheap star count for an arbitrary public repo (MCP Wire SHOW ME tiebreaker). */
+export async function fetchPublicRepoStars(
+  owner: string,
+  repo: string,
+): Promise<number | null> {
+  const o = owner.trim()
+  const r = repo.trim()
+  if (!o || !r) return null
+  try {
+    const data = await ghFetch(`/repos/${encodeURIComponent(o)}/${encodeURIComponent(r)}`)
+    const n = data?.stargazers_count
+    return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : null
+  } catch (err) {
+    if (err instanceof Error && err.message === 'rate_limited') {
+      console.warn(`[github] rate limited fetching stars for ${o}/${r}`)
+    }
+    return null
+  }
+}
+
 export interface RepoEvidenceFlags {
   hasLicense: boolean
   hasSecurityMd: boolean

@@ -25,6 +25,7 @@ export type PublicWireDispatch = {
   deletionNote: boolean
   trackedNote: boolean
   repoUrl?: string
+  stars?: number
 }
 
 const STRONG_PUBLIC_REASONS: WireWhyCode[] = [
@@ -55,6 +56,8 @@ export function publicWireClassRank(row: WireInboxRow): number {
 function comparePublicRows(a: WireInboxRow, b: WireInboxRow): number {
   const classDiff = publicWireClassRank(a) - publicWireClassRank(b)
   if (classDiff !== 0) return classDiff
+  const starsDiff = (b.stars ?? -1) - (a.stars ?? -1)
+  if (starsDiff !== 0) return starsDiff
   const timeDiff = (b.at || '').localeCompare(a.at || '')
   if (timeDiff !== 0) return timeDiff
   return a.name.localeCompare(b.name)
@@ -100,6 +103,7 @@ export function inboxRowToWireItem(row: WireInboxRow): WireItem {
     registryStatus: row.registryStatus,
     whyShown: row.whyShown,
     trackedLabel: row.tracked?.label,
+    stars: row.stars,
   }
 }
 
@@ -179,5 +183,6 @@ export function toPublicWireDispatch(item: WireItem): PublicWireDispatch {
     deletionNote: status === 'REMOVED FROM REGISTRY',
     trackedNote: Boolean(item.trackedLabel),
     repoUrl: item.repoUrl,
+    stars: item.stars,
   }
 }

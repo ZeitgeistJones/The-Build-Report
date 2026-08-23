@@ -1,5 +1,5 @@
 import type { McpWireAdminRecord, McpWireStatus, WireInboxRow, WirePile } from '@/lib/mcpWire'
-import { officialRegistryRecordUrl } from '@/lib/mcpWire'
+import { formatWireStars, officialRegistryRecordUrl, sortShowMeRows } from '@/lib/mcpWire'
 import {
   githubRepoDisplay,
   parseGithubOwnerRepo,
@@ -101,6 +101,9 @@ function InboxCard({
         <span className="wire-inbox__keep is-skip">SKIP</span>
       )}
       <p className="wire-card__title">{row.title || row.name}</p>
+      {typeof row.stars === 'number' && (
+        <p className="wire-card__stars">{formatWireStars(row.stars)} on GitHub</p>
+      )}
       <p className="wire-card__what">
         <strong>What it is:</strong> {row.whatItIs || row.description || '—'}
       </p>
@@ -243,21 +246,10 @@ export default function McpWireInbox({ record }: { record: McpWireAdminRecord | 
   const showMe = record.showMeCount ?? 0
   const routine = record.routineCount ?? 0
   const filtered = record.filteredCount ?? record.skippedFilterCount + record.skippedOtherCount
-  const showRank: Record<WireInboxRow['kind'], number> = {
-    new: 0,
-    withdrawn: 1,
-    revised: 2,
-    unknown: 3,
-  }
   const showRows = record.inbox
     .filter(r => pileOf(r) === 'show')
     .slice()
-    .sort(
-      (a, b) =>
-        Number(!!b.tracked) - Number(!!a.tracked) ||
-        showRank[a.kind] - showRank[b.kind] ||
-        (b.at || '').localeCompare(a.at || ''),
-    )
+    .sort(sortShowMeRows)
   const routineRows = record.inbox.filter(r => pileOf(r) === 'routine')
   const filteredRows = record.inbox.filter(r => pileOf(r) === 'filtered')
   const reasonEntries = Object.entries(record.reasonCounts ?? {}) as [WireWhyCode, number][]

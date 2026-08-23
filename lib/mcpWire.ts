@@ -1,9 +1,11 @@
 import { getRedis } from '@/lib/redis'
+import { fetchPublicRepoStars } from '@/lib/github'
 import {
   composeWhyShownText,
   firstSentence,
   githubPublisherDisplay,
   happenedLine,
+  parseGithubOwnerRepo,
   parseRegistryStatus,
   surfaceWhy,
   type RegistryLifecycle,
@@ -24,6 +26,66 @@ export const SHOW_STORE_CAP = 80
 export const ROUTINE_STORE_CAP = 50
 export const FILTERED_STORE_CAP = 80
 
+const SHOW_STAR_FETCH_CONCURRENCY = 4
+
+export function formatWireStars(stars: number): string {
+  if (stars >= 1000) {
+    const k = stars / 1000
+    return `${k >= 10 ? Math.round(k) : k.toFixed(1).replace(/\.0$/, '')}k★`
+  }
+  return `${stars}★`
+}
+
+/** Admin + public SHOW ME order: tracked, kind, then GitHub stars, then recency. */
+export function sortShowMeRows(a: WireInboxRow, b: WireInboxRow): number {
+  const rank: Record<WireInboxRow['kind'], number> = {
+    new: 0,
+    withdrawn: 1,
+    revised: 2,
+    unknown: 3,
+  }
+  return (
+    Number(!!b.tracked) - Number(!!a.tracked) ||
+    rank[a.kind] - rank[b.kind] ||
+    (b.stars ?? -1) - (a.stars ?? -1) ||
+    (b.at || '').localeCompare(a.at || '') ||
+    a.name.localeCompare(b.name)
+  )
+}
+
+/**
+ * Fetch GitHub stars only for SHOW ME rows with a public repo URL.
+ * Dedupes by owner/repo — typically a handful of calls per collection.
+ */
+export async function attachGithubStarsToShowRows(rows: WireInboxRow[]): Promise<void> {
+  const byKey = new Map<string, { owner: string; repo: string; rows: WireInboxRow[] }>()
+  for (const row of rows) {
+    if (row.pile !== 'show') continue
+    const parsed = parseGithubOwnerRepo(row.repoUrl)
+    if (!parsed) continue
+    const key = `${parsed.owner}/${parsed.repo}`
+    const cur = byKey.get(key)
+    if (cur) cur.rows.push(row)
+    else byKey.set(key, { owner: parsed.owner, repo: parsed.repo, rows: [row] })
+  }
+  if (byKey.size === 0) return
+
+  const entries = [...byKey.values()]
+  for (let i = 0; i < entries.length; i += SHOW_STAR_FETCH_CONCURRENCY) {
+    const batch = entries.slice(i, i + SHOW_STAR_FETCH_CONCURRENCY)
+    const results = await Promise.all(
+      batch.map(async entry => ({
+        entry,
+        stars: await fetchPublicRepoStars(entry.owner, entry.repo),
+      })),
+    )
+    for (const { entry, stars } of results) {
+      if (stars == null) continue
+      for (const row of entry.rows) row.stars = stars
+    }
+  }
+}
+
 /** One dispatch on the wire (newspaper preview / public snapshot). */
 export type WireItem = {
   name: string
@@ -39,6 +101,8 @@ export type WireItem = {
   registryStatus?: RegistryLifecycle
   whyShown?: WireWhyCode[]
   trackedLabel?: string
+  /** GitHub stargazers when the listing has a public repo URL. */
+  stars?: number
 }
 
 export type McpWireStatus = 'ok' | 'partial' | 'failed'
@@ -80,6 +144,8 @@ export type WireInboxRow = {
   statusMessage?: string
   publishedAt?: string
   updatedAt?: string
+  /** GitHub stargazers for repoUrl — filled for SHOW ME during collection. */
+  stars?: number
 }
 
 export type McpWireAdminRecord = {
@@ -471,14 +537,8 @@ export function buildWireCollection(rows: RegistryRow[]): {
   const routine = allRows.filter(r => r.pile === 'routine')
   const filtered = allRows.filter(r => r.pile === 'filtered')
 
-  // Admin SHOW ME: new registrations first so they're easy to find; removals next.
-  const rank = { new: 0, withdrawn: 1, revised: 2, unknown: 3 }
-  show.sort(
-    (a, b) =>
-      Number(!!b.tracked) - Number(!!a.tracked) ||
-      rank[a.kind] - rank[b.kind] ||
-      (b.at || '').localeCompare(a.at || ''),
-  )
+  // Admin SHOW ME: new first, then stars (filled later during collection), then recency.
+  show.sort(sortShowMeRows)
   routine.sort((a, b) => (b.at || '').localeCompare(a.at || ''))
   filtered.sort((a, b) => (b.at || '').localeCompare(a.at || ''))
 
@@ -588,9 +648,16 @@ export async function collectMcpWireDetailed(
   try {
     const fetched = await fetchChanges(since)
     const built = buildWireCollection(fetched.rows)
+    await attachGithubStarsToShowRows(built.inbox)
+
+    const show = built.inbox.filter(r => r.pile === 'show').sort(sortShowMeRows)
+    const routine = built.inbox.filter(r => r.pile === 'routine')
+    const filtered = built.inbox.filter(r => r.pile === 'filtered')
+    const inbox = [...show, ...routine, ...filtered]
+    const printItems = selectPublicWireItems(show)
     const status: McpWireStatus = fetched.complete ? 'ok' : 'partial'
     const { through, watermarkAdvanced } = nextWatermark(status, priorThrough, collectedAt)
-    const printed = built.items.slice(0, PRINT_CAP)
+    const printed = printItems.slice(0, PRINT_CAP)
 
     const snapshot: McpWireSnapshot = {
       dateKey,
@@ -622,7 +689,7 @@ export async function collectMcpWireDetailed(
       routineCount: built.routineCount,
       filteredCount: built.filteredCount,
       reasonCounts: built.reasonCounts,
-      inbox: built.inbox,
+      inbox,
       inboxCap: INBOX_CAP,
       inboxCapped:
         built.showMeCount > SHOW_STORE_CAP ||
