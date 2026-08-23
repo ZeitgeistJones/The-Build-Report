@@ -1304,25 +1304,12 @@ button {
   margin: 0 0 22px;
 }
 
-.ext-paper-comic .ext-paper-sectionhead {
-  margin-bottom: 10px;
-}
-
 .ext-paper-comic__img {
   display: block;
   width: 100%;
   height: auto;
   border: 1px solid var(--border-strong);
   background: var(--surface-1);
-}
-
-.ext-paper-comic__credit {
-  margin: 8px 0 0;
-  font-family: var(--font-kicker);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
 }
 
 /* --- Off the wire --- */

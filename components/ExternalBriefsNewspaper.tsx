@@ -151,13 +151,11 @@ function chunkPairs<T>(items: T[]): T[][] {
 const DAILY_LOOP_COMIC = {
   src: '/daily-loop-comic-building-in-public.jpg',
   alt: 'Comic: an agent posts that it is building in public; someone asks if it built anything.',
-  credit: 'Building in public',
 } as const
 
 function DailyLoopComic() {
   return (
     <aside className="ext-paper-comic" aria-label="Comic">
-      <p className="ext-paper-sectionhead">Comic</p>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         className="ext-paper-comic__img"
@@ -166,7 +164,6 @@ function DailyLoopComic() {
         width={1200}
         height={900}
       />
-      <p className="ext-paper-comic__credit">{DAILY_LOOP_COMIC.credit}</p>
     </aside>
   )
 }
