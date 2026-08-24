@@ -155,8 +155,8 @@ function chunkPairs<T>(items: T[]): T[][] {
 }
 
 const DAILY_LOOP_COMIC = {
-  src: '/daily-loop-comic-vibe-coding.jpg',
-  alt: 'Comic: a coder says vibe coding let an agent ship an app in two hours; asked about tests and security, a friend notes the users are handling those.',
+  src: '/daily-loop-comic-bankr-tv-robot.jpg',
+  alt: 'Comic: friends talk up Bankr as the infra layer crypto needed; the punchline is everyone actually wants the cute TV robot.',
 } as const
 
 function DailyLoopComic() {
