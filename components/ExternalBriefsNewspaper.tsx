@@ -21,6 +21,12 @@ import {
 } from '@/lib/externalOwnerBrief'
 import type { McpWireSnapshot } from '@/lib/mcpWire'
 import {
+  applyYbEditorialCopy,
+  getYbEditorialOverride,
+  pinYbLeadAccount,
+  type YbEditorialMedia,
+} from '@/lib/ybEditorialOverrides'
+import {
   orderStoriesForYbFrontPage,
 } from '@/lib/yesterdaysBuildsLeadPolicy'
 
@@ -218,6 +224,44 @@ function Byline({
   )
 }
 
+function StoryMedia({ media }: { media: YbEditorialMedia }) {
+  return (
+    <figure className="ext-paper-media">
+      <div className="ext-paper-media__row">
+        <a
+          className="ext-paper-media__qr-link"
+          href={media.docsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            className="ext-paper-media__qr"
+            src={media.qrSrc}
+            alt={`QR code to ${media.docsLabel}`}
+            width={160}
+            height={160}
+          />
+        </a>
+        {media.easterEggSrc && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            className="ext-paper-media__egg"
+            src={media.easterEggSrc}
+            alt="Crop of the QR code Base hid in yesterday’s graphic"
+          />
+        )}
+      </div>
+      <figcaption className="ext-paper-media__cap">
+        {media.caption}{' '}
+        <a href={media.docsUrl} target="_blank" rel="noopener noreferrer">
+          {media.docsLabel} →
+        </a>
+      </figcaption>
+    </figure>
+  )
+}
+
 function StoryBlock({
   story,
   variant,
@@ -228,6 +272,7 @@ function StoryBlock({
   result,
   onRegenerate,
   leadKicker,
+  media,
 }: {
   story: Story
   variant: 'lead' | 'second' | 'brief'
@@ -239,6 +284,7 @@ function StoryBlock({
   onRegenerate?: () => void
   /** Override the lead-slot label (e.g. Strongest observed when no material lead). */
   leadKicker?: string
+  media?: YbEditorialMedia | null
 }) {
   const { account, brief, text } = story
   const paragraphs = toParagraphs(text)
@@ -296,6 +342,8 @@ function StoryBlock({
       {account.sampleNote && <p className="ext-paper-sample">{account.sampleNote}</p>}
       {admin && result && <p className="ext-paper-result">{result}</p>}
 
+      {variant === 'lead' && media && <StoryMedia media={media} />}
+
       <div className="ext-paper-body">
         {body.map((p, i) => (
           <p key={i}>{p}</p>
@@ -318,8 +366,22 @@ export default function ExternalBriefsNewspaper({
 }: Props) {
   const { normie } = useNormieMode()
 
+  const editionDateKey =
+    issueDateKey ??
+    Object.values(briefs).find(b => b?.dateKey)?.dateKey ??
+    null
+  const editorial = getYbEditorialOverride(editionDateKey)
+
   const rows = EXTERNAL_BRIEF_ACCOUNTS.map(account => {
-    const brief = briefs[account.id] ?? null
+    let brief = briefs[account.id] ?? null
+    if (
+      brief &&
+      editorial &&
+      editorial.leadAccountId === account.id &&
+      brief.dateKey === editorial.dateKey
+    ) {
+      brief = applyYbEditorialCopy(brief, editorial)
+    }
     return { account, brief, text: brief ? briefBody(brief, normie).trim() : '' } as Story
   })
 
@@ -347,7 +409,10 @@ export default function ExternalBriefsNewspaper({
   )
 
   const byId = new Map<string, Story>(shipping.map(s => [s.account.id, s]))
-  const ranked = frontPage.orderedIds
+  const orderedIds = editorial
+    ? pinYbLeadAccount(frontPage.orderedIds, editorial.leadAccountId)
+    : frontPage.orderedIds
+  const ranked = orderedIds
     .map(id => byId.get(id))
     .filter((s): s is Story => Boolean(s))
 
@@ -359,8 +424,13 @@ export default function ExternalBriefsNewspaper({
   const longShorts = shorts.filter(s => isLongAlsoFiled(s))
   const packShorts = shorts.filter(s => !isLongAlsoFiled(s))
   const shortPairs = chunkPairs(packShorts)
-  const leadKicker =
-    frontPage.usedV1 && !frontPage.materialLead ? 'Strongest observed' : 'Lead story'
+  const leadKicker = editorial?.leadKicker
+    ? editorial.leadKicker
+    : frontPage.usedV1 && !frontPage.materialLead
+      ? 'Strongest observed'
+      : 'Lead story'
+  const leadMedia =
+    editorial && lead?.account.id === editorial.leadAccountId ? editorial.media ?? null : null
 
   const anyDate = issueDateKey ?? rows.map(r => r.brief?.dateKey).find(Boolean) ?? null
   const issue = ybIssueNumber(anyDate)
@@ -430,6 +500,7 @@ export default function ExternalBriefsNewspaper({
             admin={admin}
             normie={normie}
             leadKicker={leadKicker}
+            media={leadMedia}
             {...stateFor(lead.account.id)}
           />
 

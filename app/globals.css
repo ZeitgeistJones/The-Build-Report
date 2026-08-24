@@ -1180,6 +1180,58 @@ button {
   margin-bottom: 0;
 }
 
+/* Editorial extras (QR / Easter egg) — full width above multi-column lead body */
+.ext-paper-media {
+  margin: 0 0 18px;
+  padding: 0;
+}
+
+.ext-paper-media__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 20px;
+}
+
+.ext-paper-media__qr-link {
+  display: block;
+  flex-shrink: 0;
+  line-height: 0;
+  border: 1px solid var(--paper-ink);
+  background: #fff;
+  padding: 8px;
+}
+
+.ext-paper-media__qr {
+  display: block;
+  width: 132px;
+  height: 132px;
+  image-rendering: pixelated;
+}
+
+.ext-paper-media__egg {
+  display: block;
+  max-width: min(280px, 100%);
+  height: auto;
+  border: 1px solid var(--border);
+}
+
+.ext-paper-media__cap {
+  margin: 10px 0 0;
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 1.45;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.ext-paper-media__cap a {
+  color: var(--paper-red);
+  font-style: normal;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .ext-paper-story--lead .ext-paper-body {
   column-gap: 30px;
   column-rule: 1px solid var(--border);
@@ -1658,18 +1710,15 @@ button {
   border-bottom: 1px solid var(--paper-ink);
 }
 
+/* NEW / ONCHAIN kickers carry the signal — no grey card (pairs looked uneven). */
 .ext-wire__item--new {
-  padding: 12px 12px 12px 14px;
-  margin: 0 -4px 0 -8px;
-  border-left: 3px solid var(--accent);
-  background: var(--surface-2);
-  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--paper-ink);
 }
 
 .ext-wire__item--solo.ext-wire__item--new {
   margin: 0;
-  padding: 16px 18px 16px 20px;
+  padding: 12px 0;
 }
 
 .ext-wire__meta {
