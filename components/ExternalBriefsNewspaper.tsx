@@ -227,37 +227,33 @@ function Byline({
 function StoryMedia({ media }: { media: YbEditorialMedia }) {
   return (
     <figure className="ext-paper-media">
-      <div className="ext-paper-media__row">
-        <a
-          className="ext-paper-media__qr-link"
-          href={media.docsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            className="ext-paper-media__qr"
-            src={media.qrSrc}
-            alt={`QR code to ${media.docsLabel}`}
-            width={160}
-            height={160}
-          />
-        </a>
-        {media.easterEggSrc && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            className="ext-paper-media__egg"
-            src={media.easterEggSrc}
-            alt="Crop of the QR code Base hid in yesterday’s graphic"
-          />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="ext-paper-media__hero" src={media.heroSrc} alt={media.heroAlt} />
+      <div className="ext-paper-media__footer">
+        {media.qrSrc && (
+          <a
+            className="ext-paper-media__qr-link"
+            href={media.docsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              className="ext-paper-media__qr"
+              src={media.qrSrc}
+              alt={`QR code to ${media.docsLabel}`}
+              width={88}
+              height={88}
+            />
+          </a>
         )}
+        <figcaption className="ext-paper-media__cap">
+          {media.caption}{' '}
+          <a href={media.docsUrl} target="_blank" rel="noopener noreferrer">
+            {media.docsLabel} →
+          </a>
+        </figcaption>
       </div>
-      <figcaption className="ext-paper-media__cap">
-        {media.caption}{' '}
-        <a href={media.docsUrl} target="_blank" rel="noopener noreferrer">
-          {media.docsLabel} →
-        </a>
-      </figcaption>
     </figure>
   )
 }

@@ -1180,17 +1180,25 @@ button {
   margin-bottom: 0;
 }
 
-/* Editorial extras (QR / Easter egg) — full width above multi-column lead body */
+/* Editorial lead visual — full graphic first; small QR as a caption cue */
 .ext-paper-media {
-  margin: 0 0 18px;
+  margin: 0 0 20px;
   padding: 0;
 }
 
-.ext-paper-media__row {
+.ext-paper-media__hero {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--paper-ink);
+  background: #fff;
+}
+
+.ext-paper-media__footer {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 16px 20px;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 10px;
 }
 
 .ext-paper-media__qr-link {
@@ -1199,30 +1207,26 @@ button {
   line-height: 0;
   border: 1px solid var(--paper-ink);
   background: #fff;
-  padding: 8px;
+  padding: 4px;
 }
 
 .ext-paper-media__qr {
   display: block;
-  width: 132px;
-  height: 132px;
+  width: 72px;
+  height: 72px;
   image-rendering: pixelated;
 }
 
-.ext-paper-media__egg {
-  display: block;
-  max-width: min(280px, 100%);
-  height: auto;
-  border: 1px solid var(--border);
-}
-
 .ext-paper-media__cap {
-  margin: 10px 0 0;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
   font-family: var(--font-display);
   font-size: 13px;
   line-height: 1.45;
   font-style: italic;
   color: var(--text-muted);
+  padding-top: 2px;
 }
 
 .ext-paper-media__cap a {
