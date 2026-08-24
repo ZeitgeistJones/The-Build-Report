@@ -1290,6 +1290,17 @@ button {
   background: transparent;
 }
 
+.yb-share__wordmark {
+  margin: 0 0 18px;
+  color: var(--paper-red);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.yb-share__wordmark .daily-loop-wordmark {
+  font-size: 1em;
+}
+
 .yb-share__kicker {
   margin: 0 0 10px;
   font-family: var(--font-kicker);
