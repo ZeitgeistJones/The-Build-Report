@@ -1236,6 +1236,136 @@ button {
   text-underline-offset: 2px;
 }
 
+.ext-paper-share-row {
+  margin: 14px 0 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ext-paper-share {
+  font-family: var(--font-kicker);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-red);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.ext-paper-share:hover {
+  border-bottom-color: var(--paper-red);
+}
+
+/* Per-story share landing */
+.yb-share {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 0 48px;
+}
+
+.yb-share__back {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.yb-share__back a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.yb-share__back a:hover {
+  color: var(--paper-red);
+}
+
+.yb-share__sep {
+  margin: 0 8px;
+  color: var(--border-strong);
+}
+
+.yb-share__card {
+  border-top: 4px solid var(--paper-red);
+  border-bottom: 1px solid var(--paper-ink);
+  padding: 28px 0 24px;
+  background: transparent;
+}
+
+.yb-share__kicker {
+  margin: 0 0 10px;
+  font-family: var(--font-kicker);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-red);
+}
+
+.yb-share__headline {
+  margin: 0 0 12px;
+  font-family: var(--font-slab);
+  font-size: clamp(28px, 5vw, 40px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.yb-share__issue {
+  margin: 0 0 18px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.yb-share__teaser {
+  margin: 0 0 28px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1.55;
+  font-style: italic;
+  color: var(--text-primary);
+}
+
+.yb-share__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.yb-share__primary {
+  display: inline-block;
+  padding: 10px 16px;
+  background: var(--paper-red);
+  color: #fff;
+  font-family: var(--font-kicker);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.yb-share__primary:hover {
+  filter: brightness(1.05);
+}
+
+.yb-share__secondary {
+  font-family: var(--font-kicker);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--paper-red);
+  text-decoration: none;
+  border-bottom: 1px solid var(--paper-red);
+}
+
+.yb-share__fine {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .ext-paper-story--lead .ext-paper-body {
   column-gap: 30px;
   column-rule: 1px solid var(--border);

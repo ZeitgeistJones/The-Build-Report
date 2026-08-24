@@ -4,7 +4,8 @@ import { useNormieMode } from '@/components/NormieModeProvider'
 import YbIssueNav from '@/components/YbIssueNav'
 import McpWire from '@/components/McpWire'
 import DailyLoopWordmark from '@/components/DailyLoopWordmark'
-import { canonicalYbIssuePath, ybIssueNumber } from '@/lib/ybIssue'
+import YbStoryShareButton from '@/components/YbStoryShareButton'
+import { canonicalYbIssuePath, formatIssueLong, ybIssueNumber } from '@/lib/ybIssue'
 import {
   EXTERNAL_BRIEF_ACCOUNTS,
   EXTERNAL_BRIEF_MAX_COMMITS,
@@ -26,6 +27,7 @@ import {
   pinYbLeadAccount,
   type YbEditorialMedia,
 } from '@/lib/ybEditorialOverrides'
+import { storyTeaserFromBrief } from '@/lib/ybStoryShare'
 import {
   orderStoriesForYbFrontPage,
 } from '@/lib/yesterdaysBuildsLeadPolicy'
@@ -303,6 +305,24 @@ function StoryBlock({
           ? 'Quiet'
           : 'In brief'
 
+  const shareHeadline = modelHeadline ?? account.label
+  const shareTeaser =
+    brief != null
+      ? storyTeaserFromBrief({
+          ...brief,
+          headline: shareHeadline,
+          deck: deck ?? brief.deck,
+          general: text || brief.general,
+        })
+      : ''
+  const shareIssueNo = brief?.dateKey ? ybIssueNumber(brief.dateKey) : null
+  const shareIssueLabel =
+    brief?.dateKey != null
+      ? shareIssueNo
+        ? `The Daily Loop · Issue No. ${shareIssueNo} · ${formatIssueLong(brief.dateKey)}`
+        : `The Daily Loop · ${formatIssueLong(brief.dateKey)}`
+      : ''
+
   return (
     <article id={account.id} className={`ext-paper-story ext-paper-story--${variant}`}>
       {admin && (
@@ -345,6 +365,19 @@ function StoryBlock({
           <p key={i}>{p}</p>
         ))}
       </div>
+
+      {brief?.dateKey && shareTeaser && (
+        <div className="ext-paper-share-row">
+          <YbStoryShareButton
+            dateKey={brief.dateKey}
+            accountId={account.id}
+            label={account.label}
+            headline={shareHeadline}
+            teaser={shareTeaser}
+            issueLabel={shareIssueLabel}
+          />
+        </div>
+      )}
     </article>
   )
 }
