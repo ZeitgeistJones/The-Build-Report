@@ -9,6 +9,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/daily-loop-heal",
+      "schedule": "0 10,14,18,22 * * *"
+    },
+    {
       "path": "/api/cron/podcast-mentions",
       "schedule": "20 5 * * *"
     },

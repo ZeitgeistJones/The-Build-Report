@@ -1,7 +1,11 @@
 import Link from 'next/link'
 import ExternalBriefsNewspaper from '@/components/ExternalBriefsNewspaper'
 import YbMissingEdition, { missingEditionCopy } from '@/components/YbMissingEdition'
-import { getAllExternalBriefs } from '@/lib/externalOwnerBrief'
+import {
+  getAllExternalBriefs,
+  healDailyLoopEdition,
+  listDailyLoopDeskGaps,
+} from '@/lib/externalOwnerBrief'
 import { getMcpWireAdmin } from '@/lib/mcpWire'
 import {
   hasCachedYbEdition,
@@ -10,6 +14,8 @@ import {
 } from '@/lib/ybIssue'
 
 export const dynamic = 'force-dynamic'
+/** Page may briefly heal a few missing desks before render. */
+export const maxDuration = 60
 
 export default async function DailyLoopPage({
   searchParams,
@@ -39,6 +45,22 @@ export default async function DailyLoopPage({
   }
 
   const dateKey = resolved.dateKey
+
+  // Self-heal: if desks are missing/stuck, spend a short budget filling gaps
+  // so visitors don't see a blank paper until the next cron.
+  try {
+    const gaps = await listDailyLoopDeskGaps(dateKey)
+    if (gaps.missing.length > 0 || gaps.stuck.length > 0) {
+      await healDailyLoopEdition({
+        dateKey,
+        maxAttempts: 4,
+        deadlineMs: Date.now() + 12_000,
+      })
+    }
+  } catch (err) {
+    console.error('[daily-loop] page heal failed', err)
+  }
+
   const [briefs, wireAdmin] = await Promise.all([
     getAllExternalBriefs(dateKey),
     getMcpWireAdmin(dateKey),

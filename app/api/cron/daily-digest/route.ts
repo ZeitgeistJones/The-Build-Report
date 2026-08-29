@@ -58,11 +58,11 @@ export async function GET(req: NextRequest) {
       return null
     })
 
-    // The Daily Loop (secondary digests): budgeted so Base/rate-limits cannot blank the paper.
+    // The Daily Loop (secondary digests): full desk budget; 429s defer whole-org only.
     const external = await generateAllExternalDigests({
       dateKey: editionKey,
       recheckQuiet: false,
-      maxAttempts: 12,
+      maxAttempts: 24,
       deadlineMs: startedAt + 240_000,
     }).catch(err => {
       console.error('[daily-digest] external digests failed', err)

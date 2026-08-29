@@ -812,6 +812,36 @@ export async function getAllExternalBriefs(
   return Object.fromEntries(entries)
 }
 
+/** Prefer missing desks, then stuck rate-limits, then quiet rechecks. Focus-repo desks before whole-org (Base last). */
+function prioritizeExternalBriefAccounts(
+  accounts: ExternalBriefAccount[],
+  statusById: Map<
+    ExternalBriefAccountId,
+    'missing' | 'stuck' | 'ok' | 'unknown'
+  >,
+): ExternalBriefAccount[] {
+  const band = (id: ExternalBriefAccountId): number => {
+    const st = statusById.get(id) ?? 'unknown'
+    if (st === 'missing') return 0
+    if (st === 'stuck') return 1
+    return 2
+  }
+  /** Whole-owner scans (no focusRepos) burn more GitHub quota than single-repo desks. */
+  const cost = (a: ExternalBriefAccount): number => (a.focusRepos?.length ? 0 : 1)
+  const baseLast = (a: ExternalBriefAccount): number => (a.id === 'base' ? 1 : 0)
+  return [...accounts].sort((a, b) => {
+    const dBand = band(a.id) - band(b.id)
+    if (dBand !== 0) return dBand
+    const dCost = cost(a) - cost(b)
+    if (dCost !== 0) return dCost
+    return baseLast(a) - baseLast(b)
+  })
+}
+
+function isExpensiveWholeOrgDesk(account: ExternalBriefAccount): boolean {
+  return !account.focusRepos?.length
+}
+
 /** Cron/warm: generate secondary Daily Loop digests; failures stay isolated. */
 export async function generateAllExternalDigests(options?: {
   force?: boolean
@@ -854,8 +884,34 @@ export async function generateAllExternalDigests(options?: {
   const maxAttempts = options?.maxAttempts ?? EXTERNAL_BRIEF_ACCOUNTS.length
   const healOnly = Boolean(options?.healOnly)
   const recheckQuiet = Boolean(options?.recheckQuiet)
+  const dateKey = options?.dateKey ?? yesterdayMountainDateKey()
 
-  for (const account of EXTERNAL_BRIEF_ACCOUNTS) {
+  const statusById = new Map<
+    ExternalBriefAccountId,
+    'missing' | 'stuck' | 'ok' | 'unknown'
+  >()
+  if (!options?.force) {
+    await Promise.all(
+      EXTERNAL_BRIEF_ACCOUNTS.map(async account => {
+        const existing = await readCachedDigest(account, dateKey)
+        if (!existing?.general?.trim()) {
+          statusById.set(account.id, 'missing')
+          return
+        }
+        const needsLlmHeal =
+          existing.llmFallback === true || looksLikeTemplateFallback(existing.general)
+        if (existing.rateLimited === true || needsLlmHeal) {
+          statusById.set(account.id, 'stuck')
+          return
+        }
+        statusById.set(account.id, 'ok')
+      }),
+    )
+  }
+
+  const ordered = prioritizeExternalBriefAccounts(EXTERNAL_BRIEF_ACCOUNTS, statusById)
+
+  for (const account of ordered) {
     if (options?.deadlineMs != null && Date.now() >= options.deadlineMs) {
       console.warn('[external-brief] batch stopped — deadline reached', {
         next: account.id,
@@ -868,9 +924,22 @@ export async function generateAllExternalDigests(options?: {
       break
     }
 
+    // After repeated 429s, skip expensive whole-org desks but keep healing focus-repo desks.
+    if (consecutiveRateLimits >= 2 && isExpensiveWholeOrgDesk(account)) {
+      console.warn('[external-brief] skip whole-org after rate limits', { id: account.id })
+      results.push({
+        id: account.id,
+        ok: false,
+        skipped: true,
+        error: 'deferred — GitHub rate limited; focus desks prioritized',
+        rateLimited: true,
+      })
+      continue
+    }
+
     try {
       if (!options?.force) {
-        const existing = await readCachedDigest(account, options?.dateKey ?? yesterdayMountainDateKey())
+        const existing = await readCachedDigest(account, dateKey)
         if (existing?.general?.trim()) {
           const needsLlmHeal =
             existing.llmFallback === true || looksLikeTemplateFallback(existing.general)
@@ -916,7 +985,7 @@ export async function generateAllExternalDigests(options?: {
       attempts += 1
       const digest = await generateAndCacheExternalDigest(account.id, {
         force: options?.force,
-        dateKey: options?.dateKey,
+        dateKey: options?.dateKey ?? dateKey,
         recheckQuiet: recheckQuiet || undefined,
       })
       results.push({
@@ -930,12 +999,12 @@ export async function generateAllExternalDigests(options?: {
 
       if (digest.rateLimited && digest.commitCount === 0) {
         consecutiveRateLimits += 1
+        // Never abort the whole batch — missing desks must keep getting chances.
         if (consecutiveRateLimits >= 2) {
           console.warn(
-            '[external-brief] batch stopped — consecutive GitHub rate limits (avoid empty paper)',
-            { last: account.id },
+            '[external-brief] consecutive GitHub rate limits — skip remaining whole-org only',
+            { last: account.id, consecutiveRateLimits },
           )
-          break
         }
       } else {
         consecutiveRateLimits = 0
@@ -948,4 +1017,68 @@ export async function generateAllExternalDigests(options?: {
     }
   }
   return results
+}
+
+/** Which Daily Loop desks are missing or stuck for a given edition date. */
+export async function listDailyLoopDeskGaps(dateKey?: string): Promise<{
+  dateKey: string
+  missing: ExternalBriefAccountId[]
+  stuck: ExternalBriefAccountId[]
+}> {
+  const key = dateKey ?? yesterdayMountainDateKey()
+  const missing: ExternalBriefAccountId[] = []
+  const stuck: ExternalBriefAccountId[] = []
+  await Promise.all(
+    EXTERNAL_BRIEF_ACCOUNTS.map(async account => {
+      const existing = await readCachedDigest(account, key)
+      if (!existing?.general?.trim()) {
+        missing.push(account.id)
+        return
+      }
+      const needsLlmHeal =
+        existing.llmFallback === true || looksLikeTemplateFallback(existing.general)
+      if (existing.rateLimited === true || needsLlmHeal) {
+        stuck.push(account.id)
+      }
+    }),
+  )
+  return { dateKey: key, missing, stuck }
+}
+
+/**
+ * Heal missing/stuck Daily Loop desks for one edition.
+ * Safe to call from page load (short budget) or a dedicated cron (longer budget).
+ */
+export async function healDailyLoopEdition(options?: {
+  dateKey?: string
+  maxAttempts?: number
+  deadlineMs?: number
+}): Promise<{
+  dateKey: string
+  missingBefore: ExternalBriefAccountId[]
+  stuckBefore: ExternalBriefAccountId[]
+  results: Awaited<ReturnType<typeof generateAllExternalDigests>>
+}> {
+  const gaps = await listDailyLoopDeskGaps(options?.dateKey)
+  if (gaps.missing.length === 0 && gaps.stuck.length === 0) {
+    return {
+      dateKey: gaps.dateKey,
+      missingBefore: [],
+      stuckBefore: [],
+      results: [],
+    }
+  }
+  const results = await generateAllExternalDigests({
+    dateKey: gaps.dateKey,
+    healOnly: true,
+    recheckQuiet: false,
+    maxAttempts: options?.maxAttempts ?? Math.max(gaps.missing.length + gaps.stuck.length, 4),
+    deadlineMs: options?.deadlineMs,
+  })
+  return {
+    dateKey: gaps.dateKey,
+    missingBefore: gaps.missing,
+    stuckBefore: gaps.stuck,
+    results,
+  }
 }

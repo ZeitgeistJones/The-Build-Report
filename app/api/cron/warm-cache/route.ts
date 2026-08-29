@@ -64,11 +64,12 @@ export async function GET(req: NextRequest) {
     })
 
     // Heal only missing / rateLimited-stuck desks — do not re-scan every quiet desk.
+    // Budget high enough for a full desk pass; batch no longer aborts on 429s.
     const external = await generateAllExternalDigests({
       dateKey: editionKey,
       healOnly: true,
       recheckQuiet: false,
-      maxAttempts: 8,
+      maxAttempts: 24,
       deadlineMs: startedAt + 240_000,
     }).catch(err => {
       console.error('[warm-cache] external digests failed', err)
