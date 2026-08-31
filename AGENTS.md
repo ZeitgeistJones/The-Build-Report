@@ -56,7 +56,10 @@ are commit-weighted aggregates. Shipping leverage aggregates the same per-repo s
 
 ## Workflow conventions
 
-- Git: the agent **commits**, the user **pushes**. Don't push unless asked.
+- Git: the agent **commits and pushes** when work is done (unless the user says not to).
+- **Vercel Hobby cron limit:** schedules may run **at most once per day**. A multi-fire cron
+  (e.g. `0 10,14,18,22 * * *`) **fails the entire production deploy** and leaves the site stuck
+  on an old build. Daily Loop heal is once daily at 15:00 UTC; page-load self-heal covers gaps.
 
 ## Local debug tooling
 
