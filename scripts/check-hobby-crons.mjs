@@ -111,4 +111,20 @@ if (!briefSrc.includes('healDailyLoopEdition')) {
 }
 ok('batch no longer aborts on consecutive rate limits; healDailyLoopEdition present')
 
+if (!briefSrc.includes('isPublishableExternalBrief')) {
+  fail('public brief quality gate is missing from externalOwnerBrief.ts')
+}
+const paperSrc = readFileSync(
+  join(root, 'components/ExternalBriefsNewspaper.tsx'),
+  'utf8',
+)
+if (!paperSrc.includes('isPublishableExternalBrief(r.brief)')) {
+  fail('Daily Loop paper does not block template/rate-limited fallback stories')
+}
+const shareSrc = readFileSync(join(root, 'lib/ybStoryShare.ts'), 'utf8')
+if (!shareSrc.includes('isPublishableExternalBrief(brief)')) {
+  fail('Daily Loop share pages do not block template/rate-limited fallback stories')
+}
+ok('public paper and share pages block unfinished fallback stories')
+
 console.log('check-hobby-crons: all good')

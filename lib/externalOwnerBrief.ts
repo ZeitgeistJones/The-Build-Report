@@ -332,8 +332,25 @@ export type ExternalBriefData = BuildBriefData & {
   quote?: string
   quoteRepo?: string
   quoteScore?: number
+  /** Never publish deterministic template copy as a finished story. */
+  llmFallback?: boolean
+  /** Never publish an incomplete rate-limited fetch as a finished story. */
+  rateLimited?: boolean
   /** Optional Lead Policy v1 classification. Older cache entries omit this. */
   leadPolicy?: YbLeadPolicy
+}
+
+/** Public paper/share gate: real activity plus a completed AI write-up only. */
+export function isPublishableExternalBrief(
+  brief: ExternalBriefData | null | undefined,
+): brief is ExternalBriefData {
+  return Boolean(
+    brief &&
+      brief.commitCount > 0 &&
+      brief.llmFallback !== true &&
+      brief.rateLimited !== true &&
+      (brief.general?.trim() || brief.text?.trim()),
+  )
 }
 
 function digestRedisKey(account: ExternalBriefAccount, dateKey: string): string {
@@ -682,6 +699,9 @@ async function cacheDigest(
 
 function toBriefData(digest: ExternalDigestCache): ExternalBriefData {
   const leadPolicy = parseLeadPolicy(digest.leadPolicy)
+  const llmFallback =
+    digest.llmFallback === true ||
+    (digest.commitCount > 0 && looksLikeTemplateFallback(digest.general))
   return {
     text: digest.general,
     general: digest.general,
@@ -701,6 +721,8 @@ function toBriefData(digest: ExternalDigestCache): ExternalBriefData {
     repoCount: digest.repoCount,
     commitCount: digest.commitCount,
     generatedAt: digest.generatedAt,
+    ...(llmFallback ? { llmFallback: true } : {}),
+    ...(digest.rateLimited ? { rateLimited: true } : {}),
   }
 }
 

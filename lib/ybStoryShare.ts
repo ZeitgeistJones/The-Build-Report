@@ -5,6 +5,7 @@ import {
   EXTERNAL_BRIEF_ACCOUNTS,
   getExternalBrief,
   getExternalBriefAccount,
+  isPublishableExternalBrief,
   type ExternalBriefAccountId,
   type ExternalBriefData,
 } from '@/lib/externalOwnerBrief'
@@ -78,7 +79,7 @@ export async function loadYbStorySharePayload(
   if (!account) return null
 
   let brief = await getExternalBrief(account.id, dateKey)
-  if (!brief) return null
+  if (!isPublishableExternalBrief(brief)) return null
 
   const editorial = getYbEditorialOverride(dateKey)
   if (editorial && editorial.leadAccountId === account.id && brief.dateKey === editorial.dateKey) {

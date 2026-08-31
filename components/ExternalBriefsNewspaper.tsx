@@ -16,6 +16,7 @@ import {
   OUTSIDE_DESK_TITLE,
   externalBriefGithubLabel,
   externalBriefGithubUrl,
+  isPublishableExternalBrief,
   type ExternalBriefAccount,
   type ExternalBriefAccountId,
   type ExternalBriefData,
@@ -417,7 +418,11 @@ export default function ExternalBriefsNewspaper({
   // Paper body matches live: only desks with commits. Quiet editions (Admin)
   // render in a separate chrome section below so they do not change the layout.
   const withText = rows.filter(r => r.text.length > 0)
-  const shipping = withText.filter(r => (r.brief?.commitCount ?? 0) > 0)
+  const shipping = withText.filter(r =>
+    admin
+      ? (r.brief?.commitCount ?? 0) > 0
+      : isPublishableExternalBrief(r.brief),
+  )
   const quiet = admin
     ? withText
         .filter(r => (r.brief?.commitCount ?? 0) <= 0)
