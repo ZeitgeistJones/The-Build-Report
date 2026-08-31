@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/check-hobby-crons.mjs && next build",
+    "check:hobby-crons": "node scripts/check-hobby-crons.mjs",
     "start": "next start",
     "debug:burn": "node scripts/debug-burn-scan.mjs",
     "debug:promo": "node scripts/debug-promo-eligibility.mjs",

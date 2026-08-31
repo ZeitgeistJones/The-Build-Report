@@ -7,7 +7,11 @@ import {
   yesterdayMountainDateKey,
 } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
-import { generateAllExternalDigests } from '@/lib/externalOwnerBrief'
+import {
+  generateAllExternalDigests,
+  healDailyLoopEdition,
+  listDailyLoopDeskGaps,
+} from '@/lib/externalOwnerBrief'
 import { collectMcpWire } from '@/lib/mcpWire'
 import { runOvernightActiveRescores } from '@/lib/overnightActiveRescore'
 
@@ -37,8 +41,30 @@ export async function GET(req: NextRequest) {
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
 
-    // CLAWD homepage columns first — The Daily Loop must not starve these again.
+    // CLAWD homepage columns first.
     const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
+
+    // Daily Loop next — before overnight rescores/wire so the paper cannot be starved.
+    const external = await generateAllExternalDigests({
+      dateKey: editionKey,
+      recheckQuiet: false,
+      maxAttempts: 24,
+      deadlineMs: startedAt + 200_000,
+    }).catch(err => {
+      console.error('[daily-digest] external digests failed', err)
+      return null
+    })
+
+    // Second pass: only missing/stuck desks with whatever budget remains.
+    const heal = await healDailyLoopEdition({
+      dateKey: editionKey,
+      maxAttempts: 24,
+      deadlineMs: startedAt + 250_000,
+    }).catch(err => {
+      console.error('[daily-digest] daily-loop heal failed', err)
+      return null
+    })
+
     const needle = await generateAndCacheNeedle({
       dateKey: editionKey,
       force: true,
@@ -58,21 +84,13 @@ export async function GET(req: NextRequest) {
       return null
     })
 
-    // The Daily Loop (secondary digests): full desk budget; 429s defer whole-org only.
-    const external = await generateAllExternalDigests({
-      dateKey: editionKey,
-      recheckQuiet: false,
-      maxAttempts: 24,
-      deadlineMs: startedAt + 240_000,
-    }).catch(err => {
-      console.error('[daily-digest] external digests failed', err)
-      return null
-    })
-
     const wire = await collectMcpWire(editionKey).catch(err => {
       console.error('[daily-digest] mcp wire failed', err)
       return null
     })
+
+    const gaps = await listDailyLoopDeskGaps(editionKey).catch(() => null)
+
     return NextResponse.json({
       ok: true,
       dateKey: digest.dateKey,
@@ -83,6 +101,8 @@ export async function GET(req: NextRequest) {
       needleRepoCount: needle?.repoCount ?? 0,
       overnight,
       externalBriefs: external,
+      dailyLoopHeal: heal,
+      dailyLoopGaps: gaps,
       mcpWire: wire ? { status: wire.status, printed: wire.items.length, total: wire.totalChanges } : null,
     })
   } catch (err: unknown) {

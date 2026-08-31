@@ -48,14 +48,27 @@ export default async function DailyLoopPage({
 
   // Self-heal: fill as many missing/stuck desks as the request budget allows.
   // Hobby only allows one heal cron/day, so page load is the real safety net.
+  // Two passes: first fills hard gaps; second uses leftover time if still incomplete.
   try {
     const gaps = await listDailyLoopDeskGaps(dateKey)
     if (gaps.missing.length > 0 || gaps.stuck.length > 0) {
+      const deadlineMs = Date.now() + 50_000
       await healDailyLoopEdition({
         dateKey,
-        maxAttempts: 12,
-        deadlineMs: Date.now() + 45_000,
+        maxAttempts: 14,
+        deadlineMs,
       })
+      const still = await listDailyLoopDeskGaps(dateKey)
+      if (
+        (still.missing.length > 0 || still.stuck.length > 0) &&
+        Date.now() < deadlineMs - 5_000
+      ) {
+        await healDailyLoopEdition({
+          dateKey,
+          maxAttempts: 8,
+          deadlineMs,
+        })
+      }
     }
   } catch (err) {
     console.error('[daily-loop] page heal failed', err)

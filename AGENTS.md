@@ -73,4 +73,4 @@ After `npm install`, run `npm run setup:playwright` once (downloads Chromium for
 | `npm run debug:theme:local` | Same, against `localhost:3000` (start `npm run dev` first) |
 | `npm run scan:dictionary` | Mine universal jargon from live score blurbs (needs `CRON_SECRET` in `.env.cron.local` — Sensitive vars can’t be pulled via CLI) |
 
-Gated production debug APIs (use `CRON_SECRET` as `?key=`): `/api/debug/burn-totals`, `/api/debug/home-perf`, `/api/debug/commit-counts`, `/api/debug/promo-status`, `/api/debug/promo-eligibility`, `/api/debug/score-blurbs`.
+Gated production debug APIs (use `CRON_SECRET` as `?key=`): `/api/debug/burn-totals`, `/api/debug/home-perf`, `/api/debug/commit-counts`, `/api/debug/promo-status`, `/api/debug/promo-eligibility`, `/api/debug/score-blurbs`, `/api/debug/daily-loop-gaps`.

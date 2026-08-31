@@ -10,7 +10,11 @@ import {
   yesterdayMountainDateKey,
 } from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
-import { generateAllExternalDigests } from '@/lib/externalOwnerBrief'
+import {
+  generateAllExternalDigests,
+  healDailyLoopEdition,
+  listDailyLoopDeskGaps,
+} from '@/lib/externalOwnerBrief'
 import { runOvernightActiveRescores } from '@/lib/overnightActiveRescore'
 
 export const dynamic = 'force-dynamic'
@@ -42,8 +46,30 @@ export async function GET(req: NextRequest) {
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
 
-    // Homepage columns before The Daily Loop heal.
+    // Homepage brief first.
     const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
+
+    // Daily Loop heal before overnight work so gaps cannot wait on rescores.
+    const external = await generateAllExternalDigests({
+      dateKey: editionKey,
+      healOnly: true,
+      recheckQuiet: false,
+      maxAttempts: 24,
+      deadlineMs: startedAt + 200_000,
+    }).catch(err => {
+      console.error('[warm-cache] external digests failed', err)
+      return null
+    })
+
+    const heal = await healDailyLoopEdition({
+      dateKey: editionKey,
+      maxAttempts: 24,
+      deadlineMs: startedAt + 250_000,
+    }).catch(err => {
+      console.error('[warm-cache] daily-loop heal failed', err)
+      return null
+    })
+
     const overnight = await runOvernightActiveRescores({
       stats,
       dateKey: editionKey,
@@ -63,18 +89,7 @@ export async function GET(req: NextRequest) {
       return null
     })
 
-    // Heal only missing / rateLimited-stuck desks — do not re-scan every quiet desk.
-    // Budget high enough for a full desk pass; batch no longer aborts on 429s.
-    const external = await generateAllExternalDigests({
-      dateKey: editionKey,
-      healOnly: true,
-      recheckQuiet: false,
-      maxAttempts: 24,
-      deadlineMs: startedAt + 240_000,
-    }).catch(err => {
-      console.error('[warm-cache] external digests failed', err)
-      return null
-    })
+    const gaps = await listDailyLoopDeskGaps(editionKey).catch(() => null)
 
     return NextResponse.json({
       ok: true,
@@ -93,6 +108,8 @@ export async function GET(req: NextRequest) {
       needleRepoCount: needle?.repoCount ?? 0,
       overnight,
       externalBriefs: external,
+      dailyLoopHeal: heal,
+      dailyLoopGaps: gaps,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Warm cache failed'
