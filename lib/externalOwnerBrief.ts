@@ -900,7 +900,11 @@ export async function generateAllExternalDigests(options?: {
         }
         const needsLlmHeal =
           existing.llmFallback === true || looksLikeTemplateFallback(existing.general)
-        if (existing.rateLimited === true || needsLlmHeal) {
+        if (existing.rateLimited === true) {
+          statusById.set(account.id, 'stuck')
+          return
+        }
+        if (existing.commitCount > 0 && needsLlmHeal) {
           statusById.set(account.id, 'stuck')
           return
         }
@@ -944,9 +948,13 @@ export async function generateAllExternalDigests(options?: {
           const needsLlmHeal =
             existing.llmFallback === true || looksLikeTemplateFallback(existing.general)
           const confirmedActivity = existing.commitCount > 0 && !needsLlmHeal
-          const confirmedQuiet = existing.commitCount === 0 && existing.rateLimited === false
-          const needsHeal = existing.rateLimited === true || needsLlmHeal
-          if (confirmedActivity || confirmedQuiet) {
+          // Quiet days are fine even if the quiet copy came from the template —
+          // only rate-limited empties and activity-with-template need a re-run.
+          const confirmedQuiet =
+            existing.commitCount === 0 && existing.rateLimited === false
+          const needsHeal =
+            existing.rateLimited === true || (existing.commitCount > 0 && needsLlmHeal)
+          if (confirmedActivity || (confirmedQuiet && !needsHeal)) {
             results.push({
               id: account.id,
               ok: true,
@@ -1035,9 +1043,15 @@ export async function listDailyLoopDeskGaps(dateKey?: string): Promise<{
         missing.push(account.id)
         return
       }
+      if (existing.rateLimited === true) {
+        stuck.push(account.id)
+        return
+      }
+      // Quiet template copy is acceptable. Activity still using the shipping-summary
+      // template (or llmFallback) is not — those desks need another LLM pass.
       const needsLlmHeal =
         existing.llmFallback === true || looksLikeTemplateFallback(existing.general)
-      if (existing.rateLimited === true || needsLlmHeal) {
+      if (existing.commitCount > 0 && needsLlmHeal) {
         stuck.push(account.id)
       }
     }),
