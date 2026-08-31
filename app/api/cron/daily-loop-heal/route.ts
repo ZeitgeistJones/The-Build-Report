@@ -6,8 +6,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 /**
- * Midday / evening catch-up for Daily Loop desks that warm-cache or daily-digest
- * left missing or stuck (rate-limited). Safe to run often — no-ops when complete.
+ * Midday catch-up for Daily Loop desks that warm-cache or daily-digest
+ * left missing or stuck (rate-limited). Hobby plan: one cron/day only.
+ * Safe to run often via manual trigger — no-ops when complete.
  */
 export async function GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     const heal = await healDailyLoopEdition({
       dateKey: editionKey,
-      maxAttempts: 16,
+      maxAttempts: 24,
       deadlineMs: startedAt + 100_000,
     })
 

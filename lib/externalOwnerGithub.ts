@@ -11,8 +11,13 @@ import {
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN
 
-/** Safety cap — busy repos can exceed one GitHub page; stop runaway pagination. */
-const MAX_COMMIT_PAGES = 20
+/**
+ * Safety cap — Busy monorepos can dump hundreds of commits in a day.
+ * The LLM only uses the newest 40 anyway; paginating further burns GitHub
+ * quota and used to blank the entire Daily Loop batch on rate limits.
+ * One page (≤100) is enough for count signal + writeup sample.
+ */
+const MAX_COMMIT_PAGES = 1
 
 export type ExternalRepoCommit = {
   message: string
@@ -135,10 +140,11 @@ async function resolveFocusCandidates(
 }
 
 /**
- * All commits on a Mountain calendar day for one repo.
+ * All commits on a Mountain calendar day for one repo (newest-first sample).
  *
- * Uses since+until so today's flood cannot bury yesterday on page 1, and
- * paginates so days with >100 commits still count.
+ * Uses since+until so today's flood cannot bury yesterday on page 1.
+ * Cap pages deliberately — full pagination on high-volume repos (OpenClaw etc.)
+ * exhausted GitHub quota and left the paper empty.
  */
 async function fetchRepoCommitsOnDay(
   ownerEnc: string,
