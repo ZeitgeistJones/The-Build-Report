@@ -127,4 +127,24 @@ if (!shareSrc.includes('isPublishableExternalBrief(brief)')) {
 }
 ok('public paper and share pages block unfinished fallback stories')
 
+const buildBriefSrc = readFileSync(join(root, 'lib/buildBrief.ts'), 'utf8')
+if (!buildBriefSrc.includes('generateTextGeminiFirst({')) {
+  fail("Yesterday's Build overview lost its Anthropic failover")
+}
+if (
+  !buildBriefSrc.includes(
+    'if (digest && !isRetryableDigest(digest)) return toBuildBriefData(digest)',
+  )
+) {
+  fail("homepage can publish a retryable Yesterday's Build template fallback")
+}
+if (
+  !buildBriefSrc.includes(
+    'if (digest) return isRetryableDigest(digest) ? null : digest',
+  )
+) {
+  fail("archives can publish a retryable Yesterday's Build template fallback")
+}
+ok("Yesterday's Build uses provider failover and blocks public template fallbacks")
+
 console.log('check-hobby-crons: all good')

@@ -1,4 +1,9 @@
-import { generateTextGeminiOnly, hasGeminiApiKey } from '@/lib/llm'
+import {
+  generateTextGeminiFirst,
+  generateTextGeminiOnly,
+  hasGeminiApiKey,
+  hasLlmApiKey,
+} from '@/lib/llm'
 import { getRedis } from '@/lib/redis'
 import { getEffectiveTag } from '@/lib/economicGrade'
 import { hasShippingLeverageTag } from '@/lib/rubrics/shippingLeverage'
@@ -461,7 +466,7 @@ async function generateDigestWithAi(
   gradeContext: string,
   mountainDateKey: string,
 ): Promise<DigestAiPayload | null> {
-  if (!hasGeminiApiKey()) return null
+  if (!hasLlmApiKey()) return null
 
   const facts = `You write copy for The Build Report — an independent dashboard that tracks clawdbotatg's GitHub repos for $CLAWD holders.
 
@@ -496,7 +501,9 @@ ${normieVoiceGuidance('digestGeneral')}
 
 Return ONLY those two labeled blocks. No JSON, no markdown, no title.`
 
-  const { text, provider } = await generateTextGeminiOnly({
+  // Homepage copy must not fall back to a public template just because Gemini
+  // is briefly overloaded. This rotates Gemini keys, then fails over to Haiku.
+  const { text, provider } = await generateTextGeminiFirst({
     prompt,
     maxTokens: 3072,
     temperature: NORMIE_TEMPERATURE,
@@ -793,11 +800,12 @@ async function readCachedDigest(dateKey: string): Promise<DailyDigestCache | nul
 /** Public read for Archives — one Mountain calendar edition (digest, or legacy brief). */
 export async function getCachedDigestForDate(dateKey: string): Promise<DailyDigestCache | null> {
   const digest = await readCachedDigest(dateKey)
-  if (digest) return digest
+  // Emergency templates remain internal retry state, never a published archive.
+  if (digest) return isRetryableDigest(digest) ? null : digest
 
   // Older editions were stored as build-brief:{date} without card blurbs.
   const legacy = await readLegacyBrief(dateKey)
-  if (!legacy) return null
+  if (!legacy || isTemplateFallbackGeneral(legacy.text)) return null
   const empty: CardBlurbs = { builder: '', economic: '', integrity: '' }
   return {
     general: legacy.text,
@@ -859,12 +867,14 @@ export function toBuildBriefData(digest: DailyDigestCache): BuildBriefData {
 export async function getBuildBrief(): Promise<BuildBriefData | null> {
   for (const targetKey of buildBriefEditionKeys()) {
     const digest = await readCachedDigest(targetKey)
-    if (digest) return toBuildBriefData(digest)
+    // If today's model run failed, show the previous completed edition instead
+    // of publishing deterministic emergency copy as real editorial output.
+    if (digest && !isRetryableDigest(digest)) return toBuildBriefData(digest)
   }
 
   const targetKey = buildBriefEditionKeys()[0]
   const legacy = await readLegacyBrief(targetKey)
-  if (legacy) {
+  if (legacy && !isTemplateFallbackGeneral(legacy.text)) {
     return {
       text: legacy.text,
       general: legacy.text,
