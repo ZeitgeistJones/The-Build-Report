@@ -132,6 +132,16 @@ export async function runOvernightActiveRescores(options: {
       const message = err instanceof Error ? err.message : 'rescore failed'
       console.error(`[overnight-rescore] ${slug} failed:`, err)
       failed.push({ slug, error: message })
+      // Free-tier / daily Gemini caps — don't burn the rest of the batch on the same wall.
+      if (/quota|429|RESOURCE_EXHAUSTED|free_tier|rate.?limit/i.test(message)) {
+        for (const rest of batch.slice(batch.indexOf(slug) + 1)) {
+          failed.push({
+            slug: rest,
+            error: 'skipped — LLM quota exhausted earlier in this batch',
+          })
+        }
+        break
+      }
     }
   }
 
