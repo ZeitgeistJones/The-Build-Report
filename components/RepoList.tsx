@@ -1252,25 +1252,40 @@ export default function RepoList({
             </div>
           </button>
 
-          {rescoreMeta?.rescoreAt && (
-            <div
-              style={{
-                flexShrink: 0,
-                alignSelf: isMobile ? 'stretch' : 'center',
-                textAlign: isMobile ? 'left' : 'right',
-                fontSize: '11px',
-                color: 'var(--text-muted)',
-                lineHeight: 1.4,
-                minWidth: isMobile ? undefined : '108px',
-              }}
-            >
-              Rescored
-              <br />
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                {formatScoredDateLabel(rescoreMeta.rescoreAt)}
-              </span>
-            </div>
-          )}
+          {(() => {
+            // Prefer the live score cache timestamp when it is newer than the
+            // last “What changed” summary — summaries can lag if a rescore
+            // wrote grades but failed before saving rescoreAt.
+            const summaryAt = rescoreMeta?.rescoreAt ?? null
+            const liveAt =
+              repo.scoredAt && !looksLikeBaselineDate(repo.scoredAt) ? repo.scoredAt : null
+            const summaryMs = summaryAt ? Date.parse(summaryAt) : 0
+            const liveMs = liveAt ? Date.parse(liveAt) : 0
+            const displayAt =
+              Number.isFinite(liveMs) && liveMs > summaryMs
+                ? liveAt
+                : summaryAt ?? liveAt
+            if (!displayAt) return null
+            return (
+              <div
+                style={{
+                  flexShrink: 0,
+                  alignSelf: isMobile ? 'stretch' : 'center',
+                  textAlign: isMobile ? 'left' : 'right',
+                  fontSize: '11px',
+                  color: 'var(--text-muted)',
+                  lineHeight: 1.4,
+                  minWidth: isMobile ? undefined : '108px',
+                }}
+              >
+                Rescored
+                <br />
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
+                  {formatScoredDateLabel(displayAt)}
+                </span>
+              </div>
+            )
+          })()}
         </div>
 
         {isExpanded && (
