@@ -41,10 +41,19 @@ export async function GET(req: NextRequest) {
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
 
-    // CLAWD homepage columns first.
+    // Free-tier Gemini: catch up the most overdue grades before digest/Needle/Loop.
+    const overnight = await runOvernightActiveRescores({
+      stats,
+      dateKey: editionKey,
+      batchSize: 2,
+      refreshNeedle: false,
+    }).catch(err => {
+      console.error('[daily-digest] overnight rescore failed', err)
+      return null
+    })
+
     const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
 
-    // Daily Loop next — before overnight rescores/wire so the paper cannot be starved.
     const external = await generateAllExternalDigests({
       dateKey: editionKey,
       recheckQuiet: false,
@@ -55,7 +64,6 @@ export async function GET(req: NextRequest) {
       return null
     })
 
-    // Second pass: only missing/stuck desks with whatever budget remains.
     const heal = await healDailyLoopEdition({
       dateKey: editionKey,
       maxAttempts: 24,
@@ -71,16 +79,6 @@ export async function GET(req: NextRequest) {
       activity,
     }).catch(err => {
       console.error('[daily-digest] needle generation failed', err)
-      return null
-    })
-
-    const overnight = await runOvernightActiveRescores({
-      stats,
-      dateKey: editionKey,
-      batchSize: 3,
-      refreshNeedle: false,
-    }).catch(err => {
-      console.error('[daily-digest] overnight rescore failed', err)
       return null
     })
 

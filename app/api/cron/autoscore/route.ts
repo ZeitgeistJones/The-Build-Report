@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runAutoscorePipeline } from '@/lib/autoscorePipeline'
-import { generateAndCacheBuildBrief, loadReposForBrief } from '@/lib/buildBrief'
+import {
+  generateAndCacheBuildBrief,
+  loadReposForBrief,
+  yesterdayMountainDateKey,
+} from '@/lib/buildBrief'
 import { syncBurnSnapshot } from '@/lib/burnSnapshot'
 import { syncGitHubStatsSnapshot } from '@/lib/githubStatsSnapshot'
+import { runOvernightActiveRescores } from '@/lib/overnightActiveRescore'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -21,12 +26,25 @@ export async function GET(req: NextRequest) {
   try {
     const result = await runAutoscorePipeline({ fresh: true })
     await syncGitHubStatsSnapshot(result.stats)
+
+    // Midday free-tier slot: chip away at weeks-overdue grades (instant-wallet class).
+    const overnight = await runOvernightActiveRescores({
+      stats: result.stats,
+      dateKey: yesterdayMountainDateKey(),
+      batchSize: 2,
+      refreshNeedle: false,
+    }).catch(err => {
+      console.error('[autoscore] overdue rescore catch-up failed', err)
+      return null
+    })
+
     const repos = await loadReposForBrief(result.stats)
     const brief = await generateAndCacheBuildBrief(result.stats, repos)
     const burnSnapshot = await syncBurnSnapshot()
     return NextResponse.json({
       ok: true,
       ...result,
+      overnight,
       briefGenerated: true,
       briefRepoCount: brief.repoCount,
       briefCommitCount: brief.commitCount,

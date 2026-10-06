@@ -80,15 +80,18 @@ async function ensureQueue(
   for (const row of activity) candidates.add(row.slug)
   for (const slug of existing) candidates.add(slug)
 
+  // Free-tier Gemini: only a few rescored land per day. Prefer weeks-overdue
+  // cards (behindRank) over "shipped yesterday but scored recently" so a desk
+  // like instant-wallet cannot sit on Sep 14 while fresher repos keep winning.
   const queue = Array.from(candidates)
     .filter(slug => !shouldSkipRepo(slug) && !already.has(slug) && !done.has(slug))
     .sort((a, b) => {
-      const ca = activityCommits.get(a) ?? 0
-      const cb = activityCommits.get(b) ?? 0
-      if (cb !== ca) return cb - ca
       const ra = behindRank.get(a) ?? Number.MAX_SAFE_INTEGER
       const rb = behindRank.get(b) ?? Number.MAX_SAFE_INTEGER
       if (ra !== rb) return ra - rb
+      const ca = activityCommits.get(a) ?? 0
+      const cb = activityCommits.get(b) ?? 0
+      if (cb !== ca) return cb - ca
       return a.localeCompare(b)
     })
 

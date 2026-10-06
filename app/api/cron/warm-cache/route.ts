@@ -46,10 +46,20 @@ export async function GET(req: NextRequest) {
     const editionKey = yesterdayMountainDateKey()
     const activity = collectBuildActivityForMountainDay(stats, repos, editionKey)
 
-    // Homepage brief first.
+    // Free-tier Gemini: spend the first calls on the most overdue grades.
+    // Digests/Needle can wait — stranded Rescored dates cannot.
+    const overnight = await runOvernightActiveRescores({
+      stats,
+      dateKey: editionKey,
+      batchSize: 2,
+      refreshNeedle: false,
+    }).catch(err => {
+      console.error('[warm-cache] overnight rescore failed', err)
+      return null
+    })
+
     const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
 
-    // Daily Loop heal before overnight work so gaps cannot wait on rescores.
     const external = await generateAllExternalDigests({
       dateKey: editionKey,
       healOnly: true,
@@ -67,16 +77,6 @@ export async function GET(req: NextRequest) {
       deadlineMs: startedAt + 250_000,
     }).catch(err => {
       console.error('[warm-cache] daily-loop heal failed', err)
-      return null
-    })
-
-    const overnight = await runOvernightActiveRescores({
-      stats,
-      dateKey: editionKey,
-      batchSize: 3,
-      refreshNeedle: false,
-    }).catch(err => {
-      console.error('[warm-cache] overnight rescore failed', err)
       return null
     })
 
