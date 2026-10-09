@@ -279,7 +279,9 @@ export async function generateAndCacheNeedle(
   if (!qualifying.length && !activity.length) return existing ?? null
 
   const ai = await generateNeedleCopy(qualifying, activity)
-  if (!ai && existing && !isFallbackNeedleCopy(existing)) {
+  // On force regen, never keep a prior AI Needle — stale copy is what we're replacing
+  // (e.g. Gemini 429). Fall through to deterministic fallback instead.
+  if (!options.force && !ai && existing && !isFallbackNeedleCopy(existing)) {
     console.warn('[needle] AI failed; keeping previous AI Needle', { dateKey })
     return existing
   }

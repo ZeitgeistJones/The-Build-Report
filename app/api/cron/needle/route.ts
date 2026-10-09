@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getGitHubStats } from '@/lib/github'
+import {
+  collectBuildActivityForMountainDay,
+  loadReposForBrief,
+  yesterdayMountainDateKey,
+} from '@/lib/buildBrief'
 import { generateAndCacheNeedle } from '@/lib/needle'
 
 export const dynamic = 'force-dynamic'
@@ -16,12 +22,19 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const needle = await generateAndCacheNeedle()
+    const force = req.nextUrl.searchParams.get('force') === '1'
+    const dateKey = yesterdayMountainDateKey()
+    const stats = await getGitHubStats({ fresh: true })
+    const repos = await loadReposForBrief(stats)
+    const activity = collectBuildActivityForMountainDay(stats, repos, dateKey)
+    const needle = await generateAndCacheNeedle({ dateKey, force, activity })
     return NextResponse.json({
       ok: true,
       generated: Boolean(needle),
       repoCount: needle?.repoCount ?? 0,
       dateKey: needle?.dateKey ?? null,
+      source: needle?.source ?? null,
+      textPreview: needle?.text?.slice(0, 220) ?? null,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Needle generation failed'
