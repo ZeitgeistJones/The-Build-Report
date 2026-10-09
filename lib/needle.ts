@@ -206,6 +206,10 @@ Write TWO versions in this exact layout:
 
 STANDARD:
 2-3 sentences. Pick the single most holder-relevant signal — an app/lock/burn path, shipping leverage that multiplies holder-facing work, or a grade move that changes the holder read. Casual, direct. Name specific repos when listed above. Do NOT invent grade moves from commits alone — only cite grade/rubric changes when OVERNIGHT / RESCORE NOTES include them. Do NOT invent missing README/docs unless a rescore note says so.
+TIME RULES (hard):
+- "Just added / shipped / launched / overnight" product claims ONLY when that repo appears under SHIPPING ACTIVITY with commits that day.
+- A rescore alone is a score refresh, not new shipping. If a repo is only in RESCORE NOTES (no commits that day), talk about the grade move — never invent a fresh feature launch.
+- Do not restate old product history (e.g. months-old staking/forum features) as if it landed overnight.
 
 PLAIN:
 Same facts and repo names, for someone who knows nothing about code.
