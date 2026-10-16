@@ -34,27 +34,35 @@ const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
  * Override with GEMINI_FALLBACK_MODELS (comma-separated).
  */
 const DEFAULT_GEMINI_FALLBACK_MODELS = [
-  'gemini-3.8-flash',
   'gemini-3.7-flash',
   'gemini-3.5-flash',
   'gemini-3-flash-preview',
+  'gemini-3.8-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite',
   'gemini-flash-lite-latest',
 ]
 
-/** Skip models that already returned 429/404 in this warm instance instead of re-hitting them per call. */
+/** Skip models that recently returned 429/404/503 in this warm instance instead of re-hitting them per call. */
 const EXHAUSTED_MODEL_TTL_MS = 30 * 60 * 1000
+const BUSY_MODEL_TTL_MS = 5 * 60 * 1000
+/** model → time it may be retried */
 const exhaustedGeminiModels = new Map<string, number>()
 
 function isModelExhausted(model: string): boolean {
-  const at = exhaustedGeminiModels.get(model)
-  if (at == null) return false
-  if (Date.now() - at > EXHAUSTED_MODEL_TTL_MS) {
+  const until = exhaustedGeminiModels.get(model)
+  if (until == null) return false
+  if (Date.now() > until) {
     exhaustedGeminiModels.delete(model)
     return false
   }
   return true
+}
+
+/** "High demand" 503s are per model and usually short-lived — move on rather than wait. */
+function isGeminiOverloadedError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.includes('"code":503') || message.includes('UNAVAILABLE') || message.includes('high demand')
 }
 
 function isGeminiModelMissingError(err: unknown): boolean {
@@ -232,7 +240,14 @@ async function generateWithGeminiKey(
     console.warn(`[${label}] Gemini (${keyLabel}) output unusable; retrying without thinking`)
   } catch (err) {
     // Don't burn a second attempt on a dead key/model — let the rotator advance.
-    if (isGeminiQuotaError(err) || isGeminiInvalidKeyError(err) || isGeminiModelMissingError(err)) throw err
+    if (
+      isGeminiQuotaError(err) ||
+      isGeminiInvalidKeyError(err) ||
+      isGeminiModelMissingError(err) ||
+      isGeminiOverloadedError(err)
+    ) {
+      throw err
+    }
     console.warn(`[${label}] Gemini (${keyLabel}) first attempt failed; retrying without thinking:`, err)
   }
   return generateWithGeminiOnce(opts, apiKey, model, 'off', retryMax)
@@ -248,8 +263,8 @@ async function generateWithGeminiModel(opts: GenerateTextOptions, model: string)
       return await generateWithGeminiKey(opts, keys[i], i, model)
     } catch (err) {
       lastErr = err
-      // A missing model is missing for every key.
-      if (isGeminiModelMissingError(err)) throw err
+      // A missing or overloaded model is the same for every key.
+      if (isGeminiModelMissingError(err) || isGeminiOverloadedError(err)) throw err
       const canRotate =
         i < keys.length - 1 && (isGeminiQuotaError(err) || isGeminiInvalidKeyError(err))
       if (canRotate) {
@@ -278,11 +293,11 @@ async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
       return await generateWithGeminiModel(opts, model)
     } catch (err) {
       lastErr = err
-      if (isGeminiQuotaError(err) || isGeminiModelMissingError(err)) {
-        exhaustedGeminiModels.set(model, Date.now())
-        console.warn(
-          `[${label}] ${model} ${isGeminiModelMissingError(err) ? 'unavailable' : 'quota exhausted'}; trying next model`,
-        )
+      const busy = isGeminiOverloadedError(err)
+      if (isGeminiQuotaError(err) || isGeminiModelMissingError(err) || busy) {
+        exhaustedGeminiModels.set(model, Date.now() + (busy ? BUSY_MODEL_TTL_MS : EXHAUSTED_MODEL_TTL_MS))
+        const why = busy ? 'overloaded' : isGeminiModelMissingError(err) ? 'unavailable' : 'quota exhausted'
+        console.warn(`[${label}] ${model} ${why}; trying next model`)
         continue
       }
       throw err

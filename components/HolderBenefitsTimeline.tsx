@@ -78,7 +78,10 @@ export default function HolderBenefitsTimeline({ benefits, gradeMoves, burn }: P
       )}
 
       <section>
-        <h2 style={sectionLabel}>Recent holder-economics grade moves</h2>
+        <h2 style={{ ...sectionLabel, marginBottom: '4px' }}>Recent holder-economics grade moves</h2>
+        <p style={{ margin: '0 0 10px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          When our grade caught up to a change in a burn or lock project. The date is the rescore, not the launch.
+        </p>
         {gradeMoves.length === 0 ? (
           <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
             No burn or supply-lock project changed its holder-economics grade in the last 90 days.
@@ -89,7 +92,7 @@ export default function HolderBenefitsTimeline({ benefits, gradeMoves, burn }: P
               <div key={m.slug} style={card}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', alignItems: 'baseline', marginBottom: '6px' }}>
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                    {formatDate(m.rescoreAt)}
+                    Rescored {formatDate(m.rescoreAt)}
                   </span>
                   <span style={{ fontSize: '14px', fontWeight: 600 }}>{m.name}</span>
                   <span

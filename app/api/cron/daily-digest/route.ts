@@ -54,6 +54,16 @@ export async function GET(req: NextRequest) {
 
     const digest = await generateAndCacheDailyDigest(stats, repos, editionKey)
 
+    // Homepage first: external desks can run long enough to hit the 300s limit.
+    const needle = await generateAndCacheNeedle({
+      dateKey: editionKey,
+      force: true,
+      activity,
+    }).catch(err => {
+      console.error('[daily-digest] needle generation failed', err)
+      return null
+    })
+
     const external = await generateAllExternalDigests({
       dateKey: editionKey,
       recheckQuiet: false,
@@ -70,15 +80,6 @@ export async function GET(req: NextRequest) {
       deadlineMs: startedAt + 250_000,
     }).catch(err => {
       console.error('[daily-digest] daily-loop heal failed', err)
-      return null
-    })
-
-    const needle = await generateAndCacheNeedle({
-      dateKey: editionKey,
-      force: true,
-      activity,
-    }).catch(err => {
-      console.error('[daily-digest] needle generation failed', err)
       return null
     })
 
