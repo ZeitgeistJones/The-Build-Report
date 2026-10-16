@@ -27,6 +27,41 @@ const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash'
 const RETIRED_GEMINI_MODELS = ['gemini-2.5-flash', 'models/gemini-2.5-flash']
 const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001'
 
+/**
+ * Free-tier quota is per Google project *per model* (~20 requests/day each), and all
+ * GEMINI_API_KEY_* values may share one project. Walking several models multiplies the
+ * daily budget; one exhausted model must not push the homepage onto template copy.
+ * Override with GEMINI_FALLBACK_MODELS (comma-separated).
+ */
+const DEFAULT_GEMINI_FALLBACK_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.5-flash',
+  'gemini-3-flash-preview',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-lite-latest',
+]
+
+/** Skip models that already returned 429/404 in this warm instance instead of re-hitting them per call. */
+const EXHAUSTED_MODEL_TTL_MS = 30 * 60 * 1000
+const exhaustedGeminiModels = new Map<string, number>()
+
+function isModelExhausted(model: string): boolean {
+  const at = exhaustedGeminiModels.get(model)
+  if (at == null) return false
+  if (Date.now() - at > EXHAUSTED_MODEL_TTL_MS) {
+    exhaustedGeminiModels.delete(model)
+    return false
+  }
+  return true
+}
+
+function isGeminiModelMissingError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.includes('"code":404') || message.includes('NOT_FOUND') || message.includes('no longer available')
+}
+
 function isGeminiQuotaError(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err)
   return (
@@ -94,6 +129,18 @@ function geminiModel(): string {
   return requested
 }
 
+/** Primary model first, then fallbacks with their own free-tier buckets (deduped). */
+function geminiModelChain(): string[] {
+  const fromEnv = process.env.GEMINI_FALLBACK_MODELS?.split(',').map(s => s.trim().replace(/^models\//, '')) ?? []
+  const fallbacks = fromEnv.filter(Boolean).length ? fromEnv.filter(Boolean) : DEFAULT_GEMINI_FALLBACK_MODELS
+  const chain: string[] = []
+  for (const model of [geminiModel(), ...fallbacks]) {
+    if (!model || RETIRED_GEMINI_MODELS.includes(model) || chain.includes(model)) continue
+    chain.push(model)
+  }
+  return chain
+}
+
 function anthropicModel(): string {
   return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_ANTHROPIC_MODEL
 }
@@ -139,10 +186,10 @@ function extractGeminiText(response: {
 async function generateWithGeminiOnce(
   opts: GenerateTextOptions,
   apiKey: string,
+  model: string,
   thinking: 'auto' | 'off',
   maxTokens?: number,
 ): Promise<string> {
-  const model = geminiModel()
   const thinkingConfig = thinkingConfigFor(model, thinking)
   const ai = new GoogleGenAI({ apiKey })
   const response = await ai.models.generateContent({
@@ -171,46 +218,70 @@ async function generateWithGeminiKey(
   opts: GenerateTextOptions,
   apiKey: string,
   keyIndex: number,
+  model: string,
 ): Promise<string> {
   const label = opts.label ?? 'gemini'
-  const keyLabel = keyIndex === 0 ? 'primary' : `backup#${keyIndex}`
+  const keyLabel = `${model} ${keyIndex === 0 ? 'primary' : `backup#${keyIndex}`}`
   const firstMax = opts.maxTokens
   const retryMax = Math.min(Math.max(opts.maxTokens ?? 2048, 8192), 16384)
   const accept = (text: string) => !opts.usable || opts.usable(text)
 
   try {
-    const text = await generateWithGeminiOnce(opts, apiKey, 'auto', firstMax)
+    const text = await generateWithGeminiOnce(opts, apiKey, model, 'auto', firstMax)
     if (accept(text)) return text
     console.warn(`[${label}] Gemini (${keyLabel}) output unusable; retrying without thinking`)
   } catch (err) {
-    // Don't burn a second attempt on a dead key — let the rotator advance.
-    if (isGeminiQuotaError(err) || isGeminiInvalidKeyError(err)) throw err
-    const message = err instanceof Error ? err.message : String(err)
-    if (message.includes('"code":404') || message.includes('NOT_FOUND') || message.includes('no longer available')) {
-      throw err
-    }
+    // Don't burn a second attempt on a dead key/model — let the rotator advance.
+    if (isGeminiQuotaError(err) || isGeminiInvalidKeyError(err) || isGeminiModelMissingError(err)) throw err
     console.warn(`[${label}] Gemini (${keyLabel}) first attempt failed; retrying without thinking:`, err)
   }
-  return generateWithGeminiOnce(opts, apiKey, 'off', retryMax)
+  return generateWithGeminiOnce(opts, apiKey, model, 'off', retryMax)
 }
 
-async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
+/** Rotate keys for one model. Throws the last error when every key fails. */
+async function generateWithGeminiModel(opts: GenerateTextOptions, model: string): Promise<string> {
   const label = opts.label ?? 'gemini'
   const keys = geminiApiKeys()
-  if (!keys.length) throw new Error('GEMINI_API_KEY is not set')
-
   let lastErr: unknown
   for (let i = 0; i < keys.length; i++) {
     try {
-      return await generateWithGeminiKey(opts, keys[i], i)
+      return await generateWithGeminiKey(opts, keys[i], i, model)
     } catch (err) {
       lastErr = err
+      // A missing model is missing for every key.
+      if (isGeminiModelMissingError(err)) throw err
       const canRotate =
         i < keys.length - 1 && (isGeminiQuotaError(err) || isGeminiInvalidKeyError(err))
       if (canRotate) {
         const why = isGeminiInvalidKeyError(err) ? 'invalid' : 'quota exhausted'
+        console.warn(`[${label}] ${model} key ${i === 0 ? 'primary' : `backup#${i}`} ${why}; trying next key`)
+        continue
+      }
+      throw err
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
+}
+
+async function generateWithGemini(opts: GenerateTextOptions): Promise<string> {
+  const label = opts.label ?? 'gemini'
+  if (!geminiApiKeys().length) throw new Error('GEMINI_API_KEY is not set')
+
+  const chain = geminiModelChain()
+  const ready = chain.filter(m => !isModelExhausted(m))
+  // Every model hit quota recently — retry the chain anyway rather than fail without trying.
+  const models = ready.length ? ready : chain
+
+  let lastErr: unknown
+  for (const model of models) {
+    try {
+      return await generateWithGeminiModel(opts, model)
+    } catch (err) {
+      lastErr = err
+      if (isGeminiQuotaError(err) || isGeminiModelMissingError(err)) {
+        exhaustedGeminiModels.set(model, Date.now())
         console.warn(
-          `[${label}] Gemini key ${i === 0 ? 'primary' : `backup#${i}`} ${why}; trying next key`,
+          `[${label}] ${model} ${isGeminiModelMissingError(err) ? 'unavailable' : 'quota exhausted'}; trying next model`,
         )
         continue
       }

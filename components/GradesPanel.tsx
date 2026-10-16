@@ -274,6 +274,9 @@ function GradeCard({
   isMobile: boolean
 }) {
   const canShowTrend = Boolean(trendExplanation && period !== '60d')
+  // Mobile 2×2 grid: clamp the paragraph so four cards fit on roughly one screen.
+  const [copyOpen, setCopyOpen] = useState(false)
+  const clampCopy = isMobile && !copyOpen
 
   return (
     <div
@@ -281,7 +284,8 @@ function GradeCard({
         background: isSelected || isRubricSelected ? 'var(--surface-2)' : 'var(--surface-1)',
         border: `1px solid ${isSelected || isRubricSelected ? 'var(--accent-border)' : 'var(--border)'}`,
         borderRadius: 'var(--radius-lg)',
-        padding: '16px',
+        padding: isMobile ? '12px' : '16px',
+        minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100%',
@@ -289,14 +293,14 @@ function GradeCard({
         transition: 'border-color 0.15s ease, background 0.15s ease',
       }}
     >
-      <div style={{ marginBottom: '10px' }}>
+      <div style={{ marginBottom: isMobile ? '6px' : '10px' }}>
         <div
           style={{
-            fontSize: '11px',
+            fontSize: isMobile ? '10px' : '11px',
             color: 'var(--text-muted)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
-            marginBottom: '6px',
+            marginBottom: isMobile ? '4px' : '6px',
           }}
         >
           {label}
@@ -306,14 +310,14 @@ function GradeCard({
           style={{
             display: 'flex',
             alignItems: 'baseline',
-            gap: '8px',
+            gap: isMobile ? '4px 6px' : '8px',
             marginBottom: '4px',
             flexWrap: isMobile ? 'wrap' : 'nowrap',
           }}
         >
           <span
             style={{
-              fontSize: '36px',
+              fontSize: isMobile ? '28px' : '36px',
               lineHeight: 1,
               fontWeight: 600,
               fontFamily: 'var(--font-mono)',
@@ -326,7 +330,7 @@ function GradeCard({
           {grade && (
             <span
               style={{
-                fontSize: '18px',
+                fontSize: isMobile ? '15px' : '18px',
                 fontWeight: 500,
                 fontFamily: 'var(--font-mono)',
                 color: 'var(--text-secondary)',
@@ -342,9 +346,10 @@ function GradeCard({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
-                fontSize: '11px',
+                fontSize: isMobile ? '10px' : '11px',
                 color: 'var(--text-muted)',
                 fontFamily: 'var(--font-mono)',
+                ...(isMobile ? { flexBasis: '100%' } : {}),
               }}
             >
               <TrendArrow trend={grade.trend} />
@@ -356,48 +361,83 @@ function GradeCard({
 
       <p
         style={{
-          fontSize: '13px',
+          fontSize: isMobile ? '12px' : '13px',
           color: 'var(--text-secondary)',
-          lineHeight: 1.6,
-          margin: '0 0 12px',
+          lineHeight: isMobile ? 1.45 : 1.6,
+          margin: isMobile ? '0 0 4px' : '0 0 12px',
           flexGrow: 1,
+          ...(clampCopy
+            ? {
+                display: '-webkit-box',
+                WebkitLineClamp: 4,
+                WebkitBoxOrient: 'vertical' as const,
+                overflow: 'hidden',
+              }
+            : {}),
         }}
       >
         {laymanCopy}
       </p>
+      {isMobile && (
+        <button
+          type="button"
+          onClick={() => setCopyOpen(o => !o)}
+          aria-expanded={copyOpen}
+          style={{
+            alignSelf: 'flex-start',
+            fontSize: '11px',
+            color: 'var(--text-muted)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '2px 0 6px',
+          }}
+        >
+          {copyOpen ? 'Less ▴' : 'More ▾'}
+        </button>
+      )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: isMobile ? '0 10px' : '8px 14px',
+          marginTop: 'auto',
+          paddingTop: isMobile ? '6px' : '10px',
+          borderTop: '1px solid var(--border)',
+        }}
+      >
         {canShowTrend && (
           <button
             type="button"
             onClick={() => onSelectTrend(isSelected ? null : cardId)}
             style={{
-              fontSize: '12px',
+              fontSize: isMobile ? '11px' : '12px',
               color: 'var(--accent)',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
               textAlign: 'left',
-              padding: '8px 0 0',
+              padding: isMobile ? '6px 0 0' : '8px 0 0',
             }}
           >
-            {isSelected ? 'Close ✕' : 'Why this trend? →'}
+            {isSelected ? 'Close ✕' : isMobile ? 'Why? →' : 'Why this trend? →'}
           </button>
         )}
         <button
           type="button"
           onClick={() => onSelectRubric(isRubricSelected ? null : cardId)}
           style={{
-            fontSize: '12px',
+            fontSize: isMobile ? '11px' : '12px',
             color: 'var(--accent)',
             background: 'none',
             border: 'none',
             cursor: 'pointer',
             textAlign: 'left',
-            padding: '8px 0 0',
+            padding: isMobile ? '6px 0 0' : '8px 0 0',
           }}
         >
-          {isRubricSelected ? 'Close breakdown ✕' : 'Grade breakdown →'}
+          {isRubricSelected ? (isMobile ? 'Close ✕' : 'Close breakdown ✕') : isMobile ? 'Breakdown →' : 'Grade breakdown →'}
         </button>
       </div>
     </div>
@@ -662,8 +702,8 @@ export default function GradesPanel({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, minmax(0, 1fr))',
-          gap: isMobile ? '10px' : '12px',
+          gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(4, minmax(0, 1fr))',
+          gap: isMobile ? '8px' : '12px',
           alignItems: 'stretch',
         }}
       >
@@ -726,6 +766,7 @@ export default function GradesPanel({
         {isMobile && (
           <div
             style={{
+              gridColumn: '1 / -1',
               display: 'flex',
               alignItems: 'center',
               gap: '10px',
