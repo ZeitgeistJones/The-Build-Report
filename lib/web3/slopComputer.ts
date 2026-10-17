@@ -118,7 +118,10 @@ export async function fetchAllEpisodes(maxAmount = 200): Promise<SlopEpisode[]> 
   }))
 }
 
+// slop.computer's own gateway first: the public ipfs.io / dweb.link gateways now
+// 429 every request ("switching to a service worker gateway only").
 const IPFS_GATEWAYS = [
+  'https://media.slop.computer/ipfs/',
   'https://dweb.link/ipfs/',
   'https://gateway.pinata.cloud/ipfs/',
   'https://ipfs.io/ipfs/',

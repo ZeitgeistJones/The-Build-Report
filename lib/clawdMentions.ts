@@ -7,7 +7,7 @@
  * source's own search window. Collected by /api/cron/clawd-mentions once a day.
  */
 import { getRedis } from '@/lib/redis'
-import { fetchAllEpisodes, episodePublicUrl } from '@/lib/web3/slopComputer'
+import { fetchAllEpisodes, episodePublicUrl, fetchIpfsText } from '@/lib/web3/slopComputer'
 import { extractTranscriptUri, fetchJsonFromIpfs, fetchTranscriptLines } from '@/lib/podcastMentions'
 
 export type ClawdMentionSource = 'farcaster' | 'bluesky' | 'hackernews' | 'github' | 'podcast'
@@ -42,6 +42,11 @@ const MAX_TEXT = 400
  * the cashtag and project-specific names count as a mention.
  */
 const MENTION_RE = /\$clawd\b|clawdbotatg|larv\.ai|clawdviction/i
+/**
+ * slop.computer is clawdbotatg's own show, where bare "clawd" means the bot/token —
+ * and speech-to-text never writes the "$", so the strict pattern would miss spoken mentions.
+ */
+const PODCAST_MENTION_RE = /\$clawd\b|\bclawd\b|clawdbotatg|larv\.ai|clawdviction/i
 const SEARCH_TERMS = ['$CLAWD', 'clawdbotatg', 'larv.ai', 'clawdviction']
 const UA = { 'User-Agent': 'TheBuildReport/1.0 (+https://the-build-report.vercel.app)' }
 
@@ -223,6 +228,51 @@ async function collectGitHub(): Promise<ClawdMention[]> {
 const MAX_LINES_PER_EPISODE = 6
 const podcastProgress = { scanned: 0, total: 0 }
 
+interface EpisodeLine {
+  ts: number
+  address: string | null
+  handle: string | null
+  text: string
+}
+
+/** Live chat log (JSONL, same shape as the transcript). Skips system lines like music changes. */
+async function fetchChatLines(chatCid: string): Promise<EpisodeLine[]> {
+  const text = await fetchIpfsText(chatCid.startsWith('ipfs://') ? chatCid : `ipfs://${chatCid}`, 15_000)
+  if (!text) return []
+  const lines: EpisodeLine[] = []
+  for (const raw of text.split('\n')) {
+    if (!raw.trim()) continue
+    try {
+      const obj = JSON.parse(raw) as { ts?: unknown; address?: unknown; handle?: unknown; text?: unknown; kind?: unknown }
+      if (obj.kind === 'system' || typeof obj.text !== 'string' || typeof obj.ts !== 'number') continue
+      lines.push({
+        ts: obj.ts,
+        address: typeof obj.address === 'string' ? obj.address : null,
+        handle: typeof obj.handle === 'string' ? obj.handle : null,
+        text: obj.text,
+      })
+    } catch {
+      // skip malformed line
+    }
+  }
+  return lines
+}
+
+function chatCidFromManifest(manifest: Record<string, unknown>): string | null {
+  const chat = manifest.chat
+  if (typeof chat === 'string' && chat) return chat
+  if (chat && typeof chat === 'object' && typeof (chat as { cid?: unknown }).cid === 'string') {
+    return (chat as { cid: string }).cid
+  }
+  return null
+}
+
+function speakerLabel(l: EpisodeLine): string {
+  if (l.handle) return l.handle
+  if (l.address) return `${l.address.slice(0, 6)}…${l.address.slice(-4)}`
+  return 'anon'
+}
+
 async function collectPodcasts(deadlineMs: number): Promise<ClawdMention[]> {
   const redis = getRedis()
   const episodes = await fetchAllEpisodes()
@@ -235,21 +285,30 @@ async function collectPodcasts(deadlineMs: number): Promise<ClawdMention[]> {
     if (Date.now() > deadlineMs) break
     if (scanned.has(ep.id) || !ep.manifest) continue
     const manifest = await fetchJsonFromIpfs<Record<string, unknown>>(ep.manifest)
-    const transcriptUri = manifest ? extractTranscriptUri(manifest) : null
-    const lines = transcriptUri ? await fetchTranscriptLines(transcriptUri) : []
-    // Transcript not pinned yet — retry on a later run instead of marking it scanned.
-    if (!lines.length) continue
+    if (!manifest) continue
+    const transcriptUri = extractTranscriptUri(manifest)
+    const chatCid = chatCidFromManifest(manifest)
+    const [spoken, chat] = await Promise.all([
+      transcriptUri ? fetchTranscriptLines(transcriptUri) : Promise.resolve([]),
+      chatCid ? fetchChatLines(chatCid) : Promise.resolve([]),
+    ])
+    // Files not reachable yet — retry on a later run instead of marking it scanned.
+    if (!spoken.length && !chat.length) continue
 
-    const hits = lines.filter(l => MENTION_RE.test(l.text)).slice(0, MAX_LINES_PER_EPISODE)
-    for (const l of hits) {
+    const tagged: [EpisodeLine, 'said' | 'chat'][] = [
+      ...spoken.map(l => [l, 'said'] as [EpisodeLine, 'said']),
+      ...chat.map(l => [l, 'chat'] as [EpisodeLine, 'chat']),
+    ]
+    const hits = tagged.filter(([l]) => PODCAST_MENTION_RE.test(l.text)).slice(0, MAX_LINES_PER_EPISODE)
+    for (const [l, kind] of hits) {
       out.push({
-        id: `podcast:${ep.id}:${l.ts}`,
+        id: `podcast:${ep.id}:${kind}:${l.ts}`,
         source: 'podcast',
-        author: l.handle ?? `${l.address.slice(0, 6)}…${l.address.slice(-4)}`,
+        author: speakerLabel(l),
         text: clip(l.text),
         url: episodePublicUrl(ep.slug),
         at: new Date(Number.isFinite(l.ts) ? l.ts : Number(ep.datetime) * 1000).toISOString(),
-        context: ep.name,
+        context: `${ep.name} · ${kind === 'said' ? 'said on air' : 'live chat'}`,
       })
     }
     await redis.sadd(PODCAST_SCANNED_KEY, ep.id)
