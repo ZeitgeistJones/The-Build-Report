@@ -28,6 +28,8 @@ export interface ClawdMentionCollectResult {
   added: Record<ClawdMentionSource, number>
   errors: string[]
   total: number
+  podcastEpisodesScanned: number
+  podcastEpisodesTotal: number
 }
 
 const MENTIONS_KEY = 'build-report:clawd-mentions'
@@ -188,10 +190,11 @@ async function collectGitHub(): Promise<ClawdMention[]> {
   const token = process.env.GITHUB_TOKEN?.trim()
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
   if (token) headers.Authorization = `Bearer ${token}`
+  // No "$CLAWD" query: GitHub search drops the "$" and matches thousands of Claude "Clawd" mascot repos.
   const queries = [
     'clawdbotatg in:name,description,readme -user:clawdbotatg',
     '"larv.ai" in:readme,description -user:clawdbotatg',
-    '"$CLAWD" in:readme,description -user:clawdbotatg',
+    'clawdviction in:name,description,readme -user:clawdbotatg',
   ]
   const out: ClawdMention[] = []
   for (const q of queries) {
@@ -218,12 +221,15 @@ async function collectGitHub(): Promise<ClawdMention[]> {
 // ── slop.computer podcasts ─────────────────────────────────────────
 
 const MAX_LINES_PER_EPISODE = 6
+const podcastProgress = { scanned: 0, total: 0 }
 
 async function collectPodcasts(deadlineMs: number): Promise<ClawdMention[]> {
   const redis = getRedis()
   const episodes = await fetchAllEpisodes()
   const scanned = new Set((await redis.smembers<string[]>(PODCAST_SCANNED_KEY).catch(() => [])) ?? [])
   const out: ClawdMention[] = []
+  podcastProgress.total = episodes.length
+  podcastProgress.scanned = scanned.size
 
   for (const ep of episodes) {
     if (Date.now() > deadlineMs) break
@@ -247,6 +253,7 @@ async function collectPodcasts(deadlineMs: number): Promise<ClawdMention[]> {
       })
     }
     await redis.sadd(PODCAST_SCANNED_KEY, ep.id)
+    podcastProgress.scanned++
   }
   return out
 }
@@ -302,6 +309,15 @@ export async function collectClawdMentions(opts: { deadlineMs: number }): Promis
   for (const [source, run] of runs) {
     try {
       const found = await run()
+      // GitHub is a current list of repos, not a post stream — drop repos that no longer match.
+      if (source === 'github') {
+        const keep = new Set(found.map(m => m.id))
+        const stale = [...existingIds].filter(id => id.startsWith('github:') && !keep.has(id))
+        if (stale.length) {
+          await redis.hdel(MENTIONS_KEY, ...stale)
+          for (const id of stale) existingIds.delete(id)
+        }
+      }
       const fresh: Record<string, ClawdMention> = {}
       for (const m of found) {
         if (existingIds.has(m.id) || fresh[m.id]) continue
@@ -321,5 +337,11 @@ export async function collectClawdMentions(opts: { deadlineMs: number }): Promis
   }
 
   await pruneOldest().catch(err => console.error('[clawd-mentions] prune failed', err))
-  return { added, errors, total: existingIds.size }
+  return {
+    added,
+    errors,
+    total: existingIds.size,
+    podcastEpisodesScanned: podcastProgress.scanned,
+    podcastEpisodesTotal: podcastProgress.total,
+  }
 }
