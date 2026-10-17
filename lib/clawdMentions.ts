@@ -33,7 +33,10 @@ export interface ClawdMentionCollectResult {
 }
 
 const MENTIONS_KEY = 'build-report:clawd-mentions'
-const PODCAST_SCANNED_KEY = 'build-report:clawd-mentions:podcast-scanned'
+/** v2: rescan after filtering room-event lines; legacy "podcast:" ids are dropped on the next run. */
+const PODCAST_SCANNED_KEY = 'build-report:clawd-mentions:podcast-scanned-v2'
+const PODCAST_ID_PREFIX = 'podcast2:'
+const LEGACY_PODCAST_ID_PREFIX = 'podcast:'
 const MAX_STORED = 3000
 const MAX_TEXT = 400
 
@@ -213,7 +216,7 @@ async function collectGitHub(): Promise<ClawdMention[]> {
         id: `github:${r.full_name.toLowerCase()}`,
         source: 'github',
         author: r.owner?.login ?? r.full_name.split('/')[0],
-        text: clip(r.description || 'Repository referencing clawdbotatg / $CLAWD'),
+        text: clip(r.description || 'No description. The repo mentions clawdbotatg, larv.ai, or clawdviction.'),
         url: r.html_url,
         at: new Date(r.created_at).toISOString(),
         context: r.full_name,
@@ -267,6 +270,14 @@ function chatCidFromManifest(manifest: Record<string, unknown>): string | null {
   return null
 }
 
+/** Room events logged into transcripts ("🔳 clawdbotatg.eth set the room QR code", "paused the music"). */
+function isRoomEvent(text: string): boolean {
+  return (
+    /^[^\p{L}\p{N}]*\S+\.eth\s+(set|paused|played|switched|started|stopped|resumed|changed|skipped|cleared)\b/iu.test(text) ||
+    /set the room QR code|the music\b/i.test(text)
+  )
+}
+
 function speakerLabel(l: EpisodeLine): string {
   if (l.handle) return l.handle
   if (l.address) return `${l.address.slice(0, 6)}…${l.address.slice(-4)}`
@@ -299,10 +310,19 @@ async function collectPodcasts(deadlineMs: number): Promise<ClawdMention[]> {
       ...spoken.map(l => [l, 'said'] as [EpisodeLine, 'said']),
       ...chat.map(l => [l, 'chat'] as [EpisodeLine, 'chat']),
     ]
-    const hits = tagged.filter(([l]) => PODCAST_MENTION_RE.test(l.text)).slice(0, MAX_LINES_PER_EPISODE)
+    const seenText = new Set<string>()
+    const hits = tagged
+      .filter(([l]) => {
+        if (!PODCAST_MENTION_RE.test(l.text) || isRoomEvent(l.text)) return false
+        const norm = l.text.toLowerCase().replace(/\s+/g, ' ').trim()
+        if (seenText.has(norm)) return false
+        seenText.add(norm)
+        return true
+      })
+      .slice(0, MAX_LINES_PER_EPISODE)
     for (const [l, kind] of hits) {
       out.push({
-        id: `podcast:${ep.id}:${kind}:${l.ts}`,
+        id: `${PODCAST_ID_PREFIX}${ep.id}:${kind}:${l.ts}`,
         source: 'podcast',
         author: speakerLabel(l),
         text: clip(l.text),
@@ -345,6 +365,11 @@ async function pruneOldest(): Promise<void> {
 export async function collectClawdMentions(opts: { deadlineMs: number }): Promise<ClawdMentionCollectResult> {
   const redis = getRedis()
   const existingIds = new Set((await redis.hkeys(MENTIONS_KEY).catch(() => [])) ?? [])
+  const legacyPodcast = [...existingIds].filter(id => id.startsWith(LEGACY_PODCAST_ID_PREFIX))
+  if (legacyPodcast.length) {
+    await redis.hdel(MENTIONS_KEY, ...legacyPodcast)
+    for (const id of legacyPodcast) existingIds.delete(id)
+  }
   // First run walks deeper into Farcaster history; daily runs only need the newest pages.
   const farcasterPages = existingIds.size === 0 ? 10 : 2
 

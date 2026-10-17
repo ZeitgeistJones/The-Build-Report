@@ -29,6 +29,10 @@ export default async function ClawdMentionsPage() {
         people&apos;s GitHub repos, and slop.computer podcasts. Updated daily. X/Twitter isn&apos;t included — its search
         API is paid.
       </p>
+      <p style={{ margin: '-14px 0 24px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        Heads up: copycat tokens also called $CLAWD launched during the January Clawdbot hype, so a few cashtag posts
+        may be about those, not clawdbotatg&apos;s $CLAWD on Base.
+      </p>
 
       <ClawdMentionsFeed mentions={mentions} />
     </>
