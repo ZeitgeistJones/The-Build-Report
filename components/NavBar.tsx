@@ -22,6 +22,9 @@ function DesktopNavLinks() {
       <a href="/benefits" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Holder Benefits
       </a>
+      <a href="/mentions" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+        Mentions
+      </a>
       <a href="/sky" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
         Night Sky
       </a>
@@ -80,6 +83,9 @@ function MobileNavMenu({ open, onClose }: { open: boolean; onClose: () => void }
         </a>
         <a href="/benefits" className="mobile-nav-link" onClick={onClose}>
           Holder Benefits
+        </a>
+        <a href="/mentions" className="mobile-nav-link" onClick={onClose}>
+          $CLAWD Mentions
         </a>
         <a href="/sky" className="mobile-nav-link" onClick={onClose}>
           Night Sky

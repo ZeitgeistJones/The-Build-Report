@@ -197,7 +197,7 @@ async function populatePendingWriteup(id: string): Promise<boolean> {
   }
 }
 
-type TranscriptLine = {
+export type TranscriptLine = {
   ts: number
   address: string
   handle: string | null
@@ -369,7 +369,7 @@ function findMentionCandidates(
   return out
 }
 
-async function fetchJsonFromIpfs<T>(ipfsUri: string): Promise<T | null> {
+export async function fetchJsonFromIpfs<T>(ipfsUri: string): Promise<T | null> {
   try {
     const text = await fetchIpfsText(ipfsUri, 15_000)
     if (!text) return null
@@ -379,7 +379,7 @@ async function fetchJsonFromIpfs<T>(ipfsUri: string): Promise<T | null> {
   }
 }
 
-async function fetchTranscriptLines(transcriptUri: string): Promise<TranscriptLine[]> {
+export async function fetchTranscriptLines(transcriptUri: string): Promise<TranscriptLine[]> {
   try {
     const text = await fetchIpfsText(transcriptUri, 20_000)
     if (!text) return []
@@ -412,7 +412,7 @@ async function fetchTranscriptLines(transcriptUri: string): Promise<TranscriptLi
  * Slop.Computer manifests store transcript as `{ cid, segmentCount }` (confirmed
  * via IPFS probe). Also accept legacy string / alternate key shapes.
  */
-function extractTranscriptUri(manifest: Record<string, unknown>): string | null {
+export function extractTranscriptUri(manifest: Record<string, unknown>): string | null {
   const candidates = ['transcript', 'transcriptCid', 'transcriptUri', 'transcript_cid']
   for (const key of candidates) {
     const val = manifest[key]
