@@ -273,7 +273,7 @@ function chatCidFromManifest(manifest: Record<string, unknown>): string | null {
 /** Room events logged into transcripts ("🔳 clawdbotatg.eth set the room QR code", "paused the music"). */
 function isRoomEvent(text: string): boolean {
   return (
-    /^[^\p{L}\p{N}]*\S+\.eth\s+(set|paused|played|switched|started|stopped|resumed|changed|skipped|cleared)\b/iu.test(text) ||
+    /^[^A-Za-z0-9]*\S+\.eth\s+(set|paused|played|switched|started|stopped|resumed|changed|skipped|cleared)\b/i.test(text) ||
     /set the room QR code|the music\b/i.test(text)
   )
 }
